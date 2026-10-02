@@ -80,6 +80,11 @@ html, body {
 .t-energy { grid-column: 2 / span 2; grid-row: 2 / span 2; font-size: 15px; --c: 92, 204, 255; }
 .t-missile { grid-column: 1; grid-row: 2; --c: 255, 120, 70; }
 .t-ballistic { grid-column: 1; grid-row: 3; --c: 255, 204, 51; }
+.t-fusion { --c: 200, 128, 255; }
+.tzoom {
+  position: absolute; left: calc(64px + env(safe-area-inset-left)); top: calc(10px + env(safe-area-inset-top));
+  width: 58px; height: 40px;
+}
 
 .tpause {
   position: absolute; left: calc(12px + env(safe-area-inset-left)); top: calc(10px + env(safe-area-inset-top));

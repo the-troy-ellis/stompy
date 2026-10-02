@@ -141,34 +141,49 @@
     // The autocannon is the opposite: big individual hits, little heat, ammo.
     ac:     { name: 'AUTOCANNON', kind: 'shell',  dmg: 11,  heat: 2,  cd: 1.1, range: 650, speed: 340, ammo: 30 },
     lrm:    { name: 'LRM-10',    kind: 'missile', dmg: 1.9, heat: 6,  cd: 4.5, range: 850, speed: 120, ammo: 14, count: 10 },
+    // Hold a targeting laser on one mech for `scan` seconds -- any break and it
+    // starts over -- and the reactor discharges at the target's resonant
+    // frequency: an outright kill. The price: heat jumps to `overload` (a
+    // deep shutdown, ~5 s) and the cannon needs `cd` seconds to recharge.
+    // Lock help, so it's hard but possible: the laser counts within `slack` m
+    // of a mech, a slip shorter than `grace` s pauses the scan rather than
+    // resetting it, and while locked the torso is drawn gently toward the
+    // target (`assist`, per second).
+    fusion: { name: 'FUSION CANNON', kind: 'fusion', scan: 3, cd: 25, overload: 140, range: 600, scanHeat: 2, col: [0.78, 0.5, 1],
+      slack: 1.5, grace: 0.5, assist: 2.2,
+      // Reactor feedback: firing costs this share of your own torso's max
+      // armour -- enough to kill you if it's already low. The discharge is a
+      // pulse of sine waves travelling the targeting beam at `pulseSpeed` m/s;
+      // the target dies when it arrives.
+      feedback: 0.35, pulseSpeed: 350 },
   };
 
   // Three fire controls, one per kind of weapon: lasers are energy (no ammo,
   // lots of heat), the autocannon is ballistic, LRMs are missiles.
-  const CATS = ['energy', 'ballistic', 'missile'];
-  const CAT_OF = { laser: 'energy', mlaser: 'energy', ac: 'ballistic', lrm: 'missile' };
-  const CAT_LABEL = { energy: 'ENERGY', ballistic: 'BALLISTIC', missile: 'MISSILE' };
-  const CAT_KEY = { energy: 'LMB 1', ballistic: 'RMB 2', missile: 'SPC 3' };
+  const CATS = ['energy', 'ballistic', 'missile', 'fusion'];
+  const CAT_OF = { laser: 'energy', mlaser: 'energy', ac: 'ballistic', lrm: 'missile', fusion: 'fusion' };
+  const CAT_LABEL = { energy: 'ENERGY', ballistic: 'BALLISTIC', missile: 'MISSILE', fusion: 'FUSION' };
+  const CAT_KEY = { energy: 'LMB 1', ballistic: 'RMB 2', missile: 'SPC 3', fusion: 'G 4' };
 
   // Hit points per section: T(orso), L/R A(rm), L/R L(eg). Losing the torso kills.
   const CHASSIS = {
-    kestrel: { name: 'KESTREL', speed: 15, turn: 1.05, sink: 10, scale: 1, pref: 300,
+    kestrel: { name: 'KESTREL', legs: 'reverse', speed: 15, turn: 1.05, sink: 10, scale: 1, pref: 300,
       hp: { T: 72, LA: 32, RA: 32, LL: 42, RL: 42 }, col: [0.55, 0.58, 0.62], acc: [0.85, 0.6, 0.15],
-      weapons: [['laser', 'LA'], ['laser', 'RA'], ['ac', 'T'], ['lrm', 'T']] },
-    jackal: { name: 'JACKAL', speed: 19, turn: 1.6, sink: 9, scale: 0.85, pref: 140, acc0: 0.035,
+      weapons: [['laser', 'LA'], ['laser', 'RA'], ['ac', 'T'], ['lrm', 'T'], ['fusion', 'T']] },
+    jackal: { name: 'JACKAL', legs: 'forward', speed: 19, turn: 1.6, sink: 9, scale: 0.85, pref: 140, acc0: 0.035,
       hp: { T: 30, LA: 13, RA: 13, LL: 18, RL: 18 }, col: [0.62, 0.26, 0.2], acc: [0.2, 0.2, 0.22],
-      weapons: [['mlaser', 'LA'], ['mlaser', 'RA']] },
-    warden: { name: 'WARDEN', speed: 9, turn: 0.7, sink: 10, scale: 1.15, pref: 330, acc0: 0.025,
+      weapons: [['mlaser', 'LA'], ['mlaser', 'RA'], ['fusion', 'T']] },
+    warden: { name: 'WARDEN', legs: 'quad', speed: 9, turn: 0.7, sink: 10, scale: 1.15, pref: 330, acc0: 0.025,
       hp: { T: 58, LA: 28, RA: 28, LL: 34, RL: 34 }, col: [0.36, 0.4, 0.3], acc: [0.75, 0.7, 0.2],
-      weapons: [['lrm', 'T'], ['ac', 'RA'], ['laser', 'LA']] },
+      weapons: [['lrm', 'T'], ['ac', 'RA'], ['laser', 'LA'], ['fusion', 'T']] },
   };
 
   // The selectable mechs, in selector order, with what the menu says about them.
   const MECH_ORDER = ['kestrel', 'jackal', 'warden'];
   const MECH_INFO = {
-    kestrel: { role: 'MEDIUM · ALL-ROUNDER', kit: '2x LG LASER · AUTOCANNON · LRM-10', fire: 0.75 },
-    jackal: { role: 'LIGHT · FAST, HARD TO HIT', kit: '2x MED LASER', fire: 0.35 },
-    warden: { role: 'HEAVY · FIRE SUPPORT', kit: 'LG LASER · AUTOCANNON · LRM-10', fire: 0.85 },
+    kestrel: { role: 'REVERSE-JOINT · MEDIUM ALL-ROUNDER', kit: '2x LG LASER · AUTOCANNON · LRM-10 · FUSION', fire: 0.75 },
+    jackal: { role: 'FORWARD-JOINT · LIGHT, FAST', kit: '2x MED LASER · FUSION', fire: 0.35 },
+    warden: { role: 'QUADRUPED · HEAVY FIRE SUPPORT', kit: 'LG LASER · AUTOCANNON · LRM-10 · FUSION', fire: 0.85 },
   };
 
   const PALS = {
@@ -284,13 +299,36 @@
     return b;
   }
 
+  // Body plans, by leg type. Lengths are model units (x chassis scale), and
+  // buildMechParts builds each type's leg meshes to match l1 / l2. Per leg:
+  // hip (hx, hz), rest foot (fx, fz) and its phase in the gait cycle; `swing`
+  // is the share of the cycle a foot spends in the air. +x is the mech's
+  // left, +z its front. `knee` is which way the joint bends.
+  const GEO = {
+    forward: { hip: 4.6, l1: 2.6, l2: 2.5, ankle: 0.42, knee: 'forward', swing: 0.42, stride: [3.5, 4.5],
+      radius: 2.4, height: 7.9, legTop: 4.4, torsoY: 5, eye: [0, 2.35, 1.9], armX: 2.25, armY: 2.0, rackY: 3.2, acY: 1.6,
+      legs: [{ hx: 0.95, hz: 0, fx: 1.1, fz: 0, ph: 0 }, { hx: -0.95, hz: 0, fx: -1.1, fz: 0, ph: 0.5 }] },
+    // Bird-like: the joint points backward, feet are three-toed claws.
+    reverse: { hip: 4.9, l1: 2.7, l2: 2.9, ankle: 0.5, knee: 'back', swing: 0.42, stride: [3.5, 4.5],
+      radius: 2.4, height: 8.6, legTop: 4.7, torsoY: 5.3, eye: [0, 2.6, 1.5], armX: 2.3, armY: 2.0, rackY: 3.3, acY: 1.6,
+      legs: [{ hx: 1.0, hz: 0.1, fx: 1.15, fz: 0.45, ph: 0 }, { hx: -1.0, hz: 0.1, fx: -1.15, fz: 0.45, ph: 0.5 }] },
+    // Four legs bowed out like a spider's, trotting: diagonal pairs together.
+    quad: { hip: 3.4, l1: 2.4, l2: 2.9, ankle: 0.35, knee: 'out', swing: 0.42, stride: [3.0, 3.6],
+      radius: 3.1, height: 6.6, legTop: 3.3, torsoY: 4.0, eye: [0, 1.6, 1.4], armX: 1.9, armY: 1.2, rackY: 2.1, acY: 0.9,
+      legs: [{ hx: 1.4, hz: 1.6, fx: 2.9, fz: 2.3, ph: 0 }, { hx: -1.4, hz: -1.6, fx: -2.9, fz: -2.2, ph: 0 },
+             { hx: -1.4, hz: 1.6, fx: -2.9, fz: 2.3, ph: 0.5 }, { hx: 1.4, hz: -1.6, fx: 2.9, fz: -2.2, ph: 0.5 }] },
+  };
+  const geoOf = m => GEO[m.ch.legs] || GEO.forward;
+
   function buildMechParts(ch) {
+    if (ch.legs === 'reverse') return buildReverseParts(ch);
+    if (ch.legs === 'quad') return buildQuadParts(ch);
     const c = ch.col, dark = mul(c, 0.55), acc = ch.acc, glass = [0.08, 0.1, 0.13];
     const part = f => { const b = new Builder(); f(b); return b; };
     return {
       hip: part(b => b.cube(M.S(2.6, 0.9, 1.6), dark)),
       // Upper leg runs 2.6 down -y from the hip, lower leg 2.5 down from the knee
-      // (LEG.l1 / LEG.l2): the IK in drawMech depends on these lengths.
+      // (GEO.forward.l1 / l2): the IK in drawMech depends on these lengths.
       uleg: part(b => { b.cube(chain(M.T(0, -1.3, 0), M.S(0.95, 2.8, 1.25)), c, 0.85, 0.9); b.cube(chain(M.T(0, -2.6, 0.25), M.S(1.05, 0.75, 1)), dark); }),
       lleg: part(b => { b.cube(chain(M.T(0, -1.25, -0.1), M.S(0.8, 2.5, 1.05)), c); b.cube(chain(M.T(0, -1.1, -0.65), M.S(0.3, 1.8, 0.3)), dark); }),
       foot: part(b => b.cube(chain(M.T(0, -0.2, 0.35), M.S(1.25, 0.4, 2.3)), dark, 0.8, 0.8)),
@@ -309,6 +347,75 @@
     };
   }
 
+  // The mech from the sketch: square torso, domed cockpit, missile pods on the
+  // shoulders, bird legs with clawed feet.
+  function buildReverseParts(ch) {
+    const c = ch.col, dark = mul(c, 0.55), acc = ch.acc, glass = [0.08, 0.1, 0.13], tube = [0.06, 0.06, 0.07];
+    const part = f => { const b = new Builder(); f(b); return b; };
+    return {
+      hip: part(b => { b.cube(M.S(2.8, 0.9, 1.8), dark); b.cube(chain(M.T(0, -0.1, -0.9), M.S(1.4, 0.6, 0.5)), c); }),
+      // l1 = 2.7: an armoured thigh.
+      uleg: part(b => { b.cube(chain(M.T(0, -1.35, 0), M.S(1.15, 2.9, 1.45)), c, 0.8, 0.85); b.cube(chain(M.T(0, -2.7, 0), M.S(1.1, 0.8, 1.1)), dark); }),
+      // l2 = 2.9: a slimmer shin with a hydraulic ram.
+      lleg: part(b => { b.cube(chain(M.T(0, -1.45, 0), M.S(0.7, 2.9, 0.9)), c, 1.2, 1.15); b.cube(chain(M.T(0, -1.3, 0.55), M.S(0.28, 2.2, 0.28)), dark); }),
+      // Three toes forward and a spur behind.
+      foot: part(b => {
+        b.cube(chain(M.T(0, -0.15, 0), M.S(0.8, 0.5, 0.8)), dark);
+        b.cube(chain(M.T(0, -0.32, 1.0), M.S(0.38, 0.34, 1.7)), dark, 0.7, 0.8);
+        for (const sx of [1, -1]) b.cube(chain(M.T(sx * 0.42, -0.32, 0.75), M.RY(sx * 0.42), M.S(0.34, 0.32, 1.45)), dark, 0.7, 0.8);
+        b.cube(chain(M.T(0, -0.32, -0.6), M.S(0.3, 0.3, 0.9)), dark, 0.7, 0.8);
+      }),
+      torso: part(b => {
+        b.cube(chain(M.T(0, 1.3, 0), M.S(3.2, 2.6, 2.4)), c, 0.95, 0.95);
+        b.cube(chain(M.T(0, 2.95, 0.2), M.S(1.6, 0.8, 1.5)), c, 0.6, 0.6);          // the dome...
+        b.cube(chain(M.T(0, 3.42, 0.2), M.S(0.95, 0.25, 0.9)), c, 0.55, 0.55);
+        b.cube(chain(M.T(0, 3.0, 0.92), M.S(0.95, 0.26, 0.12)), glass);              // ...and its viewport
+        for (const sx of [1, -1]) {                                                  // missile pods, tubes facing forward
+          b.cube(chain(M.T(sx * 1.75, 3.0, -0.1), M.S(1.25, 1.25, 1.45)), acc);
+          for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++)
+            b.cube(chain(M.T(sx * 1.75 + (i - 1) * 0.34, 3.0 + (j - 1) * 0.34, 0.64), M.S(0.2, 0.2, 0.06)), tube);
+        }
+        b.cube(chain(M.T(0, 1.0, -1.35), M.S(2, 1.6, 0.5)), dark);
+      }),
+      arm: part(b => {
+        b.cube(chain(M.T(0, -0.6, 0.1), M.S(0.95, 1.8, 1.15)), c);
+        b.cube(chain(M.T(0, -1.15, 1.45), M.S(0.38, 0.38, 2.3)), dark);
+        b.cube(chain(M.T(0, 0.25, 0), M.S(1.2, 0.75, 1.35)), dark);
+      }),
+    };
+  }
+
+  // A low armoured hull on four bowed legs, weapons on a turret.
+  function buildQuadParts(ch) {
+    const c = ch.col, dark = mul(c, 0.55), acc = ch.acc, glass = [0.08, 0.1, 0.13], tube = [0.06, 0.06, 0.07];
+    const part = f => { const b = new Builder(); f(b); return b; };
+    return {
+      // The hull, drawn at hip height; leg mounts at the corners.
+      hip: part(b => {
+        b.cube(M.S(3.4, 1.3, 4.4), c, 0.85, 0.9);
+        b.cube(chain(M.T(0, -0.1, 2.45), M.S(2.4, 0.9, 0.7)), dark, 0.8, 0.8);
+        b.cube(chain(M.T(0, 0.15, -2.35), M.S(2.6, 1.0, 0.6)), dark);
+        for (const sx of [1, -1]) for (const sz of [1, -1]) b.cube(chain(M.T(sx * 1.45, 0, sz * 1.6), M.S(0.95, 0.95, 0.95)), acc);
+      }),
+      // l1 = 2.4 thigh, l2 = 2.9 tapering shin, a broad pad of a foot.
+      uleg: part(b => { b.cube(chain(M.T(0, -1.2, 0), M.S(0.8, 2.4, 0.9)), c); b.cube(chain(M.T(0, -2.4, 0), M.S(0.95, 0.75, 0.95)), dark); }),
+      lleg: part(b => { b.cube(chain(M.T(0, -1.45, 0), M.S(0.55, 2.9, 0.6)), c, 1.45, 1.4); b.cube(chain(M.T(0, -0.2, 0), M.S(0.85, 0.5, 0.85)), dark); }),
+      foot: part(b => b.cube(chain(M.T(0, -0.17, 0), M.S(1.15, 0.35, 1.15)), dark, 0.75, 0.75)),
+      // The turret: cockpit at the front, an LRM box on top.
+      torso: part(b => {
+        b.cube(chain(M.T(0, 0.7, 0), M.S(2.7, 1.4, 2.5)), c, 0.85, 0.85);
+        b.cube(chain(M.T(0, 0.85, 1.3), M.S(1.5, 0.5, 0.25)), glass);
+        b.cube(chain(M.T(0, 1.75, -0.3), M.S(1.8, 0.75, 1.5)), acc);
+        for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++)
+          b.cube(chain(M.T((i - 1.5) * 0.4, 1.6 + j * 0.3, 0.46), M.S(0.22, 0.22, 0.06)), tube);
+      }),
+      arm: part(b => {
+        b.cube(chain(M.T(0, -0.35, 0.2), M.S(0.8, 1.1, 1.6)), c);
+        b.cube(chain(M.T(0, -0.5, 1.6), M.S(0.36, 0.36, 2.4)), dark);
+      }),
+    };
+  }
+
   /* ======================= the app ======================= */
 
   function start(root) {
@@ -318,11 +425,12 @@
         <div class="touch-ui" hidden>
           <div class="stick" hidden><div class="knob"></div></div>
           <button class="tbtn tpause" data-t="pause" aria-label="Pause">II</button>
+          <button class="tbtn tzoom" data-t="zoom">ZOOM</button>
           <button class="tbtn tstop" data-t="stop">STOP</button>
           <div class="tcluster">
             <button class="tbtn" data-t="jump">JUMP</button>
             <button class="tbtn" data-t="tgt">TGT</button>
-            <button class="tbtn" data-t="zoom">ZOOM</button>
+            <button class="tbtn tfire t-fusion" data-t="fusion">FUSION</button>
             <button class="tbtn tfire t-missile" data-t="missile">MISSILE</button>
             <button class="tbtn tfire t-energy" data-t="energy">ENERGY</button>
             <button class="tbtn tfire t-ballistic" data-t="ballistic">BALLISTIC</button>
@@ -653,6 +761,15 @@
         this.noise(0.14, 0.08 * force, 200, 50);
         play('punch', { vol: 0.3 * force, rate: 0.5, vary: 0.04 });
       },
+      fusionCrack() {
+        this.osc('sawtooth', 2600, 180, 0.35, 0.12); this.osc('square', 1400, 90, 0.4, 0.05);
+        this.noise(0.25, 0.25, 6000, 900, 'highpass');
+      },
+      fusion(at) {
+        const o = { at, ref: 120 };
+        play('boom_big', { ...o, vol: 1.2, rate: 0.7 }); play('crunch', { ...o, vol: 0.9, rate: 0.5 });
+        this.osc('sawtooth', 2200, 50, 1.3, 0.12, o); this.osc('sine', 90, 20, 1.6, 0.5, o);
+      },
       beep() { if (!play('beep', { vol: 0.2, vary: 0 })) this.osc('square', 1200, 1190, 0.06, 0.03); },
       powerdown() { play('powerdown', { vol: 0.6, rate: 0.6, vary: 0 }); this.osc('sawtooth', 220, 30, 1.6, 0.05); },
       powerup() { play('powerup', { vol: 0.6, rate: 0.8, vary: 0 }); this.osc('sine', 60, 240, 0.8, 0.06); },
@@ -693,15 +810,15 @@
     let menuSel = store.get('menu.sel', 'campaign');
     let fpMap = store.get('fp.map', 0), fpFoes = store.get('fp.foes', 3);
     const G = { state: 'brief', paused: false, mechs: [], shots: [], beams: [], parts: [], wrecks: [], msgs: [],
-      eye: [0, 0, 0], view: [0, 0, 1], flash: 0, shake: 0, kick: 0, lastTwist: 0, cbeams: [], pendingHits: new Map(),
+      eye: [0, 0, 0], view: [0, 0, 1], flash: 0, shake: 0, kick: 0, lastTwist: 0, cbeams: [], pendingHits: new Map(), pulses: [],
       touchUI: matchMedia('(pointer: coarse)').matches, touchTurn: 0, zoom: false, target: null, sel: 0, endT: 0 };
     let ter = null, world = null, pal = null;
     const keys = {};
     // Which fire controls are held: by touch button, mouse button or key.
-    const held = { energy: false, ballistic: false, missile: false };
+    const held = { energy: false, ballistic: false, missile: false, fusion: false };
     const clearHeld = () => { for (const c of CATS) held[c] = false; };
     let volleySeq = 0;
-    const KEY_FOR = { energy: ['Digit1'], ballistic: ['Digit2'], missile: ['Digit3', 'Space'] };
+    const KEY_FOR = { energy: ['Digit1'], ballistic: ['Digit2'], missile: ['Digit3', 'Space'], fusion: ['Digit4', 'KeyG'] };
     const isHeld = c => held[c] || KEY_FOR[c].some(k => keys[k]);
     // A missile press is latched until the next frame sees it, so a tap
     // shorter than a frame (a slow phone, a quick thumb) still fires.
@@ -739,7 +856,7 @@
       ter = makeTerrain(seed);
       if (world) gl.deleteBuffer(world.buf);
       world = upload(buildTerrainMesh(ter, pal, seed));
-      G.mechs = []; G.shots = []; G.beams = []; G.parts = []; G.wrecks = []; G.msgs = [];
+      G.mechs = []; G.shots = []; G.beams = []; G.parts = []; G.wrecks = []; G.msgs = []; G.pulses = [];
       G.target = null; G.flash = 0; G.shake = 0; G.kick = 0; G.zoom = false; G.endT = 0; G.time = 0; G.guide = null; G.mDown = false;
       G.stats = { shots: 0, hits: 0, dealt: 0, taken: 0, kills: 0 };
       G.def = def;
@@ -758,19 +875,18 @@
     /* ---------- geometry helpers ---------- */
 
     const frame = m => chain(M.T(m.x, m.y + (m.bob || 0), m.z), M.RY(m.yaw), M.S(m.ch.scale));
-    const torsoFrame = m => chain(frame(m), M.T(0, 5, 0), M.RY(m.twist));
+    const torsoFrame = m => chain(frame(m), M.T(0, geoOf(m).torsoY, 0), M.RY(m.twist));
     const center = m => [m.x, m.y + 4.2 * m.ch.scale, m.z];
-    const MOUNTS = { LA: [2.25, 0.8, 2.4], RA: [-2.25, 0.8, 2.4] };
     function muzzle(m, w) {
-      const tf = torsoFrame(m);
-      if (w.mount === 'T') return M.apply(tf, w.type === 'lrm' ? [w.side % 2 ? -1.25 : 1.25, 3.2, 0.6] : [-0.9, 1.6, 1.6]);
-      return M.apply(tf, MOUNTS[w.mount]);
+      const tf = torsoFrame(m), g = geoOf(m);
+      if (w.mount === 'T') return M.apply(tf, w.type === 'lrm' ? [w.side % 2 ? -1.25 : 1.25, g.rackY, 0.6] : [-0.9, g.acY, 1.6]);
+      return M.apply(tf, [(w.mount === 'LA' ? 1 : -1) * g.armX, g.armY - 1.2, 2.4]);
     }
-    const eyeOf = m => M.apply(torsoFrame(m), [0, 2.35, 1.9]);
+    const eyeOf = m => M.apply(torsoFrame(m), geoOf(m).eye);
     const viewYaw = m => m.yaw + m.twist;
 
     function rayCyl(o, d, m) {
-      const R = 2.4 * m.ch.scale, Hh = 7.9 * m.ch.scale;
+      const g = geoOf(m), R = g.radius * m.ch.scale, Hh = g.height * m.ch.scale;
       const ox = o[0] - m.x, oz = o[2] - m.z, a = d[0] * d[0] + d[2] * d[2];
       if (a < 1e-8) return null;
       const b = 2 * (ox * d[0] + oz * d[2]), c = ox * ox + oz * oz - R * R, disc = b * b - 4 * a * c;
@@ -840,7 +956,7 @@
 
     function sectionHit(m, p) {
       const dx = p[0] - m.x, dz = p[2] - m.z, ly = (p[1] - m.y) / m.ch.scale;
-      if (ly < 4.4) { const a = m.yaw; return dx * cos(a) - dz * sin(a) > 0 ? 'LL' : 'RL'; }
+      if (ly < geoOf(m).legTop) { const a = m.yaw; return dx * cos(a) - dz * sin(a) > 0 ? 'LL' : 'RL'; }
       const a = viewYaw(m), lx = (dx * cos(a) - dz * sin(a)) / m.ch.scale;
       return lx > 1.6 ? 'LA' : lx < -1.6 ? 'RA' : 'T';
     }
@@ -909,7 +1025,7 @@
       }
       if (src === G.player) G.stats.kills++;
       say('Target destroyed.', true);
-      if (!G.mechs.some(e => e.team !== 0 && e.alive)) {
+      if (G.player.alive && !G.mechs.some(e => e.team !== 0 && e.alive)) {
         G.state = 'over'; G.endT = 3.5; G.won = true;
         setTimeout(() => say('Mission objectives complete.', true), 1400);
       }
@@ -917,7 +1033,7 @@
 
     function fire(m, w, aim, target) {
       const d = w.def;
-      if (d.kind === 'beam') return false;   // lasers are continuous: see beamTick
+      if (d.kind === 'beam' || d.kind === 'fusion') return false;   // continuous: see beamTick / fusionTick
       if (!m.alive || m.shutdown || w.dead || w.cd > 0 || (d.ammo && w.ammo <= 0)) return false;
       const mz = muzzle(m, w);
       const dir = norm(sub(aim, mz));
@@ -1003,29 +1119,28 @@
     // it. Once the hip has passed it by half a stride it lifts, arcs, and
     // lands half a stride ahead of where the body will be at touchdown -- so
     // feet never slide, and faster walking just means quicker steps.
-    const LEG = { hip: 4.6, hipX: 0.95, footX: 1.1, l1: 2.6, l2: 2.5, ankle: 0.42 };
-
-    // Where foot i (0 = left) would stand, `ahead` units along the heading.
+    // Where foot i would stand, `ahead` units along the heading.
     function restFoot(m, i, ahead = 0) {
-      const s = m.ch.scale, side = i === 0 ? 1 : -1, c = cos(m.yaw), sn = sin(m.yaw);
-      const x = m.x + c * side * LEG.footX * s + sn * ahead, z = m.z - sn * side * LEG.footX * s + c * ahead;
+      const s = m.ch.scale, leg = geoOf(m).legs[i], c = cos(m.yaw), sn = sin(m.yaw);
+      const lx = leg.fx * s, lz = leg.fz * s + ahead;
+      const x = m.x + c * lx + sn * lz, z = m.z - sn * lx + c * lz;
       return [x, ter.height(x, z), z];
     }
     function initFeet(m) {
-      m.feet = [0, 1].map(i => ({ pos: restFoot(m, i), from: null, lifted: false, yaw: m.yaw }));
-      m.bob = 0; m.cyc = 0.45;   // both feet planted
+      m.feet = geoOf(m).legs.map((_, i) => ({ pos: restFoot(m, i), from: null, lifted: false, yaw: m.yaw }));
+      m.bob = 0; m.cyc = 0.45;   // between swings: every foot planted
     }
 
     // One gait clock per mech, advanced by distance travelled (and turning),
     // not time -- so the feet can't drift into step with each other, and a
-    // swing's landing spot can be predicted exactly. The left foot swings
-    // over cycle [0, SWING), the right over [0.5, 0.5 + SWING); in between
-    // both are planted. Each swing aims, every frame, at where its rest spot
-    // will be at touchdown plus a stance's worth ahead.
-    const SWING = 0.42, STANCE_AHEAD = (1 - SWING) / 2;
-
+    // swing's landing spot can be predicted exactly. Each leg swings over
+    // [ph, ph + swing) of the cycle (bipeds: left at 0, right at 0.5; the
+    // quadruped trots, diagonal pairs together); between swings all feet are
+    // planted. Each swing aims, every frame, at where its rest spot will be
+    // at touchdown plus a stance's worth ahead.
     function swingTarget(m, i, u, D, dir) {
-      return restFoot(m, i, dir * ((1 - u) * SWING * D + STANCE_AHEAD * D));
+      const sw = geoOf(m).swing;
+      return restFoot(m, i, dir * ((1 - u) * sw * D + ((1 - sw) / 2) * D));
     }
 
     function gait(m, dt) {
@@ -1041,13 +1156,13 @@
       if (m.wasAir) { m.wasAir = false; m.cyc = 0.45; m.feet.forEach((f, i) => { f.pos = restFoot(m, i); f.yaw = m.yaw; }); }
 
       // Cycle length in distance: longer strides when faster, but a planted
-      // foot never gets more than STANCE_AHEAD * D from its hip (leg reach).
-      const D = s * (3.5 + 4.5 * pace);
-      const swingOf = i => { const u = (m.cyc - i * 0.5) / SWING; return u >= 0 && u < 1 ? u : null; };
-      const before = [swingOf(0), swingOf(1)];
+      // foot never gets more than (1 - swing) / 2 * D from its hip (leg reach).
+      const g = geoOf(m), D = s * (g.stride[0] + g.stride[1] * pace);
+      const swingOf = i => { const u = (((m.cyc - g.legs[i].ph) % 1 + 1) % 1) / g.swing; return u < 1 ? u : null; };
+      const before = g.legs.map((_, i) => swingOf(i));
       const moving = abs(m.speed) > 0.3 || dyaw > 1e-4;
       // Stopped mid-stride: finish the step on the clock rather than freeze with a foot up.
-      let adv = moving ? (abs(m.speed) * dt + dyaw * 2.5 * s) / D : (before[0] != null || before[1] != null ? dt / 0.6 : 0);
+      let adv = moving ? (abs(m.speed) * dt + dyaw * 2.5 * s) / D : (before.some(u => u != null) ? dt / 0.6 : 0);
       m.cyc = (m.cyc + min(adv, 0.2)) % 1;
 
       const dir = abs(m.speed) > 0.3 ? Math.sign(m.speed) : 0;
@@ -1150,7 +1265,7 @@
       }
       if (off > 0.25 || e.heat > 72 || e.shutdown || e.ai.jitter > 0 || !P.alive) return;
       for (const w of e.weapons) {
-        if (w.def.kind === 'beam' || w.dead || w.cd > 0 || dist > w.def.range * 0.95) continue;
+        if (w.def.kind === 'beam' || w.def.kind === 'fusion' || w.dead || w.cd > 0 || dist > w.def.range * 0.95) continue;
         let aim = pc;
         if (w.def.kind === 'shell') { const t = dist / w.def.speed; aim = add(pc, [sin(P.yaw) * P.speed * t, 0, cos(P.yaw) * P.speed * t]); }
         const err = dist * e.ch.acc0 * (1 + abs(P.speed) / 14) * (P.air ? 1.6 : 1);
@@ -1190,6 +1305,7 @@
 
       const armed = P.alive && !G.paused && !G.roundOver;
       P.beamOn = armed && isHeld('energy') && !G.guide;
+      fusionTick(P, dt, armed && isHeld('fusion') && !G.guide);
       if (armed && isHeld('ballistic')) fireCat('ballistic');
       missileTrigger(armed && (isHeld('missile') || missileTap));
       missileTap = false;
@@ -1199,6 +1315,7 @@
         if (m.remote) {
           if (m.alive) { netInterp(m, dt); gait(m, dt); }
           if (m.alive && m.net?.bm && m.net.be) remoteBeam(m, m.net.be); else m.beaming = false;
+          if (m.alive && m.net?.fl) G.cbeams.push({ a: muzzle(m, m.weapons.find(w => w.def.kind === 'fusion')), b: m.net.fl, col: WEAPONS.fusion.col, w: 0.05 + 0.035 * abs(sin(G.time * 37)) });
           continue;
         }
         if (m.team !== 0 && m.alive) think(m, dt);
@@ -1212,7 +1329,7 @@
       // Mechs don't walk through each other.
       const alive = G.mechs.filter(m => m.alive);
       for (let i = 0; i < alive.length; i++) for (let j = i + 1; j < alive.length; j++) {
-        const a = alive[i], b = alive[j], dx = b.x - a.x, dz = b.z - a.z, d = hypot(dx, dz), r = 2.4 * (a.ch.scale + b.ch.scale);
+        const a = alive[i], b = alive[j], dx = b.x - a.x, dz = b.z - a.z, d = hypot(dx, dz), r = geoOf(a).radius * a.ch.scale + geoOf(b).radius * b.ch.scale;
         if (d < r && d > 0.01 && !(a.remote && b.remote)) {
           // Only move mechs this client owns; other pilots' clients move theirs.
           const fa = a.remote ? 0 : b.remote ? 1 : 0.5, fb = b.remote ? 0 : a.remote ? 1 : 0.5, gap = r - d;
@@ -1247,6 +1364,7 @@
         if (s.life <= 0 && s.kind === 'missile' && !hit) { if (!s.ghost) blast(s.p, s.dmg, s.owner, null); explode(s.p, false); }
       }
       G.shots = G.shots.filter(s => s.life > 0);
+      updatePulses(dt);
       for (const b of G.beams) b.life -= dt;
       G.beams = G.beams.filter(b => b.life > 0);
       for (const p of G.parts) {
@@ -1273,6 +1391,7 @@
       G.flash = max(0, G.flash - dt * 1.2);
       G.shake = max(0, G.shake - dt * 2.2);
       G.kick = max(0, G.kick - dt * 5);
+      G.whiteFlash = max(0, (G.whiteFlash || 0) - dt * 1.6);
 
       const live = P.alive && !P.shutdown, pace = min(1, abs(P.speed) / P.ch.speed);
       loopSet('hum_loop', P.alive ? (P.shutdown ? 0.03 : 0.07 + 0.13 * pace) : 0, P.shutdown ? 0.5 : 0.72 + 0.4 * pace);
@@ -1334,6 +1453,127 @@
       for (const m of G.mechs) if (m.melt && m.meltAt !== G.time) m.melt = max(0, m.melt - MELT_COOL * dt);
     }
     const beamMult = m => (m.beamMech ? meltMult(m.beamMech.melt || 0) : 1);
+    /* ----- fusion cannon: scan the resonant frequency, then dump the reactor into it ----- */
+
+    function fusionTick(m, dt, on) {
+      const w = m.weapons.find(w => w.def.kind === 'fusion' && !w.dead);
+      const st = m.fusion || (m.fusion = { mech: null, t: 0, on: false, end: null });
+      if (!on || !w || w.cd > 0 || m.shutdown || !m.alive) {
+        st.on = false; st.t = 0; st.mech = null; st.end = null;
+        if (m === G.player) fusionSound(false, 0);
+        return;
+      }
+      st.on = true;
+      const d = w.def, mz = muzzle(m, w), dir = norm(sub(G.aim, mz));
+      const hit = rayHit(mz, dir, d.range, m);
+      // What the laser is on: a direct hit, or a mech it passes within
+      // `slack` of (with clear line of sight to it).
+      const tgt = hit?.mech || nearMiss(m, mz, dir, d);
+      const end = tgt ? center(tgt) : hit ? hit.point : add(mz, mul(dir, d.range));
+      st.end = end;
+      m.heat += d.scanHeat * dt;
+      // A thin, flickering targeting laser, not a weapon beam.
+      G.cbeams.push({ a: mz, b: end, col: d.col, w: 0.05 + 0.035 * abs(sin(G.time * 37)) });
+      // The scan counts on one mech. A slip shorter than `grace` pauses it;
+      // longer, or onto another mech, and it starts over.
+      if (tgt && tgt === st.mech) { st.t += dt; st.off = 0; }
+      else if (st.mech && !tgt && (st.off = (st.off || 0) + dt) < d.grace) { /* slipping: hold */ }
+      else { st.mech = tgt || null; st.t = 0; st.off = 0; }
+      st.slipping = !!(st.mech && st.off > 0);
+      // Locked and on it: draw the torso gently toward the target.
+      if (m === G.player && st.mech && !st.slipping) {
+        const c = center(st.mech), e = G.eye, k = 1 - Math.exp(-d.assist * dt);
+        const wantTwist = wrapA(atan2(c[0] - e[0], c[2] - e[2]) - m.yaw);
+        const wantPitch = atan2(c[1] - e[1], hypot(c[0] - e[0], c[2] - e[2]));
+        m.twist = clampN(m.twist + wrapA(wantTwist - m.twist) * k, -1.9, 1.9);
+        m.pitch = clampN(m.pitch + (wantPitch - m.pitch) * k, -0.4, 0.45);
+      }
+      const p = st.mech ? min(1, st.t / d.scan) : 0;
+      if (st.mech && random() < dt * (20 + 60 * p)) particle(add(end, [rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)]), [rnd(-2, 2), rnd(0, 3), rnd(-2, 2)], 0.3, 0.3, w.def.col, 'fire');
+      if (m === G.player) fusionSound(true, p);
+      if (st.mech && st.t >= w.def.scan) fusionFire(m, w, mz, st.mech, end);
+    }
+
+    // The mech the laser passes closest to, if within its radius + slack and
+    // nothing (terrain) is in the way.
+    function nearMiss(m, mz, dir, d) {
+      let best = null, bestD = Infinity;
+      for (const t of G.mechs) {
+        if (!t.alive || t === m) continue;
+        const c = center(t), v = sub(c, mz), along = dot(v, dir);
+        if (along < 0 || along > d.range) continue;
+        const miss = len(sub(v, mul(dir, along))), lim = geoOf(t).radius * t.ch.scale + d.slack;
+        if (miss > lim || miss >= bestD) continue;
+        if (rayTerrain(mz, norm(v), len(v) - 1) != null) continue;
+        best = t; bestD = miss;
+      }
+      return best;
+    }
+
+    // Fire: launch the pulse down the beam, then the reactor pays for it --
+    // feedback into your own torso, a deep overload shutdown, a recharge.
+    function fusionFire(m, w, mz, t, end) {
+      const d = w.def;
+      launchPulse(mz, t, m, false);
+      if (mp() && m === G.player) netSend({ t: 'fx', k: 'fu', a: mz.map(r2), id2: t.netId || 0, b: center(t).map(r2) });
+      m.heat = d.overload; m.shutdown = true; w.cd = d.cd;
+      m.fusion.t = 0; m.fusion.mech = null; m.fusion.on = false;
+      if (m === G.player) {
+        G.whiteFlash = 0.7; G.shake = 1.2;
+        fusionSound(false, 0); sfx.fusionCrack(); sfx.powerdown();
+      }
+      const cost = m.max.T * d.feedback;
+      m.hp.T -= cost;
+      if (m === G.player) { G.stats.taken += cost; G.flash = min(0.6, G.flash + 0.4); sfx.clang(); }
+      if (m.hp.T <= 0) { m.hp.T = 0; destroy(m, null); return; }
+      if (m === G.player) say('Resonance discharge. Reactor overload. Torso damage.', true);
+    }
+
+    // The pulse: travels from the muzzle to the target (following it if it
+    // moves); kills on arrival. Ghost pulses are other pilots' -- visual only.
+    function launchPulse(a, target, shooter, ghost, b) {
+      const end = target ? center(target) : b;
+      G.pulses.push({ a, b: end, target, shooter, ghost, t: 0, dur: max(0.2, len(sub(end, a)) / WEAPONS.fusion.pulseSpeed), hit: false, seed: random() * 100 });
+    }
+    function updatePulses(dt) {
+      for (const pu of G.pulses) {
+        pu.t += dt;
+        if (pu.target && pu.target.alive) pu.b = center(pu.target);
+        if (pu.hit || pu.t < pu.dur) continue;
+        pu.hit = true;
+        explode(pu.b, true); explode(add(pu.b, [0, 3, 0]), true);
+        for (let i = 0; i < 14; i++) particle(add(pu.b, [rnd(-2, 2), rnd(-3, 3), rnd(-2, 2)]), [rnd(-16, 16), rnd(4, 20), rnd(-16, 16)], rnd(0.5, 1.1), rnd(0.8, 2.2), [0.95, 0.85, 1], 'fire');
+        sfx.fusion(pu.b);
+        if (pu.ghost || !pu.target || !pu.target.alive) continue;
+        // Resonance: the whole frame shakes itself apart, however much armour.
+        const t = pu.target;
+        if (t.remote) {
+          netSend({ t: 'hit', to: t.netId, amt: 40, p: pu.b.map(r2), fu: 1 });
+          if (pu.shooter === G.player) { G.stats.hits++; G.hitMark = 0.6; }
+        } else { t.hp.T = 0; destroy(t, pu.shooter); }
+      }
+      G.pulses = G.pulses.filter(pu => pu.t < pu.dur + 0.25);
+    }
+
+    // Scan tone: a pulsing whine that climbs as the scan converges.
+    let fhum = null;
+    function fusionSound(on, p) {
+      const c = ac();
+      if (!c) { if (fhum) fhum.g.gain.value = 0; return; }
+      if (!fhum || fhum.c !== c) {
+        const o = c.createOscillator(), lfo = c.createOscillator(), lg = c.createGain(), g = c.createGain();
+        o.type = 'triangle'; lfo.type = 'square'; lg.gain.value = 0; g.gain.value = 0;
+        lfo.connect(lg).connect(g.gain); o.connect(g).connect(out());
+        o.start(); lfo.start();
+        fhum = { c, o, lfo, lg, g };
+      }
+      const t = c.currentTime;
+      fhum.g.gain.setTargetAtTime(on ? 0.04 : 0, t, 0.02);
+      fhum.lg.gain.setTargetAtTime(on ? 0.03 : 0, t, 0.02);
+      fhum.o.frequency.setTargetAtTime(320 + 1100 * p * p, t, 0.05);
+      fhum.lfo.frequency.setTargetAtTime(6 + 22 * p, t, 0.05);
+    }
+
     // Another pilot's beam, drawn from their lasers to where they say it ends.
     // Visual only: their client scores it.
     function remoteBeam(m, end) {
@@ -1448,7 +1688,7 @@
     function blast(p, dmg, owner, direct) {
       for (const m of G.mechs) {
         if (!m.alive || m === owner || m === direct) continue;
-        const R = 2.4 * m.ch.scale, top = m.y + 7.9 * m.ch.scale;
+        const g = geoOf(m), R = g.radius * m.ch.scale, top = m.y + g.height * m.ch.scale;
         const hx = p[0] - m.x, hz = p[2] - m.z, hd = hypot(hx, hz);
         const dy = p[1] < m.y ? m.y - p[1] : p[1] > top ? p[1] - top : 0;
         const d = hypot(max(0, hd - R), dy);
@@ -1498,24 +1738,29 @@
       const mf = meltFrac(m), heatWas = drawHeat;
       const tint = mf ? mix3(VPtint || [1, 1, 1], [2.2, 0.8, 0.25], mf * 0.6) : VPtint || [1, 1, 1];
       if (mf) drawHeat = min(1, drawHeat + mf * 0.3);
-      draw(parts.hip, chain(B, M.T(0, LEG.hip, 0)), tint);
-      // Legs reach for wherever the feet actually are.
+      const g = geoOf(m), back = mul(fwd, -1);
+      draw(parts.hip, chain(B, M.T(0, g.hip, 0)), tint);
+      const hull = M.apply(B, [0, g.hip, 0]);
+      // Legs reach for wherever the feet actually are; the knee bends forward,
+      // backward (bird legs) or out and up (the quadruped's spider legs).
       m.feet.forEach((f, i) => {
-        const side = i === 0 ? 1 : -1;
-        const legTint = m.hp[side > 0 ? 'LL' : 'RL'] > 0 ? tint : mul(tint, 0.35);
-        const H = M.apply(B, [side * LEG.hipX, LEG.hip, 0]);
-        const A = add(f.pos, [0, LEG.ankle * sc, 0]);
-        const K = solveKnee(H, A, fwd, LEG.l1 * sc, LEG.l2 * sc);
-        const ankle = add(K, mul(norm(sub(A, K)), LEG.l2 * sc));   // stays attached even if out of reach
-        draw(parts.uleg, limb(H, K, fwd, sc), legTint);
-        draw(parts.lleg, limb(K, ankle, fwd, sc), legTint);
+        const leg = g.legs[i];
+        const legTint = m.hp[leg.hx > 0 ? 'LL' : 'RL'] > 0 ? tint : mul(tint, 0.35);
+        const H = M.apply(B, [leg.hx, g.hip, leg.hz]);
+        const pole = g.knee === 'forward' ? fwd : g.knee === 'back' ? back
+          : norm(add(norm([H[0] - hull[0], 0, H[2] - hull[2]]), [0, 0.9, 0]));
+        const A = add(f.pos, [0, g.ankle * sc, 0]);
+        const K = solveKnee(H, A, pole, g.l1 * sc, g.l2 * sc);
+        const ankle = add(K, mul(norm(sub(A, K)), g.l2 * sc));   // stays attached even if out of reach
+        draw(parts.uleg, limb(H, K, pole, sc), legTint);
+        draw(parts.lleg, limb(K, ankle, pole, sc), legTint);
         draw(parts.foot, chain(M.T(...ankle), M.RY(f.yaw), M.S(sc)), legTint);
       });
-      const TB = chain(B, M.T(0, 5, 0), M.RY(m.twist));
+      const TB = chain(B, M.T(0, g.torsoY, 0), M.RY(m.twist));
       draw(parts.torso, TB, tint);
       for (const [s, k] of [[1, 'LA'], [-1, 'RA']]) {
         if (m.hp[k] <= 0) continue;
-        draw(parts.arm, chain(TB, M.T(s * 2.25, 2.0, 0), M.RX(-m.pitch)), tint);
+        draw(parts.arm, chain(TB, M.T(s * g.armX, g.armY, 0), M.RX(-m.pitch)), tint);
       }
       drawHeat = heatWas;
     }
@@ -1602,6 +1847,35 @@
         if (s.kind === 'shell') draw(meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.25, 0.25, 2.2)), [1, 0.85, 0.4], 1);
         else draw(meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.35, 0.35, 1.2)), [1, 0.55, 0.25], 1);
       }
+      // Fusion pulses: six sine waves, each in its own plane with its own
+      // frequency and phase, writhing inside a packet that races down the
+      // beam; the straight targeting beam stays lit underneath while it flies.
+      for (const pu of G.pulses) {
+        const v = sub(pu.b, pu.a), L = len(v), d = mul(v, 1 / (L || 1));
+        const u = norm(cross(d, abs(d[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0])), w2 = cross(u, d);
+        const yw = atan2(d[0], d[2]), pt = Math.asin(clampN(d[1], -1, 1));
+        if (!pu.hit) draw(meshes.beam, chain(M.T(...pu.a), M.RY(yw), M.RX(-pt), M.S(0.05, 0.05, L)), [0.85, 0.6, 1], 1);
+        const head = min(1, pu.t / pu.dur) * L, pack = min(L, 34), fade = pu.hit ? max(0, 1 - (pu.t - pu.dur) / 0.25) : 1;
+        if (fade <= 0) continue;
+        const N = 28, tt = performance.now() / 1000;
+        for (let k = 0; k < 6; k++) {
+          const th = k * PI / 3 + pu.seed, amp = (0.9 + 0.3 * k) * fade, f = 0.22 + 0.09 * k, ph = pu.seed * (k + 1) + tt * (18 + 3 * k);
+          const dirk = add(mul(u, cos(th)), mul(w2, sin(th)));
+          let prev = null;
+          for (let i = 0; i <= N; i++) {
+            const sAlong = head - pack + (pack * i) / N;
+            if (sAlong < 0) { prev = null; continue; }
+            const env = sin(PI * i / N);   // the packet swells in the middle and tapers at both ends
+            const q = add(add(pu.a, mul(d, sAlong)), mul(dirk, amp * env * sin(TAU * f * sAlong + ph)));
+            if (prev) {
+              const sv = sub(q, prev), sl = len(sv), sd = mul(sv, 1 / (sl || 1));
+              draw(meshes.beam, chain(M.T(...prev), M.RY(atan2(sd[0], sd[2])), M.RX(-Math.asin(clampN(sd[1], -1, 1))), M.S(0.22, 0.22, sl)),
+                mix3([1, 1, 1], [0.8, 0.55, 1], k / 8), 1);
+            }
+            prev = q;
+          }
+        }
+      }
       for (const b of G.cbeams) {
         const v = sub(b.b, b.a), l = len(v), d = mul(v, 1 / (l || 1));
         draw(meshes.beam, chain(M.T(...b.a), M.RY(atan2(d[0], d[2])), M.RX(-Math.asin(clampN(d[1], -1, 1))), M.S(b.w, b.w, l)), b.col, 1);
@@ -1671,7 +1945,7 @@
         diag: { x: 100 + 3.2 * u, y: 116, u },
         weapons: { x: W - 205, y: 2 * r + 34 },
         throttle: { x: 14, y: H - 196, h: 120 },
-        target: { x: 64, y: 10 },
+        target: { x: 132, y: 10 },   // right of the pause and zoom buttons
         hostiles: { x: W - 14, y: 2 * r + 34 + 56 },   // under the weapon list, clear of the compass
       };
     }
@@ -1800,6 +2074,7 @@
 
       // Damage flash.
       if (G.flash > 0) { ctx.fillStyle = `rgba(255,40,20,${G.flash * 0.4})`; ctx.fillRect(0, 0, W, H); }
+      if (G.whiteFlash > 0) { ctx.fillStyle = `rgba(235,215,255,${G.whiteFlash * 0.85})`; ctx.fillRect(0, 0, W, H); }
 
       // Crosshair.
       const ch = project(G.aim) || [W / 2, H / 2];
@@ -1808,6 +2083,33 @@
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(ch[0] + dx * 5, ch[1] + dy * 5); ctx.lineTo(ch[0] + dx * 14, ch[1] + dy * 14); }
       ctx.stroke();
       ctx.strokeRect(ch[0] - 1, ch[1] - 1, 2, 2);
+      // Fusion scan: a violet ring filling over the scan, a frequency readout
+      // that settles as it converges, and LOCK at the end.
+      const fs = P.fusion;
+      if (fs?.on) {
+        const w = P.weapons.find(w => w.def.kind === 'fusion'), p = fs.mech ? min(1, fs.t / w.def.scan) : 0;
+        ctx.strokeStyle = 'rgba(200,128,255,0.3)'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(ch[0], ch[1], 30, 0, TAU); ctx.stroke();
+        const slip = fs.slipping && floor(performance.now() / 90) % 2;
+        ctx.strokeStyle = slip ? AMBER : '#c8f'; ctx.beginPath(); ctx.arc(ch[0], ch[1], 30, -PI / 2, -PI / 2 + TAU * p); ctx.stroke();
+        ctx.lineWidth = 1; ctx.textAlign = 'center'; ctx.fillStyle = fs.slipping ? AMBER : '#c8f';
+        if (!fs.mech) ctx.fillText('FUSION: NO TARGET', ch[0], ch[1] + 46);
+        else if (fs.slipping) ctx.fillText(`LOCK SLIPPING -- ${Math.floor(p * 100)}%`, ch[0], ch[1] + 46);
+        else {
+          const hz = (37.4 + (fs.mech.netId || 3) * 4.19 + (1 - p) * rnd(-20, 20)).toFixed(2);
+          ctx.fillText(`RESONANCE SCAN ${Math.floor(p * 100)}%`, ch[0], ch[1] + 46);
+          ctx.fillText(`f ${hz} Hz`, ch[0], ch[1] + 60);
+        }
+        // The price, always shown -- red if firing now would kill you.
+        const cost = Math.round(P.max.T * w.def.feedback), fatal = P.hp.T <= cost;
+        ctx.fillStyle = fatal ? (floor(performance.now() / 200) % 2 ? RED : AMBER) : DIM;
+        ctx.fillText(fatal ? 'DISCHARGE WILL BREACH YOUR TORSO' : `FEEDBACK -${cost} TORSO`, ch[0], ch[1] + (fs.mech ? 74 : 60));
+      }
+      if (G.scanWarn && performance.now() - G.scanWarn.at < 300 && floor(performance.now() / 150) % 2) {
+        ctx.font = 'bold 15px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.fillStyle = RED;
+        ctx.fillText(`RESONANCE SCAN -- ${pilotName(G.scanWarn.by)} ${Math.floor(G.scanWarn.p * 100)}%`, W / 2, L.viewBottom * 0.22);
+        ctx.font = '11px "Lucida Console", "Courier New", monospace';
+      }
       // Laser: a ring that fills as the armour under the beam melts (the
       // damage multiplier). Only when the beam is on a mech.
       if (P.beaming && P.beamMech) {
@@ -1927,7 +2229,11 @@
           const x = wx + 150 + i * (bw + 3);
           ctx.fillStyle = w.dead ? '#622' : '#031203'; ctx.fillRect(x, wy - 3, bw, 6);
           if (w.dead) return;
-          if (w.def.kind === 'beam') {
+          if (w.def.kind === 'fusion') {
+            const sc = P.fusion?.on && P.fusion.mech ? min(1, P.fusion.t / w.def.scan) : null;
+            const f = sc ?? 1 - w.cd / w.def.cd;
+            ctx.fillStyle = sc != null ? '#c8f' : f >= 1 ? GREEN : AMBER; ctx.fillRect(x, wy - 3, bw * max(0.04, f), 6);
+          } else if (w.def.kind === 'beam') {
             // Beams don't recharge; show how melted the target's armour is.
             const k = P.beaming ? (beamMult(P) - 1) / (MELT_MAX - 1) : 0;
             ctx.fillStyle = P.beaming ? (k >= 0.99 ? '#fff' : '#5cf') : GREEN;
@@ -1996,6 +2302,7 @@
         <tr><td>Left side</td><td>drag: sideways turns the legs, up / down sets the throttle (it stays set)</td></tr>
         <tr><td>Right side</td><td>drag: twist the torso and aim</td></tr>
         <tr><td>ENERGY (hold)</td><td>laser beams: damage climbs the longer you hold them on one target -- watch your heat</td></tr>
+        <tr><td>FUSION (hold)</td><td>keep the scan on a mech for 3 s (drag the button to aim; brief slips are forgiven): it dies outright -- and the feedback hurts your own torso and shuts your reactor down</td></tr>
         <tr><td>BALLISTIC (hold)</td><td>autocannon: big single hits, little heat, limited ammo</td></tr>
         <tr><td>MISSILE</td><td>tap: fire the LRMs (they home in on a locked target)<br>hold: fly them yourself in IR -- drag to steer, let go to detonate</td></tr>
         <tr><td>TGT</td><td>next target</td></tr>
@@ -2008,6 +2315,7 @@
         <tr><td>W / S</td><td>throttle up / down (it stays set)</td><td>X</td><td>full stop</td></tr>
         <tr><td>A / D</td><td>turn legs</td><td>Mouse</td><td>twist torso &amp; aim</td></tr>
         <tr><td>Left mouse / 1</td><td>laser beams (hold on target: damage climbs, so does heat)</td><td>Right mouse / 2</td><td>autocannon (big hits)</td></tr>
+        <tr><td>G / 4 (hold)</td><td>fusion cannon: scan one mech for 3 s -- it dies; the feedback hurts your torso and shuts you down</td><td></td><td></td></tr>
         <tr><td>Space / 3</td><td>tap: fire missiles &middot; hold: fly them, release to detonate</td><td>F</td><td>fire everything</td></tr>
         <tr><td>T</td><td>next target</td><td></td><td></td></tr>
         <tr><td>R</td><td>target under crosshair</td><td>J (hold)</td><td>jump jets</td></tr>
@@ -2278,7 +2586,7 @@
     });
 
     const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX', 'KeyC', 'KeyJ', 'KeyT', 'KeyR', 'KeyF', 'KeyZ', 'KeyP', 'Space',
-      'Digit1', 'Digit2', 'Digit3', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
+      'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyG', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
     // Keys are taken at the document: hiding the overlay drops focus to <body>,
     // and pointer lock doesn't move it back.
     const onKeyDown = e => {
@@ -2381,6 +2689,10 @@
         steerBy(e.clientX - (f.lx ?? e.clientX), e.clientY - (f.ly ?? e.clientY), f.kind === 'btn' ? 0.009 : 0.006);
         f.lx = e.clientX; f.ly = e.clientY;
       } else if (f.kind === 'btn') {
+        f.lx = e.clientX; f.ly = e.clientY;
+      } else if (f.kind === 'btn' && f.name === 'fusion' && P.alive) {
+        P.twist = clampN(P.twist - (e.clientX - f.lx) * 0.0055, -1.9, 1.9);
+        P.pitch = clampN(P.pitch - (e.clientY - f.ly) * 0.0055 * (invertY ? -1 : 1), -0.4, 0.45);
         f.lx = e.clientX; f.ly = e.clientY;
       } else if (f.kind === 'aim' && P.alive) {
         const sens = G.zoom ? 0.0022 : 0.0055;
@@ -2485,7 +2797,10 @@
         case 's': netState(m); break;
         case 'fx': netFx(m); break;
         case 'hit':
-          if (G.player.alive) damage(G.player, m.p, m.amt, mechById(m.from) || null);
+          if (!G.player.alive) break;
+          // A fusion discharge isn't damage: it's the frame shaking apart.
+          if (m.fu && G.player.spawnT <= 0 && !G.roundOver) { G.whiteFlash = 1; destroy(G.player, mechById(m.from) || null); }
+          else damage(G.player, m.p, m.amt, mechById(m.from) || null);
           break;
         case 'kill': {
           setScores(m.scores);
@@ -2514,7 +2829,7 @@
       ter = makeTerrain(seed);
       if (world) gl.deleteBuffer(world.buf);
       world = upload(buildTerrainMesh(ter, pal, seed));
-      G.mechs = []; G.shots = []; G.beams = []; G.parts = []; G.wrecks = []; G.msgs = [];
+      G.mechs = []; G.shots = []; G.beams = []; G.parts = []; G.wrecks = []; G.msgs = []; G.pulses = [];
       G.target = null; G.flash = 0; G.shake = 0; G.kick = 0; G.zoom = false; G.time = 0; G.guide = null; G.mDown = false;
       G.stats = { shots: 0, hits: 0, dealt: 0, taken: 0, kills: 0 };
       G.def = { name: 'Arena', foes: [] };
@@ -2559,7 +2874,9 @@
       const P = G.player;
       netSend({ t: 's', ch: P.type, x: r2(P.x), y: r2(P.y), z: r2(P.z), yaw: r2(P.yaw), tw: r2(P.twist), p: r2(P.pitch), sp: r2(P.speed),
         air: P.air ? 1 : 0, al: P.alive ? 1 : 0, sd: P.shutdown ? 1 : 0, hp: HPK.map(k => r2(P.hp[k])),
-        bm: P.beaming ? 1 : 0, be: P.beaming && P.beamEnd ? P.beamEnd.map(r2) : 0, bf: r2(beamMult(P)) });
+        bm: P.beaming ? 1 : 0, be: P.beaming && P.beamEnd ? P.beamEnd.map(r2) : 0, bf: r2(beamMult(P)),
+        fl: P.fusion?.on && P.fusion.end ? P.fusion.end.map(r2) : 0, sc: P.fusion?.mech?.netId || 0,
+        sp: P.fusion?.mech ? r2(min(1, P.fusion.t / WEAPONS.fusion.scan)) : 0 });
     }
 
     function netState(s) {
@@ -2572,6 +2889,12 @@
       }
       const first = !r.net;
       r.net = { ...s, at: performance.now() };
+      // Someone's resonance scan is on us: warn, with an alarm.
+      if (s.sc === Net.id && s.sp > 0) {
+        if (!G.scanWarn || performance.now() - G.scanWarn.at > 1000) say('Warning. Resonance scan.', true);
+        G.scanWarn = { by: s.id, p: s.sp, at: performance.now() };
+        if (random() < 0.3) sfx.beep();
+      }
       if (Array.isArray(s.hp)) HPK.forEach((k, i) => { r.hp[k] = +s.hp[i] || 0; });
       if (first || (s.al && !r.alive)) {
         // Appeared or respawned: jump straight there.
@@ -2621,6 +2944,9 @@
             owner: src, dmg: 0, life: d.range / d.speed + 1, target, smoke: 0, age: 1, ghost: true, vid: f.v, from: f.id });
         }
         sfx.missile(f.p);
+      } else if (f.k === 'fu') {
+        launchPulse(f.a, f.id2 ? mechById(f.id2) : null, src, true, f.b);
+        sfx.fusionCrack();
       } else if (f.k === 'mg' || f.k === 'md') {
         // Another pilot is flying a volley (mg: where it is and where it's
         // heading) or has detonated it (md). Their client scores the damage.
@@ -2639,7 +2965,7 @@
       raf = requestAnimationFrame(loop);
       const dt = min(0.05, (ts - last) / 1000 || 0);
       last = ts;
-      if (document.hidden) { for (const k of Object.keys(loops)) loopSet(k, 0); beamSound(false, 1); return; }
+      if (document.hidden) { for (const k of Object.keys(loops)) loopSet(k, 0); beamSound(false, 1); fusionSound(false, 0); return; }
       if (ts - lastAudioCheck > 1000) {
         lastAudioCheck = ts;
         const c = Sound.ctx;
@@ -2648,7 +2974,7 @@
       if (G.state === 'play' && !document.hasFocus() && !G.paused) pause(true);
       if (G.state === 'menu') menuTick(dt);
       if ((G.state === 'play' && (!G.paused || mp())) || G.state === 'over') update(dt);
-      else { for (const k of Object.keys(loops)) loopSet(k, 0); beamSound(false, 1); }
+      else { for (const k of Object.keys(loops)) loopSet(k, 0); beamSound(false, 1); fusionSound(false, 0); }
       render();
     };
 

@@ -53,6 +53,23 @@ fires its lasers in bursts with a wandering aim and eases off before
 overheating. In the arena, beam state rides in the 15 Hz state message and beam
 damage is batched (`flushHits`).
 
+**The fusion cannon** (`fusionTick` / `fusionFire`), on every mech but never
+used by the AI. Hold FUSION (G / 4, or the touch button -- drag it to aim) and
+a thin violet targeting laser scans whatever it's on. Keep it on one mech for
+3 s. It's meant to be hard but possible, so the lock helps a little: the laser
+counts within 1.5 m of a mech (`slack`, with clear line of sight), a slip
+shorter than 0.5 s pauses the scan instead of resetting it (`grace`; the ring
+flickers amber, LOCK SLIPPING), and while locked the torso is drawn gently
+toward the target (`assist`). Off for longer, onto another mech, or letting go
+-- and the scan starts over. (Tuned against a strafing Jackal at ~77 kph with
+wobbly, laggy aim: no kills in 20 s under the old strict 4 s rule, kills in
+5-10 s with these.) Then the reactor discharges at the target's resonant
+frequency and the target is destroyed outright, whatever its armour. The cost:
+heat jumps to 140 (a ~5 s overload shutdown) and the cannon recharges for
+25 s. In the arena the target sees a flashing RESONANCE SCAN warning with the
+scanner's name (`sc` / `sp` in the state message) and can break line of sight;
+the kill travels as a `hit` with `fu: 1`, which the server passes through.
+
 **The autocannon** is the opposite trade: big single hits, little heat, ammo.
 
 **Guided missiles.** A tap of the missile control fires a volley as usual. Keep
@@ -107,11 +124,23 @@ How it works:
 
 ## Running it
 
-It's a static site: serve this folder with any web server
-(`python3 -m http.server 8000`) and open it. There is no build step.
+It's a static site: any web server will do, and there is no build step.
 
-The multiplayer arena also needs the relay, `python3 server.py` (stdlib
-Python 3, port 8096); the game connects to `ws://<page host>:8096/ws`.
+```sh
+python3 -m http.server 8000        # then open http://localhost:8000
+```
+
+Single player needs nothing else. For the multiplayer arena, also run the relay
+(stdlib Python 3, no dependencies) on the same machine:
+
+```sh
+python3 server.py                  # listens on :8096; the game connects to ws://<page host>:8096/ws
+```
+
+Phones on the same network can then open `http://<that machine's IP>:8000`.
+The relay only accepts pages served from an IP address, `localhost`, or a host
+named `stompy.*` (its `Origin` check). `STOMPY_SCORE_LIMIT` and
+`STOMPY_ROUND_GAP` set the round length.
 
 Settings and mission progress are kept in each browser's localStorage under
 `stompy.*`.
@@ -119,10 +148,18 @@ Settings and mission progress are kept in each browser's localStorage under
 ## How it works, briefly
 
 - **Walking.** Each mech has a gait clock driven by distance travelled, not
-  time. The left foot swings over one window of the cycle, the right over the
-  opposite one; a planted foot never moves, and each swing lands where its rest
-  spot will be at touchdown. Legs are two-bone IK (`solveKnee`, `limb`). Leg
-  lengths in `LEG` must match the `uleg`/`lleg` meshes in `buildMechParts`.
+  time. Each leg swings over its own window of the cycle (`GEO[].legs[].ph`);
+  a planted foot never moves, and each swing lands where its rest
+  spot will be at touchdown. Legs are two-bone IK (`solveKnee`, `limb`), with
+  the knee aimed by the body plan's `knee` (forward, back, or out-and-up).
+- **Body plans.** Each chassis has a leg type (`CHASSIS[].legs`), and `GEO`
+  holds that type's body plan: hip height, leg lengths, which way the knee
+  bends, per-leg hip and rest-foot positions and gait phase, body radius and
+  height (hits, collisions, blasts) and where the torso, cockpit and weapon
+  mounts sit. KESTREL is reverse-jointed (bird legs, clawed feet, missile pods
+  and a domed cockpit -- the sketch), JACKAL forward-jointed, WARDEN a
+  quadruped that trots on diagonal pairs with knees bowed out like a spider's.
+  `buildMechParts` builds each type's meshes to match its `l1` / `l2`.
 - **Sound.** `loadSamples()` decodes the clips once audio is unlocked by a
   click; `sfx.*` layers them over synthesised tones (which also stand in if a
   clip fails). Continuous hum/jet/servo loops are driven from `update()`.

@@ -205,8 +205,10 @@ def handle_message(c, msg):
         target = players.get(int(num(msg.get("to"), 0, 99)))
         if target and target is not c and not arena["over"]:
             p = msg.get("p") if isinstance(msg.get("p"), list) else [0, 0, 0]
+            # fu: a fusion-cannon discharge -- the victim's client treats it as
+            # a kill rather than damage (hit damage is capped at 40).
             send(target, {"t": "hit", "from": c.id, "amt": num(msg.get("amt"), 0, 40),
-                          "p": [num(v, -1e4, 1e4) for v in p[:3]]})
+                          "p": [num(v, -1e4, 1e4) for v in p[:3]], "fu": 1 if msg.get("fu") else 0})
     elif t == "died":
         c.deaths += 1
         killer = players.get(int(num(msg.get("by"), 0, 99)))
