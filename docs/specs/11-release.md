@@ -44,10 +44,11 @@ returns on the first touch).
 
 Mission 1 only, first time only (`store` key `tut.done`), each prompt shown
 once in the HUD font near the relevant instrument, fading when the player
-does the thing: throttle (`W / S` or `DRAG UP`), turn, aim, fire energy with
-the melt ring, fire ballistic, missiles with a lock, jets, heat warning when
-first over 60, target cycle when a second enemy appears. Each prompt is at
-most three words plus the key or gesture. Skippable by pausing (the pause
+does the thing. In the house voice, at most three words plus the key or
+gesture: `W: GO. S: LESS GO.` · `A / D: LEGS` · `MOUSE: TORSO` · `HOLD LMB:
+MELT IT` · `RMB: THUMP` · `SPACE: MISSILES (HOLD TO FLY)` · `J: UP` · `E:
+PUNCH` (when a JACKAL is in reach) · `HEAT: TOO MUCH` (first over 60) · `T:
+NEXT ONE` (when a second enemy appears). Touch variants name the gesture. Skippable by pausing (the pause
 screen gains `SKIP TUTORIAL`).
 
 ### Accessibility and settings

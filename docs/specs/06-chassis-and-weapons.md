@@ -2,18 +2,27 @@
 
 | | |
 |---|---|
-| Status | draft (names and numbers are proposals) |
+| Status | draft (names and numbers are proposals; PURPLE PUNCHER is confirmed) |
 | Milestone | M2 |
 | Size | L (each chassis is an M issue; each weapon an S issue) |
-| Depends on | M0; AI profiles from [05-ai.md](05-ai.md) for the enemy versions |
+| Depends on | M0; AI profiles from [05-ai.md](05-ai.md); melee from [12-melee.md](12-melee.md) for PURPLE PUNCHER |
 | Touch parity | no new controls; every weapon maps to an existing category |
 
 ## Summary
 
-Three new chassis to round out light, medium-long-range and assault roles,
+Three new chassis to round out light, long-range and assault-brawler roles,
 and six new weapons spread across the three categories so that mechlab-lite
 has real choices. Everything is built the way the existing three are: a body
-plan in `GEO`, hand-built flat-shaded parts, a profile for the AI.
+plan in `GEO`, hand-built flat-shaded parts, a profile for the AI. Names are
+toy-line, not field-manual: the register the game is called Stompy in.
+
+## Naming
+
+Rules from the tone guide: readable at a glance, no explanation needed, no
+references to anything outside the game, funnier when said in the cockpit
+voice's flat delivery. One or two words, caps on the HUD. The existing five
+weapons keep their plain names for now; renaming them is an open question
+(proposal at the bottom).
 
 ## Weapons
 
@@ -22,24 +31,46 @@ mechlab. Categories never change, so no new buttons.
 
 | Key | Name | Cat | Kind | Numbers | Tons | Character |
 |---|---|---|---|---|---|---|
-| `ppc` | PPC | energy | `bolt` (new) | dmg 14, heat 11, cd 3.5, range 600, speed 420 | 7 | A slow blue bolt. Big heat. Its hit scrambles the target's HUD for 1.5 s (radar and target box flicker). |
-| `plaser` | PULSE LASER | energy | `beam` | dps 2.6, hps 8, range 300, melts 1.5× faster | 3 | Short range melt specialist. Stuttering beam visual (width flickers at 12 Hz). |
-| `srm` | SRM-6 | missile | `missile` | dmg 2.6 ×6, heat 4, cd 3, range 260, speed 160, ammo 18 volleys, no homing | 3 | Dumb-fire spread. The hold-to-guide works on it too. |
-| `gauss` | GAUSS RIFLE | ballistic | `shell` | dmg 20, heat 1, cd 3.2, range 800, speed 700, ammo 12 | 12 | The sniper's gun. Loud, bright tracer, heavy recoil kick. |
-| `mg` | MACHINE GUN | ballistic | `shell`, burst | dmg 0.8 per round, 6 rounds per 0.3 s burst, heat 0.2, cd 0.5, range 220, ammo 60 bursts | 1 | Strips a melted section fast. Tracers. |
-| `flamer` | FLAMER | energy | `beam` | dps 0.8, hps 3, range 90, adds 6 heat/s to the target | 1.5 | Forces shutdowns at knife range. Orange cone of fire particles. |
+| `ppc` | THUNDERCLAP | energy | `bolt` (new) | dmg 14, heat 11, cd 3.5, range 600, speed 420 | 7 | A slow blue bolt with a crack of thunder. Big heat. Its hit scrambles the target's HUD for 1.5 s (radar and target box flicker) and gives a strong wobble kick. |
+| `plaser` | PEPPER LASER | energy | `beam` | dps 2.6, hps 8, range 300, melts 1.5× faster | 3 | Short range melt specialist. Stuttering beam (width flickers at 12 Hz) with a sizzle. |
+| `srm` | FIRECRACKERS | missile | `missile` | dmg 2.6 ×6, heat 4, cd 3, range 260, speed 160, ammo 18 volleys, no homing | 3 | Dumb-fire spread that pops. Hold-to-guide works on it too. Small knockback per hit. |
+| `gauss` | BIG BONKER | ballistic | `shell` | dmg 20, heat 1, cd 3.2, range 800, speed 700, ammo 12 | 12 | The sniper's gun. Loud, bright tracer, heavy recoil that rocks the shooter back a step, and a knockback on the target worth a shove. |
+| `mg` | PEASHOOTER | ballistic | `shell`, burst | dmg 0.8 per round, 6 rounds per 0.3 s burst, heat 0.2, cd 0.5, range 220, ammo 60 bursts | 1 | Strips a melted section fast. Tracers, a rattle, no respect. |
+| `flamer` | TOASTER | energy | `beam` | dps 0.8, hps 3, range 90, adds 6 heat/s to the target | 1.5 | Forces shutdowns at knife range. Orange cone of fire particles. A shut-down enemy is a punchable enemy. |
 
 New weapon kinds in code: `bolt` is a `shell` with its own mesh colour and an
-on-hit callback (`onHit(target)` → scramble); `beam` gains optional
-`meltRate` and `targetHeat`; `shell` gains optional `burst: { n, dt }`.
+on-hit callback (`onHit(target)` → scramble, wobble); `beam` gains optional
+`meltRate` and `targetHeat`; `shell` gains optional `burst: { n, dt }` and
+`knock` (m/s applied through `push`).
 
 Existing weapons get `tons`: `laser` 5, `mlaser` 2, `ac` 8, `lrm` 6.
 
 ## Chassis
 
-Three new body plans or variants. Names follow the bird/animal register.
+### PURPLE PUNCHER — assault brawler (unlock after mission 11)
 
-### MANTIS — light reverse-joint skirmisher (unlock after mission 6)
+The mech the game is named after, more or less. Purple. Fists.
+
+| | |
+|---|---|
+| Legs | `forward` variant: thick, `hip 5.0`, `l1 2.6, l2 2.6`, `stride [3.0, 3.4]`, heavy footfalls (nearby mechs feel them) |
+| Scale | 1.3 |
+| Speed / turn | 9 / 0.6 |
+| Sink | 12 |
+| Jets | none stock (system slot allows level 1: a jumping PURPLE PUNCHER is a stomp delivery system) |
+| HP | T 110, LA 50, RA 50, LL 60, RL 60 |
+| Colours | `col [0.45, 0.22, 0.6]`, `acc [0.95, 0.75, 0.2]` (purple with yellow knuckles) |
+| Melee | the real punch block from [12-melee.md](12-melee.md): dmg 30, reach 14×scale, knock 22, stomp 18 |
+| Hardpoints | T ballistic (AUTOCANNON), T missile (FIRECRACKERS). Arms carry fists, not hardpoints. |
+| Tons | 80 (the fists are free; its guns are modest) |
+| Look | Boxy torso wider than tall, shoulders like a fridge, two oversized fists on short thick arms (separate `buildFist` parts so they swing), a low cockpit slit, flat head. It should read as "that one punches" from 400 m. |
+| AI | `brawler`: closes to reach using the cannon on the way, punches, never retreats, alpha below 40% torso. Stomps if it has jets. |
+| Menu role line | `ASSAULT · IT PUNCHES` |
+
+Its arrival in mission 10 is the campaign's set piece: a shape on the ridge
+that is the wrong colour, then the footfalls.
+
+### PIPSQUEAK — light reverse-joint skirmisher (unlock after mission 6)
 
 | | |
 |---|---|
@@ -49,12 +80,13 @@ Three new body plans or variants. Names follow the bird/animal register.
 | Sink | 8 |
 | Jets | fuel 1.5×, climb 1.2× (stock jets level 2) |
 | HP | T 28, LA 12, RA 12, LL 16, RL 16 |
-| Hardpoints | LA missile (SRM-6), RA energy (MED LASER), T ballistic (MG) |
+| Hardpoints | LA missile (FIRECRACKERS), RA energy (MED LASER), T ballistic (PEASHOOTER) |
 | Tons | 25 |
-| Look | Narrow torso, long shins, SRM box on the left shoulder, a single eye slit. |
-| AI | `harass` with SRMs; breaks off at 50% torso |
+| Look | Narrow torso, long shins, FIRECRACKERS box on the left shoulder, a single eye slit. Hops more than it walks. |
+| AI | `harass` with FIRECRACKERS; stomps from above; breaks off at 50% torso; gets shoved a very long way |
+| Menu role line | `REVERSE-JOINT · SMALL, RUDE` |
 
-### HERON — medium forward-joint sniper (unlock after mission 8)
+### BEANPOLE — medium forward-joint sniper (unlock after mission 8)
 
 | | |
 |---|---|
@@ -62,27 +94,19 @@ Three new body plans or variants. Names follow the bird/animal register.
 | Scale | 1.0 |
 | Speed / turn | 13 / 0.9 |
 | Sink | 11 |
-| Jets | none (level 0; jets slot allows level 1 at 1.5 t) |
+| Jets | none (jets slot allows level 1 at 1.5 t) |
 | HP | T 60, LA 26, RA 26, LL 36, RL 36 |
-| Hardpoints | RA ballistic (GAUSS), LA energy (PPC), T energy (MED LASER) |
+| Hardpoints | RA ballistic (BIG BONKER), LA energy (THUNDERCLAP), T energy (MED LASER) |
 | Tons | 50 |
-| Look | Long barrel arm, a tall sensor mast on the torso, narrow stance. |
-| AI | `ridge`; relocates after three shots |
+| Look | Long barrel arm, a tall sensor mast on the torso, narrow stance; the gauss recoil visibly rocks it on its stilts. |
+| AI | `ridge`; relocates after three shots; keeps out of punching range of everything |
+| Menu role line | `FORWARD-JOINT · LONG GUN, LONG LEGS` |
 
-### BISON — assault forward-joint (unlock after mission 11)
+### Existing three, role lines refreshed
 
-| | |
-|---|---|
-| Legs | `forward` variant: thick, `hip 5.0`, `l1 2.6, l2 2.6`, `stride [3.0, 3.4]`, heavier footfalls |
-| Scale | 1.3 |
-| Speed / turn | 8 / 0.55 |
-| Sink | 12 |
-| Jets | none |
-| HP | T 110, LA 48, RA 48, LL 60, RL 60 |
-| Hardpoints | LA ballistic (AUTOCANNON), RA ballistic (AUTOCANNON), T energy (PPC), T missile (LRM-10) |
-| Tons | 85 |
-| Look | A wall. Boxy torso wider than tall, shoulder cannons, a low cockpit slit, a flat-topped head. |
-| AI | `holdLine`; alpha below 40%; never retreats |
+- KESTREL: `REVERSE-JOINT · DOES A BIT OF EVERYTHING`
+- JACKAL: `FORWARD-JOINT · FAST, FLIMSY`
+- WARDEN: `QUADRUPED · SLOW, STUBBORN`
 
 ### Body plan mechanics
 
@@ -90,53 +114,59 @@ Three new body plans or variants. Names follow the bird/animal register.
 `geo: { hip, l1, l2, stride, swing }` partial that `geoOf(m)` merges. The
 mesh builders already size legs from `l1`/`l2`; torso and arm builders take a
 `style` string per chassis for the distinct silhouettes (`buildTorso(ch)`
-with a switch). Keep each chassis's parts under 600 triangles.
+with a switch; `buildFist` for PURPLE PUNCHER). Keep each chassis's parts
+under 700 triangles.
 
-Footfall sound and camera kick scale with `ch.scale` (BISON steps should be
-felt).
+Footfall feedback scales with `scale²` per the feel table; PURPLE PUNCHER's
+steps are felt by anyone within 40 m.
 
 ## Menu
 
 `MECH_ORDER` becomes the unlock-aware list; locked chassis show as a dark
 silhouette with `LOCKED` in the role line, cycle-able but not launchable.
-`MECH_INFO` gains the role lines:
-
-- MANTIS: `REVERSE-JOINT · LIGHT SKIRMISHER`
-- HERON: `FORWARD-JOINT · LONG-RANGE`
-- BISON: `FORWARD-JOINT · ASSAULT`
+PURPLE PUNCHER's silhouette is still purple when locked (the one exception,
+on purpose).
 
 ## Arena
 
 Chassis already travel in `ch`. Add the three to `CHASSIS`; the server's
 allow-list (M5a adds one) includes them. Balance in free-for-all is by
-tonnage honesty: the BISON is slow enough to be fusion-scanned.
+tonnage honesty: PURPLE PUNCHER is slow enough to be fusion-scanned and
+kited, and devastating if you let it close.
 
 ## Code touchpoints
 
-- `src/data/weapons.js`, `chassis.js`, `geo.js`, `src/data/systems.js`.
-- `src/sim/combat.js`: `bolt` kind, bursts, `onHit`, target heat from beams
-  in `beams.js`.
+- `src/data/weapons.js`, `chassis.js`, `geo.js`, `src/data/systems.js`,
+  `src/data/feel.js` rows for the new weapons.
+- `src/sim/combat.js`: `bolt` kind, bursts, `onHit`, shell `knock`; target
+  heat from beams in `beams.js`.
 - `src/sim/mech.js`: HUD scramble timer (`m.scramble`).
 - `src/render/hud.js`: scramble effect (radar blips jitter, target box
-  dropped while `scramble > 0`); tracers for MG/gauss in `scene.js`.
-- `src/mesh/mechParts.js`: three builders or styles.
-- `src/audio/sfx.js`: `ppc`, `gauss`, `mg`, `flamer` recipes from existing
-  clips plus synthesis (no new assets needed; note which clips).
-- `src/ui/menu.js`: locked state.
+  dropped while `scramble > 0`); tracers for PEASHOOTER/BIG BONKER in
+  `scene.js`.
+- `src/mesh/mechParts.js`: three builders or styles plus fists.
+- `src/audio/sfx.js`: `thunderclap`, `bonker`, `peashooter`, `toaster`
+  recipes from existing clips plus synthesis (no new assets needed; note
+  which clips).
+- `src/ui/menu.js`: locked state, role lines.
 
 ## Acceptance criteria
 
 1. Each chassis walks with no foot slide at all throttles, on slopes, and
    after a jump landing (gait test parameterised over all six chassis).
 2. Each weapon fires from the player and from the AI, is drawn, makes a
-   sound, and hits a target in a headless test with the expected damage.
-3. PPC scramble lasts 1.5 s and is visible on the HUD; flamer raises target
-   heat at 6/s; MG fires 6 rounds per burst; pulse laser reaches full melt in
-   2 s (tests).
-4. Menu shows six chassis with unlock state; the three new ones render in the
-   menu at the right framing on phone and desktop (screenshots).
-5. `MECH_INFO.fire` bars and mechlab stats are consistent with the tables.
-6. Arena: two clients, one in each new chassis, see each other correctly.
+   sound, has its feel-table row, and hits a target in a headless test with
+   the expected damage.
+3. THUNDERCLAP scramble lasts 1.5 s and is visible on the HUD; TOASTER
+   raises target heat at 6/s; PEASHOOTER fires 6 rounds per burst; PEPPER
+   LASER reaches full melt in 2 s; BIG BONKER knocks a JACKAL ≥ 3 m (tests).
+4. PURPLE PUNCHER's punch uses its own melee block; with one arm destroyed
+   it still punches at full strength; with both, it shoves (test).
+5. Menu shows six chassis with unlock state; the three new ones render in the
+   menu at the right framing on phone and desktop (screenshots). PURPLE
+   PUNCHER is unmistakably purple and unmistakably has fists at menu scale.
+6. `MECH_INFO.fire` bars and mechlab stats are consistent with the tables.
+7. Arena: two clients, one in each new chassis, see each other correctly.
 
 ## Performance
 
@@ -145,7 +175,11 @@ shells at 200, oldest dropped silently.
 
 ## Open questions
 
-- Names: MANTIS, HERON, BISON. Alternatives if the owner prefers all birds:
-  SWIFT, HERON, CONDOR.
-- Should any chassis lack the fusion cannon (the BISON, for balance)? Default:
-  all have it.
+- Names: PIPSQUEAK and BEANPOLE are proposals; PURPLE PUNCHER is fixed.
+  Alternatives if wanted: SKEETER / STILTS.
+- Renaming the original five to match (`needs-owner`): LG LASER → BIG ZAPPER,
+  MED LASER → ZAPPER, AUTOCANNON → THUMPER, LRM-10 → TEN PACK, FUSION CANNON
+  stays (it is the serious one, which is the joke). Default: leave them until
+  the owner picks.
+- Should PURPLE PUNCHER lack the fusion cannon? Default: it has it; a mech
+  that can punch you or dissolve you is a good villain.

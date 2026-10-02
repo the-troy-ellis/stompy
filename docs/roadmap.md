@@ -40,41 +40,56 @@ Exit: `npm test` green in CI, `dist/stompy.js` plays identically to today on
 desktop and a phone, the playtest checklist passes, and the file structure
 matches [architecture.md](architecture.md).
 
-## M1 — Feel and AI
+## M1 — Feel, thunk, melee and AI
 
-Goal: the fights are better before there are more of them.
+Goal: the fights feel like Stompy before there are more of them.
 
+- **Thunk pass** ([specs/13-thunk.md](specs/13-thunk.md)): one tunable table
+  for all feedback; footfalls with kick, sub-bass and dust scaled by chassis;
+  landing squash with a spring; hit wobble on the body and the view; recoil
+  that rocks the torso and nudges the mech; knockback; shutdown sag; a death
+  with a beat before the collapse; oversized explosions; hum ducking on big
+  hits. A REDUCED MOTION setting damps it all.
+- **Melee** ([specs/12-melee.md](specs/12-melee.md)): PUNCH on every chassis
+  (a shove for most, a real punch for PURPLE PUNCHER when it arrives in M2),
+  stomps when landing from jets on a mech, knockback with mass scaling, AI
+  that punches back and that keeps out of reach, arena support.
 - AI rewrite as per-chassis behaviours with shared utilities
   ([specs/05-ai.md](specs/05-ai.md)): cover and ridgelines, jump jets, focus
   on the damaged section, retreat to cool, light mechs harass, heavies hold
   range, group cohesion. Difficulty setting (EASY / NORMAL / HARD) that scales
   accuracy, awareness and aggression, never HP.
 - Hit feedback: section-specific sparks and smoke, armour-plate debris that
-  bounces and stays for a while, a short hit-stop on the crosshair, the
-  cockpit shake scaled by section.
+  bounces and stays for a while, a short hit-stop on the crosshair.
 - Death: multi-stage destruction (torso blows, legs buckle, wreck settles),
-  more and heavier debris.
-- Walking feel: footfall dust, slope slows you, landing from jets digs in.
+  more and heavier debris; a mech that loses both legs sits down before it
+  dies.
 - Heat feel: the view warps a little above 85 heat, the hum rises, the HUD
   bars flicker before shutdown.
 - Target info panel: show the target's section damage diagram and range, and
   a lead indicator for the autocannon.
+- Voice: the dry-line pools from the tone guide, with the once-per-minute
+  limiter and seeded pick.
 - Settings: mouse sensitivity, touch aim sensitivity, field of view, voice
-  volume, music/SFX split when music exists.
+  volume, reduced motion.
 
-Exit: a HARD mission-4 fight is winnable but tense; playtesters can tell a
-JACKAL from a WARDEN by behaviour alone.
+Exit: a HARD mission-4 fight is winnable but tense; a tester who plays sixty
+seconds says it feels heavy and fun without being prompted; playtesters can
+tell a JACKAL from a WARDEN by behaviour alone.
 
 ## M2 — Content and mechlab
 
 Goal: more things to fight with and against, and a way to choose.
 
 - Three new chassis ([specs/06-chassis-and-weapons.md](specs/06-chassis-and-weapons.md)):
-  a light reverse-joint skirmisher, a medium forward-joint sniper, an assault
-  biped. Each needs a body plan or a variant of one, meshes, menu entry,
-  AI behaviour and a place in the campaign.
-- Six new weapons: PPC, pulse laser, SRM-6, gauss rifle, machine gun, flamer.
-  Each maps to an existing category so the controls do not change.
+  PIPSQUEAK (light reverse-joint skirmisher), BEANPOLE (medium forward-joint
+  sniper) and PURPLE PUNCHER (assault brawler with fists, the melee chassis).
+  Each needs a body plan or a variant of one, meshes, menu entry, AI
+  behaviour and a place in the campaign.
+- Six new weapons: THUNDERCLAP (PPC), PEPPER LASER (pulse), FIRECRACKERS
+  (SRM-6), BIG BONKER (gauss), PEASHOOTER (machine gun), TOASTER (flamer).
+  Each maps to an existing category so the controls do not change. The
+  original five keep their plain names; renaming them is an open question.
 - Mechlab-lite ([specs/02-mechlab.md](specs/02-mechlab.md)): hardpoints per
   chassis with a category and a location; a tonnage budget; three system
   slots (heat sinks, armour, jump jets); loadouts saved per chassis; the
@@ -82,7 +97,8 @@ Goal: more things to fight with and against, and a way to choose.
 - Free play gains chassis mix and difficulty pickers.
 
 Exit: six chassis selectable, twelve weapons, mechlab usable with two thumbs
-in under a minute, arena accepts and renders custom loadouts.
+in under a minute, arena accepts and renders custom loadouts, and PURPLE
+PUNCHER punching a JACKAL off a ridge gets a laugh in a playtest.
 
 ## M3 — Campaign
 
@@ -174,7 +190,7 @@ Goal: it is a product.
   offline single player.
 - Gamepad support on desktop and phones (standard mapping).
 - Mission 1 as a silent tutorial: HUD prompts that appear once and never
-  again.
+  again, in the house voice (`W: GO. S: LESS GO.`).
 - Accessibility pass: colour-blind-safe radar and section colours, HUD scale
   setting, reduced-motion setting.
 - Performance pass against the budget table; load-time pass.
@@ -187,6 +203,7 @@ Spec: [specs/11-release.md](specs/11-release.md).
 
 See the non-goals in [vision.md](vision.md). Also not scheduled, pending a
 decision from the owner: music (the game has none; a short synthesised menu
-loop would fit the register), AI use of the fusion cannon (today never; a
+loop would fit the register), renaming the original five weapons to match the
+new ones, AI use of the fusion cannon (today never; a
 HARD-only boss use is proposed in specs/05-ai.md as an open question), and a
 replay/ghost system (determinism makes it cheap later).

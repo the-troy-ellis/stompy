@@ -25,10 +25,12 @@ it, clamped to the view edge with an arrow when off-screen, and a matching
 blip on the radar. Secondary objectives are dimmer and listed under the
 primary.
 
-Voice, in the existing register, one line per transition: `Objective
-updated.` `Structure destroyed.` `Convoy under fire.` `Convoy lost.`
-`Reinforcements inbound.` `Extraction point reached.` `Mission objectives
-complete.` `Mission failed.`
+Voice, in the cockpit register, one line per transition. Warnings flat:
+`Convoy under fire.` `Reinforcements inbound.` `Objective updated.`
+Resolved events may draw from a pool: `Structure destroyed.` ·
+`Structure destroyed. It was in the way.`; `Convoy lost.`; `Extraction point
+reached.` · `Extraction point reached. Nobody is here.`; `Mission objectives
+complete.` · `Mission complete. Good stomping.`; `Mission failed.`
 
 Debrief shows each objective with a tick or cross, then the stats.
 
@@ -66,7 +68,8 @@ objective).
 mesh, radius, height }`. Kinds:
 
 - **structure**: static; drawn from a prop mesh; `rayCyl` hit volume like a
-  mech; damage goes to a single `hp`; destroying spawns debris and a wreck
+  mech; damage goes to a single `hp` (punches count, and a tower that is
+  punched down topples toward the puncher's facing with the thunk beat); destroying spawns debris and a wreck
   variant (collapsed box) and flags its tags. Structures are also the
   buildings M4 scatters, with `hp: Infinity` when decorative.
 - **vehicle**: moves along a waypoint list at a fixed speed, stops when the

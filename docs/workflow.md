@@ -31,7 +31,7 @@ and people alike.
 
 ## Pull requests
 
-Title: `M2: PPC weapon (#42)`. Body uses this template (also in
+Title: `M2: THUNDERCLAP weapon (#42)`. Body uses this template (also in
 `.github/pull_request_template.md` once M0 lands):
 
 ```
@@ -49,7 +49,7 @@ Steps for a reviewer, on desktop and on a phone.
 - [ ] Playtest checklist run on a phone (model, browser)
 - [ ] Frame budget checked where the change touches render/update
 - [ ] Spec status updated; README/docs updated if behaviour changed
-- [ ] No new text longer than two sentences; new voice lines in the voice register
+- [ ] New text passes the tone guide (one sentence, dry voice, no outside references); warnings stay flat
 
 ## Screenshots / recordings
 Required for anything visual or HUD.
@@ -76,6 +76,10 @@ A PR is done when all of these hold:
 5. **Docs**: spec status moved; architecture map updated if files moved;
    README updated if a player would notice.
 6. **Tone**: new strings pass the tone guide in [vision.md](vision.md).
+7. **Thunk**: anything that adds an action or an impact (a weapon, a hit, a
+   landing, a UI confirm) ships with its feedback: sound, camera, body
+   reaction, per [specs/13-thunk.md](specs/13-thunk.md). A silent, still
+   action is not done.
 
 ## Playtest checklist
 
@@ -160,7 +164,10 @@ frame time over 60 s of fighting. Report both in the PR.
 - Adding a library. Don't. If you need a matrix function, write it in
   `src/util/math.js`.
 - Adding text. Every string gets the tone test. Prefer a HUD marker or a voice
-  line.
+  line. Being funny in two sentences; the second one is where it dies.
+- Making it solemn. If a new mech, weapon or mission name would fit in a
+  military manual, try again. If it would fit in a Saturday-morning cartoon
+  toy line, that is closer.
 - Shipping a desktop-only control. If it needs a key, it needs a touch
   affordance, or it is a desktop *convenience* for something touch does
   another way.

@@ -45,10 +45,24 @@ to it.
 | | M0: README refresh (arena chassis note, docs link) and CLAUDE.md | docs | S | roadmap §M0 |
 | | M0: ESLint rule forbidding DOM/render imports from src/sim and src/data | tooling | S | 00 §Acceptance 4 |
 
-## M1 — Feel and AI
+## M1 — Feel, thunk, melee and AI
 
 | # | Title | Labels | Size | Spec |
 |---|---|---|---|---|
+| | M1: feel table (data/feel.js), spring helper, FEEL debug panel | sim, render, tooling | S | 13 §Feel table |
+| | M1: footfalls and landing squash with scale, dust, bass, haptics | sim, render, audio, platform:touch | M | 13 §Pass |
+| | M1: hit wobble (body and view), recoil, muzzle flash | sim, render | M | 13 §Pass |
+| | M1: shutdown sag, restart overshoot, HUD dim and hum duck | sim, render, hud, audio | S | 13 §Pass |
+| | M1: section loss as debris; limp with one leg; sit down with none and keep firing | sim, render | M | 13 §Pass |
+| | M1: death beat and topple | sim, render | S | 13 §Pass |
+| | M1: sub-bass thump voice and hum ducking | audio | S | 13 §Audio layer |
+| | M1: REDUCED MOTION and HAPTICS settings | ui | S | 13 §Reduced motion |
+| | M1: knockback (push field, mass scaling, blast knockback) | sim | S | 12 §Knockback |
+| | M1: shove and stomp (resolution, recover state, feedback) | sim, render, audio | M | 12 §Punch resolution, §Stomp |
+| | M1: PUNCH input: E / mouse 4 / touch button / fist icon | ui, hud, platform:touch | S | 12 §Player experience |
+| | M1: melee in the arena (pu, kb, me, st; server clamps) | net, server | S | 12 §Arena |
+| | M1: AI punches and reach avoidance | ai | S | 12 §AI |
+| | M1: voice line pools with once-per-minute limiter and seeded pick | audio | S | vision §The voice |
 | | M1: AI perception (line of sight, last-known position, shout, search) | ai, sim | M | 05 §Perception |
 | | M1: AI behaviour library (keepRange, useCover, ridge, harass, holdLine, avoid*) | ai, sim | M | 05 §Movement |
 | | M1: AI fire discipline and section targeting | ai, sim | S | 05 §Fire discipline |
@@ -71,17 +85,18 @@ to it.
 | | M2: hardpoints, tonnage and systems data; loadout validate/apply/stats | sim, content | M | 02 §Data |
 | | M2: FIT screen (mechlab UI) with live mech preview | ui, platform:touch | M | 02 §Player experience |
 | | M2: loadout in the arena state message; server-side validation with parity fixture | net, server | S | 02 §Arena |
-| | M2: weapon PPC (bolt kind, HUD scramble) | sim, hud, content | S | 06 §Weapons |
-| | M2: weapon PULSE LASER (meltRate) | sim, content | S | 06 |
-| | M2: weapon SRM-6 (dumb-fire volley) | sim, content | S | 06 |
-| | M2: weapon GAUSS RIFLE (tracer, recoil) | sim, render, content | S | 06 |
-| | M2: weapon MACHINE GUN (bursts, tracers, shell cap) | sim, render, content | S | 06 |
-| | M2: weapon FLAMER (target heat, cone particles) | sim, render, content | S | 06 |
+| | M2: weapon THUNDERCLAP (bolt kind, HUD scramble, wobble) | sim, hud, content | S | 06 §Weapons |
+| | M2: weapon PEPPER LASER (meltRate) | sim, content | S | 06 |
+| | M2: weapon FIRECRACKERS (dumb-fire volley, small knockback) | sim, content | S | 06 |
+| | M2: weapon BIG BONKER (tracer, recoil, knockback) | sim, render, content | S | 06 |
+| | M2: weapon PEASHOOTER (bursts, tracers, shell cap) | sim, render, content | S | 06 |
+| | M2: weapon TOASTER (target heat, cone particles) | sim, render, content | S | 06 |
 | | M2: GEO per-chassis overrides and torso/arm styles in mech parts | render, sim | S | 06 §Body plan mechanics |
-| | M2: chassis MANTIS (plan, mesh, profile, menu) | content, render, ai | M | 06 §MANTIS |
-| | M2: chassis HERON | content, render, ai | M | 06 §HERON |
-| | M2: chassis BISON | content, render, ai | M | 06 §BISON |
-| | M2: unlock-aware mech selector with LOCKED state | ui | S | 06 §Menu |
+| | M2: chassis PURPLE PUNCHER (plan, fists, mesh, brawler profile, real punch, menu) | content, render, ai, sim | L | 06 §PURPLE PUNCHER, 12 |
+| | M2: chassis PIPSQUEAK | content, render, ai | M | 06 §PIPSQUEAK |
+| | M2: chassis BEANPOLE | content, render, ai | M | 06 §BEANPOLE |
+| | M2: unlock-aware mech selector with LOCKED state and new role lines | ui | S | 06 §Menu |
+| | M2: KNUCKLES system slot for PURPLE PUNCHER | sim, ui | S | 02 §Data |
 | | M2: Free Play pickers for chassis mix and difficulty | ui | S | roadmap §M2 |
 | | M2: sfx recipes for the six new weapons from existing clips | audio | S | 06 |
 | | M2: balance pass on all twelve weapons and six chassis (with notes) | content, needs-owner | M | 06 |
@@ -99,7 +114,9 @@ to it.
 | | M3: objective HUD line, markers, radar blips, voice lines | hud, audio | S | 03 §Player experience |
 | | M3: debrief with per-objective results | ui | S | 03 |
 | | M3: turret entity (mission 9 launchers) | sim, content | S | 04 §Code touchpoints |
-| | M3: campaign strip, replay, unlocks, confirm-restart | ui | S | 04 §Progression |
+| | M3: campaign strip, replay, unlocks, REALLY? confirm-restart | ui | S | 04 §Progression |
+| | M3: debrief verdict words | ui | S | 04 §Debrief verdicts |
+| | M3: mission 10 PURPLE PUNCHER entrance (reveal wave entry) | content, sim | S | 04 §Code touchpoints |
 | | M3: missions 1–4 (Act I) | content | M | 04 |
 | | M3: missions 5–8 (Act II) | content | M | 04 |
 | | M3: missions 9–12 (Act III) | content | M | 04 |
@@ -181,4 +198,5 @@ to it.
 | Music: synthesised menu loop | audio, needs-owner | Not in scope until asked. |
 | AI fusion cannon on HARD assault | ai, needs-owner | Proposal in 05 §Open questions. |
 | Replays from the seeded sim | sim, tooling | Cheap after M0; no player demand yet. |
-| Chassis names (MANTIS/HERON/BISON) and mission names/briefs | content, needs-owner | Proposals in 06 and 04. |
+| Chassis names (PIPSQUEAK/BEANPOLE) and mission names/briefs/verdicts | content, needs-owner | Proposals in 06 and 04; PURPLE PUNCHER is fixed. |
+| Rename the original five weapons (BIG ZAPPER, THUMPER, TEN PACK…) | content, needs-owner | Proposal in 06 §Open questions. |

@@ -10,8 +10,12 @@ Rules that are easy to miss:
   `docs/architecture.md` lists (esbuild, ESLint, Playwright, `node --test`).
 - Every feature works on a phone held sideways with two thumbs, or it is not
   done. Test on a real phone, not device mode.
-- Text is minimal: one-sentence briefs, cockpit-voice register, no
-  characters. See the tone guide in `docs/vision.md`.
+- Text is minimal but not solemn: one-sentence wry briefs, a deadpan cockpit
+  voice, silly hardware names (PURPLE PUNCHER, BIG BONKER), no characters,
+  no references to things outside the game. Warnings stay flat; jokes come
+  after the fact. See the tone guide in `docs/vision.md`.
+- Feel is the top pillar: thunk. Footfalls, hits, landings and punches must
+  be felt (camera, body squash/wobble, sub-bass). See `docs/specs/13-thunk.md`.
 - Keep the invariants in `docs/architecture.md` (feet never slide, terrain
   height matches the mesh, melt belongs to the target, heat 100/45, shooter
   scores and victim applies in the arena, audio only after a gesture).

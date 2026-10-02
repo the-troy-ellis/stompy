@@ -63,6 +63,7 @@ The fusion cannon is not a hardpoint; every chassis has it (today's rule). In
 | Heat sinks | 0–3 | `sink +2` | 1 |
 | Armour | 0–2 | every section `hp × (1 + 0.1·L)`, `speed × (1 − 0.04·L)` | 2 |
 | Jump jets | 0–2 | 0 = none (no jets at all), 1 = stock, 2 = fuel 1.5× and climb 1.2× | 1.5 |
+| Knuckles | 0–1 | melee `dmg` and `knock` × 1.5; PURPLE PUNCHER only (others do not have the slot) | 3 |
 
 Tonnage budget per chassis is set so that the stock loadout uses about 85%
 of it. Draft numbers (`06-chassis-and-weapons.md` finalises):
@@ -72,6 +73,7 @@ of it. Draft numbers (`06-chassis-and-weapons.md` finalises):
 | JACKAL | 25 | 21 |
 | KESTREL | 45 | 38 |
 | WARDEN | 60 | 51 |
+| PURPLE PUNCHER | 80 | 62 |
 
 A **loadout** is `{ hp: { la: 'laser', ra: 'mlaser', t1: null, t2: 'lrm' },
 sys: { sinks: 1, armour: 0, jets: 1 } }`. `src/sim/loadout.js` exports:
@@ -110,7 +112,8 @@ message so its HUD can say `LOADOUT REJECTED`.
 - No ammo count choices; ammo comes with the weapon.
 - No per-section armour; one slider.
 - No engine or speed tuning beyond the armour penalty.
-- No hardpoint changes; chassis identity is the hardpoint map.
+- No hardpoint changes; chassis identity is the hardpoint map. PURPLE
+  PUNCHER's fists are not hardpoints and cannot be removed.
 
 ## Code touchpoints
 
