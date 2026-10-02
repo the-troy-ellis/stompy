@@ -70,6 +70,12 @@ If one of them blocks you, raise it in the issue, do not route around it.
 - **Multiplayer:** polish the LAN arena first, then co-op campaign, then
   internet rooms. The trust-the-client model stays; the server validates
   bounds, it does not simulate.
+- **Naming:** the owner names things after seeing them. Internal keys are
+  stable and display names live in one table; every PR that makes a new
+  mech, weapon or mission visible ends with candidates and screenshots for
+  the owner to pick from. PURPLE PUNCHER is the only confirmed name; every
+  other name in these docs is a placeholder. See the naming rules in
+  [workflow.md](workflow.md).
 - **Hosting:** undecided. The plan recommends GitHub Pages for the static site
   and one small VPS for the relay (see
   [specs/10-internet-play.md](specs/10-internet-play.md)), and keeps the

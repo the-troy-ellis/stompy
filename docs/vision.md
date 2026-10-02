@@ -139,6 +139,13 @@ Starter pool (the owner edits; agents add to `src/audio/voice.js` from here):
 | Mission failed | `Mission failed.` (flat, then the debrief verdict does the humour) |
 | New chassis | `New chassis available.` · `New chassis available. It is purple.` (PURPLE PUNCHER only) |
 
+### Who names what
+
+The owner picks names after seeing the thing move, so agents propose and
+never decide. Candidates should be sayable in the cockpit voice's flat
+delivery, one or two words, and should make the silhouette funnier rather
+than explain it. See the naming rules in [workflow.md](workflow.md).
+
 ### Tests every string must pass
 
 - Can it be shorter? Make it shorter.

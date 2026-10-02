@@ -49,6 +49,7 @@ Steps for a reviewer, on desktop and on a phone.
 - [ ] Playtest checklist run on a phone (model, browser)
 - [ ] Frame budget checked where the change touches render/update
 - [ ] Spec status updated; README/docs updated if behaviour changed
+- [ ] NAMING section included if this PR makes a new mech, weapon, mission or verdict visible (see Naming things)
 - [ ] New text passes the tone guide (one sentence, dry voice, no outside references); warnings stay flat
 
 ## Screenshots / recordings
@@ -147,6 +148,33 @@ Procedure: Free Play, 6 hostiles, volcanic plain, with any new feature on.
 Open the browser's performance panel or use the in-game frame-time readout
 (M1 adds one behind a settings toggle). Record median and 95th percentile
 frame time over 60 s of fighting. Report both in the PR.
+
+## Naming things
+
+The owner names mechs, weapons, missions and verdicts after seeing them, to
+feel out the vibe. The plan therefore never commits to a display name before
+the thing exists. Rules:
+
+- **Keys are not names.** Code, data, save files and the network protocol use
+  stable internal keys (`chassis.light1`, `weapon.bolt1`, mission `m07`).
+  Display names live in one table, `src/data/names.js`, and nowhere else.
+  Renaming is a one-line change that touches no logic and no saves.
+- **Build with a placeholder.** Until named, a thing ships with a plain
+  working label in the names table (`LIGHT MECH`, `BOLT GUN`, `MISSION 7`)
+  and a `// unnamed` comment. Placeholders are allowed on `main`.
+- **Show it, then ask.** The PR that makes a thing visible (the mesh in the
+  menu turntable, the weapon firing, the mission playable) ends with a
+  **NAMING** section: a short screen recording or three screenshots (menu
+  turntable, in combat, destroyed or fired), one line on its personality,
+  and three to five name candidates in the tone register. The owner replies
+  with a name or their own; the follow-up is a one-line PR to
+  `names.js`. Agents never pick the final name.
+- **Proposals in specs are proposals.** PIPSQUEAK, BEANPOLE, THUNDERCLAP and
+  the rest are there so the specs read well. PURPLE PUNCHER is the one name
+  the owner has given. Treat every other name in `docs/` as a placeholder
+  until `names.js` says otherwise.
+- **Voice lines and briefs** follow the same rule: they ship as drafts and
+  the mission's playable PR asks for the owner's edit.
 
 ## Working with the specs
 

@@ -172,6 +172,7 @@ src/
     palettes.js    PALS and weather/time variants (M4)
     missions.js    MISSIONS, missionDef, objective definitions (M3)
     colors.js      MP_COLORS
+    names.js       every display name, keyed; the only place a name lives
   world/
     terrain.js     makeTerrain, height sampling, BOUND
     terrainMesh.js buildTerrainMesh (Builder in; GL out)

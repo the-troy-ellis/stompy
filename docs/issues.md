@@ -32,6 +32,7 @@ to it.
 |---|---|---|---|---|
 | | M0: tooling, package.json, lint, build, gitignore | tooling | S | 00 §Stage 1 |
 | | M0: extract pure leaf modules (math, store, dom, builder, data, terrain, mech parts) | tooling, sim | S | 00 §Stage 1 |
+| | M0: names.js: move every display name (chassis, weapons, missions, role lines) behind stable keys | data, docs | S | workflow §Naming things |
 | | M0: first tests (terrain, math, data) | tooling | S | 00 §Stage 1, 01 |
 | | M0: createGame, seeded RNG, fx sink; thread game/fx through the sim | sim, tooling | M | 00 §Stage 2 |
 | | M0: move the sim into src/sim (mech, gait, combat, beams, fusion, missiles, ai, update) | sim | M | 00 §Stage 3 |
@@ -100,6 +101,7 @@ to it.
 | | M2: Free Play pickers for chassis mix and difficulty | ui | S | roadmap §M2 |
 | | M2: sfx recipes for the six new weapons from existing clips | audio | S | 06 |
 | | M2: balance pass on all twelve weapons and six chassis (with notes) | content, needs-owner | M | 06 |
+| | M2: naming round for light1, sniper1 and the six new weapons (one issue per thing, opened by the PR that makes it visible) | content, needs-owner | S | workflow §Naming things |
 
 ## M3 — Campaign
 
@@ -123,6 +125,7 @@ to it.
 | | M3: contracts after 12 with objective types and full roster | content, sim | S | 04 §After twelve |
 | | M3: scripted "perfect player" harness and win/fail tests for all twelve | tooling, sim | S | 04 §Acceptance 1 |
 | | M3: full NORMAL playthrough report (time, attempts, text audit) | content, docs | S | 04 §Acceptance 2–4 |
+| | M3: naming round for mission names, briefs and verdicts (opened per act by the act's PR) | content, needs-owner | S | workflow §Naming things |
 
 ## M4 — Atmosphere
 
@@ -198,5 +201,5 @@ to it.
 | Music: synthesised menu loop | audio, needs-owner | Not in scope until asked. |
 | AI fusion cannon on HARD assault | ai, needs-owner | Proposal in 05 §Open questions. |
 | Replays from the seeded sim | sim, tooling | Cheap after M0; no player demand yet. |
-| Chassis names (PIPSQUEAK/BEANPOLE) and mission names/briefs/verdicts | content, needs-owner | Proposals in 06 and 04; PURPLE PUNCHER is fixed. |
+| Chassis names (light1/sniper1) and mission names/briefs/verdicts | content, needs-owner | Decided per thing in its NAMING round once visible; PURPLE PUNCHER is fixed. |
 | Rename the original five weapons (BIG ZAPPER, THUMPER, TEN PACK…) | content, needs-owner | Proposal in 06 §Open questions. |

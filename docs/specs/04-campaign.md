@@ -16,6 +16,12 @@ least twice. Then open contracts. Text stays minimal: a name, one wry line,
 the objective readout. The campaign's humour is in what it asks you to do
 and what shows up, not in how much it talks.
 
+Mission names, briefs and verdicts below are drafts. Missions are keyed
+`m01`–`m12` in code; the playable PR for each ends with a NAMING section
+(a recording of the mission's first minute and its set piece, plus two or
+three name and brief candidates) for the owner to pick from. Placeholder
+chassis names (PIPSQUEAK, BEANPOLE) will change; PURPLE PUNCHER will not.
+
 ## Structure
 
 Three acts, one biome each, with the fourth mission of each act at night or in

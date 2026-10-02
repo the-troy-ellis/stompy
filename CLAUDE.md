@@ -19,6 +19,11 @@ Rules that are easy to miss:
 - Keep the invariants in `docs/architecture.md` (feet never slide, terrain
   height matches the mesh, melt belongs to the target, heat 100/45, shooter
   scores and victim applies in the arena, audio only after a gesture).
+- Names are the owner's, picked after seeing the thing. Use stable keys in
+  code, put display names only in `src/data/names.js`, ship placeholders,
+  and end any PR that makes a new mech, weapon or mission visible with a
+  NAMING section (screenshots plus candidates). PURPLE PUNCHER is the only
+  confirmed name. See `docs/workflow.md`.
 - Balance numbers change only in issues about balance.
 - Any change to a network message bumps `PROTOCOL` and updates
   `docs/architecture.md`.

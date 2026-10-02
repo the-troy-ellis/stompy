@@ -18,18 +18,22 @@ toy-line, not field-manual: the register the game is called Stompy in.
 
 ## Naming
 
-Rules from the tone guide: readable at a glance, no explanation needed, no
-references to anything outside the game, funnier when said in the cockpit
-voice's flat delivery. One or two words, caps on the HUD. The existing five
-weapons keep their plain names for now; renaming them is an open question
-(proposal at the bottom).
+The owner names things after seeing them. Every name below except PURPLE
+PUNCHER is a placeholder so the spec reads well. Build each chassis and
+weapon under its **key** (left column), give it a plain working label in
+`src/data/names.js`, and end the PR that makes it visible with a NAMING
+section (turntable and combat screenshots, a personality line, three to five
+candidates). Rules in [../workflow.md](../workflow.md). Candidates should be
+readable at a glance, reference nothing outside the game, and be funnier in
+the cockpit voice's flat delivery. The existing five weapons keep their
+plain names until the owner decides otherwise.
 
 ## Weapons
 
 Numbers are a starting point for balance issues; `tons` and `fp` are for
 mechlab. Categories never change, so no new buttons.
 
-| Key | Name | Cat | Kind | Numbers | Tons | Character |
+| Key | Placeholder name | Cat | Kind | Numbers | Tons | Character |
 |---|---|---|---|---|---|---|
 | `ppc` | THUNDERCLAP | energy | `bolt` (new) | dmg 14, heat 11, cd 3.5, range 600, speed 420 | 7 | A slow blue bolt with a crack of thunder. Big heat. Its hit scrambles the target's HUD for 1.5 s (radar and target box flicker) and gives a strong wobble kick. |
 | `plaser` | PEPPER LASER | energy | `beam` | dps 2.6, hps 8, range 300, melts 1.5× faster | 3 | Short range melt specialist. Stuttering beam (width flickers at 12 Hz) with a sizzle. |
@@ -47,9 +51,12 @@ Existing weapons get `tons`: `laser` 5, `mlaser` 2, `ac` 8, `lrm` 6.
 
 ## Chassis
 
-### PURPLE PUNCHER — assault brawler (unlock after mission 11)
+Chassis keys: `puncher`, `light1`, `sniper1`. Only `puncher` has its name.
 
-The mech the game is named after, more or less. Purple. Fists.
+### PURPLE PUNCHER (`puncher`) — assault brawler (unlock after mission 11)
+
+The mech the game is named after, more or less. Purple. Fists. The one
+confirmed name in this document.
 
 | | |
 |---|---|
@@ -70,7 +77,7 @@ The mech the game is named after, more or less. Purple. Fists.
 Its arrival in mission 10 is the campaign's set piece: a shape on the ridge
 that is the wrong colour, then the footfalls.
 
-### PIPSQUEAK — light reverse-joint skirmisher (unlock after mission 6)
+### `light1` (placeholder PIPSQUEAK) — light reverse-joint skirmisher (unlock after mission 6)
 
 | | |
 |---|---|
@@ -86,7 +93,7 @@ that is the wrong colour, then the footfalls.
 | AI | `harass` with FIRECRACKERS; stomps from above; breaks off at 50% torso; gets shoved a very long way |
 | Menu role line | `REVERSE-JOINT · SMALL, RUDE` |
 
-### BEANPOLE — medium forward-joint sniper (unlock after mission 8)
+### `sniper1` (placeholder BEANPOLE) — medium forward-joint sniper (unlock after mission 8)
 
 | | |
 |---|---|
@@ -175,8 +182,8 @@ shells at 200, oldest dropped silently.
 
 ## Open questions
 
-- Names: PIPSQUEAK and BEANPOLE are proposals; PURPLE PUNCHER is fixed.
-  Alternatives if wanted: SKEETER / STILTS.
+- Names: decided by the owner from each chassis's and weapon's NAMING
+  section once it is visible. Nothing here is fixed except PURPLE PUNCHER.
 - Renaming the original five to match (`needs-owner`): LG LASER → BIG ZAPPER,
   MED LASER → ZAPPER, AUTOCANNON → THUMPER, LRM-10 → TEN PACK, FUSION CANNON
   stays (it is the serious one, which is the joke). Default: leave them until
