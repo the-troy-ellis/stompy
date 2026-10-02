@@ -18,6 +18,7 @@ plays the cockpit computer.
 | `sounds/` | CC0 clips from Kenney's Sci-fi and Impact packs. Sources and mapping in `sounds/README.txt`. |
 | `favicon.svg` | The mech icon. |
 | `server.py` | The multiplayer arena: a stdlib WebSocket relay (port 8096). |
+| `docs/` | The development plan: vision, architecture map, roadmap, workflow and per-feature specs. Start at `docs/README.md`. |
 
 ## Main menu
 
