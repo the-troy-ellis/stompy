@@ -18,6 +18,20 @@ plays the cockpit computer.
 | `sounds/` | CC0 clips from Kenney's Sci-fi and Impact packs. Sources and mapping in `sounds/README.txt`. |
 | `favicon.svg` | The mech icon. |
 
+## Controls
+
+Keyboard and mouse: the table on the briefing screen (W/S throttle, A/D legs,
+mouse aims, click fires, P/Esc pause, M mute).
+
+Touch (phones and tablets; switches on automatically, and back to mouse mode if
+a mouse is used): a floating stick on the left 40% of the screen turns the legs
+and nudges the throttle (which stays set), dragging anywhere else aims, and the
+buttons bottom-right are FIRE (hold), ALL, JUMP (hold), WPN, TGT and ZOOM, with
+STOP and pause on the left. Each finger is tracked separately, so steering,
+aiming and firing combine. On touch the HUD drops the cockpit dashboard and
+moves instruments to the top edge (`hudLayout()`), launching asks for full
+screen and landscape, and a phone held upright is told to turn sideways.
+
 ## Running it
 
 It's a static site: serve this folder with any web server

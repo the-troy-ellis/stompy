@@ -7,6 +7,11 @@ html, body {
   overflow: hidden;
   background: #000;
   color: #7f7;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
 }
 
 #app { position: fixed; inset: 0; display: flex; }
@@ -23,6 +28,66 @@ html, body {
   overflow: auto;
 }
 .mech-overlay[hidden] { display: none; }
+/* Centre when it fits, scroll from the top when it doesn't: plain
+   justify-content:center pushes the top of a tall briefing off-screen where
+   it can't be scrolled back to (a phone held sideways). */
+.mech-overlay { justify-content: flex-start; }
+.mech-overlay > :first-child { margin-top: auto; }
+.mech-overlay > :last-child { margin-bottom: auto; }
+/* The briefing can be taller than a phone held sideways: let it scroll, but
+   never pinch- or double-tap-zoom. */
+.mech-overlay { touch-action: pan-y; z-index: 3; }
+
+/* ---------- touch controls ---------- */
+
+.touch-ui {
+  position: absolute; inset: 0; z-index: 2;
+  touch-action: none;
+  font: bold 12px "Lucida Console", "Courier New", monospace;
+}
+.touch-ui[hidden] { display: none; }
+
+.stick {
+  position: absolute; width: 112px; height: 112px; margin: -56px 0 0 -56px;
+  border-radius: 50%; border: 2px solid rgba(95, 255, 95, .45); background: rgba(0, 30, 0, .25);
+  pointer-events: none;
+}
+.stick[hidden] { display: none; }
+.knob {
+  position: absolute; left: 50%; top: 50%; width: 48px; height: 48px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%; background: rgba(95, 255, 95, .35); border: 2px solid rgba(160, 255, 160, .7);
+}
+
+.tbtn {
+  font: inherit; color: #9f9; letter-spacing: 1px;
+  background: rgba(0, 30, 0, .35); border: 2px solid rgba(95, 255, 95, .5); border-radius: 10px;
+  padding: 0; touch-action: none;
+}
+.tbtn.on { background: rgba(95, 255, 95, .45); color: #031; }
+
+.tcluster {
+  position: absolute;
+  right: calc(12px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom));
+  display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px); gap: 8px;
+}
+.tcluster [data-t="alpha"] { grid-column: 1; grid-row: 2; }
+.tcluster [data-t="jump"] { grid-column: 1; grid-row: 3; }
+.tfire {
+  grid-column: 2 / span 2; grid-row: 2 / span 2;
+  border-radius: 50%; font-size: 16px; color: #fc3;
+  border-color: rgba(255, 204, 51, .7); background: rgba(60, 30, 0, .35);
+}
+.tfire.on { background: rgba(255, 204, 51, .5); color: #310; }
+
+.tpause {
+  position: absolute; left: calc(12px + env(safe-area-inset-left)); top: calc(10px + env(safe-area-inset-top));
+  width: 44px; height: 40px;
+}
+.tstop {
+  position: absolute; left: calc(12px + env(safe-area-inset-left)); bottom: calc(12px + env(safe-area-inset-bottom));
+  width: 64px; height: 40px; color: #fc3; border-color: rgba(255, 204, 51, .6);
+}
 .mech-overlay h1 {
   font: bold 34px "Arial Black", Arial, sans-serif; color: #fc3; letter-spacing: 3px;
   margin: 0; text-shadow: 3px 3px #840; text-align: center;
@@ -48,6 +113,13 @@ html, body {
 .mech-keys { border-collapse: collapse; width: 100%; margin-top: 6px; }
 .mech-keys td { padding: 1px 6px 1px 0; vertical-align: top; }
 .mech-keys td:nth-child(odd) { color: #fc3; white-space: nowrap; }
+
+@media (max-height: 500px) {
+  .mech-overlay { font-size: 11px; gap: 8px; padding: 10px; }
+  .mech-overlay h1 { font-size: 22px; }
+  .mech-overlay .panel { padding: 6px 10px; }
+  .mech-overlay p { margin: 5px 0; }
+}
 
 @media (max-width: 600px) {
   .mech-overlay h1 { font-size: 26px; }

@@ -253,6 +253,19 @@
     root.innerHTML = `
       <div class="mech-wrap" tabindex="-1">
         <canvas class="mech-gl"></canvas><canvas class="mech-hud"></canvas>
+        <div class="touch-ui" hidden>
+          <div class="stick" hidden><div class="knob"></div></div>
+          <button class="tbtn tpause" data-t="pause" aria-label="Pause">II</button>
+          <button class="tbtn tstop" data-t="stop">STOP</button>
+          <div class="tcluster">
+            <button class="tbtn" data-t="zoom">ZOOM</button>
+            <button class="tbtn" data-t="tgt">TGT</button>
+            <button class="tbtn" data-t="wpn">WPN</button>
+            <button class="tbtn" data-t="alpha">ALL</button>
+            <button class="tbtn tfire" data-t="fire">FIRE</button>
+            <button class="tbtn" data-t="jump">JUMP</button>
+          </div>
+        </div>
         <div class="mech-overlay"></div>
       </div>`;
     const wrap = $('.mech-wrap', root), cv = $('.mech-gl', root), hud = $('.mech-hud', root), ov = $('.mech-overlay', root);
@@ -513,7 +526,8 @@
     let invertY = store.get('mech.invert', false);
     let missionN = store.get('mech.mission', 0);
     const G = { state: 'brief', paused: false, mechs: [], shots: [], beams: [], parts: [], wrecks: [], msgs: [],
-      eye: [0, 0, 0], view: [0, 0, 1], flash: 0, shake: 0, kick: 0, lastTwist: 0, zoom: false, target: null, sel: 0, endT: 0 };
+      eye: [0, 0, 0], view: [0, 0, 1], flash: 0, shake: 0, kick: 0, lastTwist: 0,
+      touchUI: matchMedia('(pointer: coarse)').matches, touchTurn: 0, zoom: false, target: null, sel: 0, endT: 0 };
     let ter = null, world = null, pal = null;
     const keys = {};
     let firing = false;
@@ -924,7 +938,7 @@
         if (keys.KeyW) P.throttle = min(1, P.throttle + dt * 0.9);
         if (keys.KeyS) P.throttle = max(-0.35, P.throttle - dt * 0.9);
         if (keys.KeyX) P.throttle = 0;
-        const turn = (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0);
+        const turn = clampN((keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0) + G.touchTurn, -1, 1);
         P.yaw += turn * P.ch.turn * dt * (P.hp.LL > 0 && P.hp.RL > 0 ? 1 : 0.5);
         const kt = (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0), kp = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0);
         P.twist = clampN(P.twist + kt * 1.6 * dt, -1.9, 1.9);
@@ -1163,18 +1177,48 @@
       box('LL', -1.6, 4.4, 1.5, 4); box('RL', 0.1, 4.4, 1.5, 4);
     }
 
+    // Where each instrument goes. Desktop: the cockpit dashboard along the
+    // bottom. Touch: no dashboard -- the bottom belongs to the thumbs and the
+    // controls -- so instruments move to the top corners.
+    function hudLayout() {
+      if (!G.touchUI) {
+        const dash = min(150, H * 0.27), top = H - dash + 8, u = min(7, dash / 12);
+        return {
+          frame: true, dash, viewBottom: H - dash,
+          radar: { x: W / 2, y: H - dash / 2 + 4, r: dash * 0.4 },
+          bars: { x: W * 0.1 + 6, y: top, h: dash - 30 },
+          diag: { x: W * 0.1 + 34 + 3.2 * u, y: top + 6, u },
+          weapons: { x: W * 0.62, y: top + 4 },
+          throttle: { x: W * 0.9 - 26, y: top, h: dash - 30 },
+          target: { x: W * 0.1 + 8, y: 48 },
+          hostiles: { x: W * 0.965 - 10, y: 20 },
+        };
+      }
+      const r = clampN(H * 0.12, 30, 46), u = 5;
+      return {
+        frame: false, dash: 0, viewBottom: H,
+        radar: { x: W - r - 14, y: r + 12, r },
+        bars: { x: 64, y: 112, h: 70 },
+        diag: { x: 100 + 3.2 * u, y: 116, u },
+        weapons: { x: W - 205, y: 2 * r + 34 },
+        throttle: { x: 14, y: H - 196, h: 120 },
+        target: { x: 64, y: 10 },
+        hostiles: { x: W - 2 * r - 30, y: 20 },
+      };
+    }
+
     function drawHUD() {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
       ctx.translate(0, G.kick * 3);  // the dashboard jolts with each step
       if (G.state === 'brief') return;
-      const P = G.player;
+      const P = G.player, L = hudLayout(), dash = L.dash;
       ctx.font = '11px "Lucida Console", "Courier New", monospace';
       ctx.textBaseline = 'middle';
       ctx.lineWidth = 1;
 
       // Cockpit frame: side struts and the dashboard.
-      const dash = min(150, H * 0.27);
+      if (L.frame) {
       ctx.fillStyle = '#121416';
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(W * 0.035, 0); ctx.lineTo(W * 0.1, H - dash); ctx.lineTo(0, H - dash * 0.6); ctx.fill();
       ctx.beginPath(); ctx.moveTo(W, 0); ctx.lineTo(W * 0.965, 0); ctx.lineTo(W * 0.9, H - dash); ctx.lineTo(W, H - dash * 0.6); ctx.fill();
@@ -1182,7 +1226,7 @@
       g.addColorStop(0, '#2a2d30'); g.addColorStop(0.08, '#1a1c1e'); g.addColorStop(1, '#0b0c0d');
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.moveTo(0, H); ctx.lineTo(0, H - dash * 0.6); ctx.lineTo(W * 0.1, H - dash); ctx.lineTo(W * 0.9, H - dash); ctx.lineTo(W, H - dash * 0.6); ctx.lineTo(W, H); ctx.fill();
-      const top = H - dash + 8;
+      }
 
       // Damage flash.
       if (G.flash > 0) { ctx.fillStyle = `rgba(255,40,20,${G.flash * 0.4})`; ctx.fillRect(0, 0, W, H); }
@@ -1216,7 +1260,7 @@
       for (const m of G.mechs) {
         if (!m.alive || m.team === 0 || m === t) continue;
         const p = project([m.x, m.y + 9 * m.ch.scale, m.z]);
-        if (!p || p[1] > H - dash) continue;
+        if (!p || p[1] > L.viewBottom) continue;
         ctx.fillStyle = RED;
         ctx.beginPath(); ctx.moveTo(p[0] - 4, p[1] - 6); ctx.lineTo(p[0] + 4, p[1] - 6); ctx.lineTo(p[0], p[1]); ctx.fill();
       }
@@ -1242,7 +1286,7 @@
       ctx.fillStyle = DIM; ctx.textAlign = 'left'; ctx.fillText('LEGS', legX + 9, ty + 36);
 
       // Radar.
-      const rr = dash * 0.4, rx = W / 2, ry = H - dash / 2 + 4;
+      const { x: rx, y: ry, r: rr } = L.radar;
       ctx.fillStyle = '#031203'; ctx.beginPath(); ctx.arc(rx, ry, rr, 0, TAU); ctx.fill();
       ctx.strokeStyle = DIM; ctx.beginPath(); ctx.arc(rx, ry, rr, 0, TAU); ctx.stroke();
       ctx.beginPath(); ctx.arc(rx, ry, rr / 2, 0, TAU); ctx.stroke();
@@ -1260,26 +1304,25 @@
         ctx.fillRect(px - 2, py - 2, m === t ? 5 : 4, m === t ? 5 : 4);
       }
       ctx.fillStyle = GREEN; ctx.fillRect(rx - 1, ry - 1, 3, 3);
-      ctx.fillStyle = DIM; ctx.textAlign = 'center'; ctx.fillText(`${RANGE}m`, rx, ry + rr + 9 > H ? ry + rr - 8 : ry + rr + 7);
+      ctx.fillStyle = DIM; ctx.textAlign = 'center'; ctx.fillText(`${RANGE}m`, rx, ry + rr + 9 > H ? ry + rr - 8 : ry + rr + 8);
 
       // Left: own damage, heat, jump jets.
       ctx.textAlign = 'left';
-      const u = min(7, dash / 12);
-      mechDiagram(P, W * 0.1 + 34 + 3.2 * u, top + 6, u);
+      mechDiagram(P, L.diag.x, L.diag.y, L.diag.u);
       const bar = (x, label, f, col, warn) => {
-        const bh = dash - 30;
+        const bh = L.bars.h, top = L.bars.y;
         ctx.fillStyle = '#031203'; ctx.fillRect(x, top, 10, bh);
         ctx.fillStyle = warn ? (floor(G.time * 6) % 2 ? RED : AMBER) : col; ctx.fillRect(x, top + bh * (1 - clampN(f, 0, 1)), 10, bh * clampN(f, 0, 1));
         ctx.strokeStyle = DIM; ctx.strokeRect(x + 0.5, top + 0.5, 9, bh - 1);
         ctx.fillStyle = DIM; ctx.fillText(label, x - 1, top + bh + 8);
       };
-      const lx = W * 0.1 + 6;
+      const lx = L.bars.x;
       bar(lx, 'HT', P.heat / 100, P.heat > 80 ? RED : P.heat > 55 ? AMBER : GREEN, P.heat > 85);
       bar(lx + 18, 'JJ', P.fuel, '#3cf');
 
       // Right: weapons.
-      const wx = W * 0.62, gs = groups();
-      let wy = top + 4;
+      const wx = L.weapons.x, gs = groups();
+      let wy = L.weapons.y;
       ctx.textAlign = 'left';
       for (const w of P.weapons) {
         const sel = gs[G.sel] === w.type;
@@ -1297,7 +1340,7 @@
       }
 
       // Throttle / speed.
-      const thx = W * 0.9 - 26, bh = dash - 30;
+      const thx = L.throttle.x, top = L.throttle.y, bh = L.throttle.h;
       ctx.fillStyle = '#031203'; ctx.fillRect(thx, top, 12, bh);
       const zero = top + bh * (1 / 1.35);
       const spF = P.speed / (P.ch.speed * 1.35);
@@ -1307,12 +1350,12 @@
       ctx.beginPath(); ctx.moveTo(thx - 3, zero); ctx.lineTo(thx + 15, zero); ctx.stroke();
       const thY = zero - bh * (P.throttle / 1.35);
       ctx.fillStyle = AMBER; ctx.beginPath(); ctx.moveTo(thx - 2, thY); ctx.lineTo(thx - 8, thY - 4); ctx.lineTo(thx - 8, thY + 4); ctx.fill();
-      ctx.textAlign = 'right'; ctx.fillStyle = GREEN;
-      ctx.fillText(`${Math.round(P.speed * 5.4)} KPH`, thx - 10, top + bh + 8);
+      ctx.textAlign = L.frame ? 'right' : 'left'; ctx.fillStyle = GREEN;
+      ctx.fillText(`${Math.round(P.speed * 5.4)} KPH`, L.frame ? thx - 10 : thx, L.frame ? top + bh + 8 : top - 10);
 
       // Target panel.
       if (t && t.alive) {
-        const px = W * 0.1 + 8, py = 48, pw = 150, ph = 92;
+        const px = L.target.x, py = L.target.y, pw = 150, ph = 92;
         ctx.fillStyle = 'rgba(0,20,0,.6)'; ctx.fillRect(px, py, pw, ph);
         ctx.strokeStyle = DIM; ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
         ctx.textAlign = 'left'; ctx.fillStyle = AMBER;
@@ -1334,16 +1377,32 @@
       if (P.shutdown) {
         ctx.font = 'bold 22px "Lucida Console", monospace';
         ctx.fillStyle = floor(G.time * 3) % 2 ? RED : AMBER;
-        ctx.fillText('REACTOR SHUTDOWN', W / 2, (H - dash) * 0.4);
+        ctx.fillText('REACTOR SHUTDOWN', W / 2, L.viewBottom * 0.4);
       }
-      if (G.zoom) { ctx.font = '11px "Lucida Console", monospace'; ctx.fillStyle = GREEN; ctx.fillText('ZOOM 2.5x', W / 2, H - dash - 10); }
+      if (G.zoom) { ctx.font = '11px "Lucida Console", monospace'; ctx.fillStyle = GREEN; ctx.fillText('ZOOM 2.5x', W / 2, L.viewBottom - (L.frame ? 10 : 24)); }
       const left = G.mechs.filter(m => m.alive && m.team !== 0).length;
       ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'right'; ctx.fillStyle = DIM;
-      ctx.fillText(`HOSTILES ${left}`, W * 0.965 - 10, 20);
+      ctx.fillText(`HOSTILES ${left}`, L.hostiles.x, L.hostiles.y);
+      // Phones held upright get a cramped, stretched view.
+      if (G.touchUI && H > W) {
+        ctx.font = 'bold 16px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.fillStyle = AMBER;
+        ctx.fillText('TURN YOUR DEVICE SIDEWAYS', W / 2, H * 0.3);
+      }
     }
 
     /* ---------- screens ---------- */
 
+    const TOUCH_CONTROLS = `
+      <table class="mech-keys">
+        <tr><td>Left side</td><td>drag: sideways turns the legs, up / down sets the throttle (it stays set)</td></tr>
+        <tr><td>Right side</td><td>drag: twist the torso and aim</td></tr>
+        <tr><td>FIRE (hold)</td><td>fire the selected weapon group</td></tr>
+        <tr><td>ALL</td><td>fire everything</td></tr>
+        <tr><td>WPN / TGT</td><td>next weapon group / next target</td></tr>
+        <tr><td>JUMP (hold)</td><td>jump jets</td></tr>
+        <tr><td>ZOOM / STOP / II</td><td>zoom, full stop, pause</td></tr>
+      </table>`;
+    const controls = () => (G.touchUI ? TOUCH_CONTROLS : CONTROLS);
     const CONTROLS = `
       <table class="mech-keys">
         <tr><td>W / S</td><td>throttle up / down (it stays set)</td><td>X</td><td>full stop</td></tr>
@@ -1358,7 +1417,7 @@
     const OPTS = {
       sound: ['SOUND', () => settings.sound, v => { settings.sound = v; store.set('sound', v); }],
       voice: ['VOICE', () => voiceOn, v => { voiceOn = v; store.set('mech.voice', v); }],
-      invert: ['INVERT MOUSE', () => invertY, v => { invertY = v; store.set('mech.invert', v); }],
+      invert: ['INVERT AIM', () => invertY, v => { invertY = v; store.set('mech.invert', v); }],
     };
     const optLabel = k => `${OPTS[k][0]}: ${OPTS[k][1]() ? 'ON' : 'OFF'}`;
     const options = () => `<div class="opts">${Object.keys(OPTS).map(k => `<button class="opt" data-opt="${k}">${optLabel(k)}</button>`).join('')}
@@ -1369,6 +1428,7 @@
 
     function briefing() {
       G.state = 'brief';
+      syncTouchUI();
       startMission(missionN);
       const d = G.def, p = PALS[d.pal];
       const counts = d.foes.reduce((a, f) => ((a[f] = (a[f] || 0) + 1), a), {});
@@ -1380,8 +1440,8 @@
           <p>TERRAIN: ${esc(p.name)}<br>OBJECTIVE: Destroy all hostile mechs
             (${Object.entries(counts).map(([k, n]) => `${n}x ${CHASSIS[k].name}`).join(', ')})<br>
             YOUR MECH: KESTREL &mdash; 2x LG LASER, AUTOCANNON, LRM-10, JUMP JETS</p>
-          ${CONTROLS}
-          ${matchMedia('(hover: none)').matches ? '<p class="k">This needs a keyboard and mouse; touch screens can watch but not pilot.</p>' : ''}
+          ${controls()}
+          ${G.touchUI ? '<p class="k">Best played sideways, full screen.</p>' : ''}
         </div>
         <div style="display:flex;gap:10px">
           <button class="go" data-a="launch">LAUNCH</button>
@@ -1396,6 +1456,12 @@
       hideOverlay();
       wrap.focus();
       G.state = 'play'; G.paused = false;
+      syncTouchUI();
+      // On a phone, go full screen and sideways where the browser allows it.
+      if (G.touchUI && !document.fullscreenElement && document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+          .then(() => screen.orientation?.lock?.('landscape')).catch(() => {});
+      }
       Sound.unlock();
       loadSamples();
       lockPointer();
@@ -1404,6 +1470,7 @@
 
     function debrief() {
       G.state = 'debrief';
+      syncTouchUI();
       exitLock();
       const s = G.stats, acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
       const tm = `${floor(G.time / 60)}:${String(floor(G.time % 60)).padStart(2, '0')}`;
@@ -1430,8 +1497,9 @@
       if (on) {
         for (const k in keys) keys[k] = false;
         exitLock();   // give the cursor back, or nothing outside the game can be clicked
-        showOverlay(`<h1>PAUSED</h1><div class="panel" style="text-align:center">Click to resume.</div><div class="panel">${CONTROLS}</div>${options()}`);
-      } else { hideOverlay(); wrap.focus(); lockPointer(); }
+        syncTouchUI();
+        showOverlay(`<h1>PAUSED</h1><div class="panel" style="text-align:center">Click to resume.</div><div class="panel">${controls()}</div>${options()}`);
+      } else { hideOverlay(); wrap.focus(); syncTouchUI(); lockPointer(); }
     }
 
     ov.addEventListener('click', e => {
@@ -1449,7 +1517,7 @@
 
     /* ---------- input ---------- */
 
-    const lockPointer = () => { try { const r = cv.requestPointerLock?.(); r?.catch?.(() => {}); } catch { /* fall back to arrows */ } };
+    const lockPointer = () => { if (G.touchUI) return; try { const r = cv.requestPointerLock?.(); r?.catch?.(() => {}); } catch { /* fall back to arrows */ } };
     const exitLock = () => { if (document.pointerLockElement === cv) document.exitPointerLock(); };
     const locked = () => document.pointerLockElement === cv;
     let hadLock = false;
@@ -1471,7 +1539,7 @@
 
     wrap.addEventListener('contextmenu', e => e.preventDefault());
     cv.parentElement.addEventListener('mousedown', e => {
-      if (e.target.closest('.mech-overlay')) return;
+      if (e.target.closest('.mech-overlay') || G.touchUI) return;
       wrap.focus();
       Sound.unlock();
       loadSamples();
@@ -1509,6 +1577,93 @@
     const onKeyUp = e => { keys[e.code] = false; };
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
+
+    /* ---------- touch ---------- */
+
+    // Left 40% of the screen: a floating stick that appears under the thumb.
+    // Sideways turns the legs; up/down moves the throttle from wherever it was
+    // when the thumb went down (so steering doesn't reset your speed), and the
+    // throttle stays set on release, like W/S. Anywhere else: drag to aim.
+    // Buttons handle themselves. Every finger is tracked separately.
+    const tui = $('.touch-ui', root), stick = $('.stick', tui), knob = $('.knob', tui);
+    const fingers = new Map();
+    const STICK_R = 56;
+    const syncTouchUI = () => {
+      tui.hidden = !(G.touchUI && (G.state === 'play' || G.state === 'over') && !G.paused);
+      if (tui.hidden) releaseFingers();
+    };
+    function releaseFingers() {
+      for (const f of fingers.values()) if (f.kind === 'btn') touchButton(f.name, false, f.el);
+      fingers.clear();
+      G.touchTurn = 0; stick.hidden = true;
+    }
+    function touchButton(name, down, el) {
+      el?.classList.toggle('on', down);
+      if (name === 'fire') firing = down;
+      else if (name === 'jump') keys.KeyJ = down;
+      if (!down) return;
+      const gs = groups();
+      if (name === 'alpha') alpha();
+      else if (name === 'wpn') { G.sel = (G.sel + 1) % gs.length; sfx.beep(); }
+      else if (name === 'tgt') cycleTarget();
+      else if (name === 'zoom') G.zoom = !G.zoom;
+      else if (name === 'stop') G.player.throttle = 0;
+      else if (name === 'pause') pause(true);
+    }
+    // Stop the browser turning touches into scrolls, zooms and fake mouse clicks.
+    tui.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+    tui.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      Sound.unlock(); loadSamples();
+      tui.setPointerCapture?.(e.pointerId);
+      const b = e.target.closest('[data-t]');
+      if (b) { fingers.set(e.pointerId, { kind: 'btn', name: b.dataset.t, el: b }); touchButton(b.dataset.t, true, b); return; }
+      const r = tui.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+      const haveStick = [...fingers.values()].some(f => f.kind === 'stick');
+      if (x < r.width * 0.4 && !haveStick) {
+        fingers.set(e.pointerId, { kind: 'stick', x0: x, y0: y, thr0: G.player.throttle });
+        stick.hidden = false;
+        stick.style.left = x + 'px'; stick.style.top = y + 'px';
+        knob.style.transform = 'translate(-50%, -50%)';
+      } else fingers.set(e.pointerId, { kind: 'aim', lx: e.clientX, ly: e.clientY });
+    });
+    tui.addEventListener('pointermove', e => {
+      const f = fingers.get(e.pointerId);
+      if (!f || G.state !== 'play' || G.paused) return;
+      const P = G.player;
+      if (f.kind === 'stick') {
+        const r = tui.getBoundingClientRect();
+        let dx = e.clientX - r.left - f.x0, dy = e.clientY - r.top - f.y0;
+        const d = hypot(dx, dy);
+        if (d > STICK_R) { dx *= STICK_R / d; dy *= STICK_R / d; }
+        knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        const dead = v => (abs(v) < 8 ? 0 : v - Math.sign(v) * 8);
+        G.touchTurn = clampN(-dead(dx) / (STICK_R - 8), -1, 1);
+        if (P.alive && !P.shutdown) P.throttle = clampN(f.thr0 - dead(dy) / (STICK_R - 8), -0.35, 1);
+      } else if (f.kind === 'aim' && P.alive) {
+        const sens = G.zoom ? 0.0022 : 0.0055;
+        P.twist = clampN(P.twist - (e.clientX - f.lx) * sens, -1.9, 1.9);
+        P.pitch = clampN(P.pitch - (e.clientY - f.ly) * sens * (invertY ? -1 : 1), -0.4, 0.45);
+        f.lx = e.clientX; f.ly = e.clientY;
+      }
+    });
+    const lift = e => {
+      const f = fingers.get(e.pointerId);
+      if (!f) return;
+      fingers.delete(e.pointerId);
+      if (f.kind === 'btn') touchButton(f.name, false, f.el);
+      if (f.kind === 'stick') { G.touchTurn = 0; stick.hidden = true; }
+    };
+    tui.addEventListener('pointerup', lift);
+    tui.addEventListener('pointercancel', lift);
+    // A touchscreen laptop can switch either way: follow whatever was used last.
+    document.addEventListener('pointerdown', e => {
+      const touch = e.pointerType === 'touch';
+      if (touch === G.touchUI || e.pointerType === 'pen') return;
+      G.touchUI = touch;
+      if (touch) exitLock();
+      syncTouchUI();
+    }, true);
 
     /* ---------- loop & lifecycle ---------- */
 
