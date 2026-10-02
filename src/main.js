@@ -6,18 +6,25 @@
 // computer voice reads out the bad news.
 
 'use strict';
+import { $, esc } from './util/dom.js';
+import { store } from './util/store.js';
+import { TAU, clampN, lerp, wrapA, rnd, add, sub, mul, dot, cross, len, norm, mix3, dirOf, M, chain } from './util/math.js';
+import { Builder } from './mesh/builder.js';
+import { buildMechParts } from './mesh/mechParts.js';
+import { WEAPONS, CATS, CAT_OF, CAT_LABEL, CAT_KEY } from './data/weapons.js';
+import { CHASSIS, MECH_ORDER, MECH_INFO, HPK, SECT_NAME } from './data/chassis.js';
+import { geoOf } from './data/geo.js';
+import { PALS } from './data/palettes.js';
+import { missionDef, FP_MAPS } from './data/missions.js';
+import { MP_COLORS } from './data/colors.js';
+import { BOUND, makeTerrain } from './world/terrain.js';
+import { buildTerrainMesh } from './world/terrainMesh.js';
+
 
 (() => {
   const { sin, cos, atan2, sqrt, min, max, abs, PI, random, hypot, floor } = Math;
 
   /* ---- the little the page needs: DOM helpers, storage, audio unlock ---- */
-  const $ = (sel, root = document) => root.querySelector(sel);
-  const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  // Storage can throw (private mode, blocked site data); the game runs without it.
-  const store = {
-    get(k, d) { try { const v = localStorage.getItem('stompy.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-    set(k, v) { try { localStorage.setItem('stompy.' + k, JSON.stringify(v)); } catch { /* ignore */ } },
-  };
   const settings = { sound: store.get('sound', true) };
   // Browsers only allow audio after a click, tap or key press -- and iOS is
   // stricter on three counts, each of which silences the game on iPhones:
@@ -57,367 +64,6 @@
   for (const ev of ['touchend', 'click', 'keydown']) {
     document.addEventListener(ev, () => { if (settings.sound) Sound.unlock(); }, { capture: true, passive: true });
   }
-  const TAU = PI * 2;
-  const clampN = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
-  const lerp = (a, b, t) => a + (b - a) * t;
-  const wrapA = a => { a %= TAU; if (a > PI) a -= TAU; if (a < -PI) a += TAU; return a; };
-  const rnd = (a, b) => a + random() * (b - a);
-
-  /* ======================= vectors & matrices ======================= */
-
-  const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-  const mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
-  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-  const len = a => hypot(a[0], a[1], a[2]);
-  const norm = a => { const l = len(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
-  const mix3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
-  // yaw 0 faces +z; increasing yaw turns left. pitch > 0 looks up.
-  const dirOf = (yaw, pitch) => [sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)];
-
-  // Column-major 4x4, as WebGL wants.
-  const M = {
-    id: () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
-    mul(a, b) {
-      const o = new Float32Array(16);
-      for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
-        o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
-      }
-      return o;
-    },
-    T(x, y, z) { const m = M.id(); m[12] = x; m[13] = y; m[14] = z; return m; },
-    S(x, y = x, z = x) { const m = M.id(); m[0] = x; m[5] = y; m[10] = z; return m; },
-    RY(a) { const c = cos(a), s = sin(a); return new Float32Array([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]); },
-    RX(a) { const c = cos(a), s = sin(a); return new Float32Array([1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]); },
-    RZ(a) { const c = cos(a), s = sin(a); return new Float32Array([c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]); },
-    persp(fovy, aspect, n, f) {
-      const t = 1 / Math.tan(fovy / 2);
-      return new Float32Array([t / aspect, 0, 0, 0, 0, t, 0, 0, 0, 0, (f + n) / (n - f), -1, 0, 0, (2 * f * n) / (n - f), 0]);
-    },
-    lookAt(eye, at, up = [0, 1, 0]) {
-      const z = norm(sub(eye, at)), x = norm(cross(up, z)), y = cross(z, x);
-      return new Float32Array([x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, eye), -dot(y, eye), -dot(z, eye), 1]);
-    },
-    apply(m, p) {
-      return [m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12], m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13], m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14]];
-    },
-  };
-  const chain = (...ms) => ms.reduce((a, b) => M.mul(a, b));
-
-  /* ======================= mesh building ======================= */
-
-  // Flat-shaded triangle soup: position, normal, colour per vertex.
-  class Builder {
-    constructor() { this.d = []; }
-    tri(a, b, c, col, ref) {
-      let n = norm(cross(sub(b, a), sub(c, a)));
-      // Orient outward: away from `ref` (a point inside), or upward for terrain.
-      if (ref === 'up' ? n[1] < 0 : ref && dot(n, sub(a, ref)) < 0) n = mul(n, -1);
-      for (const p of [a, b, c]) this.d.push(p[0], p[1], p[2], n[0], n[1], n[2], col[0], col[1], col[2]);
-    }
-    quad(a, b, c, d, col, ref) { this.tri(a, b, c, col, ref); this.tri(a, c, d, col, ref); }
-    // A unit cube (-0.5..0.5) through matrix m; the top face can be tapered.
-    cube(m, col, tx = 1, tz = 1) {
-      const k = [-0.5, 0.5], C = [];
-      for (let i = 0; i < 8; i++) {
-        const y = k[(i >> 1) & 1], top = y > 0;
-        C.push(M.apply(m, [k[i & 1] * (top ? tx : 1), y, k[(i >> 2) & 1] * (top ? tz : 1)]));
-      }
-      const ctr = M.apply(m, [0, 0, 0]);
-      for (const [a, b, c, d] of [[0, 2, 6, 4], [1, 3, 7, 5], [0, 1, 5, 4], [2, 3, 7, 6], [0, 1, 3, 2], [4, 5, 7, 6]])
-        this.quad(C[a], C[b], C[c], C[d], col, ctr);
-    }
-  }
-
-  /* ======================= game data ======================= */
-
-  const WEAPONS = {
-    // Lasers are continuous beams: damage per second (dps) climbs the longer
-    // a beam stays on one mech -- its armour melts (see MELT_T / MELT_MAX) -- and heat per second
-    // (hps) is the price -- two large lasers outrun the heat sinks.
-    laser:  { name: 'LG LASER',  kind: 'beam',    dps: 3.5, hps: 12, range: 520, col: [1, 0.25, 0.2], w: 0.22, cd: 1 },
-    mlaser: { name: 'MED LASER', kind: 'beam',    dps: 2.0, hps: 6,  range: 360, col: [0.3, 1, 0.35], w: 0.16, cd: 1 },
-    // The autocannon is the opposite: big individual hits, little heat, ammo.
-    ac:     { name: 'AUTOCANNON', kind: 'shell',  dmg: 11,  heat: 2,  cd: 1.1, range: 650, speed: 340, ammo: 30 },
-    lrm:    { name: 'LRM-10',    kind: 'missile', dmg: 1.9, heat: 6,  cd: 4.5, range: 850, speed: 120, ammo: 14, count: 10 },
-    // Hold a targeting laser on one mech for `scan` seconds -- any break and it
-    // starts over -- and the reactor discharges at the target's resonant
-    // frequency: an outright kill. The price: heat jumps to `overload` (a
-    // deep shutdown, ~5 s) and the cannon needs `cd` seconds to recharge.
-    // Lock help, so it's hard but possible: the laser counts within `slack` m
-    // of a mech, a slip shorter than `grace` s pauses the scan rather than
-    // resetting it, and while locked the torso is drawn gently toward the
-    // target (`assist`, per second).
-    fusion: { name: 'FUSION CANNON', kind: 'fusion', scan: 3, cd: 25, overload: 140, range: 600, scanHeat: 2, col: [0.78, 0.5, 1],
-      slack: 1.5, grace: 0.5, assist: 2.2,
-      // Reactor feedback: firing costs this share of your own torso's max
-      // armour -- enough to kill you if it's already low. The discharge is a
-      // pulse of sine waves travelling the targeting beam at `pulseSpeed` m/s;
-      // the target dies when it arrives.
-      feedback: 0.35, pulseSpeed: 350 },
-  };
-
-  // Three fire controls, one per kind of weapon: lasers are energy (no ammo,
-  // lots of heat), the autocannon is ballistic, LRMs are missiles.
-  const CATS = ['energy', 'ballistic', 'missile', 'fusion'];
-  const CAT_OF = { laser: 'energy', mlaser: 'energy', ac: 'ballistic', lrm: 'missile', fusion: 'fusion' };
-  const CAT_LABEL = { energy: 'ENERGY', ballistic: 'BALLISTIC', missile: 'MISSILE', fusion: 'FUSION' };
-  const CAT_KEY = { energy: 'LMB 1', ballistic: 'RMB 2', missile: 'SPC 3', fusion: 'G 4' };
-
-  // Hit points per section: T(orso), L/R A(rm), L/R L(eg). Losing the torso kills.
-  const CHASSIS = {
-    kestrel: { name: 'KESTREL', legs: 'reverse', speed: 15, turn: 1.05, sink: 10, scale: 1, pref: 300,
-      hp: { T: 72, LA: 32, RA: 32, LL: 42, RL: 42 }, col: [0.55, 0.58, 0.62], acc: [0.85, 0.6, 0.15],
-      weapons: [['laser', 'LA'], ['laser', 'RA'], ['ac', 'T'], ['lrm', 'T'], ['fusion', 'T']] },
-    jackal: { name: 'JACKAL', legs: 'forward', speed: 19, turn: 1.6, sink: 9, scale: 0.85, pref: 140, acc0: 0.035,
-      hp: { T: 30, LA: 13, RA: 13, LL: 18, RL: 18 }, col: [0.62, 0.26, 0.2], acc: [0.2, 0.2, 0.22],
-      weapons: [['mlaser', 'LA'], ['mlaser', 'RA'], ['fusion', 'T']] },
-    warden: { name: 'WARDEN', legs: 'quad', speed: 9, turn: 0.7, sink: 10, scale: 1.15, pref: 330, acc0: 0.025,
-      hp: { T: 58, LA: 28, RA: 28, LL: 34, RL: 34 }, col: [0.36, 0.4, 0.3], acc: [0.75, 0.7, 0.2],
-      weapons: [['lrm', 'T'], ['ac', 'RA'], ['laser', 'LA'], ['fusion', 'T']] },
-  };
-
-  // The selectable mechs, in selector order, with what the menu says about them.
-  const MECH_ORDER = ['kestrel', 'jackal', 'warden'];
-  const MECH_INFO = {
-    kestrel: { role: 'REVERSE-JOINT · MEDIUM ALL-ROUNDER', kit: '2x LG LASER · AUTOCANNON · LRM-10 · FUSION', fire: 0.75 },
-    jackal: { role: 'FORWARD-JOINT · LIGHT, FAST', kit: '2x MED LASER · FUSION', fire: 0.35 },
-    warden: { role: 'QUADRUPED · HEAVY FIRE SUPPORT', kit: 'LG LASER · AUTOCANNON · LRM-10 · FUSION', fire: 0.85 },
-  };
-
-  const PALS = {
-    dusk: { name: 'Dusk desert', zen: [0.16, 0.1, 0.3], hor: [0.9, 0.56, 0.38], low: [0.56, 0.36, 0.23], mid: [0.74, 0.52, 0.31],
-      high: [0.92, 0.8, 0.62], rock: [0.42, 0.3, 0.25], fog: [180, 1150], light: norm([0.4, 0.75, -0.5]) },
-    ice: { name: 'Glacier', zen: [0.08, 0.14, 0.32], hor: [0.66, 0.75, 0.86], low: [0.58, 0.66, 0.75], mid: [0.8, 0.86, 0.92],
-      high: [0.98, 0.99, 1], rock: [0.42, 0.47, 0.55], fog: [120, 900], light: norm([-0.5, 0.7, -0.3]) },
-    volcanic: { name: 'Volcanic plain', zen: [0.08, 0.02, 0.03], hor: [0.6, 0.22, 0.1], low: [0.2, 0.14, 0.13], mid: [0.32, 0.22, 0.18],
-      high: [0.5, 0.34, 0.25], rock: [0.13, 0.1, 0.1], fog: [140, 1000], light: norm([0.3, 0.6, 0.6]) },
-  };
-
-  const MISSIONS = [
-    { name: 'Proving Grounds', pal: 'dusk', foes: ['jackal', 'jackal'],
-      intel: 'Two JACKAL scouts have been shadowing the convoy route out of Redwater. Fast, lightly armoured, armed with medium lasers. Run them down.' },
-    { name: 'Ridge Patrol', pal: 'ice', foes: ['jackal', 'jackal', 'jackal'],
-      intel: 'A scout lance is sweeping the glacier ridges. Visibility is poor. Use the radar and let them come to you.' },
-    { name: 'Iron Rain', pal: 'volcanic', foes: ['warden', 'jackal', 'jackal'],
-      intel: 'A WARDEN fire-support mech is shelling the refinery with long-range missiles, screened by two scouts. Close the distance: LRMs are weak up close.' },
-    { name: 'Hammerfall', pal: 'dusk', foes: ['warden', 'warden', 'jackal', 'jackal'],
-      intel: 'The Combine has committed heavies. Two WARDENs and their escorts. Watch your heat.' },
-  ];
-  function missionDef(n) {
-    if (n < MISSIONS.length) return MISSIONS[n];
-    const pals = Object.keys(PALS), k = 3 + floor(n / 2), heavies = floor(n / 3);
-    return { name: `Contract ${n + 1}`, pal: pals[n % pals.length],
-      foes: Array.from({ length: k }, (_, i) => (i < heavies ? 'warden' : 'jackal')),
-      intel: `Open contract. ${k} hostiles reported, ${heavies} of them heavy. Pay is by the kill.` };
-  }
-
-  // Multiplayer paint jobs: every pilot flies a KESTREL, told apart by colour.
-  const MP_COLORS = [
-    { name: 'STEEL', col: [0.58, 0.6, 0.64], acc: [0.85, 0.6, 0.15], css: '#9aa0a8' },
-    { name: 'RED', col: [0.72, 0.2, 0.17], acc: [0.2, 0.2, 0.22], css: '#e04a3a' },
-    { name: 'BLUE', col: [0.2, 0.38, 0.78], acc: [0.85, 0.85, 0.9], css: '#4a7ae0' },
-    { name: 'GREEN', col: [0.24, 0.55, 0.28], acc: [0.85, 0.75, 0.2], css: '#44b058' },
-    { name: 'GOLD', col: [0.82, 0.64, 0.16], acc: [0.2, 0.2, 0.22], css: '#f0c030' },
-    { name: 'VIOLET', col: [0.52, 0.28, 0.68], acc: [0.85, 0.85, 0.9], css: '#a868e0' },
-    { name: 'ORANGE', col: [0.85, 0.42, 0.14], acc: [0.2, 0.2, 0.22], css: '#f08030' },
-    { name: 'TEAL', col: [0.18, 0.6, 0.6], acc: [0.9, 0.9, 0.9], css: '#38c0c0' },
-  ];
-  const HPK = ['T', 'LA', 'RA', 'LL', 'RL'];
-
-  const SECT_NAME = { T: 'Torso', LA: 'Left arm', RA: 'Right arm', LL: 'Left leg', RL: 'Right leg' };
-
-  /* ======================= terrain ======================= */
-
-  const N = 96, CELL = 24, HALF = (N * CELL) / 2, BOUND = HALF - 90;
-
-  function makeTerrain(seed) {
-    const hs = new Float32Array((N + 1) * (N + 1));
-    const hash = (i, j) => { const s = sin(i * 127.1 + j * 311.7 + seed * 74.7) * 43758.5453; return s - floor(s); };
-    const vn = (x, z) => {
-      const i = floor(x), j = floor(z), fx = x - i, fz = z - j;
-      const u = fx * fx * (3 - 2 * fx), w = fz * fz * (3 - 2 * fz);
-      return lerp(lerp(hash(i, j), hash(i + 1, j), u), lerp(hash(i, j + 1), hash(i + 1, j + 1), u), w);
-    };
-    for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
-      const x = -HALF + i * CELL, z = -HALF + j * CELL;
-      const f = vn(x / 380 + 40, z / 380 + 40) * 0.6 + vn(x / 140, z / 140) * 0.3 + vn(x / 55, z / 55) * 0.1;
-      let h = max(0, f - 0.36) * 230;
-      const r = hypot(x, z);
-      h *= clampN((r - 70) / 200, 0, 1);       // flat landing zone around the start
-      hs[j * (N + 1) + i] = h;
-    }
-    // Same triangle split as the mesh, so mechs stand exactly on what's drawn.
-    const height = (x, z) => {
-      const gx = clampN((x + HALF) / CELL, 0, N - 1e-4), gz = clampN((z + HALF) / CELL, 0, N - 1e-4);
-      const i = gx | 0, j = gz | 0, fx = gx - i, fz = gz - j;
-      const h00 = hs[j * (N + 1) + i], h10 = hs[j * (N + 1) + i + 1], h01 = hs[(j + 1) * (N + 1) + i], h11 = hs[(j + 1) * (N + 1) + i + 1];
-      return fx + fz < 1 ? h00 + (h10 - h00) * fx + (h01 - h00) * fz : h11 + (h01 - h11) * (1 - fx) + (h10 - h11) * (1 - fz);
-    };
-    return { hs, height };
-  }
-
-  function buildTerrainMesh(ter, pal, seed) {
-    const b = new Builder(), hs = ter.hs;
-    let s = seed * 9301 + 49297;
-    const r01 = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-    const colAt = h => {
-      const t = clampN(h / 70, 0, 1);
-      const c = t < 0.5 ? mix3(pal.low, pal.mid, t * 2) : mix3(pal.mid, pal.high, t * 2 - 1);
-      return mul(c, 0.9 + r01() * 0.14);
-    };
-    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-      const x0 = -HALF + i * CELL, z0 = -HALF + j * CELL, x1 = x0 + CELL, z1 = z0 + CELL;
-      const h00 = hs[j * (N + 1) + i], h10 = hs[j * (N + 1) + i + 1], h01 = hs[(j + 1) * (N + 1) + i], h11 = hs[(j + 1) * (N + 1) + i + 1];
-      b.tri([x0, h00, z0], [x1, h10, z0], [x0, h01, z1], colAt((h00 + h10 + h01) / 3), 'up');
-      b.tri([x1, h11, z1], [x0, h01, z1], [x1, h10, z0], colAt((h11 + h01 + h10) / 3), 'up');
-    }
-    // Rocks.
-    for (let k = 0; k < 150; k++) {
-      const x = (r01() - 0.5) * 2 * BOUND, z = (r01() - 0.5) * 2 * BOUND;
-      if (hypot(x, z) < 60) continue;
-      const sz = 2 + r01() * 7;
-      b.cube(chain(M.T(x, ter.height(x, z) + sz * 0.15, z), M.RY(r01() * 6), M.RX((r01() - 0.5) * 0.6),
-        M.S(sz, sz * (0.5 + r01() * 0.8), sz * (0.7 + r01() * 0.6))), mul(pal.rock, 0.85 + r01() * 0.3), 0.55 + r01() * 0.3, 0.55 + r01() * 0.3);
-    }
-    // A few abandoned outposts.
-    for (let o = 0; o < 4; o++) {
-      const a = r01() * TAU, d = 280 + r01() * 600, cx = sin(a) * d, cz = cos(a) * d;
-      for (let k = 0; k < 7; k++) {
-        const x = cx + (r01() - 0.5) * 90, z = cz + (r01() - 0.5) * 90;
-        const w = 9 + r01() * 14, hgt = 7 + r01() * 22, dd = 9 + r01() * 14;
-        const base = ter.height(x, z) - 2;
-        const g = 0.45 + r01() * 0.2;
-        b.cube(chain(M.T(x, base + hgt / 2, z), M.RY(r01() * 0.4), M.S(w, hgt, dd)), [g, g * 0.97, g * 0.93], 0.97, 0.97);
-        b.cube(chain(M.T(x, base + hgt + 0.6, z), M.S(w * 0.6, 1.2, dd * 0.6)), [g * 0.6, g * 0.6, g * 0.6]);
-      }
-      const tx = cx + 40, tz = cz - 30, tb = ter.height(tx, tz);
-      b.cube(chain(M.T(tx, tb + 22, tz), M.S(1.4, 44, 1.4)), [0.35, 0.33, 0.3], 0.4, 0.4);
-      b.cube(chain(M.T(tx, tb + 44, tz), M.S(2.5, 1, 2.5)), [0.9, 0.15, 0.1]);
-    }
-    return b;
-  }
-
-  // Body plans, by leg type. Lengths are model units (x chassis scale), and
-  // buildMechParts builds each type's leg meshes to match l1 / l2. Per leg:
-  // hip (hx, hz), rest foot (fx, fz) and its phase in the gait cycle; `swing`
-  // is the share of the cycle a foot spends in the air. +x is the mech's
-  // left, +z its front. `knee` is which way the joint bends.
-  const GEO = {
-    forward: { hip: 4.6, l1: 2.6, l2: 2.5, ankle: 0.42, knee: 'forward', swing: 0.42, stride: [3.5, 4.5],
-      radius: 2.4, height: 7.9, legTop: 4.4, torsoY: 5, eye: [0, 2.35, 1.9], armX: 2.25, armY: 2.0, rackY: 3.2, acY: 1.6,
-      legs: [{ hx: 0.95, hz: 0, fx: 1.1, fz: 0, ph: 0 }, { hx: -0.95, hz: 0, fx: -1.1, fz: 0, ph: 0.5 }] },
-    // Bird-like: the joint points backward, feet are three-toed claws.
-    reverse: { hip: 4.9, l1: 2.7, l2: 2.9, ankle: 0.5, knee: 'back', swing: 0.42, stride: [3.5, 4.5],
-      radius: 2.4, height: 8.6, legTop: 4.7, torsoY: 5.3, eye: [0, 2.6, 1.5], armX: 2.3, armY: 2.0, rackY: 3.3, acY: 1.6,
-      legs: [{ hx: 1.0, hz: 0.1, fx: 1.15, fz: 0.45, ph: 0 }, { hx: -1.0, hz: 0.1, fx: -1.15, fz: 0.45, ph: 0.5 }] },
-    // Four legs bowed out like a spider's, trotting: diagonal pairs together.
-    quad: { hip: 3.4, l1: 2.4, l2: 2.9, ankle: 0.35, knee: 'out', swing: 0.42, stride: [3.0, 3.6],
-      radius: 3.1, height: 6.6, legTop: 3.3, torsoY: 4.0, eye: [0, 1.6, 1.4], armX: 1.9, armY: 1.2, rackY: 2.1, acY: 0.9,
-      legs: [{ hx: 1.4, hz: 1.6, fx: 2.9, fz: 2.3, ph: 0 }, { hx: -1.4, hz: -1.6, fx: -2.9, fz: -2.2, ph: 0 },
-             { hx: -1.4, hz: 1.6, fx: -2.9, fz: 2.3, ph: 0.5 }, { hx: 1.4, hz: -1.6, fx: 2.9, fz: -2.2, ph: 0.5 }] },
-  };
-  const geoOf = m => GEO[m.ch.legs] || GEO.forward;
-
-  function buildMechParts(ch) {
-    if (ch.legs === 'reverse') return buildReverseParts(ch);
-    if (ch.legs === 'quad') return buildQuadParts(ch);
-    const c = ch.col, dark = mul(c, 0.55), acc = ch.acc, glass = [0.08, 0.1, 0.13];
-    const part = f => { const b = new Builder(); f(b); return b; };
-    return {
-      hip: part(b => b.cube(M.S(2.6, 0.9, 1.6), dark)),
-      // Upper leg runs 2.6 down -y from the hip, lower leg 2.5 down from the knee
-      // (GEO.forward.l1 / l2): the IK in drawMech depends on these lengths.
-      uleg: part(b => { b.cube(chain(M.T(0, -1.3, 0), M.S(0.95, 2.8, 1.25)), c, 0.85, 0.9); b.cube(chain(M.T(0, -2.6, 0.25), M.S(1.05, 0.75, 1)), dark); }),
-      lleg: part(b => { b.cube(chain(M.T(0, -1.25, -0.1), M.S(0.8, 2.5, 1.05)), c); b.cube(chain(M.T(0, -1.1, -0.65), M.S(0.3, 1.8, 0.3)), dark); }),
-      foot: part(b => b.cube(chain(M.T(0, -0.2, 0.35), M.S(1.25, 0.4, 2.3)), dark, 0.8, 0.8)),
-      torso: part(b => {
-        b.cube(chain(M.T(0, 1.3, 0), M.S(3.4, 2.6, 2.6)), c, 0.85, 0.8);
-        b.cube(chain(M.T(0, 2.15, 1.3), M.S(1.6, 0.9, 1)), glass, 0.75, 0.6);
-        b.cube(chain(M.T(1.25, 2.85, -0.2), M.S(1.15, 0.7, 1.6)), acc);
-        b.cube(chain(M.T(-1.25, 2.85, -0.2), M.S(1.15, 0.7, 1.6)), acc);
-        b.cube(chain(M.T(0, 1.0, -1.5), M.S(2, 1.6, 0.6)), dark);
-      }),
-      arm: part(b => {
-        b.cube(chain(M.T(0, -0.6, 0.1), M.S(0.95, 1.8, 1.15)), c);
-        b.cube(chain(M.T(0, -1.15, 1.45), M.S(0.38, 0.38, 2.3)), dark);
-        b.cube(chain(M.T(0, 0.25, 0), M.S(1.25, 0.8, 1.45)), acc);
-      }),
-    };
-  }
-
-  // The mech from the sketch: square torso, domed cockpit, missile pods on the
-  // shoulders, bird legs with clawed feet.
-  function buildReverseParts(ch) {
-    const c = ch.col, dark = mul(c, 0.55), acc = ch.acc, glass = [0.08, 0.1, 0.13], tube = [0.06, 0.06, 0.07];
-    const part = f => { const b = new Builder(); f(b); return b; };
-    return {
-      hip: part(b => { b.cube(M.S(2.8, 0.9, 1.8), dark); b.cube(chain(M.T(0, -0.1, -0.9), M.S(1.4, 0.6, 0.5)), c); }),
-      // l1 = 2.7: an armoured thigh.
-      uleg: part(b => { b.cube(chain(M.T(0, -1.35, 0), M.S(1.15, 2.9, 1.45)), c, 0.8, 0.85); b.cube(chain(M.T(0, -2.7, 0), M.S(1.1, 0.8, 1.1)), dark); }),
-      // l2 = 2.9: a slimmer shin with a hydraulic ram.
-      lleg: part(b => { b.cube(chain(M.T(0, -1.45, 0), M.S(0.7, 2.9, 0.9)), c, 1.2, 1.15); b.cube(chain(M.T(0, -1.3, 0.55), M.S(0.28, 2.2, 0.28)), dark); }),
-      // Three toes forward and a spur behind.
-      foot: part(b => {
-        b.cube(chain(M.T(0, -0.15, 0), M.S(0.8, 0.5, 0.8)), dark);
-        b.cube(chain(M.T(0, -0.32, 1.0), M.S(0.38, 0.34, 1.7)), dark, 0.7, 0.8);
-        for (const sx of [1, -1]) b.cube(chain(M.T(sx * 0.42, -0.32, 0.75), M.RY(sx * 0.42), M.S(0.34, 0.32, 1.45)), dark, 0.7, 0.8);
-        b.cube(chain(M.T(0, -0.32, -0.6), M.S(0.3, 0.3, 0.9)), dark, 0.7, 0.8);
-      }),
-      torso: part(b => {
-        b.cube(chain(M.T(0, 1.3, 0), M.S(3.2, 2.6, 2.4)), c, 0.95, 0.95);
-        b.cube(chain(M.T(0, 2.95, 0.2), M.S(1.6, 0.8, 1.5)), c, 0.6, 0.6);          // the dome...
-        b.cube(chain(M.T(0, 3.42, 0.2), M.S(0.95, 0.25, 0.9)), c, 0.55, 0.55);
-        b.cube(chain(M.T(0, 3.0, 0.92), M.S(0.95, 0.26, 0.12)), glass);              // ...and its viewport
-        for (const sx of [1, -1]) {                                                  // missile pods, tubes facing forward
-          b.cube(chain(M.T(sx * 1.75, 3.0, -0.1), M.S(1.25, 1.25, 1.45)), acc);
-          for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++)
-            b.cube(chain(M.T(sx * 1.75 + (i - 1) * 0.34, 3.0 + (j - 1) * 0.34, 0.64), M.S(0.2, 0.2, 0.06)), tube);
-        }
-        b.cube(chain(M.T(0, 1.0, -1.35), M.S(2, 1.6, 0.5)), dark);
-      }),
-      arm: part(b => {
-        b.cube(chain(M.T(0, -0.6, 0.1), M.S(0.95, 1.8, 1.15)), c);
-        b.cube(chain(M.T(0, -1.15, 1.45), M.S(0.38, 0.38, 2.3)), dark);
-        b.cube(chain(M.T(0, 0.25, 0), M.S(1.2, 0.75, 1.35)), dark);
-      }),
-    };
-  }
-
-  // A low armoured hull on four bowed legs, weapons on a turret.
-  function buildQuadParts(ch) {
-    const c = ch.col, dark = mul(c, 0.55), acc = ch.acc, glass = [0.08, 0.1, 0.13], tube = [0.06, 0.06, 0.07];
-    const part = f => { const b = new Builder(); f(b); return b; };
-    return {
-      // The hull, drawn at hip height; leg mounts at the corners.
-      hip: part(b => {
-        b.cube(M.S(3.4, 1.3, 4.4), c, 0.85, 0.9);
-        b.cube(chain(M.T(0, -0.1, 2.45), M.S(2.4, 0.9, 0.7)), dark, 0.8, 0.8);
-        b.cube(chain(M.T(0, 0.15, -2.35), M.S(2.6, 1.0, 0.6)), dark);
-        for (const sx of [1, -1]) for (const sz of [1, -1]) b.cube(chain(M.T(sx * 1.45, 0, sz * 1.6), M.S(0.95, 0.95, 0.95)), acc);
-      }),
-      // l1 = 2.4 thigh, l2 = 2.9 tapering shin, a broad pad of a foot.
-      uleg: part(b => { b.cube(chain(M.T(0, -1.2, 0), M.S(0.8, 2.4, 0.9)), c); b.cube(chain(M.T(0, -2.4, 0), M.S(0.95, 0.75, 0.95)), dark); }),
-      lleg: part(b => { b.cube(chain(M.T(0, -1.45, 0), M.S(0.55, 2.9, 0.6)), c, 1.45, 1.4); b.cube(chain(M.T(0, -0.2, 0), M.S(0.85, 0.5, 0.85)), dark); }),
-      foot: part(b => b.cube(chain(M.T(0, -0.17, 0), M.S(1.15, 0.35, 1.15)), dark, 0.75, 0.75)),
-      // The turret: cockpit at the front, an LRM box on top.
-      torso: part(b => {
-        b.cube(chain(M.T(0, 0.7, 0), M.S(2.7, 1.4, 2.5)), c, 0.85, 0.85);
-        b.cube(chain(M.T(0, 0.85, 1.3), M.S(1.5, 0.5, 0.25)), glass);
-        b.cube(chain(M.T(0, 1.75, -0.3), M.S(1.8, 0.75, 1.5)), acc);
-        for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++)
-          b.cube(chain(M.T((i - 1.5) * 0.4, 1.6 + j * 0.3, 0.46), M.S(0.22, 0.22, 0.06)), tube);
-      }),
-      arm: part(b => {
-        b.cube(chain(M.T(0, -0.35, 0.2), M.S(0.8, 1.1, 1.6)), c);
-        b.cube(chain(M.T(0, -0.5, 1.6), M.S(0.36, 0.36, 2.4)), dark);
-      }),
-    };
-  }
-
-  /* ======================= the app ======================= */
-
   function start(root) {
     root.innerHTML = `
       <div class="mech-wrap" tabindex="-1">
@@ -809,9 +455,12 @@
     let chassis = MECH_ORDER.includes(store.get('mech.chassis')) ? store.get('mech.chassis') : 'kestrel';
     let menuSel = store.get('menu.sel', 'campaign');
     let fpMap = store.get('fp.map', 0), fpFoes = store.get('fp.foes', 3);
+    const params = new URLSearchParams(location.search);
     const G = { state: 'brief', paused: false, mechs: [], shots: [], beams: [], parts: [], wrecks: [], msgs: [],
       eye: [0, 0, 0], view: [0, 0, 1], flash: 0, shake: 0, kick: 0, lastTwist: 0, cbeams: [], pendingHits: new Map(), pulses: [],
-      touchUI: matchMedia('(pointer: coarse)').matches, touchTurn: 0, zoom: false, target: null, sel: 0, endT: 0 };
+      touchUI: params.has('touch') || matchMedia('(pointer: coarse)').matches, touchTurn: 0, zoom: false, target: null, sel: 0, endT: 0 };
+    // ?debug=1 exposes the state for the smoke test and for poking at in the console.
+    if (params.has('debug')) window.__stompy = { game: G };
     let ter = null, world = null, pal = null;
     const keys = {};
     // Which fire controls are held: by touch button, mouse button or key.
@@ -843,7 +492,6 @@
       G.kind = 'campaign';
     }
     // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
-    const FP_MAPS = ['random', 'dusk', 'ice', 'volcanic'];
     function startSkirmish() {
       const pk = FP_MAPS[fpMap] === 'random' ? ['dusk', 'ice', 'volcanic'][floor(random() * 3)] : FP_MAPS[fpMap];
       const foes = Array.from({ length: fpFoes }, () => (random() < 0.35 ? 'warden' : 'jackal'));
@@ -1512,7 +1160,7 @@
 
     // Fire: launch the pulse down the beam, then the reactor pays for it --
     // feedback into your own torso, a deep overload shutdown, a recharge.
-    function fusionFire(m, w, mz, t, end) {
+    function fusionFire(m, w, mz, t) {
       const d = w.def;
       launchPulse(mz, t, m, false);
       if (mp() && m === G.player) netSend({ t: 'fx', k: 'fu', a: mz.map(r2), id2: t.netId || 0, b: center(t).map(r2) });
@@ -2688,11 +2336,12 @@
         // already on it) or anywhere on the right side to steer.
         steerBy(e.clientX - (f.lx ?? e.clientX), e.clientY - (f.ly ?? e.clientY), f.kind === 'btn' ? 0.009 : 0.006);
         f.lx = e.clientX; f.ly = e.clientY;
-      } else if (f.kind === 'btn') {
-        f.lx = e.clientX; f.ly = e.clientY;
       } else if (f.kind === 'btn' && f.name === 'fusion' && P.alive) {
+        // Dragging the fusion button aims the scan (the thumb is already on it).
         P.twist = clampN(P.twist - (e.clientX - f.lx) * 0.0055, -1.9, 1.9);
         P.pitch = clampN(P.pitch - (e.clientY - f.ly) * 0.0055 * (invertY ? -1 : 1), -0.4, 0.45);
+        f.lx = e.clientX; f.ly = e.clientY;
+      } else if (f.kind === 'btn') {
         f.lx = e.clientX; f.ly = e.clientY;
       } else if (f.kind === 'aim' && P.alive) {
         const sens = G.zoom ? 0.0022 : 0.0055;
@@ -2876,6 +2525,7 @@
         air: P.air ? 1 : 0, al: P.alive ? 1 : 0, sd: P.shutdown ? 1 : 0, hp: HPK.map(k => r2(P.hp[k])),
         bm: P.beaming ? 1 : 0, be: P.beaming && P.beamEnd ? P.beamEnd.map(r2) : 0, bf: r2(beamMult(P)),
         fl: P.fusion?.on && P.fusion.end ? P.fusion.end.map(r2) : 0, sc: P.fusion?.mech?.netId || 0,
+        // eslint-disable-next-line no-dupe-keys -- the duplicate `sp` is the known wire bug fixed with the protocol move (M0 stage 5)
         sp: P.fusion?.mech ? r2(min(1, P.fusion.t / WEAPONS.fusion.scan)) : 0 });
     }
 
@@ -2960,9 +2610,9 @@
 
     /* ---------- loop & lifecycle ---------- */
 
-    let raf = 0, last = 0, lastAudioCheck = 0;
+    let last = 0, lastAudioCheck = 0;
     const loop = ts => {
-      raf = requestAnimationFrame(loop);
+      requestAnimationFrame(loop);
       const dt = min(0.05, (ts - last) / 1000 || 0);
       last = ts;
       if (document.hidden) { for (const k of Object.keys(loops)) loopSet(k, 0); beamSound(false, 1); fusionSound(false, 0); return; }
@@ -2979,7 +2629,7 @@
     };
 
     mainMenu();
-    raf = requestAnimationFrame(loop);
+    requestAnimationFrame(loop);
     setTimeout(() => wrap.focus(), 0);
   }
 

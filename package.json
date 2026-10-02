@@ -1,0 +1,19 @@
+{
+  "name": "stompy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A 90s-style 3D mech sim in raw WebGL. No libraries, no build step to play.",
+  "type": "module",
+  "scripts": {
+    "serve": "node scripts/serve.mjs",
+    "test": "node --test \"test/*.test.js\"",
+    "test:smoke": "node test/smoke/run.mjs",
+    "lint": "eslint src test scripts",
+    "build": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "eslint": "^9.0.0",
+    "playwright-core": "^1.50.0"
+  }
+}
