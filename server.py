@@ -1,0 +1,294 @@
+#!/usr/bin/env python3
+"""Stompy multiplayer relay: one free-for-all arena for up to eight phones.
+
+The server does not simulate anything. Each client runs its own mech and
+sends its state ~15 times a second; the server stamps it with the sender's id
+and relays it to everyone else. Hits are decided by the shooter's client (what
+you see is what counts, which feels fair on Wi-Fi) and forwarded to the
+victim, whose client applies the damage and reports its own death. The server
+keeps the only shared state: who is connected, the scores, and the round.
+
+Fine among friends on a LAN; trivially cheatable by anyone who edits the JS.
+
+WebSockets are implemented here directly (RFC 6455: handshake, masked client
+frames, ping/pong, close) so this stays stdlib-only.
+
+    python3 server.py [port]        # default 8096; the game connects to :8096/ws
+"""
+import asyncio
+import base64
+import hashlib
+import ipaddress
+import json
+import os
+import random
+import struct
+import sys
+import time
+from urllib.parse import urlsplit
+
+GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+MAX_PLAYERS = 8
+SCORE_LIMIT = int(os.environ.get("STOMPY_SCORE_LIMIT", 10))   # kills to win a round
+ROUND_GAP = int(os.environ.get("STOMPY_ROUND_GAP", 10))       # seconds between rounds
+MAX_MESSAGE = 16 * 1024   # bytes; a state update is ~200
+HELLO_TIMEOUT = 10
+PING_EVERY = 10
+DROP_AFTER = 25           # seconds of silence (a phone that went to sleep)
+MAX_BUFFERED = 256 * 1024 # a client this far behind is dropped, not waited for
+PALETTES = ("dusk", "ice", "volcanic")
+
+OP_CONT, OP_TEXT, OP_BIN, OP_CLOSE, OP_PING, OP_PONG = 0x0, 0x1, 0x2, 0x8, 0x9, 0xA
+
+
+def log(*a):
+    print(*a, flush=True)
+
+
+class Client:
+    def __init__(self, writer):
+        self.writer = writer
+        self.id = 0
+        self.name = ""
+        self.color = 0
+        self.kills = 0
+        self.deaths = 0
+        self.last = time.monotonic()
+
+
+players: dict[int, Client] = {}
+arena = {"seed": random.randrange(1, 10**6), "pal": random.choice(PALETTES), "over": False}
+
+
+# ---------------------------------------------------------------- WebSocket
+
+def origin_ok(origin):
+    """Only pages served as stompy.* (or from an IP / localhost) may connect.
+
+    Without this, any web page a LAN user visits could open a socket here.
+    """
+    if not origin:
+        return True  # not a browser
+    host = (urlsplit(origin).hostname or "").lower()
+    if host.startswith("stompy.") or host in ("localhost", "stompy"):
+        return True
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        return False
+
+
+async def handshake(reader, writer):
+    try:
+        head = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), 10)
+    except (asyncio.IncompleteReadError, asyncio.LimitOverrunError, asyncio.TimeoutError):
+        return False
+    lines = head.decode("latin-1").split("\r\n")
+    parts = lines[0].split()
+    headers = {}
+    for line in lines[1:]:
+        if ":" in line:
+            k, v = line.split(":", 1)
+            headers[k.strip().lower()] = v.strip()
+    key = headers.get("sec-websocket-key", "")
+    if (len(parts) < 2 or parts[0] != "GET" or parts[1].split("?")[0] != "/ws"
+            or "websocket" not in headers.get("upgrade", "").lower() or not key):
+        writer.write(b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        return False
+    if not origin_ok(headers.get("origin")):
+        writer.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        return False
+    accept = base64.b64encode(hashlib.sha1(key.encode() + GUID).digest()).decode()
+    writer.write(("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                  f"Sec-WebSocket-Accept: {accept}\r\n\r\n").encode())
+    await writer.drain()
+    return True
+
+
+async def read_message(reader):
+    """One complete message as (opcode, bytes), reassembling fragments.
+
+    Control frames (ping/pong/close) can arrive between fragments and are
+    returned immediately.
+    """
+    data, first_op = b"", None
+    while True:
+        b0, b1 = await reader.readexactly(2)
+        fin, op, masked, n = b0 & 0x80, b0 & 0x0F, b1 & 0x80, b1 & 0x7F
+        if n == 126:
+            n = struct.unpack("!H", await reader.readexactly(2))[0]
+        elif n == 127:
+            n = struct.unpack("!Q", await reader.readexactly(8))[0]
+        if not masked or n > MAX_MESSAGE or len(data) + n > MAX_MESSAGE:
+            raise ConnectionError("bad frame")
+        mask = await reader.readexactly(4)
+        payload = bytearray(await reader.readexactly(n))
+        for i in range(n):
+            payload[i] ^= mask[i & 3]
+        if op >= 0x8:
+            return op, bytes(payload)
+        if op != OP_CONT:
+            first_op = op
+        data += payload
+        if fin:
+            return first_op, data
+
+
+def frame(op, payload=b""):
+    n = len(payload)
+    if n < 126:
+        head = struct.pack("!BB", 0x80 | op, n)
+    elif n < 65536:
+        head = struct.pack("!BBH", 0x80 | op, 126, n)
+    else:
+        head = struct.pack("!BBQ", 0x80 | op, 127, n)
+    return head + payload
+
+
+def send(c, obj):
+    """Queue a message without waiting: one slow phone must not stall the rest."""
+    w = c.writer
+    if w.is_closing():
+        return
+    if w.transport.get_write_buffer_size() > MAX_BUFFERED:
+        log(f"dropping {c.name or c.id}: too far behind")
+        w.close()
+        return
+    w.write(frame(OP_TEXT, json.dumps(obj, separators=(",", ":")).encode()))
+
+
+def broadcast(obj, skip=None):
+    for c in list(players.values()):
+        if c is not skip:
+            send(c, obj)
+
+
+# ---------------------------------------------------------------- the arena
+
+def scores():
+    return [{"id": c.id, "name": c.name, "color": c.color, "kills": c.kills, "deaths": c.deaths}
+            for c in sorted(players.values(), key=lambda c: c.id)]
+
+
+def clean_name(raw, cid):
+    name = "".join(ch for ch in str(raw or "")[:16] if ch.isalnum() or ch in " _-").strip().upper()[:12]
+    return name or f"PILOT {cid}"
+
+
+def num(v, lo, hi, default=0.0):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return default
+    return default if v != v else max(lo, min(hi, v))   # v != v: NaN
+
+
+async def end_round(winner):
+    arena["over"] = True
+    log(f"round over: {winner.name} wins")
+    broadcast({"t": "roundover", "winner": winner.id, "name": winner.name, "next": ROUND_GAP, "scores": scores()})
+    await asyncio.sleep(ROUND_GAP)
+    arena.update(seed=random.randrange(1, 10**6), pal=random.choice(PALETTES), over=False)
+    for c in players.values():
+        c.kills = c.deaths = 0
+    broadcast({"t": "newround", "seed": arena["seed"], "pal": arena["pal"], "scores": scores()})
+
+
+def handle_message(c, msg):
+    t = msg.get("t")
+    if t in ("s", "fx"):
+        # Movement and weapon effects: stamp the sender and pass them on.
+        msg["id"] = c.id
+        broadcast(msg, skip=c)
+    elif t == "hit":
+        target = players.get(int(num(msg.get("to"), 0, 99)))
+        if target and target is not c and not arena["over"]:
+            p = msg.get("p") if isinstance(msg.get("p"), list) else [0, 0, 0]
+            send(target, {"t": "hit", "from": c.id, "amt": num(msg.get("amt"), 0, 40),
+                          "p": [num(v, -1e4, 1e4) for v in p[:3]]})
+    elif t == "died":
+        c.deaths += 1
+        killer = players.get(int(num(msg.get("by"), 0, 99)))
+        if killer is c:
+            killer = None
+        if killer and not arena["over"]:
+            killer.kills += 1
+        broadcast({"t": "kill", "victim": c.id, "killer": killer.id if killer else 0, "scores": scores()})
+        if killer and killer.kills >= SCORE_LIMIT and not arena["over"]:
+            asyncio.ensure_future(end_round(killer))
+
+
+async def session(reader, writer):
+    peer = writer.get_extra_info("peername")
+    c = None
+    try:
+        if not await handshake(reader, writer):
+            return
+        c = Client(writer)
+        # The first message must be a hello with a callsign and colour.
+        op, data = await asyncio.wait_for(read_message(reader), HELLO_TIMEOUT)
+        hello = json.loads(data) if op == OP_TEXT else {}
+        if hello.get("t") != "hello":
+            return
+        if len(players) >= MAX_PLAYERS:
+            send(c, {"t": "full", "max": MAX_PLAYERS})
+            return
+        c.id = next(i for i in range(1, MAX_PLAYERS + 1) if i not in players)
+        c.name = clean_name(hello.get("name"), c.id)
+        c.color = int(num(hello.get("color"), 0, 7))
+        players[c.id] = c
+        log(f"join {c.id} {c.name} from {peer[0] if peer else '?'} ({len(players)} playing)")
+        send(c, {"t": "welcome", "id": c.id, "seed": arena["seed"], "pal": arena["pal"],
+                 "limit": SCORE_LIMIT, "over": arena["over"], "scores": scores()})
+        broadcast({"t": "join", "id": c.id, "name": c.name, "color": c.color, "scores": scores()}, skip=c)
+
+        while True:
+            op, data = await read_message(reader)
+            c.last = time.monotonic()
+            if op == OP_CLOSE:
+                writer.write(frame(OP_CLOSE, data[:2]))
+                break
+            if op == OP_PING:
+                writer.write(frame(OP_PONG, data))
+            elif op == OP_TEXT:
+                try:
+                    msg = json.loads(data)
+                except ValueError:
+                    continue
+                if isinstance(msg, dict):
+                    handle_message(c, msg)
+    except (asyncio.IncompleteReadError, ConnectionError, asyncio.TimeoutError, OSError, ValueError):
+        pass
+    finally:
+        if c and players.get(c.id) is c:
+            del players[c.id]
+            log(f"leave {c.id} {c.name} ({len(players)} playing)")
+            broadcast({"t": "leave", "id": c.id, "scores": scores()})
+        writer.close()
+
+
+async def heartbeat():
+    """Ping everyone; drop anyone silent too long (phones sleep without closing)."""
+    while True:
+        await asyncio.sleep(PING_EVERY)
+        now = time.monotonic()
+        for c in list(players.values()):
+            if now - c.last > DROP_AFTER:
+                log(f"timeout {c.id} {c.name}")
+                c.writer.close()
+            elif not c.writer.is_closing():
+                c.writer.write(frame(OP_PING))
+
+
+async def main():
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8096
+    server = await asyncio.start_server(session, "0.0.0.0", port, limit=16 * 1024)
+    log(f"stompy arena on :{port}/ws (max {MAX_PLAYERS}, first to {SCORE_LIMIT})")
+    asyncio.ensure_future(heartbeat())
+    async with server:
+        await server.serve_forever()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

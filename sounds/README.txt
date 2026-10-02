@@ -7,9 +7,8 @@ Creative Commons CC0 (public domain) -- licence files alongside:
 
 Converted from OGG to mono 112 kbps MP3 (every browser decodes MP3; Safari
 doesn't reliably decode OGG). Mapping, source -> file:
-  impactMetal_heavy_00x       step0-4       footfalls, played slowed; hit clang
-  impactPunch_heavy_00x       punch0-2      footfall body, autocannon thunk
-  doorOpen_00x                hiss0-2       leg hydraulics after each step
+  impactMetal_heavy_00x       step0-4       taking a hit (armour clang)
+  impactPunch_heavy_00x       punch0-2      footfalls and landings (slowed), autocannon thunk
   impactPlate_heavy_00x       plate0-1      landings, armour hits
   laserLarge_00x              laser0-4      player's large lasers
   laserSmall_00x              mlaser0-4     Jackals' medium lasers

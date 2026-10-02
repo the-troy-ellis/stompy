@@ -19,14 +19,44 @@
     set(k, v) { try { localStorage.setItem('stompy.' + k, JSON.stringify(v)); } catch { /* ignore */ } },
   };
   const settings = { sound: store.get('sound', true) };
-  // Browsers only allow audio after a click or key press.
+  // Browsers only allow audio after a click, tap or key press -- and iOS is
+  // stricter on three counts, each of which silences the game on iPhones:
+  //  1. Web Audio follows the ring/silent switch ("ambient" audio) unless the
+  //     page asks for "playback". Safari 16.4+ has navigator.audioSession for
+  //     that; older iOS switches category if a media element plays, hence the
+  //     looping silent <audio>.
+  //  2. Only touchend/click count as the gesture (not touchstart/pointerdown),
+  //     and the context only really starts once something has played inside it.
+  //  3. It suspends audio on screen lock / app switch / calls, and only a later
+  //     gesture can resume it.
+  // So unlock() runs on every touchend/click/keydown (see the listeners below).
+  const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQQAAAAAAAAA';
   const Sound = {
-    ctx: null,
+    ctx: null, primed: false, tag: null,
     unlock() {
-      if (this.ctx) { this.ctx.resume?.(); return; }
-      try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { this.ctx = null; }
+      try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch { /* not supported */ }
+      if (IOS && !navigator.audioSession && !this.tag) {
+        try { this.tag = new Audio(SILENT_WAV); this.tag.loop = true; this.tag.play().catch(() => { this.tag = null; }); } catch { this.tag = null; }
+      }
+      if (!this.ctx) {
+        try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { this.ctx = null; return; }
+      }
+      const c = this.ctx;
+      if (c.state !== 'running') { try { c.resume()?.catch?.(() => {}); } catch { /* ignore */ } }
+      if (!this.primed) {
+        try {
+          const src = c.createBufferSource();
+          src.buffer = c.createBuffer(1, 1, 22050);
+          src.connect(c.destination); src.start(0);
+          this.primed = true;
+        } catch { /* try again next gesture */ }
+      }
     },
   };
+  for (const ev of ['touchend', 'click', 'keydown']) {
+    document.addEventListener(ev, () => { if (settings.sound) Sound.unlock(); }, { capture: true, passive: true });
+  }
   const TAU = PI * 2;
   const clampN = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -103,11 +133,22 @@
   /* ======================= game data ======================= */
 
   const WEAPONS = {
-    laser:  { name: 'LG LASER',  kind: 'beam',    dmg: 8,   heat: 9,  cd: 1.7, range: 520, col: [1, 0.25, 0.2], w: 0.22 },
-    mlaser: { name: 'MED LASER', kind: 'beam',    dmg: 4.5, heat: 4,  cd: 1.0, range: 360, col: [0.3, 1, 0.35], w: 0.16 },
-    ac:     { name: 'AUTOCANNON', kind: 'shell',  dmg: 9,   heat: 3,  cd: 1.3, range: 650, speed: 280, ammo: 30 },
+    // Lasers are continuous beams: damage per second (dps) climbs the longer
+    // a beam stays on one mech -- its armour melts (see MELT_T / MELT_MAX) -- and heat per second
+    // (hps) is the price -- two large lasers outrun the heat sinks.
+    laser:  { name: 'LG LASER',  kind: 'beam',    dps: 3.5, hps: 12, range: 520, col: [1, 0.25, 0.2], w: 0.22, cd: 1 },
+    mlaser: { name: 'MED LASER', kind: 'beam',    dps: 2.0, hps: 6,  range: 360, col: [0.3, 1, 0.35], w: 0.16, cd: 1 },
+    // The autocannon is the opposite: big individual hits, little heat, ammo.
+    ac:     { name: 'AUTOCANNON', kind: 'shell',  dmg: 11,  heat: 2,  cd: 1.1, range: 650, speed: 340, ammo: 30 },
     lrm:    { name: 'LRM-10',    kind: 'missile', dmg: 1.9, heat: 6,  cd: 4.5, range: 850, speed: 120, ammo: 14, count: 10 },
   };
+
+  // Three fire controls, one per kind of weapon: lasers are energy (no ammo,
+  // lots of heat), the autocannon is ballistic, LRMs are missiles.
+  const CATS = ['energy', 'ballistic', 'missile'];
+  const CAT_OF = { laser: 'energy', mlaser: 'energy', ac: 'ballistic', lrm: 'missile' };
+  const CAT_LABEL = { energy: 'ENERGY', ballistic: 'BALLISTIC', missile: 'MISSILE' };
+  const CAT_KEY = { energy: 'LMB 1', ballistic: 'RMB 2', missile: 'SPC 3' };
 
   // Hit points per section: T(orso), L/R A(rm), L/R L(eg). Losing the torso kills.
   const CHASSIS = {
@@ -120,6 +161,14 @@
     warden: { name: 'WARDEN', speed: 9, turn: 0.7, sink: 10, scale: 1.15, pref: 330, acc0: 0.025,
       hp: { T: 58, LA: 28, RA: 28, LL: 34, RL: 34 }, col: [0.36, 0.4, 0.3], acc: [0.75, 0.7, 0.2],
       weapons: [['lrm', 'T'], ['ac', 'RA'], ['laser', 'LA']] },
+  };
+
+  // The selectable mechs, in selector order, with what the menu says about them.
+  const MECH_ORDER = ['kestrel', 'jackal', 'warden'];
+  const MECH_INFO = {
+    kestrel: { role: 'MEDIUM · ALL-ROUNDER', kit: '2x LG LASER · AUTOCANNON · LRM-10', fire: 0.75 },
+    jackal: { role: 'LIGHT · FAST, HARD TO HIT', kit: '2x MED LASER', fire: 0.35 },
+    warden: { role: 'HEAVY · FIRE SUPPORT', kit: 'LG LASER · AUTOCANNON · LRM-10', fire: 0.85 },
   };
 
   const PALS = {
@@ -148,6 +197,19 @@
       foes: Array.from({ length: k }, (_, i) => (i < heavies ? 'warden' : 'jackal')),
       intel: `Open contract. ${k} hostiles reported, ${heavies} of them heavy. Pay is by the kill.` };
   }
+
+  // Multiplayer paint jobs: every pilot flies a KESTREL, told apart by colour.
+  const MP_COLORS = [
+    { name: 'STEEL', col: [0.58, 0.6, 0.64], acc: [0.85, 0.6, 0.15], css: '#9aa0a8' },
+    { name: 'RED', col: [0.72, 0.2, 0.17], acc: [0.2, 0.2, 0.22], css: '#e04a3a' },
+    { name: 'BLUE', col: [0.2, 0.38, 0.78], acc: [0.85, 0.85, 0.9], css: '#4a7ae0' },
+    { name: 'GREEN', col: [0.24, 0.55, 0.28], acc: [0.85, 0.75, 0.2], css: '#44b058' },
+    { name: 'GOLD', col: [0.82, 0.64, 0.16], acc: [0.2, 0.2, 0.22], css: '#f0c030' },
+    { name: 'VIOLET', col: [0.52, 0.28, 0.68], acc: [0.85, 0.85, 0.9], css: '#a868e0' },
+    { name: 'ORANGE', col: [0.85, 0.42, 0.14], acc: [0.2, 0.2, 0.22], css: '#f08030' },
+    { name: 'TEAL', col: [0.18, 0.6, 0.6], acc: [0.9, 0.9, 0.9], css: '#38c0c0' },
+  ];
+  const HPK = ['T', 'LA', 'RA', 'LL', 'RL'];
 
   const SECT_NAME = { T: 'Torso', LA: 'Left arm', RA: 'Right arm', LL: 'Left leg', RL: 'Right leg' };
 
@@ -258,12 +320,12 @@
           <button class="tbtn tpause" data-t="pause" aria-label="Pause">II</button>
           <button class="tbtn tstop" data-t="stop">STOP</button>
           <div class="tcluster">
-            <button class="tbtn" data-t="zoom">ZOOM</button>
-            <button class="tbtn" data-t="tgt">TGT</button>
-            <button class="tbtn" data-t="wpn">WPN</button>
-            <button class="tbtn" data-t="alpha">ALL</button>
-            <button class="tbtn tfire" data-t="fire">FIRE</button>
             <button class="tbtn" data-t="jump">JUMP</button>
+            <button class="tbtn" data-t="tgt">TGT</button>
+            <button class="tbtn" data-t="zoom">ZOOM</button>
+            <button class="tbtn tfire t-missile" data-t="missile">MISSILE</button>
+            <button class="tbtn tfire t-energy" data-t="energy">ENERGY</button>
+            <button class="tbtn tfire t-ballistic" data-t="ballistic">BALLISTIC</button>
           </div>
         </div>
         <div class="mech-overlay"></div>
@@ -304,8 +366,18 @@
         vFog = clamp((length(wp.xyz - uCam) - uFog.x) / (uFog.y - uFog.x), 0.0, 1.0);
       }`, `
       precision mediump float;
-      uniform vec3 uFogCol; varying vec3 vCol; varying float vFog;
-      void main() { gl_FragColor = vec4(mix(vCol, uFogCol, vFog), 1.0); }`);
+      uniform vec3 uFogCol; uniform float uIR, uHeat; varying vec3 vCol; varying float vFog;
+      void main() {
+        vec3 c = mix(vCol, uFogCol, vFog);
+        if (uIR > 0.5) {
+          // White-hot infrared (the missile camera): cold things are dim greys
+          // by brightness; hot things -- mechs, fire, weapons -- glow white.
+          float l = dot(vCol, vec3(0.3, 0.59, 0.11));
+          float g = mix(0.1 + l * 0.3, 0.97, uHeat);
+          c = vec3(mix(g, 0.06, vFog * 0.9));
+        }
+        gl_FragColor = vec4(c, 1.0);
+      }`);
     const skyProg = compile(`
       attribute vec2 aP; void main() { gl_Position = vec4(aP, 0.999, 1.0); }`, `
       precision mediump float;
@@ -315,7 +387,7 @@
         gl_FragColor = vec4(mix(uHor, uZen, smoothstep(0.0, 0.55, y)), 1.0);
       }`);
     const L = n => gl.getUniformLocation(prog, n);
-    const U = { VP: L('uVP'), M: L('uM'), light: L('uLight'), tint: L('uTint'), cam: L('uCam'), emis: L('uEmis'), fog: L('uFog'), fogCol: L('uFogCol') };
+    const U = { VP: L('uVP'), M: L('uM'), light: L('uLight'), tint: L('uTint'), cam: L('uCam'), emis: L('uEmis'), fog: L('uFog'), fogCol: L('uFogCol'), ir: L('uIR'), heat: L('uHeat') };
     const A = { pos: gl.getAttribLocation(prog, 'aPos'), nrm: gl.getAttribLocation(prog, 'aNrm'), col: gl.getAttribLocation(prog, 'aCol') };
     const SU = { zen: gl.getUniformLocation(skyProg, 'uZen'), hor: gl.getUniformLocation(skyProg, 'uHor'), h: gl.getUniformLocation(skyProg, 'uH'), res: gl.getUniformLocation(skyProg, 'uRes') };
     const skyBuf = gl.createBuffer();
@@ -339,8 +411,22 @@
       mechParts[k] = Object.fromEntries(Object.entries(p).map(([n, b]) => [n, upload(b)]));
     }
 
+    // A mesh set per chassis + multiplayer colour, built the first time it's needed.
+    function partsKeyFor(color, type = 'kestrel') {
+      if (!CHASSIS[type]) type = 'kestrel';
+      const key = `${type}:${color}`;
+      if (!mechParts[key]) {
+        const c = MP_COLORS[color] || MP_COLORS[0];
+        const p = buildMechParts({ ...CHASSIS[type], col: c.col, acc: c.acc });
+        mechParts[key] = Object.fromEntries(Object.entries(p).map(([n, b]) => [n, upload(b)]));
+      }
+      return key;
+    }
+
     let curMesh = null;
-    const draw = (mesh, m, tint = [1, 1, 1], emis = 0) => {
+    // `heat` is for the IR view; unset, it uses drawHeat (set around groups of draws).
+    let drawHeat = 0;
+    const draw = (mesh, m, tint = [1, 1, 1], emis = 0, heat) => {
       if (curMesh !== mesh) {
         gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
         gl.vertexAttribPointer(A.pos, 3, gl.FLOAT, false, 36, 0);
@@ -351,6 +437,7 @@
       gl.uniformMatrix4fv(U.M, false, m);
       gl.uniform3fv(U.tint, tint);
       gl.uniform1f(U.emis, emis);
+      gl.uniform1f(U.heat, heat === undefined ? drawHeat : heat);
       gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
     };
 
@@ -381,34 +468,101 @@
       }
       return noiseBuf;
     };
-    const volAt = p => (p ? clampN(1 - len(sub(p, G.eye)) / 900, 0, 1) : 1);
+    // Where a sound is, as heard from the cockpit. `ref` is how far it carries
+    // at full volume: past that it falls off inversely with distance, like real
+    // sound (an explosion carries across the map; a footstep doesn't). It pans
+    // by bearing relative to where the torso faces, and far sounds lose their
+    // highs the way they do outdoors. null = too faint to bother playing.
+    // Sounds with no position (`at` null) are your own: full, centred, clear.
+    function spatial(at, ref = 25) {
+      if (!at) return { g: 1, pan: 0, lp: 0 };
+      const ear = G.ear || G.eye, dx = at[0] - ear[0], dy = at[1] - ear[1], dz = at[2] - ear[2], d = hypot(dx, dy, dz);
+      if (!Number.isFinite(d)) return null;
+      const g = d <= ref ? 1 : ref / (ref + 1.4 * (d - ref));
+      if (g < 0.02) return null;
+      // yaw grows to the left; StereoPanner is -1 left .. +1 right. Right
+      // beside you it stays centred, or a sound at your feet flips sides.
+      const rel = wrapA(atan2(dx, dz) - (G.earYaw ?? viewYaw(G.player)));
+      const pan = clampN(-sin(rel) * min(1, d / 10), -1, 1) * 0.85;
+      const lp = d < 40 ? 0 : clampN(18000 * Math.pow(0.9955, d - 40), 700, 18000);
+      return { g, pan, lp };
+    }
+    // Connect a sound's last node to the mix through its muffling and panning.
+    function routeOut(c, node, sp) {
+      let n = node;
+      if (sp.lp) { const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = sp.lp; n.connect(f); n = f; }
+      if (sp.pan && c.createStereoPanner) { const pn = c.createStereoPanner(); pn.pan.value = sp.pan; n.connect(pn); n = pn; }
+      n.connect(out());
+    }
 
     // name -> number of takes (files name0..nameN-1, or just name.mp3 for 1).
-    const SAMPLES = { step: 5, punch: 3, hiss: 3, plate: 2, laser: 5, mlaser: 5, crunch: 5, boom_big: 1, boom_low: 1,
+    const SAMPLES = { step: 5, punch: 3, plate: 2, laser: 5, mlaser: 5, crunch: 5, boom_big: 1, boom_low: 1,
       missile: 1, jet_loop: 1, hum_loop: 1, servo_loop: 1, powerdown: 1, powerup: 1, beep: 1 };
     const buffers = {};
     let loading = null;
+    // Make a clip loop without a click. MP3 pads each end with a little
+    // silence, and any loop point cut into a recording leaves the waveform
+    // jumping between unrelated values -- an audible tick every time round
+    // (worst on the steady reactor hum). So drop the padding, then crossfade
+    // the last quarter-second into the start: playing past the end now runs
+    // straight into a continuation of itself. Equal-power curves, since these
+    // are noisy, uncorrelated sounds.
+    function seamless(buf) {
+      const sr = buf.sampleRate, trim = Math.floor(0.06 * sr), X = Math.floor(0.25 * sr);
+      const n = buf.length - 2 * trim - X;
+      if (n <= X) return buf;
+      const loop = Sound.ctx.createBuffer(buf.numberOfChannels, n, sr);
+      for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+        const src = buf.getChannelData(ch), dst = loop.getChannelData(ch);
+        for (let i = 0; i < n; i++) dst[i] = src[trim + i];
+        for (let i = 0; i < X; i++) {
+          const t = (i / X) * PI / 2;
+          dst[i] = src[trim + i] * sin(t) + src[trim + n + i] * cos(t);
+        }
+      }
+      return loop;
+    }
+
     function loadSamples() {
       const c = Sound.ctx;
       if (!c || loading) return;
       loading = Promise.all(Object.entries(SAMPLES).flatMap(([name, n]) => Array.from({ length: n }, (_, i) =>
         fetch(`sounds/${n > 1 ? name + i : name}.mp3`)
           .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
-          .then(b => c.decodeAudioData(b))
-          .then(buf => { (buffers[name] ||= []).push(buf); })
+          .then(b => new Promise((ok, fail) => c.decodeAudioData(b, ok, fail)))   // callback form: every Safari
+          .then(buf => { (buffers[name] ||= []).push(name.endsWith('_loop') ? seamless(buf) : buf); })
           .catch(() => { /* synthesis covers it */ }))));
     }
     // Play one random take. Lower rate = deeper and longer = heavier.
-    function play(name, { vol = 1, rate = 1, vary = 0.07, at = null, delay = 0 } = {}) {
+    // At most this many one-shot sounds at once. Eight mechs stepping plus a
+    // few missile volleys (every missile explodes) can otherwise stack up
+    // hundreds of voices, and a phone's audio gives out under that. Extra
+    // sounds are simply skipped -- nobody hears the 40th explosion anyway.
+    const MAX_SFX = 32;
+    let liveSfx = 0;
+    const voice = node => {
+      if (liveSfx >= MAX_SFX) return false;
+      liveSfx++;
+      node.onended = () => { liveSfx = max(0, liveSfx - 1); };
+      return true;
+    };
+    // A single NaN reaching the compressor silences everything until reload.
+    const ok = (...v) => v.every(Number.isFinite);
+
+    function play(name, { vol = 1, rate = 1, vary = 0.07, at = null, ref = 25, delay = 0 } = {}) {
       const c = ac(), list = buffers[name];
       if (!c || !list?.length) return false;
-      const v = vol * volAt(at);
-      if (v < 0.004) return true;
+      const sp = spatial(at, ref);
+      if (!sp) return true;
+      const v = vol * sp.g, pr = rate * (1 + rnd(-vary, vary));
+      if (!ok(v, pr) || v < 0.004) return true;
       const src = c.createBufferSource(), g = c.createGain();
+      if (!voice(src)) return true;
       src.buffer = list[floor(random() * list.length)];
-      src.playbackRate.value = rate * (1 + rnd(-vary, vary));
+      src.playbackRate.value = pr;
       g.gain.value = v;
-      src.connect(g).connect(out());
+      src.connect(g);
+      routeOut(c, g, sp);
       src.start(c.currentTime + delay);
       return true;
     }
@@ -423,72 +577,81 @@
         const buf = buffers[name]?.[0];
         if (!buf) return;
         const src = c.createBufferSource(), g = c.createGain();
-        src.buffer = buf; src.loop = true;
-        // Skip the MP3 encoder's padding at each end, or the loop clicks.
-        src.loopStart = 0.06; src.loopEnd = buf.duration - 0.06;
+        src.buffer = buf; src.loop = true;   // already made seamless at load: loop the whole buffer
         g.gain.value = 0;
         src.connect(g).connect(out());
-        src.start(c.currentTime, 0.06);
+        src.start(c.currentTime);
         l = loops[name] = { src, g };
       }
       l.g.gain.setTargetAtTime(gain, c.currentTime, 0.08);
       l.src.playbackRate.setTargetAtTime(rate, c.currentTime, 0.15);
     }
+    // osc/noise take { at, ref, delay } like play(): positioned and panned.
     const sfx = {
-      osc(type, f0, f1, dur, vol, delay = 0) {
-        const c = ac(); if (!c || vol < 0.003) return;
+      osc(type, f0, f1, dur, vol, { at = null, ref = 25, delay = 0 } = {}) {
+        const c = ac(), sp = c && spatial(at, ref);
+        if (!sp) return;
+        vol *= sp.g;
+        if (!ok(f0, f1, dur, vol) || vol < 0.003) return;
         const t = c.currentTime + delay, o = c.createOscillator(), g = c.createGain();
+        if (!voice(o)) return;
         o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
         g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-        o.connect(g).connect(out()); o.start(t); o.stop(t + dur + 0.02);
+        o.connect(g); routeOut(c, g, sp); o.start(t); o.stop(t + dur + 0.02);
       },
-      noise(dur, vol, f0, f1, type = 'lowpass') {
-        const c = ac(); if (!c || vol < 0.003) return;
+      noise(dur, vol, f0, f1, type = 'lowpass', { at = null, ref = 25 } = {}) {
+        const c = ac(), sp = c && spatial(at, ref);
+        if (!sp) return;
+        vol *= sp.g;
+        if (!ok(f0, f1, dur, vol) || vol < 0.003) return;
         const t = c.currentTime, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+        if (!voice(s)) return;
         s.buffer = noise(); f.type = type; f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
         g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-        s.connect(f).connect(g).connect(out()); s.start(t, random() * 0.5); s.stop(t + dur + 0.02);
+        s.connect(f).connect(g); routeOut(c, g, sp); s.start(t, random() * 0.5); s.stop(t + dur + 0.02);
       },
+      // How far each kind of sound carries at full volume (metres): lasers
+      // and cannon carry, explosions carry further, footsteps barely.
       laser(p, small) {
-        if (play(small ? 'mlaser' : 'laser', { at: p, vol: small ? 0.35 : 0.5, rate: small ? 1 : 0.85 })) return;
-        const v = volAt(p); this.osc('sawtooth', 1900, 180, 0.28, 0.05 * v); this.osc('sine', 900, 120, 0.3, 0.05 * v);
+        const at = { at: p, ref: 35 };
+        if (play(small ? 'mlaser' : 'laser', { ...at, vol: small ? 0.35 : 0.5, rate: small ? 1 : 0.85 })) return;
+        this.osc('sawtooth', 1900, 180, 0.28, 0.05, at); this.osc('sine', 900, 120, 0.3, 0.05, at);
       },
       // The autocannon is a thunk first and a bang second.
       cannon(p) {
-        const v = volAt(p);
-        play('punch', { at: p, vol: 0.9, rate: 0.7 });
-        play('crunch', { at: p, vol: 0.45, rate: 1.25 });
-        this.osc('sine', 110, 32, 0.32, 0.3 * v);
-        if (!buffers.punch) this.noise(0.35, 0.3 * v, 900, 80);
+        const at = { at: p, ref: 40 };
+        play('punch', { ...at, vol: 0.9, rate: 0.7 });
+        play('crunch', { ...at, vol: 0.45, rate: 1.25 });
+        this.osc('sine', 110, 32, 0.32, 0.3, at);
+        if (!buffers.punch) this.noise(0.35, 0.3, 900, 80, 'lowpass', at);
       },
-      missile(p) { if (!play('missile', { at: p, vol: 0.35, rate: 1.25, vary: 0.15 })) this.noise(0.7, 0.12 * volAt(p), 3000, 400, 'bandpass'); },
+      missile(p) { if (!play('missile', { at: p, ref: 30, vol: 0.35, rate: 1.25, vary: 0.15 })) this.noise(0.7, 0.12, 3000, 400, 'bandpass', { at: p, ref: 30 }); },
       boom(p, big) {
-        const v = volAt(p);
-        if (big) { play('boom_big', { at: p, vol: 1.1, rate: 0.9 }); play('crunch', { at: p, vol: 0.8, rate: 0.65 }); play('plate', { at: p, vol: 0.4, rate: 0.5, delay: 0.05 }); }
-        else { play('crunch', { at: p, vol: 0.55 }); play('boom_low', { at: p, vol: 0.35, rate: 1.4 }); }
-        this.osc('sine', big ? 70 : 120, 25, big ? 1.2 : 0.4, (big ? 0.4 : 0.25) * v);
-        if (!buffers.crunch) this.noise(big ? 1.6 : 0.6, (big ? 0.6 : 0.25) * v, big ? 700 : 1200, 40);
+        const at = { at: p, ref: big ? 90 : 40 };
+        if (big) { play('boom_big', { ...at, vol: 1.1, rate: 0.9 }); play('crunch', { ...at, vol: 0.8, rate: 0.65 }); play('plate', { ...at, vol: 0.4, rate: 0.5, delay: 0.05 }); }
+        else { play('crunch', { ...at, vol: 0.55 }); play('boom_low', { ...at, vol: 0.35, rate: 1.4 }); }
+        this.osc('sine', big ? 70 : 120, 25, big ? 1.2 : 0.4, big ? 0.4 : 0.25, at);
+        if (!buffers.crunch) this.noise(big ? 1.6 : 0.6, big ? 0.6 : 0.25, big ? 700 : 1200, 40, 'lowpass', at);
       },
       // Taking a hit: armour plate ringing.
       clang() {
         play('step', { vol: 0.8, rate: 1.15, vary: 0.12 }); play('plate', { vol: 0.5, rate: 0.9 });
         if (!buffers.step) { this.osc('square', 240, 120, 0.12, 0.05); this.noise(0.15, 0.15, 4000, 800, 'highpass'); }
       },
-      // A footfall: metal foot, slowed right down, on a sub-bass thump, with
-      // the leg's hydraulics hissing as it lifts. Bigger mechs step deeper.
       step(m, vol) {
-        const at = m === G.player ? null : [m.x, m.y, m.z], r = 0.6 / m.ch.scale;
-        play('step', { at, vol: 0.95 * vol, rate: r });
-        play('punch', { at, vol: 0.55 * vol, rate: r * 0.75 });
-        play('hiss', { at, vol: 0.1 * vol, rate: 1.1, delay: 0.16 });
-        const v = vol * volAt(at);
-        this.osc('sine', 62 / m.ch.scale, 28, 0.24, 0.22 * v);
-        if (!buffers.step) this.noise(0.08, 0.05 * v, 500, 100);
+        // A footfall is felt more than heard: a short, quiet sub-bass thump
+        // with a soft low-passed scuff. No recordings -- on every step of
+        // every mech, any sample turns into noise (first a clank, then a
+        // string of explosions). Bigger mechs step deeper; others are quieter.
+        const mine = m === G.player, at = { at: mine ? null : [m.x, m.y, m.z], ref: 12 };
+        const v = vol * (mine ? 1 : 0.55);
+        this.osc('sine', 72 / m.ch.scale, 36, 0.16, 0.14 * v, at);
+        this.noise(0.07, 0.035 * v, 170, 60, 'lowpass', at);
       },
       land(force) {
-        play('plate', { vol: 0.9 * force, rate: 0.55 }); play('boom_low', { vol: 0.6 * force, rate: 0.8 });
-        play('step', { vol: force, rate: 0.45 });
-        this.osc('sine', 55, 22, 0.5, 0.35 * force);
+        this.osc('sine', 62, 28, 0.32, 0.22 * force);
+        this.noise(0.14, 0.08 * force, 200, 50);
+        play('punch', { vol: 0.3 * force, rate: 0.5, vary: 0.04 });
       },
       beep() { if (!play('beep', { vol: 0.2, vary: 0 })) this.osc('square', 1200, 1190, 0.06, 0.03); },
       powerdown() { play('powerdown', { vol: 0.6, rate: 0.6, vary: 0 }); this.osc('sawtooth', 220, 30, 1.6, 0.05); },
@@ -525,17 +688,29 @@
     let voiceOn = store.get('mech.voice', true);
     let invertY = store.get('mech.invert', false);
     let missionN = store.get('mech.mission', 0);
+    // Main-menu choices, remembered between visits.
+    let chassis = MECH_ORDER.includes(store.get('mech.chassis')) ? store.get('mech.chassis') : 'kestrel';
+    let menuSel = store.get('menu.sel', 'campaign');
+    let fpMap = store.get('fp.map', 0), fpFoes = store.get('fp.foes', 3);
     const G = { state: 'brief', paused: false, mechs: [], shots: [], beams: [], parts: [], wrecks: [], msgs: [],
-      eye: [0, 0, 0], view: [0, 0, 1], flash: 0, shake: 0, kick: 0, lastTwist: 0,
+      eye: [0, 0, 0], view: [0, 0, 1], flash: 0, shake: 0, kick: 0, lastTwist: 0, cbeams: [], pendingHits: new Map(),
       touchUI: matchMedia('(pointer: coarse)').matches, touchTurn: 0, zoom: false, target: null, sel: 0, endT: 0 };
     let ter = null, world = null, pal = null;
     const keys = {};
-    let firing = false;
+    // Which fire controls are held: by touch button, mouse button or key.
+    const held = { energy: false, ballistic: false, missile: false };
+    const clearHeld = () => { for (const c of CATS) held[c] = false; };
+    let volleySeq = 0;
+    const KEY_FOR = { energy: ['Digit1'], ballistic: ['Digit2'], missile: ['Digit3', 'Space'] };
+    const isHeld = c => held[c] || KEY_FOR[c].some(k => keys[k]);
+    // A missile press is latched until the next frame sees it, so a tap
+    // shorter than a frame (a slow phone, a quick thumb) still fires.
+    let missileTap = false;
 
-    function newMech(type, team, x, z, yaw) {
+    function newMech(type, team, x, z, yaw, opts = {}) {
       const ch = CHASSIS[type];
       const m = {
-        type, ch, team, x, z, y: ter.height(x, z), vy: 0, yaw, twist: 0, pitch: 0, speed: 0, throttle: 0, heat: 0,
+        type, ch, team, partsKey: opts.partsKey || type, netId: 0, remote: false, spawnT: 0, x, z, y: ter.height(x, z), vy: 0, yaw, twist: 0, pitch: 0, speed: 0, throttle: 0, heat: 0,
         fuel: 1, jetting: false, air: false, shutdown: false, alive: true,
         hp: { ...ch.hp }, max: { ...ch.hp },
         weapons: ch.weapons.map(([w, mount], i) => ({ type: w, def: WEAPONS[w], mount, cd: random() * 0.5, ammo: WEAPONS[w].ammo || null, dead: false, side: i })),
@@ -547,23 +722,35 @@
 
     function startMission(n) {
       missionN = n; store.set('mech.mission', max(store.get('mech.mission', 0), n));
-      const def = missionDef(n);
+      startMatch(missionDef(n), 7 + n * 13, n === 0);
+      G.kind = 'campaign';
+    }
+    // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
+    const FP_MAPS = ['random', 'dusk', 'ice', 'volcanic'];
+    function startSkirmish() {
+      const pk = FP_MAPS[fpMap] === 'random' ? ['dusk', 'ice', 'volcanic'][floor(random() * 3)] : FP_MAPS[fpMap];
+      const foes = Array.from({ length: fpFoes }, () => (random() < 0.35 ? 'warden' : 'jackal'));
+      startMatch({ name: 'Free Play', pal: pk, foes, intel: '' }, 1 + floor(random() * 1e5), false);
+      G.kind = 'free';
+    }
+    function startMatch(def, seed, gentle) {
+      G.worldKind = 'match';
       pal = PALS[def.pal];
-      const seed = 7 + n * 13;
       ter = makeTerrain(seed);
+      if (world) gl.deleteBuffer(world.buf);
       world = upload(buildTerrainMesh(ter, pal, seed));
       G.mechs = []; G.shots = []; G.beams = []; G.parts = []; G.wrecks = []; G.msgs = [];
-      G.target = null; G.sel = 0; G.flash = 0; G.shake = 0; G.kick = 0; G.zoom = false; G.endT = 0; G.time = 0;
+      G.target = null; G.flash = 0; G.shake = 0; G.kick = 0; G.zoom = false; G.endT = 0; G.time = 0; G.guide = null; G.mDown = false;
       G.stats = { shots: 0, hits: 0, dealt: 0, taken: 0, kills: 0 };
       G.def = def;
-      G.player = newMech('kestrel', 0, 0, 0, 0);
+      G.player = newMech(chassis, 0, 0, 0, 0);
       G.mechs.push(G.player);
       G.eye = eyeOf(G.player); G.view = dirOf(0, 0); G.aim = add(G.eye, mul(G.view, 100));
       def.foes.forEach((t, i) => {
         const a = (i / def.foes.length) * TAU + rnd(-0.4, 0.4) + PI * 0.6, d = rnd(520, 760);
         const x = clampN(sin(a) * d, -BOUND, BOUND), z = clampN(cos(a) * d, -BOUND, BOUND);
         const e = newMech(t, 1, x, z, atan2(-x, -z) + rnd(-1, 1));
-        e.ai.aware = i === 0 && n === 0 ? false : random() < 0.3;
+        e.ai.aware = i === 0 && gentle ? false : random() < 0.3;
         G.mechs.push(e);
       });
     }
@@ -658,17 +845,31 @@
       return lx > 1.6 ? 'LA' : lx < -1.6 ? 'RA' : 'T';
     }
 
-    function damage(m, p, amt, src) {
+    // `beam`: a slice of continuous laser damage (one frame's worth) -- it
+    // isn't a "hit" for accuracy, and mustn't ring the armour every frame.
+    function damage(m, p, amt, src, beam = false) {
       if (!m.alive) return;
+      if (m.remote) {
+        // Another pilot: what the shooter sees counts, and the victim's own
+        // client applies it. Hits are batched (a beam deals damage every
+        // frame) and flushed a few times a second -- see flushHits.
+        if (G.roundOver) return;
+        const q = G.pendingHits.get(m.netId) || { amt: 0, p };
+        q.amt += amt; q.p = p;
+        G.pendingHits.set(m.netId, q);
+        if (src === G.player) { if (!beam) G.stats.hits++; G.stats.dealt += amt; G.hitMark = 0.25; }
+        return;
+      }
+      if (m === G.player && mp() && (m.spawnT > 0 || G.roundOver)) return;
       let sec = sectionHit(m, p);
       if (m.hp[sec] <= 0) sec = 'T';
       m.hp[sec] -= amt;
-      if (src === G.player && m !== G.player) { G.stats.hits++; G.stats.dealt += amt; }
+      if (src === G.player && m !== G.player) { if (!beam) G.stats.hits++; G.stats.dealt += amt; }
       if (m === G.player) {
         G.stats.taken += amt;
         G.flash = min(0.55, G.flash + amt * 0.04);
         G.shake = min(1.2, G.shake + amt * 0.05);
-        sfx.clang();
+        if (!beam || G.time - (G.lastClang || 0) > 0.35) { G.lastClang = G.time; sfx.clang(); }
         if (!G.target && src && src.alive) G.target = src;
       } else m.ai.aware = true;
       if (m.hp[sec] > 0) {
@@ -686,11 +887,21 @@
     }
 
     function destroy(m, src) {
+      if (m === G.player) { endGuide(true); G.mDown = false; }
       m.alive = false;
       explode(center(m), true);
       explode(add(center(m), [rnd(-3, 3), 2, rnd(-3, 3)]), false);
-      G.wrecks.push({ x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.type, scale: m.ch.scale, t: 0, roll: rnd(-0.6, 0.6) });
+      G.wrecks.push({ x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.partsKey, scale: m.ch.scale, t: 0, roll: rnd(-0.6, 0.6) });
       if (G.target === m) G.target = null;
+      if (mp() && m === G.player) {
+        // In the arena your own client declares your death; the server scores it.
+        netSend({ t: 'died', by: src?.netId || 0 });
+        sendState();
+        // Real time, not game time: a slow phone shouldn't make the wait longer.
+        G.respawnAt = performance.now() + 5000; G.killer = src?.netId || 0;
+        msg('MECH DESTROYED', '#f44');
+        return;
+      }
       if (m === G.player) {
         G.state = 'over'; G.endT = 3.2; G.won = false;
         msg('MECH DESTROYED', '#f44');
@@ -706,6 +917,7 @@
 
     function fire(m, w, aim, target) {
       const d = w.def;
+      if (d.kind === 'beam') return false;   // lasers are continuous: see beamTick
       if (!m.alive || m.shutdown || w.dead || w.cd > 0 || (d.ammo && w.ammo <= 0)) return false;
       const mz = muzzle(m, w);
       const dir = norm(sub(aim, mz));
@@ -716,6 +928,7 @@
         const hit = rayHit(mz, dir, d.range, m);
         const end = hit ? hit.point : add(mz, mul(dir, d.range));
         G.beams.push({ a: mz, b: end, col: d.col, w: d.w, life: 0.14, max: 0.14 });
+        if (mp() && m === G.player) netSend({ t: 'fx', k: 'b', w: w.type, a: mz.map(r2), b: end.map(r2) });
         if (hit) {
           for (let i = 0; i < 4; i++) particle(end, [rnd(-4, 4), rnd(1, 6), rnd(-4, 4)], 0.25, 0.35, d.col, 'fire');
           if (hit.mech) damage(hit.mech, end, d.dmg, m);
@@ -723,15 +936,19 @@
         sfx.laser(mz, d === WEAPONS.mlaser);
       } else if (d.kind === 'shell') {
         G.shots.push({ kind: 'shell', p: mz, v: mul(dir, d.speed), owner: m, dmg: d.dmg, life: d.range / d.speed });
+        if (mp() && m === G.player) netSend({ t: 'fx', k: 's', p: mz.map(r2), v: mul(dir, d.speed).map(r2) });
         for (let i = 0; i < 5; i++) particle(add(mz, mul(dir, 1.5)), add(mul(dir, rnd(4, 12)), [rnd(-2, 2), rnd(-1, 2), rnd(-2, 2)]), 0.15, 0.6, [1, 0.8, 0.3], 'fire');
         sfx.cannon(mz);
       } else {
+        const vid = ++volleySeq;
         for (let i = 0; i < d.count; i++) {
           const spread = norm(add(dir, [rnd(-0.08, 0.08), rnd(0, 0.12), rnd(-0.08, 0.08)]));
           G.shots.push({ kind: 'missile', p: add(mz, [rnd(-0.6, 0.6), rnd(-0.4, 0.4), rnd(-0.6, 0.6)]), v: mul(spread, d.speed * rnd(0.85, 1.1)),
-            owner: m, dmg: d.dmg, life: d.range / d.speed + 1, target, smoke: 0, age: 0 });
+            owner: m, dmg: d.dmg, life: d.range / d.speed + 1, target, smoke: 0, age: 0, vid });
         }
+        if (m === G.player) G.lastVolley = vid;
         sfx.missile(mz);
+        if (mp() && m === G.player) netSend({ t: 'fx', k: 'm', p: mz.map(r2), d: dir.map(r2), tg: target?.netId || 0, v: G.lastVolley });
       }
       return true;
     }
@@ -920,9 +1137,20 @@
       // Fire when the torso is on target, the weapon is in range, and heat allows.
       const off = abs(wrapA(toYaw - viewYaw(e)));
       e.ai.jitter -= dt;
+      // Lasers: hold the beam on in bursts while on target and cool enough,
+      // with an aim error that drifts, so the beam wanders on and off you.
+      const beam = e.weapons.find(w => w.def.kind === 'beam' && !w.dead);
+      if (beam && off < 0.3 && dist < beam.def.range * 0.95 && !e.shutdown && P.alive) {
+        if (e.heat > 70) e.ai.coolT = rnd(1.5, 3);
+        if ((e.ai.coolT = max(0, (e.ai.coolT || 0) - dt)) === 0) {
+          const err = dist * e.ch.acc0 * (1 + abs(P.speed) / 14) * (P.air ? 1.6 : 1), k = G.time * 0.9 + e.ai.strafeT;
+          e.ai.beamAim = add(pc, [sin(k * 1.3) * err, sin(k * 1.7) * err * 0.5, cos(k * 1.1) * err]);
+          e.beamOn = true;
+        }
+      }
       if (off > 0.25 || e.heat > 72 || e.shutdown || e.ai.jitter > 0 || !P.alive) return;
       for (const w of e.weapons) {
-        if (w.dead || w.cd > 0 || dist > w.def.range * 0.95) continue;
+        if (w.def.kind === 'beam' || w.dead || w.cd > 0 || dist > w.def.range * 0.95) continue;
         let aim = pc;
         if (w.def.kind === 'shell') { const t = dist / w.def.speed; aim = add(pc, [sin(P.yaw) * P.speed * t, 0, cos(P.yaw) * P.speed * t]); }
         const err = dist * e.ch.acc0 * (1 + abs(P.speed) / 14) * (P.air ? 1.6 : 1);
@@ -933,16 +1161,21 @@
 
     function update(dt) {
       G.time += dt;
+      G.cbeams = [];   // continuous beams are redrawn every frame they're on
+      G.frame = (G.frame || 0) + 1;
       const P = G.player;
-      if (P.alive && !P.shutdown) {
+      if (P.alive && !P.shutdown && !G.paused) {
         if (keys.KeyW) P.throttle = min(1, P.throttle + dt * 0.9);
         if (keys.KeyS) P.throttle = max(-0.35, P.throttle - dt * 0.9);
         if (keys.KeyX) P.throttle = 0;
         const turn = clampN((keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0) + G.touchTurn, -1, 1);
         P.yaw += turn * P.ch.turn * dt * (P.hp.LL > 0 && P.hp.RL > 0 ? 1 : 0.5);
         const kt = (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0), kp = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0);
-        P.twist = clampN(P.twist + kt * 1.6 * dt, -1.9, 1.9);
-        P.pitch = clampN(P.pitch + kp * 0.9 * dt, -0.4, 0.45);
+        if (G.guide) { G.guide.yaw += kt * 1.4 * dt; G.guide.pitch = clampN(G.guide.pitch + kp * 1.0 * dt, -1.3, 1.3); }
+        else {
+          P.twist = clampN(P.twist + kt * 1.6 * dt, -1.9, 1.9);
+          P.pitch = clampN(P.pitch + kp * 0.9 * dt, -0.4, 0.45);
+        }
         if (keys.KeyC) P.twist *= max(0, 1 - 6 * dt);
         P.jetting = !!keys.KeyJ;
       } else P.jetting = false;
@@ -955,23 +1188,46 @@
       const t = G.target;
       G.lock = !!(t && t.alive && len(sub(center(t), G.eye)) < WEAPONS.lrm.range && dot(norm(sub(center(t), G.eye)), G.view) > cos(0.3));
 
-      if (P.alive && (firing || keys.Space)) fireGroup(G.sel);
+      const armed = P.alive && !G.paused && !G.roundOver;
+      P.beamOn = armed && isHeld('energy') && !G.guide;
+      if (armed && isHeld('ballistic')) fireCat('ballistic');
+      missileTrigger(armed && (isHeld('missile') || missileTap));
+      missileTap = false;
+      if (G.guide) steerVolley(dt);
 
       for (const m of G.mechs) {
+        if (m.remote) {
+          if (m.alive) { netInterp(m, dt); gait(m, dt); }
+          if (m.alive && m.net?.bm && m.net.be) remoteBeam(m, m.net.be); else m.beaming = false;
+          continue;
+        }
         if (m.team !== 0 && m.alive) think(m, dt);
         if (m.alive) stepMech(m, dt);
+        if (m.alive && m.beamOn) beamTick(m, dt, m === P ? G.aim : m.ai.beamAim);
+        else m.beaming = false;
+        if (m !== P) m.beamOn = false;
       }
+      coolArmour(dt);
+      beamSound(P.beaming && !G.paused, beamMult(P));
       // Mechs don't walk through each other.
       const alive = G.mechs.filter(m => m.alive);
       for (let i = 0; i < alive.length; i++) for (let j = i + 1; j < alive.length; j++) {
         const a = alive[i], b = alive[j], dx = b.x - a.x, dz = b.z - a.z, d = hypot(dx, dz), r = 2.4 * (a.ch.scale + b.ch.scale);
-        if (d < r && d > 0.01) { const push = (r - d) / 2; a.x -= (dx / d) * push; a.z -= (dz / d) * push; b.x += (dx / d) * push; b.z += (dz / d) * push; }
+        if (d < r && d > 0.01 && !(a.remote && b.remote)) {
+          // Only move mechs this client owns; other pilots' clients move theirs.
+          const fa = a.remote ? 0 : b.remote ? 1 : 0.5, fb = b.remote ? 0 : a.remote ? 1 : 0.5, gap = r - d;
+          a.x -= (dx / d) * gap * fa; a.z -= (dz / d) * gap * fa; b.x += (dx / d) * gap * fb; b.z += (dz / d) * gap * fb;
+        }
       }
 
       for (const s of G.shots) {
         s.life -= dt;
         if (s.kind === 'missile') {
-          if (s.target && s.target.alive) {
+          if (s.guided && G.guide && s.vid === G.guide.vid) {
+            // Flown by the pilot: turn hard toward where the camera points.
+            const sp = len(s.v);
+            s.v = mul(norm(add(norm(s.v), mul(G.guide.dir, dt * 7))), sp);
+          } else if (s.target && s.target.alive) {
             const want = norm(sub(center(s.target), s.p)), sp = len(s.v);
             s.v = mul(norm(add(norm(s.v), mul(want, dt * (s.owner === G.player ? 1.7 : 0.9)))), sp);
           }
@@ -984,10 +1240,11 @@
         const hit = rayHit(s.p, dir, stepL, s.owner);
         if (hit) {
           s.life = -1;
-          if (hit.mech) damage(hit.mech, hit.point, s.dmg, s.owner);
+          if (hit.mech && !s.ghost) damage(hit.mech, hit.point, s.dmg, s.owner);   // ghosts are other pilots' shots: theirs to score
+          if (s.kind === 'missile' && !s.ghost) blast(hit.point, s.dmg, s.owner, hit.mech);
           explode(hit.point, false);
         } else s.p = add(s.p, mul(s.v, dt));
-        if (s.life <= 0 && s.kind === 'missile' && !hit) explode(s.p, false);
+        if (s.life <= 0 && s.kind === 'missile' && !hit) { if (!s.ghost) blast(s.p, s.dmg, s.owner, null); explode(s.p, false); }
       }
       G.shots = G.shots.filter(s => s.life > 0);
       for (const b of G.beams) b.life -= dt;
@@ -1007,13 +1264,20 @@
       }
       for (const m of G.msgs) m.t -= dt;
       G.msgs = G.msgs.filter(m => m.t > 0);
+      if (mp()) {
+        if (P.spawnT > 0) P.spawnT -= dt;
+        if (!P.alive && G.respawnAt && performance.now() >= G.respawnAt) respawn();
+        G.hitMark = max(0, (G.hitMark || 0) - dt);
+        if ((Net.sendT += dt) >= 1 / SEND_HZ) { Net.sendT = 0; sendState(); flushHits(); }
+      }
       G.flash = max(0, G.flash - dt * 1.2);
       G.shake = max(0, G.shake - dt * 2.2);
       G.kick = max(0, G.kick - dt * 5);
 
       const live = P.alive && !P.shutdown, pace = min(1, abs(P.speed) / P.ch.speed);
       loopSet('hum_loop', P.alive ? (P.shutdown ? 0.03 : 0.07 + 0.13 * pace) : 0, P.shutdown ? 0.5 : 0.72 + 0.4 * pace);
-      loopSet('jet_loop', live && P.jetting && P.fuel > 0 ? 0.32 : 0, 0.85);
+      const jetting = live && P.jetting && P.fuel > 0;
+      loopSet('jet_loop', jetting ? 0.32 : G.guide ? 0.24 : 0, jetting ? 0.85 : G.guide ? 1.7 : 0.85);
       const twistRate = abs(P.twist - G.lastTwist) / max(dt, 1e-3);
       G.lastTwist = P.twist;
       loopSet('servo_loop', live ? min(0.13, twistRate * 0.07) : 0, 0.75 + min(0.6, twistRate * 0.25));
@@ -1024,20 +1288,187 @@
       }
     }
 
-    function groups() {
-      const g = [];
-      for (const w of G.player.weapons) if (!g.includes(w.type)) g.push(w.type);
-      return g;
+    /* ----- lasers: continuous beams whose damage climbs while they stay on target ----- */
+
+    // The ramp lives in the target, not the shooter: a mech's armour "melt"
+    // rises while any beam is on it (once per frame, however many beams) and
+    // cools whenever nothing is hitting it, whoever is aiming where. Damage is
+    // dps x meltMult(target). Two pilots on one mech share its melt.
+    const MELT_T = 3;         // seconds of beam to melt armour fully
+    const MELT_MAX = 3.5;     // damage multiplier at full melt
+    const MELT_COOL = 1.5;    // melt-seconds lost per second off the beam: full to cold in 2 s
+    const meltMult = t => 1 + (MELT_MAX - 1) * (t => t * t * (3 - 2 * t))(min(1, t / MELT_T));
+    const meltFrac = m => min(1, (m?.melt || 0) / MELT_T);
+
+    // One frame of a mech's lasers firing at `aim`: every live laser draws a
+    // beam to whatever it hits and costs heat; a mech it hits takes damage
+    // scaled by that mech's melt, and its melt goes up.
+    function beamTick(m, dt, aim) {
+      const lasers = m.weapons.filter(w => w.def.kind === 'beam' && !w.dead);
+      if (!lasers.length || m.shutdown || !m.alive) { m.beaming = false; m.beamMech = null; return; }
+      if (!m.beaming) sfx.laser(m === G.player ? null : muzzle(m, lasers[0]), lasers[0].type === 'mlaser');
+      m.beaming = true;
+      m.beamEnd = aim;
+      m.beamMech = null;
+      for (const w of lasers) {
+        const mz = muzzle(m, w), dir = norm(sub(aim, mz));
+        const hit = rayHit(mz, dir, w.def.range, m);
+        const end = hit ? hit.point : add(mz, mul(dir, w.def.range));
+        const t = hit?.mech, mult = t ? meltMult(t.melt || 0) : 1;
+        drawBeam(mz, end, w.def, mult);
+        m.heat += w.def.hps * dt;
+        if (m === G.player) G.stats.shots += dt * 4;   // accuracy counts beam time in quarter-seconds
+        if (!hit) continue;
+        if (random() < dt * 25) particle(end, [rnd(-3, 3), rnd(1, 5), rnd(-3, 3)], 0.25, 0.3 + 0.1 * mult, w.def.col, 'fire');
+        if (t) {
+          m.beamMech = t;
+          damage(t, end, w.def.dps * mult * dt, m, true);
+          if (t.meltFrame !== G.frame) { t.meltFrame = G.frame; t.melt = min(MELT_T, (t.melt || 0) + dt); }
+          t.meltAt = G.time;
+          if (m === G.player) G.stats.hits += dt * 4;
+        }
+      }
     }
-    function fireGroup(idx) {
-      const P = G.player, type = groups()[idx];
+    // Armour cools whenever no beam touched it this frame.
+    function coolArmour(dt) {
+      for (const m of G.mechs) if (m.melt && m.meltAt !== G.time) m.melt = max(0, m.melt - MELT_COOL * dt);
+    }
+    const beamMult = m => (m.beamMech ? meltMult(m.beamMech.melt || 0) : 1);
+    // Another pilot's beam, drawn from their lasers to where they say it ends.
+    // Visual only: their client scores it.
+    function remoteBeam(m, end) {
+      const lasers = m.weapons.filter(w => w.def.kind === 'beam' && m.hp[w.mount] > 0);
+      if (!lasers.length) return;
+      if (!m.beaming) sfx.laser(muzzle(m, lasers[0]), false);
+      m.beaming = true;
+      for (const w of lasers) drawBeam(muzzle(m, w), end, w.def, m.net.bf || 1);   // bf: how melted their target is
+      if (random() < 0.4) particle(end, [rnd(-3, 3), rnd(1, 5), rnd(-3, 3)], 0.25, 0.4, lasers[0].def.col, 'fire');
+    }
+
+    // Beam damage lands every frame; in the arena it's sent a few times a second.
+    function flushHits() {
+      for (const [to, q] of G.pendingHits) netSend({ t: 'hit', to, amt: r2(q.amt), p: q.p.map(r2) });
+      G.pendingHits.clear();
+    }
+
+    // Your lasers' hum: a steady synth tone that climbs in pitch and
+    // brightness as the focus multiplier builds -- you hear the beam bite.
+    let hum = null;
+    function beamSound(on, mult) {
+      const c = ac();
+      if (!c) { if (hum) hum.g.gain.value = 0; return; }
+      if (!hum || hum.c !== c) {
+        const o1 = c.createOscillator(), o2 = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain();
+        o1.type = 'sawtooth'; o2.type = 'square'; f.type = 'lowpass'; f.Q.value = 4; g.gain.value = 0;
+        o1.connect(f); o2.connect(f); f.connect(g).connect(out());
+        o1.start(); o2.start();
+        hum = { c, o1, o2, f, g };
+      }
+      const t = c.currentTime, k = (mult - 1) / (MELT_MAX - 1), base = 150 + 170 * k;
+      hum.g.gain.setTargetAtTime(on ? 0.03 + 0.025 * k : 0, t, 0.03);
+      hum.o1.frequency.setTargetAtTime(base, t, 0.08);
+      hum.o2.frequency.setTargetAtTime(base * 1.505, t, 0.08);
+      hum.f.frequency.setTargetAtTime(700 + 2200 * k, t, 0.08);
+    }
+
+    // A beam lasts one frame; it's redrawn every frame it's on. Thicker and
+    // whiter as the focus climbs.
+    function drawBeam(a, b, def, mult) {
+      const k = (mult - 1) / (MELT_MAX - 1);
+      G.cbeams.push({ a, b, col: mix3(def.col, [1, 1, 1], 0.2 + 0.45 * k), w: def.w * (0.8 + 0.9 * k) * rnd(0.85, 1.15) });
+    }
+
+    /* ----- missiles: tap to fire, hold to fly them, let go to detonate ----- */
+
+    const HOLD_TO_GUIDE = 220;   // ms: shorter is a tap
+    const BLAST_R = 10;          // metres: a near miss still hurts
+
+    // Called every frame with whether the missile control is held. One volley
+    // per press; hold past HOLD_TO_GUIDE and you take over that volley.
+    function missileTrigger(down) {
+      if (down && !G.mDown) {
+        G.mDown = true; G.mAt = performance.now();
+        G.mVid = fireCat('missile') ? G.lastVolley : 0;
+      } else if (down) {
+        if (!G.guide && G.mVid && performance.now() - G.mAt >= HOLD_TO_GUIDE) startGuide(G.mVid);
+      } else if (G.mDown) {
+        G.mDown = false;
+        if (G.guide) endGuide(true);
+      }
+    }
+
+    const guidedLive = vid => G.shots.filter(s => s.vid === vid && s.owner === G.player && s.life > 0 && !s.ghost);
+    const centroid = list => mul(list.reduce((a, s) => add(a, s.p), [0, 0, 0]), 1 / list.length);
+
+    function startGuide(vid) {
+      const ms = guidedLive(vid);
+      if (!ms.length) return;
+      const d = norm(ms[0].v);
+      G.guide = { vid, yaw: atan2(d[0], d[2]), pitch: Math.asin(clampN(d[1], -1, 1)), dir: d, pos: centroid(ms), lost: 0, sendT: 0, n: ms.length };
+      for (const s of ms) { s.guided = true; s.target = null; s.life = max(s.life, 9); }
+      G.zoom = false;
+      sfx.beep();
+    }
+
+    // Each frame while flying: aim follows input, camera follows the volley.
+    function steerVolley(dt) {
+      const g = G.guide;
+      g.dir = dirOf(g.yaw, g.pitch);
+      const ms = guidedLive(g.vid);
+      g.n = ms.length;
+      if (ms.length) {
+        g.pos = centroid(ms); g.fuel = max(...ms.map(s => s.life));
+        // The camera rides in the nose of whichever missile is out in front,
+        // so the volley and its smoke trail are behind it, not in the shot.
+        g.nose = ms.reduce((a, s) => (dot(sub(s.p, g.pos), g.dir) > dot(sub(a.p, g.pos), g.dir) ? s : a)).p;
+      }
+      else if ((g.lost += dt) > 0.6) { endGuide(false); return; }   // all hit something: "signal lost", then home
+      if (mp() && (g.sendT += dt) >= 1 / SEND_HZ && ms.length) { g.sendT = 0; netSend({ t: 'fx', k: 'mg', v: g.vid, p: g.pos.map(r2), d: g.dir.map(r2) }); }
+    }
+    function steerBy(dx, dy, sens) {
+      const g = G.guide;
+      g.yaw -= dx * sens;
+      g.pitch = clampN(g.pitch - dy * sens * (invertY ? -1 : 1), -1.3, 1.3);
+    }
+
+    // Let go: every missile still flying blows up where it is. Then back to the cockpit.
+    function endGuide(detonate) {
+      const g = G.guide;
+      if (!g) return;
+      if (detonate) {
+        for (const s of guidedLive(g.vid)) { s.life = -1; blast(s.p, s.dmg, s.owner, null); explode(s.p, false); }
+        if (mp()) netSend({ t: 'fx', k: 'md', v: g.vid });
+      }
+      G.guide = null;
+    }
+
+    // Splash: anything within BLAST_R takes damage falling off with distance,
+    // on the side facing the blast. Not the mech it hit directly (that took
+    // the full hit), and never the mech that fired it.
+    function blast(p, dmg, owner, direct) {
+      for (const m of G.mechs) {
+        if (!m.alive || m === owner || m === direct) continue;
+        const R = 2.4 * m.ch.scale, top = m.y + 7.9 * m.ch.scale;
+        const hx = p[0] - m.x, hz = p[2] - m.z, hd = hypot(hx, hz);
+        const dy = p[1] < m.y ? m.y - p[1] : p[1] > top ? p[1] - top : 0;
+        const d = hypot(max(0, hd - R), dy);
+        if (d >= BLAST_R) continue;
+        const nx = hd > 0.01 ? hx / hd : 1, nz = hd > 0.01 ? hz / hd : 0;
+        const at = [m.x + nx * R, clampN(p[1], m.y + 1, top - 1), m.z + nz * R];
+        damage(m, at, dmg * 0.8 * (1 - d / BLAST_R), owner);
+      }
+    }
+
+    // Fire every weapon of one kind that's ready; held, each refires as it recharges.
+    function fireCat(cat) {
+      const P = G.player;
       let any = false;
-      for (const w of P.weapons) if (w.type === type) any = fire(P, w, G.aim, G.lock ? G.target : null) || any;
+      for (const w of P.weapons) if (CAT_OF[w.type] === cat) any = fire(P, w, G.aim, G.lock ? G.target : null) || any;
       return any;
     }
     function alpha() {
       const P = G.player;
-      for (const w of P.weapons) fire(P, w, G.aim, G.lock ? G.target : null);
+      for (const w of P.weapons) fire(P, w, G.aim, G.lock ? G.target : null);   // beams skip themselves
     }
     function cycleTarget() {
       const foes = G.mechs.filter(m => m.alive && m.team !== 0)
@@ -1061,9 +1492,12 @@
     }
 
     function drawMech(m, VPtint) {
-      const parts = mechParts[m.type], B = frame(m), sc = m.ch.scale;
+      const parts = mechParts[m.partsKey], B = frame(m), sc = m.ch.scale;
       const fwd = [sin(m.yaw), 0, cos(m.yaw)];
-      const tint = VPtint || [1, 1, 1];
+      // Armour under a beam glows orange as it melts, and runs hotter in IR.
+      const mf = meltFrac(m), heatWas = drawHeat;
+      const tint = mf ? mix3(VPtint || [1, 1, 1], [2.2, 0.8, 0.25], mf * 0.6) : VPtint || [1, 1, 1];
+      if (mf) drawHeat = min(1, drawHeat + mf * 0.3);
       draw(parts.hip, chain(B, M.T(0, LEG.hip, 0)), tint);
       // Legs reach for wherever the feet actually are.
       m.feet.forEach((f, i) => {
@@ -1083,19 +1517,42 @@
         if (m.hp[k] <= 0) continue;
         draw(parts.arm, chain(TB, M.T(s * 2.25, 2.0, 0), M.RX(-m.pitch)), tint);
       }
+      drawHeat = heatWas;
     }
 
     function render() {
       resize();
       if (!ter) return;
       gl.viewport(0, 0, cv.width, cv.height);
-      gl.clearColor(pal.hor[0], pal.hor[1], pal.hor[2], 1);
+      const P = G.player, gd = G.guide, ir = !!gd;
+      const IR_ZEN = [0.03, 0.03, 0.03], IR_HOR = [0.1, 0.1, 0.1];
+      const hor = ir ? IR_HOR : pal.hor;
+      gl.clearColor(hor[0], hor[1], hor[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      const P = G.player;
-      const fov = G.zoom ? 0.42 : 1.08;
-      const sh = G.shake * 0.012;
-      const yaw = viewYaw(P) + rnd(-sh, sh), pitch = P.pitch + rnd(-sh, sh) - (P.alive ? 0 : 0.15);
-      const eye = add(G.eye, [0, -G.kick * 0.35, 0]), dir = dirOf(yaw, pitch - G.kick * 0.016);
+      let fov, yaw, pitch, eye, dir;
+      if (G.state === 'menu') {
+        // The main menu's mech: camera in front, aimed left of it so the mech
+        // stands in the right-hand part of the screen beside the menu panel.
+        // Pulled back a touch more on short screens, and framed so the mech
+        // stands above the mech selector in the bottom-right corner.
+        const sc = P.ch.scale, R = (15 * sc + 4) * (H < 500 ? 1.45 : 1.2), aspect = W / max(1, H);
+        fov = 0.75;
+        const c = [P.x, P.y + 4 * sc, P.z];
+        eye = [c[0], c[1] + 1.6, c[2] + R];
+        const off = aspect > 1 ? 0.4 * R * Math.tan(fov / 2) * aspect : 0;
+        dir = norm(sub([c[0] - off, c[1] - (H < 500 ? 2.6 : 1.6), c[2]], eye));
+        yaw = atan2(dir[0], dir[2]); pitch = Math.asin(clampN(dir[1], -1, 1));
+      } else if (gd) {
+        // Riding just behind the volley, looking where it's going.
+        fov = 0.95; yaw = gd.yaw; pitch = gd.pitch; dir = gd.dir;
+        eye = add(gd.nose || gd.pos, add(mul(dir, 1.5), [0, 0.3, 0]));
+      } else {
+        fov = G.zoom ? 0.42 : 1.08;
+        const sh = G.shake * 0.012;
+        yaw = viewYaw(P) + rnd(-sh, sh); pitch = P.pitch + rnd(-sh, sh) - (P.alive ? 0 : 0.15);
+        eye = add(G.eye, [0, -G.kick * 0.35, 0]); dir = dirOf(yaw, pitch - G.kick * 0.016);
+      }
+      G.ear = eye; G.earYaw = yaw;   // sounds are heard from the camera
       const proj = M.persp(fov, W / max(1, H), 0.5, 1800);
       const VP = M.mul(proj, M.lookAt(eye, add(eye, dir)));
       G.VP = VP;
@@ -1107,7 +1564,7 @@
       const ap = gl.getAttribLocation(skyProg, 'aP');
       gl.enableVertexAttribArray(ap);
       gl.vertexAttribPointer(ap, 2, gl.FLOAT, false, 0, 0);
-      gl.uniform3fv(SU.zen, pal.zen); gl.uniform3fv(SU.hor, pal.hor);
+      gl.uniform3fv(SU.zen, ir ? IR_ZEN : pal.zen); gl.uniform3fv(SU.hor, hor);
       gl.uniform1f(SU.h, 0.5 - 0.5 * Math.tan(pitch) / Math.tan(fov / 2)); gl.uniform1f(SU.res, cv.height);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       gl.disableVertexAttribArray(ap);
@@ -1120,10 +1577,15 @@
       gl.uniform3fv(U.light, pal.light);
       gl.uniform3fv(U.cam, eye);
       gl.uniform2f(U.fog, pal.fog[0], pal.fog[1]);
-      gl.uniform3fv(U.fogCol, pal.hor);
+      gl.uniform3fv(U.fogCol, hor);
+      gl.uniform1f(U.ir, ir ? 1 : 0);
 
+      drawHeat = 0;
       draw(world, M.id());
-      for (const m of G.mechs) if (m.alive && m !== P) drawMech(m);
+      // In the missile camera your own mech is out there too.
+      drawHeat = 1;
+      for (const m of G.mechs) if (m.alive && (m !== P || gd || G.state === 'menu')) drawMech(m);
+      drawHeat = 0.45;
       for (const w of G.wrecks) {
         const parts = mechParts[w.type], B = chain(M.T(w.x, w.y, w.z), M.RY(w.yaw), M.S(w.scale));
         const dark = [0.3, 0.28, 0.27];
@@ -1132,10 +1594,17 @@
         draw(parts.uleg, chain(B, M.T(2.5, 0.6, 1), M.RZ(1.5)), dark);
         draw(parts.lleg, chain(B, M.T(-2.6, 0.5, -0.5), M.RZ(-1.5), M.RY(1)), dark);
       }
+      drawHeat = 1;
       for (const s of G.shots) {
+        // The nose camera can't see its own volley flying alongside it.
+        if (gd && s.guided && len(sub(s.p, eye)) < 8) continue;
         const d = norm(s.v), yw = atan2(d[0], d[2]), pt = Math.asin(clampN(d[1], -1, 1));
         if (s.kind === 'shell') draw(meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.25, 0.25, 2.2)), [1, 0.85, 0.4], 1);
         else draw(meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.35, 0.35, 1.2)), [1, 0.55, 0.25], 1);
+      }
+      for (const b of G.cbeams) {
+        const v = sub(b.b, b.a), l = len(v), d = mul(v, 1 / (l || 1));
+        draw(meshes.beam, chain(M.T(...b.a), M.RY(atan2(d[0], d[2])), M.RX(-Math.asin(clampN(d[1], -1, 1))), M.S(b.w, b.w, l)), b.col, 1);
       }
       for (const b of G.beams) {
         const v = sub(b.b, b.a), l = len(v), d = mul(v, 1 / (l || 1));
@@ -1149,7 +1618,7 @@
         if (p.kind === 'fire') { size *= 0.4 + f * 0.8; tint = mix3([0.4, 0.1, 0.05], p.col, f); }
         else if (p.kind === 'smoke') { size *= 1.6 - f * 0.8; tint = mix3(pal.hor, p.col, f); emis = 0.6; }
         else emis = 0;
-        draw(meshes.cube, chain(M.T(...p.p), M.RY(p.spin), M.RX(p.spin * 0.7), M.S(size)), tint, emis);
+        draw(meshes.cube, chain(M.T(...p.p), M.RY(p.spin), M.RX(p.spin * 0.7), M.S(size)), tint, emis, p.kind === 'fire' ? f : p.kind === 'smoke' ? 0.15 : 0.3);
       }
       [A.pos, A.nrm, A.col].forEach(a => gl.disableVertexAttribArray(a));
 
@@ -1203,15 +1672,116 @@
         weapons: { x: W - 205, y: 2 * r + 34 },
         throttle: { x: 14, y: H - 196, h: 120 },
         target: { x: 64, y: 10 },
-        hostiles: { x: W - 2 * r - 30, y: 20 },
+        hostiles: { x: W - 14, y: 2 * r + 34 + 56 },   // under the weapon list, clear of the compass
       };
+    }
+
+    const arenaBoard = () => [...Net.info.values()].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+    const boardHTML = () => `<table class="mech-keys scoreboard">${arenaBoard().map((p, i) => `<tr${p.id === Net.id ? ' class="me"' : ''}>
+      <td>${i + 1}.</td><td><span class="dot" style="background:${MP_COLORS[p.color]?.css}"></span>${esc(p.name)}</td><td>${p.kills} / ${p.deaths}</td></tr>`).join('')}</table>`;
+
+    // Scoreboard, death / respawn, spawn shield, and the round banner.
+    function drawArenaHUD(L) {
+      const P = G.player;
+      const board = arenaBoard();
+      let y = L.hostiles.y + 14;
+      const x = L.hostiles.x;
+      ctx.textAlign = 'right';
+      if (G.touchUI) {
+        // Phones: one line -- the full board would sit under the fire buttons.
+        // (It's in the menu.)
+        const rank = board.findIndex(p => p.id === Net.id) + 1, me = Net.info.get(Net.id), lead = board[0];
+        ctx.fillStyle = AMBER;
+        ctx.fillText(`#${rank} ${me ? `${me.kills}/${me.deaths}` : ''}${lead && lead.id !== Net.id ? `  LEAD ${lead.name} ${lead.kills}` : ''}`, x, y);
+      } else for (const p of board) {
+        ctx.fillStyle = p.id === Net.id ? AMBER : GREEN;
+        ctx.fillText(`${p.name.padEnd(12)} ${String(p.kills).padStart(2)}/${p.deaths}`, x, y);
+        ctx.fillStyle = MP_COLORS[p.color]?.css || GREEN;
+        ctx.fillRect(x - 128, y - 4, 8, 8);
+        y += 14;
+      }
+      ctx.textAlign = 'center';
+      const mid = L.viewBottom * 0.5;
+      if (!P.alive) {
+        ctx.font = 'bold 22px "Lucida Console", monospace'; ctx.fillStyle = RED;
+        ctx.fillText(G.killer ? `DESTROYED BY ${pilotName(G.killer)}` : 'MECH DESTROYED', W / 2, mid);
+        ctx.font = '14px "Lucida Console", monospace'; ctx.fillStyle = AMBER;
+        ctx.fillText(`RESPAWN IN ${Math.ceil(max(0, (G.respawnAt - performance.now()) / 1000))}`, W / 2, mid + 26);
+      } else if (P.spawnT > 0) {
+        ctx.font = '13px "Lucida Console", monospace'; ctx.fillStyle = '#3cf';
+        ctx.fillText('SHIELDED', W / 2, mid + 40);
+      }
+      if (G.roundOver && G.banner) {
+        ctx.font = 'bold 24px "Arial Black", Arial, sans-serif'; ctx.fillStyle = AMBER;
+        ctx.fillText(G.banner.text, W / 2, L.viewBottom * 0.37);
+        ctx.font = '13px "Lucida Console", monospace'; ctx.fillStyle = GREEN;
+        ctx.fillText(`NEXT ROUND IN ${Math.ceil(max(0, (G.banner.until - performance.now()) / 1000))}`, W / 2, L.viewBottom * 0.37 + 24);
+      }
+      ctx.font = '11px "Lucida Console", monospace';
+    }
+
+    // The missile camera: an IR feed, not the cockpit -- scanlines, static,
+    // vignette, a reticle, hot targets boxed with their range, and telemetry.
+    function drawGuideHUD() {
+      const g = G.guide, WHITE = 'rgba(255,255,255,0.9)';
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      for (let y = 0; y < H; y += 3) ctx.fillRect(0, y, W, 1);
+      ctx.fillStyle = 'rgba(255,255,255,0.09)';
+      for (let i = 0; i < 180; i++) ctx.fillRect(random() * W, random() * H, 1 + random() * 2, 1);
+      const band = (G.time * 90) % (H + 60) - 30;   // a slow rolling interference band
+      ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(0, band, W, 18);
+      const vg = ctx.createRadialGradient(W / 2, H / 2, min(W, H) * 0.25, W / 2, H / 2, max(W, H) * 0.7);
+      vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.8)');
+      ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+
+      const cx = W / 2, cy = H / 2;
+      ctx.strokeStyle = WHITE; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        ctx.moveTo(cx + sx * 46, cy + sy * 30 - sy * 12); ctx.lineTo(cx + sx * 46, cy + sy * 30); ctx.lineTo(cx + sx * 46 - sx * 14, cy + sy * 30);
+      }
+      ctx.moveTo(cx - 10, cy); ctx.lineTo(cx - 3, cy); ctx.moveTo(cx + 3, cy); ctx.lineTo(cx + 10, cy);
+      ctx.moveTo(cx, cy - 10); ctx.lineTo(cx, cy - 3); ctx.moveTo(cx, cy + 3); ctx.lineTo(cx, cy + 10);
+      ctx.stroke(); ctx.lineWidth = 1;
+
+      // Hot targets.
+      ctx.font = '11px "Lucida Console", "Courier New", monospace'; ctx.textBaseline = 'middle';
+      let nearest = Infinity;
+      for (const m of G.mechs) {
+        if (!m.alive || m === G.player) continue;
+        const r = len(sub(center(m), g.pos));
+        nearest = min(nearest, r);
+        const q = project(center(m));
+        if (!q || q[0] < 0 || q[0] > W || q[1] < 0 || q[1] > H) continue;
+        const k = clampN(900 / max(r, 1), 8, 40);
+        ctx.strokeStyle = WHITE; ctx.strokeRect(q[0] - k, q[1] - k * 1.3, k * 2, k * 2.6);
+        ctx.fillStyle = WHITE; ctx.textAlign = 'center';
+        ctx.fillText(`${m.remote ? pilotName(m.netId) : m.ch.name} ${Math.round(r)}m`, q[0], q[1] - k * 1.3 - 9);
+      }
+
+      ctx.fillStyle = WHITE; ctx.textAlign = 'left';
+      const lx = G.touchUI ? 70 : 20;
+      ctx.fillText('MSL CAM   IR / WHT-HOT', lx, 22);
+      ctx.fillText(`LRM ${g.n}/${WEAPONS.lrm.count}`, lx, 38);
+      ctx.textAlign = 'right';
+      const rx = G.touchUI ? W - 120 : W - 20;
+      ctx.fillText(`ALT ${Math.round(g.pos[1] - ter.height(g.pos[0], g.pos[2]))}m`, rx, 22);
+      ctx.fillText(nearest < Infinity ? `TGT ${Math.round(nearest)}m` : 'TGT ---', rx, 38);
+      ctx.fillText(`FUEL ${max(0, g.fuel || 0).toFixed(1)}s`, rx, 54);
+      ctx.textAlign = 'center';
+      if (g.lost > 0 || !g.n) {
+        ctx.font = 'bold 20px "Lucida Console", monospace'; ctx.fillText('SIGNAL LOST', cx, cy - 60);
+      } else {
+        ctx.fillText(G.touchUI ? 'DRAG TO STEER  ·  LIFT TO DETONATE' : 'STEER WITH THE MOUSE  ·  RELEASE TO DETONATE', cx, G.touchUI ? 66 : H - 24);
+      }
     }
 
     function drawHUD() {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
+      if (G.state === 'menu') return;
+      if (G.guide) { drawGuideHUD(); return; }
       ctx.translate(0, G.kick * 3);  // the dashboard jolts with each step
-      if (G.state === 'brief') return;
       const P = G.player, L = hudLayout(), dash = L.dash;
       ctx.font = '11px "Lucida Console", "Courier New", monospace';
       ctx.textBaseline = 'middle';
@@ -1238,6 +1808,23 @@
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(ch[0] + dx * 5, ch[1] + dy * 5); ctx.lineTo(ch[0] + dx * 14, ch[1] + dy * 14); }
       ctx.stroke();
       ctx.strokeRect(ch[0] - 1, ch[1] - 1, 2, 2);
+      // Laser: a ring that fills as the armour under the beam melts (the
+      // damage multiplier). Only when the beam is on a mech.
+      if (P.beaming && P.beamMech) {
+        const mult = beamMult(P), k = (mult - 1) / (MELT_MAX - 1);
+        ctx.strokeStyle = 'rgba(92,204,255,0.35)'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(ch[0], ch[1], 22, 0, TAU); ctx.stroke();
+        ctx.strokeStyle = k >= 0.99 ? '#fff' : '#5cf';
+        ctx.beginPath(); ctx.arc(ch[0], ch[1], 22, -PI / 2, -PI / 2 + TAU * k); ctx.stroke();
+        ctx.lineWidth = 1; ctx.fillStyle = k >= 0.99 ? '#fff' : '#5cf'; ctx.textAlign = 'left';
+        ctx.fillText(`x${mult.toFixed(1)}`, ch[0] + 28, ch[1] - 14);
+      }
+      // Arena hits are applied on the victim's phone; this X says yours landed.
+      if (G.hitMark > 0) {
+        ctx.strokeStyle = AMBER; ctx.lineWidth = 2; ctx.beginPath();
+        for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { ctx.moveTo(ch[0] + dx * 6, ch[1] + dy * 6); ctx.lineTo(ch[0] + dx * 12, ch[1] + dy * 12); }
+        ctx.stroke(); ctx.lineWidth = 1;
+      }
 
       // Target brackets.
       const t = G.target;
@@ -1253,7 +1840,7 @@
           ctx.stroke(); ctx.lineWidth = 1;
           ctx.fillStyle = G.lock ? RED : AMBER;
           ctx.textAlign = 'center';
-          ctx.fillText(G.lock ? 'LOCK' : t.ch.name, a[0], y0 - 8);
+          ctx.fillText(G.lock ? 'LOCK' : t.remote ? pilotName(t.netId) : t.ch.name, a[0], y0 - 8);
         }
       }
       // Enemy markers in view (small chevrons), so far-off mechs can be found.
@@ -1261,8 +1848,9 @@
         if (!m.alive || m.team === 0 || m === t) continue;
         const p = project([m.x, m.y + 9 * m.ch.scale, m.z]);
         if (!p || p[1] > L.viewBottom) continue;
-        ctx.fillStyle = RED;
+        ctx.fillStyle = m.remote ? pilotCss(m.netId) : RED;
         ctx.beginPath(); ctx.moveTo(p[0] - 4, p[1] - 6); ctx.lineTo(p[0] + 4, p[1] - 6); ctx.lineTo(p[0], p[1]); ctx.fill();
+        if (m.remote) { ctx.textAlign = 'center'; ctx.fillText(pilotName(m.netId), p[0], p[1] - 14); }
       }
 
       // Compass tape: torso heading, with a mark for where the legs point.
@@ -1300,7 +1888,7 @@
         if (d > RANGE) continue;
         const ang = atan2(dx, dz) - vy;
         const px = rx - sin(ang) * (d / RANGE) * rr, py = ry - cos(ang) * (d / RANGE) * rr;
-        ctx.fillStyle = m === t ? AMBER : RED;
+        ctx.fillStyle = m === t ? AMBER : m.remote ? pilotCss(m.netId) : RED;
         ctx.fillRect(px - 2, py - 2, m === t ? 5 : 4, m === t ? 5 : 4);
       }
       ctx.fillStyle = GREEN; ctx.fillRect(rx - 1, ry - 1, 3, 3);
@@ -1321,21 +1909,31 @@
       bar(lx + 18, 'JJ', P.fuel, '#3cf');
 
       // Right: weapons.
-      const wx = L.weapons.x, gs = groups();
+      const wx = L.weapons.x;
       let wy = L.weapons.y;
       ctx.textAlign = 'left';
-      for (const w of P.weapons) {
-        const sel = gs[G.sel] === w.type;
-        ctx.fillStyle = w.dead ? '#622' : sel ? GREEN : DIM;
-        const label = `${sel ? '>' : ' '}${w.def.name}${w.mount === 'T' ? '' : w.mount === 'LA' ? ' L' : ' R'}`;
-        ctx.fillText(label, wx, wy);
-        const ammo = w.def.ammo ? String(w.ammo).padStart(3) : '   ';
-        ctx.fillText(w.dead ? 'DESTROYED' : ammo, wx + 120, wy);
-        if (!w.dead) {
-          const f = 1 - w.cd / w.def.cd;
-          ctx.fillStyle = '#031203'; ctx.fillRect(wx + 150, wy - 3, 40, 6);
-          ctx.fillStyle = f >= 1 ? GREEN : AMBER; ctx.fillRect(wx + 150, wy - 3, 40 * f, 6);
-        }
+      for (const cat of CATS) {
+        const ws = P.weapons.filter(w => CAT_OF[w.type] === cat);
+        if (!ws.length) continue;
+        const live = ws.filter(w => !w.dead), firingNow = isHeld(cat);
+        ctx.fillStyle = !live.length ? '#622' : firingNow ? AMBER : GREEN;
+        ctx.fillText(`${G.touchUI ? '' : CAT_KEY[cat].padEnd(6)}${CAT_LABEL[cat]}`, wx, wy);
+        const ammo = live.find(w => w.def.ammo);
+        ctx.fillStyle = GREEN;
+        if (ammo) ctx.fillText(String(ammo.ammo).padStart(3), wx + 118, wy);
+        // One small recharge bar per weapon of this kind (both lasers, say).
+        const bw = (40 - (ws.length - 1) * 3) / ws.length;
+        ws.forEach((w, i) => {
+          const x = wx + 150 + i * (bw + 3);
+          ctx.fillStyle = w.dead ? '#622' : '#031203'; ctx.fillRect(x, wy - 3, bw, 6);
+          if (w.dead) return;
+          if (w.def.kind === 'beam') {
+            // Beams don't recharge; show how melted the target's armour is.
+            const k = P.beaming ? (beamMult(P) - 1) / (MELT_MAX - 1) : 0;
+            ctx.fillStyle = P.beaming ? (k >= 0.99 ? '#fff' : '#5cf') : GREEN;
+            ctx.fillRect(x, wy - 3, P.beaming ? bw * max(0.08, k) : bw, 6);
+          } else { const f = 1 - w.cd / w.def.cd; ctx.fillStyle = f >= 1 ? GREEN : AMBER; ctx.fillRect(x, wy - 3, bw * f, 6); }
+        });
         wy += 15;
       }
 
@@ -1359,7 +1957,7 @@
         ctx.fillStyle = 'rgba(0,20,0,.6)'; ctx.fillRect(px, py, pw, ph);
         ctx.strokeStyle = DIM; ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
         ctx.textAlign = 'left'; ctx.fillStyle = AMBER;
-        ctx.fillText(`TGT ${t.ch.name}`, px + 6, py + 10);
+        ctx.fillText(`TGT ${t.remote ? pilotName(t.netId) : t.ch.name}`, px + 6, py + 10);
         ctx.fillStyle = GREEN;
         ctx.fillText(`RNG ${Math.round(hypot(t.x - P.x, t.z - P.z))}m`, px + 6, py + 24);
         ctx.fillText(t.shutdown ? 'SHUTDOWN' : `${Math.round(t.speed * 5.4)} KPH`, px + 6, py + 38);
@@ -1382,7 +1980,8 @@
       if (G.zoom) { ctx.font = '11px "Lucida Console", monospace'; ctx.fillStyle = GREEN; ctx.fillText('ZOOM 2.5x', W / 2, L.viewBottom - (L.frame ? 10 : 24)); }
       const left = G.mechs.filter(m => m.alive && m.team !== 0).length;
       ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'right'; ctx.fillStyle = DIM;
-      ctx.fillText(`HOSTILES ${left}`, L.hostiles.x, L.hostiles.y);
+      ctx.fillText(mp() ? `PILOTS ${Net.info.size}  FIRST TO ${Net.limit}` : `HOSTILES ${left}`, L.hostiles.x, L.hostiles.y);
+      if (mp()) drawArenaHUD(L);
       // Phones held upright get a cramped, stretched view.
       if (G.touchUI && H > W) {
         ctx.font = 'bold 16px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.fillStyle = AMBER;
@@ -1396,9 +1995,10 @@
       <table class="mech-keys">
         <tr><td>Left side</td><td>drag: sideways turns the legs, up / down sets the throttle (it stays set)</td></tr>
         <tr><td>Right side</td><td>drag: twist the torso and aim</td></tr>
-        <tr><td>FIRE (hold)</td><td>fire the selected weapon group</td></tr>
-        <tr><td>ALL</td><td>fire everything</td></tr>
-        <tr><td>WPN / TGT</td><td>next weapon group / next target</td></tr>
+        <tr><td>ENERGY (hold)</td><td>laser beams: damage climbs the longer you hold them on one target -- watch your heat</td></tr>
+        <tr><td>BALLISTIC (hold)</td><td>autocannon: big single hits, little heat, limited ammo</td></tr>
+        <tr><td>MISSILE</td><td>tap: fire the LRMs (they home in on a locked target)<br>hold: fly them yourself in IR -- drag to steer, let go to detonate</td></tr>
+        <tr><td>TGT</td><td>next target</td></tr>
         <tr><td>JUMP (hold)</td><td>jump jets</td></tr>
         <tr><td>ZOOM / STOP / II</td><td>zoom, full stop, pause</td></tr>
       </table>`;
@@ -1407,8 +2007,9 @@
       <table class="mech-keys">
         <tr><td>W / S</td><td>throttle up / down (it stays set)</td><td>X</td><td>full stop</td></tr>
         <tr><td>A / D</td><td>turn legs</td><td>Mouse</td><td>twist torso &amp; aim</td></tr>
-        <tr><td>Click / Space</td><td>fire selected group</td><td>Right-click / F</td><td>fire everything</td></tr>
-        <tr><td>Tab / 1-3</td><td>select weapon group</td><td>T</td><td>next target</td></tr>
+        <tr><td>Left mouse / 1</td><td>laser beams (hold on target: damage climbs, so does heat)</td><td>Right mouse / 2</td><td>autocannon (big hits)</td></tr>
+        <tr><td>Space / 3</td><td>tap: fire missiles &middot; hold: fly them, release to detonate</td><td>F</td><td>fire everything</td></tr>
+        <tr><td>T</td><td>next target</td><td></td><td></td></tr>
         <tr><td>R</td><td>target under crosshair</td><td>J (hold)</td><td>jump jets</td></tr>
         <tr><td>C</td><td>centre torso on legs</td><td>Z</td><td>zoom</td></tr>
         <tr><td>Arrows</td><td>twist / aim without mouse</td><td>P / Esc</td><td>pause</td></tr>
@@ -1423,33 +2024,106 @@
     const options = () => `<div class="opts">${Object.keys(OPTS).map(k => `<button class="opt" data-opt="${k}">${optLabel(k)}</button>`).join('')}
       <button class="opt" data-a="full">FULL SCREEN</button></div>`;
 
-    function showOverlay(html) { ov.innerHTML = html; ov.hidden = false; }
-    function hideOverlay() { ov.hidden = true; }
+    function showOverlay(html, cls = '') { ov.innerHTML = html; ov.className = 'mech-overlay' + (cls ? ' ' + cls : ''); ov.hidden = false; }
+    function hideOverlay() { ov.hidden = true; ov.className = 'mech-overlay'; }
 
-    function briefing() {
-      G.state = 'brief';
-      syncTouchUI();
-      startMission(missionN);
-      const d = G.def, p = PALS[d.pal];
-      const counts = d.foes.reduce((a, f) => ((a[f] = (a[f] || 0) + 1), a), {});
-      showOverlay(`
-        <h1>STOMPY</h1>
-        <div class="panel">
-          <div class="k">MISSION ${missionN + 1}: ${esc(d.name.toUpperCase())}</div>
+    /* ----- the main menu: Campaign / Free Play / Multiplayer / Settings, and your mech ----- */
+
+    const MENU = [['campaign', 'CAMPAIGN'], ['free', 'FREE PLAY'], ['mp', 'MULTIPLAYER'], ['settings', 'SETTINGS']];
+
+    function mainMenu(sel = menuSel, status = '') {
+      if (Net.ws) { const ws = Net.ws; Net.ws = null; ws.close(); }
+      G.mode = 'sp'; G.state = 'menu'; G.paused = false; G.guide = null;
+      menuSel = sel; store.set('menu.sel', sel);
+      syncTouchUI(); exitLock();
+      // The backdrop: a quiet patch of desert, with your mech standing in it.
+      if (G.worldKind !== 'menu') {
+        G.worldKind = 'menu';
+        pal = PALS.dusk;
+        ter = makeTerrain(3);
+        if (world) gl.deleteBuffer(world.buf);
+        world = upload(buildTerrainMesh(ter, pal, 3));
+      }
+      G.shots = []; G.beams = []; G.cbeams = []; G.parts = []; G.wrecks = []; G.msgs = [];
+      showMech();
+      renderMenu(status);
+    }
+    // The mech on show: multiplayer shows it in your arena colour.
+    function showMech() {
+      const key = menuSel === 'mp' ? partsKeyFor(mpColor, chassis) : chassis;
+      G.player = newMech(chassis, 0, 0, 0, 0, { partsKey: key });
+      G.mechs = [G.player];
+      menuTick(0);
+    }
+    function menuTick(dt) {
+      const m = G.player, t = performance.now() / 1000;
+      if (!m) return;
+      if (!G.menuDrag) G.showYaw = (G.showYaw ?? 2.6) + dt * 0.35;
+      m.yaw = G.showYaw; m.twist = sin(t * 0.6) * 0.3; m.pitch = sin(t * 0.4) * 0.08;
+      initFeet(m);
+      m.bob = sin(t * 1.7) * 0.06;   // idling: a slow breath
+    }
+
+    function menuDetail(status) {
+      if (menuSel === 'campaign') {
+        const d = missionDef(missionN), p = PALS[d.pal];
+        const counts = d.foes.reduce((a, f) => ((a[f] = (a[f] || 0) + 1), a), {});
+        return `<div class="k">MISSION ${missionN + 1}: ${esc(d.name.toUpperCase())}</div>
           <p>${esc(d.intel)}</p>
-          <p>TERRAIN: ${esc(p.name)}<br>OBJECTIVE: Destroy all hostile mechs
-            (${Object.entries(counts).map(([k, n]) => `${n}x ${CHASSIS[k].name}`).join(', ')})<br>
-            YOUR MECH: KESTREL &mdash; 2x LG LASER, AUTOCANNON, LRM-10, JUMP JETS</p>
-          ${controls()}
-          ${G.touchUI ? '<p class="k">Best played sideways, full screen.</p>' : ''}
-        </div>
-        <div style="display:flex;gap:10px">
-          <button class="go" data-a="launch">LAUNCH</button>
-          ${missionN > 0 ? '<button class="go" data-a="first">START OVER</button>' : ''}
-        </div>
-        ${options()}
+          <p class="dim">${esc(p.name.toUpperCase())} · ${Object.entries(counts).map(([k, n]) => `${n}x ${CHASSIS[k].name}`).join(', ')}</p>
+          ${missionN > 0 ? '<button class="opt" data-a="restart">RESTART CAMPAIGN</button>' : ''}`;
+      }
+      if (menuSel === 'free') {
+        const mapName = FP_MAPS[fpMap] === 'random' ? 'RANDOM' : PALS[FP_MAPS[fpMap]].name.toUpperCase();
+        return `<p>One battle, your rules.</p>
+          <div class="mm-pick"><span>MAP</span><button data-fp="map" data-d="-1">◀</button><b>${mapName}</b><button data-fp="map" data-d="1">▶</button></div>
+          <div class="mm-pick"><span>HOSTILES</span><button data-fp="foes" data-d="-1">◀</button><b>${fpFoes}</b><button data-fp="foes" data-d="1">▶</button></div>`;
+      }
+      if (menuSel === 'mp') {
+        return `<p>Free-for-all for up to 8 pilots on this network. First to ${Net.limit} kills wins the round.</p>
+          <p class="lobby-row"><label for="callsign">CALLSIGN</label>
+            <input id="callsign" class="callsign" maxlength="12" value="${esc(mpName)}" placeholder="PILOT"
+              autocomplete="off" spellcheck="false" autocapitalize="characters" enterkeyhint="go"></p>
+          <div class="swatches">${MP_COLORS.map((c, i) => `<button class="swatch${i === mpColor ? ' on' : ''}" data-col="${i}"
+            style="background:${c.css}" aria-label="${c.name}" title="${c.name}"></button>`).join('')}</div>
+          <p class="status k">${esc(status)}</p>`;
+      }
+      return `${options()}
+        <div class="mm-controls">${controls()}</div>
         <p class="credits">Original game, raw WebGL. Sound effects by <a href="https://kenney.nl" target="_blank" rel="noopener">Kenney</a> (CC0).
-          The cockpit voice is your browser's speech engine.</p>`);
+          The cockpit voice is your browser's speech engine.</p>`;
+    }
+
+    function renderMenu(status = '') {
+      const ch = CHASSIS[chassis], info = MECH_INFO[chassis];
+      const hpSum = c => Object.values(CHASSIS[c].hp).reduce((a, v) => a + v, 0);
+      const maxHp = max(...MECH_ORDER.map(hpSum)), maxSpeed = max(...MECH_ORDER.map(c => CHASSIS[c].speed));
+      const bar = (label, f) => `<span>${label}</span><i><b style="width:${Math.round(f * 100)}%"></b></i>`;
+      const launchLabel = { campaign: 'LAUNCH', free: 'LAUNCH', mp: 'JOIN ARENA' }[menuSel];
+      showOverlay(`
+        <div class="mm">
+          <div class="mm-left">
+            <div class="mm-title">STOMPY</div>
+            <nav class="mm-items">${MENU.map(([k, label]) => `<button class="mm-item${k === menuSel ? ' on' : ''}" data-sel="${k}">${label}</button>`).join('')}</nav>
+            <div class="mm-detail">${menuDetail(status)}</div>
+            ${launchLabel ? `<button class="mm-launch" data-a="go">${launchLabel}</button>` : ''}
+          </div>
+          <div class="mm-right">
+            <div class="mm-select">
+              <div class="mm-label">SELECT MECH</div>
+              <div class="mm-mech"><button data-mech="-1" aria-label="Previous mech">◀</button><span>${ch.name}</span><button data-mech="1" aria-label="Next mech">▶</button></div>
+              <div class="mm-role">${info.role}</div>
+              <div class="mm-kit">${info.kit}</div>
+              <div class="mm-stats">${bar('SPEED', ch.speed / maxSpeed)}${bar('ARMOR', hpSum(chassis) / maxHp)}${bar('FIREPOWER', info.fire)}</div>
+            </div>
+          </div>
+        </div>`, 'menu');
+    }
+
+    function go() {
+      if (menuSel === 'campaign') { startMission(missionN); launch(); }
+      else if (menuSel === 'free') { startSkirmish(); launch(); }
+      else if (menuSel === 'mp') join();
     }
 
     function launch() {
@@ -1465,7 +2139,8 @@
       Sound.unlock();
       loadSamples();
       lockPointer();
-      say(`Mission ${missionN + 1}. ${G.def.name}. Systems online.`, true);
+      syncWeaponButtons();
+      say(G.kind === 'campaign' ? `Mission ${missionN + 1}. ${G.def.name}. Systems online.` : 'Free play. Systems online.', true);
     }
 
     function debrief() {
@@ -1474,31 +2149,37 @@
       exitLock();
       const s = G.stats, acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
       const tm = `${floor(G.time / 60)}:${String(floor(G.time % 60)).padStart(2, '0')}`;
-      if (G.won) store.set('mech.mission', max(store.get('mech.mission', 0), missionN + 1));
+      const camp = G.kind === 'campaign';
+      if (G.won && camp) store.set('mech.mission', max(store.get('mech.mission', 0), missionN + 1));
       showOverlay(`
         <h1 style="color:${G.won ? '#5f5' : '#f44'}">${G.won ? 'MISSION COMPLETE' : 'MECH DESTROYED'}</h1>
         <div class="panel">
-          <div class="k">MISSION ${missionN + 1}: ${esc(G.def.name.toUpperCase())}</div>
+          <div class="k">${camp ? `MISSION ${missionN + 1}: ${esc(G.def.name.toUpperCase())}` : 'FREE PLAY'}</div>
           <p>TIME ${tm}<br>KILLS ${s.kills} / ${G.def.foes.length}<br>
-             ACCURACY ${acc}% (${s.hits} of ${s.shots})<br>
+             ACCURACY ${acc}% (${Math.round(s.hits)} of ${Math.round(s.shots)})<br>
              DAMAGE DEALT ${Math.round(s.dealt)} &nbsp; TAKEN ${Math.round(s.taken)}</p>
         </div>
-        <div style="display:flex;gap:10px">
-          ${G.won ? '<button class="go" data-a="next">NEXT MISSION</button>' : ''}
-          <button class="go" data-a="retry">${G.won ? 'REPLAY' : 'RETRY'}</button>
-        </div>
-        ${options()}`);
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+          ${camp && G.won ? '<button class="go" data-a="next">NEXT MISSION</button>' : ''}
+          ${camp ? `<button class="go" data-a="retry">${G.won ? 'REPLAY' : 'RETRY'}</button>` : '<button class="go" data-a="again">PLAY AGAIN</button>'}
+          <button class="go" data-a="menu">MAIN MENU</button>
+        </div>`);
     }
 
     function pause(on) {
       if (G.state !== 'play') return;
       G.paused = on;
-      firing = false;
+      clearHeld();
       if (on) {
         for (const k in keys) keys[k] = false;
+        endGuide(true); G.mDown = false;
         exitLock();   // give the cursor back, or nothing outside the game can be clicked
         syncTouchUI();
-        showOverlay(`<h1>PAUSED</h1><div class="panel" style="text-align:center">Click to resume.</div><div class="panel">${controls()}</div>${options()}`);
+        showOverlay(`<h1>${mp() ? 'MENU' : 'PAUSED'}</h1>
+          <div class="panel" style="text-align:center">${mp() ? 'The match keeps going while you are in here. Tap or click to get back in.' : 'Click to resume.'}</div>
+          ${mp() ? `<div class="panel"><div class="k">SCORES &mdash; FIRST TO ${Net.limit}</div>${boardHTML()}</div>` : ''}
+          <div class="panel">${controls()}</div>${options()}
+          ${mp() ? '<button class="go" data-a="leave">LEAVE MATCH</button>' : '<button class="go" data-a="menu">MAIN MENU</button>'}`);
       } else { hideOverlay(); wrap.focus(); syncTouchUI(); lockPointer(); }
     }
 
@@ -1508,12 +2189,54 @@
       const a = e.target.closest('[data-a]')?.dataset.a;
       if (a === 'full') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); return; }
       if (e.target.closest('a')) return;
-      if (a === 'launch') launch();
-      else if (a === 'first') { missionN = 0; store.set('mech.mission', 0); briefing(); }
-      else if (a === 'next') { missionN++; briefing(); }
-      else if (a === 'retry') briefing();
+      const sw = e.target.closest('[data-col]');
+      if (sw) { mpColor = +sw.dataset.col; store.set('mp.color', mpColor); ov.querySelectorAll('.swatch').forEach(b => b.classList.toggle('on', b === sw)); if (G.state === 'menu') showMech(); return; }
+      if (e.target.closest('input')) return;
+      if (G.state === 'menu') {
+        const sel = e.target.closest('[data-sel]')?.dataset.sel, md = e.target.closest('[data-mech]'), fp = e.target.closest('[data-fp]');
+        if (sel) { const wasMp = menuSel === 'mp'; menuSel = sel; store.set('menu.sel', sel); if (wasMp !== (sel === 'mp')) showMech(); renderMenu(); return; }
+        if (md) { cycleMech(+md.dataset.mech); return; }
+        if (fp) {
+          const d = +fp.dataset.d;
+          if (fp.dataset.fp === 'map') fpMap = (fpMap + d + FP_MAPS.length) % FP_MAPS.length;
+          else fpFoes = clampN(fpFoes + d, 1, 8);
+          store.set('fp.map', fpMap); store.set('fp.foes', fpFoes);
+          renderMenu(); return;
+        }
+        if (a === 'go') go();
+        else if (a === 'restart') { missionN = 0; store.set('mech.mission', 0); renderMenu(); }
+        return;
+      }
+      if (a === 'menu') { mainMenu(); return; }
+      if (a === 'mp') { mainMenu('mp'); return; }
+      if (a === 'leave') { leaveArena(); return; }
+      if (a === 'next') { missionN++; startMission(missionN); launch(); }
+      else if (a === 'retry') { startMission(missionN); launch(); }
+      else if (a === 'again') { startSkirmish(); launch(); }
       else if (G.state === 'play' && G.paused) pause(false);
     });
+
+    function cycleMech(d) {
+      chassis = MECH_ORDER[(MECH_ORDER.indexOf(chassis) + d + MECH_ORDER.length) % MECH_ORDER.length];
+      store.set('mech.chassis', chassis);
+      showMech(); renderMenu();
+    }
+    ov.addEventListener('input', e => { if (e.target.matches('.callsign')) { mpName = e.target.value.toUpperCase().slice(0, 12); store.set('mp.name', mpName); } });
+    // Drag anywhere off the menu panel to turn the mech round.
+    ov.addEventListener('pointerdown', e => {
+      if (G.state !== 'menu' || e.target.closest('button, input, a, .mm-left, .mm-select')) return;
+      G.menuDrag = { x: e.clientX }; ov.setPointerCapture?.(e.pointerId);
+    });
+    ov.addEventListener('pointermove', e => { if (G.menuDrag) { G.showYaw += (e.clientX - G.menuDrag.x) * 0.012; G.menuDrag.x = e.clientX; } });
+    const endDrag = () => { G.menuDrag = null; };
+    ov.addEventListener('pointerup', endDrag); ov.addEventListener('pointercancel', endDrag);
+    // Only show fire buttons for the kinds of weapon this mech carries.
+    function syncWeaponButtons() {
+      for (const c of CATS) {
+        const btn = $(`[data-t="${c}"]`, tui);
+        if (btn) btn.hidden = !G.player.weapons.some(w => CAT_OF[w.type] === c);
+      }
+    }
 
     /* ---------- input ---------- */
 
@@ -1530,6 +2253,7 @@
     const onMouseMove = e => {
       if (G.state !== 'play' || G.paused || !G.player.alive) return;
       if (!locked()) return;
+      if (G.guide) { steerBy(e.movementX, e.movementY, 0.0028); return; }
       const sens = (G.zoom ? 0.0009 : 0.0024);
       const P = G.player;
       P.twist = clampN(P.twist - e.movementX * sens, -1.9, 1.9);
@@ -1545,19 +2269,35 @@
       loadSamples();
       if (G.state !== 'play' || G.paused) return;
       if (!locked()) { lockPointer(); return; }
-      if (e.button === 0) firing = true;
-      if (e.button === 2) alpha();
+      const cat = { 0: 'energy', 2: 'ballistic', 1: 'missile' }[e.button];
+      if (cat) { held[cat] = true; e.preventDefault(); if (cat === 'missile') missileTap = true; }
     });
-    addEventListener('mouseup', () => { firing = false; });
+    addEventListener('mouseup', e => {
+      const cat = { 0: 'energy', 2: 'ballistic', 1: 'missile' }[e.button];
+      if (cat && !G.touchUI) held[cat] = false;
+    });
 
-    const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX', 'KeyC', 'KeyJ', 'KeyT', 'KeyR', 'KeyF', 'KeyZ', 'KeyP', 'Tab', 'Space',
+    const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX', 'KeyC', 'KeyJ', 'KeyT', 'KeyR', 'KeyF', 'KeyZ', 'KeyP', 'Space',
       'Digit1', 'Digit2', 'Digit3', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
     // Keys are taken at the document: hiding the overlay drops focus to <body>,
     // and pointer lock doesn't move it back.
     const onKeyDown = e => {
-      if (e.key === 'F2') { e.preventDefault(); exitLock(); briefing(); return; }
+      if (e.target.closest?.('input')) { if (e.key === 'Enter' && G.state === 'menu') { e.preventDefault(); go(); } return; }
+      if (e.key === 'F2') { e.preventDefault(); exitLock(); if (mp()) leaveArena(); else mainMenu(); return; }
       if (e.code === 'KeyM') { OPTS.sound[2](!settings.sound); msg(settings.sound ? 'SOUND ON' : 'SOUND OFF'); return; }
-      if (G.state !== 'play') { if (e.key === 'Enter' && G.state === 'brief') { e.preventDefault(); launch(); } return; }
+      if (G.state === 'menu') {
+        const i = MENU.findIndex(([k]) => k === menuSel);
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          const next = MENU[(i + (e.key === 'ArrowDown' ? 1 : -1) + MENU.length) % MENU.length][0];
+          const wasMp = menuSel === 'mp'; menuSel = next; store.set('menu.sel', next);
+          if (wasMp !== (next === 'mp')) showMech();
+          renderMenu();
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); cycleMech(e.key === 'ArrowRight' ? 1 : -1); }
+        else if (e.key === 'Enter') { e.preventDefault(); go(); }
+        return;
+      }
+      if (G.state !== 'play') return;
       // Esc only ever pauses: leaving pointer lock already pauses via
       // pointerlockchange, and a toggle here would immediately undo that.
       if (e.code === 'Escape') { e.preventDefault(); if (!G.paused) pause(true); return; }
@@ -1566,9 +2306,7 @@
       e.preventDefault();
       if (e.repeat && keys[e.code]) return;
       keys[e.code] = true;
-      const gs = groups();
-      if (e.code === 'Tab') { G.sel = (G.sel + 1) % gs.length; sfx.beep(); }
-      if (e.code.startsWith('Digit')) { const i = +e.code.slice(5) - 1; if (i < gs.length) { G.sel = i; sfx.beep(); } }
+      if (KEY_FOR.missile.includes(e.code)) missileTap = true;
       if (e.code === 'KeyT') cycleTarget();
       if (e.code === 'KeyR' && G.aimMech && G.aimMech.team !== 0) { G.target = G.aimMech; sfx.beep(); }
       if (e.code === 'KeyF') alpha();
@@ -1599,13 +2337,10 @@
     }
     function touchButton(name, down, el) {
       el?.classList.toggle('on', down);
-      if (name === 'fire') firing = down;
+      if (CATS.includes(name)) { held[name] = down; if (down && name === 'missile') missileTap = true; }
       else if (name === 'jump') keys.KeyJ = down;
       if (!down) return;
-      const gs = groups();
-      if (name === 'alpha') alpha();
-      else if (name === 'wpn') { G.sel = (G.sel + 1) % gs.length; sfx.beep(); }
-      else if (name === 'tgt') cycleTarget();
+      if (name === 'tgt') cycleTarget();
       else if (name === 'zoom') G.zoom = !G.zoom;
       else if (name === 'stop') G.player.throttle = 0;
       else if (name === 'pause') pause(true);
@@ -1617,7 +2352,7 @@
       Sound.unlock(); loadSamples();
       tui.setPointerCapture?.(e.pointerId);
       const b = e.target.closest('[data-t]');
-      if (b) { fingers.set(e.pointerId, { kind: 'btn', name: b.dataset.t, el: b }); touchButton(b.dataset.t, true, b); return; }
+      if (b) { fingers.set(e.pointerId, { kind: 'btn', name: b.dataset.t, el: b, lx: e.clientX, ly: e.clientY }); touchButton(b.dataset.t, true, b); return; }
       const r = tui.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
       const haveStick = [...fingers.values()].some(f => f.kind === 'stick');
       if (x < r.width * 0.4 && !haveStick) {
@@ -1640,6 +2375,13 @@
         const dead = v => (abs(v) < 8 ? 0 : v - Math.sign(v) * 8);
         G.touchTurn = clampN(-dead(dx) / (STICK_R - 8), -1, 1);
         if (P.alive && !P.shutdown) P.throttle = clampN(f.thr0 - dead(dy) / (STICK_R - 8), -0.35, 1);
+      } else if (G.guide && (f.kind === 'aim' || (f.kind === 'btn' && f.name === 'missile'))) {
+        // Flying missiles: drag the missile button itself (the thumb is
+        // already on it) or anywhere on the right side to steer.
+        steerBy(e.clientX - (f.lx ?? e.clientX), e.clientY - (f.ly ?? e.clientY), f.kind === 'btn' ? 0.009 : 0.006);
+        f.lx = e.clientX; f.ly = e.clientY;
+      } else if (f.kind === 'btn') {
+        f.lx = e.clientX; f.ly = e.clientY;
       } else if (f.kind === 'aim' && P.alive) {
         const sens = G.zoom ? 0.0022 : 0.0055;
         P.twist = clampN(P.twist - (e.clientX - f.lx) * sens, -1.9, 1.9);
@@ -1665,21 +2407,252 @@
       syncTouchUI();
     }, true);
 
+    /* ---------- multiplayer arena ---------- */
+
+    // A free-for-all for up to eight pilots via server.py (port 8096). Each
+    // client is the authority for its own mech: it sends its state ~15 times a
+    // second, reports hits it lands, applies hits it takes, and declares its
+    // own death. Other pilots are drawn from their latest state, smoothed and
+    // extrapolated, and walk with the same gait. Their shots arrive as effects
+    // ("ghosts") that look real but never score -- their shooter scores them.
+    const NET_PORT = 8096, SEND_HZ = 15;
+    const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10 };
+    const mp = () => G.mode === 'mp';
+    const r2 = v => Math.round(v * 100) / 100;
+    let mpName = store.get('mp.name', ''), mpColor = store.get('mp.color', floor(random() * MP_COLORS.length));
+    const pilotName = id => Net.info.get(id)?.name || `PILOT ${id}`;
+    const pilotCss = id => MP_COLORS[Net.info.get(id)?.color ?? 0]?.css || '#f44';
+    const mechById = id => (id === Net.id ? G.player : G.mechs.find(m => m.netId === id));
+
+    const setStatus = t => { const el = $('.status', ov); if (el) el.textContent = t; };
+
+    function join() {
+      if (Net.ws) return;
+      mpName = ($('.callsign', ov)?.value || '').trim().toUpperCase().slice(0, 12);
+      store.set('mp.name', mpName); store.set('mp.color', mpColor);
+      Sound.unlock(); loadSamples();
+      setStatus('CONNECTING...');
+      let ws, welcomed = false;
+      try { ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:${NET_PORT}/ws`); }
+      catch { setStatus('COULD NOT CONNECT'); return; }
+      Net.ws = ws;
+      ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', name: mpName, color: mpColor }));
+      ws.onmessage = e => {
+        let m; try { m = JSON.parse(e.data); } catch { return; }
+        if (m.t === 'welcome') welcomed = true;
+        onNet(m);
+      };
+      ws.onclose = () => {
+        if (Net.ws !== ws) return;   // we closed it on purpose
+        Net.ws = null;
+        if (!welcomed) { if (G.state === 'menu' && !/FULL/.test($('.status', ov)?.textContent || '')) setStatus('THE ARENA SERVER IS NOT ANSWERING'); }
+        else if (mp()) lostConnection();
+      };
+    }
+    function netSend(obj) { if (Net.ws && Net.ws.readyState === 1) Net.ws.send(JSON.stringify(obj)); }
+    function leaveArena() {
+      const ws = Net.ws; Net.ws = null; ws?.close();
+      G.mode = 'sp'; Net.info.clear();
+      mainMenu('mp');
+    }
+    function lostConnection() {
+      Net.info.clear();
+      mainMenu('mp', 'CONNECTION LOST -- A PHONE THAT SLEEPS DROPS OUT. JOIN AGAIN?');
+    }
+
+    function setScores(list) {
+      if (!Array.isArray(list)) return;
+      Net.info = new Map(list.map(p => [p.id, p]));
+    }
+
+    function onNet(m) {
+      switch (m.t) {
+        case 'full': setStatus(`THE ARENA IS FULL (${m.max} PILOTS) -- TRY AGAIN LATER`); break;
+        case 'welcome':
+          Net.id = m.id; Net.limit = m.limit || 10;
+          setScores(m.scores);
+          startArena(m.seed, m.pal);
+          G.roundOver = !!m.over;
+          break;
+        case 'join': setScores(m.scores); msg(`${pilotName(m.id)} JOINED`); break;
+        case 'leave': {
+          msg(`${pilotName(m.id)} LEFT`);
+          G.mechs = G.mechs.filter(x => x.netId !== m.id || x === G.player);
+          if (G.target?.netId === m.id) G.target = null;
+          setScores(m.scores);
+          break;
+        }
+        case 's': netState(m); break;
+        case 'fx': netFx(m); break;
+        case 'hit':
+          if (G.player.alive) damage(G.player, m.p, m.amt, mechById(m.from) || null);
+          break;
+        case 'kill': {
+          setScores(m.scores);
+          const mine = m.killer === Net.id || m.victim === Net.id;
+          msg(m.killer ? `${pilotName(m.killer)} DESTROYED ${pilotName(m.victim)}` : `${pilotName(m.victim)} WENT DOWN`, mine ? '#fc3' : '#7f7');
+          if (m.killer === Net.id) { G.stats.kills++; say('Target destroyed.', true); }
+          break;
+        }
+        case 'roundover':
+          setScores(m.scores);
+          G.roundOver = true;
+          G.banner = { text: m.winner === Net.id ? 'YOU WIN THE ROUND' : `${m.name} WINS THE ROUND`, until: performance.now() + (m.next || 10) * 1000 };
+          say(m.winner === Net.id ? 'Round won.' : 'Round over.', true);
+          break;
+        case 'newround':
+          setScores(m.scores);
+          startArena(m.seed, m.pal);
+          say('New round.', true);
+          break;
+      }
+    }
+
+    function startArena(seed, palName) {
+      G.mode = 'mp';
+      pal = PALS[palName] || PALS.dusk;
+      ter = makeTerrain(seed);
+      if (world) gl.deleteBuffer(world.buf);
+      world = upload(buildTerrainMesh(ter, pal, seed));
+      G.mechs = []; G.shots = []; G.beams = []; G.parts = []; G.wrecks = []; G.msgs = [];
+      G.target = null; G.flash = 0; G.shake = 0; G.kick = 0; G.zoom = false; G.time = 0; G.guide = null; G.mDown = false;
+      G.stats = { shots: 0, hits: 0, dealt: 0, taken: 0, kills: 0 };
+      G.def = { name: 'Arena', foes: [] };
+      G.roundOver = false; G.banner = null; G.respawnAt = 0; G.hitMark = 0;
+      G.worldKind = 'match';
+      G.player = newMech(chassis, 0, 0, 0, 0, { partsKey: partsKeyFor(mpColor, chassis) });
+      G.player.netId = Net.id;
+      G.mechs.push(G.player);
+      respawn();
+      hideOverlay(); wrap.focus();
+      G.state = 'play'; G.paused = false;
+      syncTouchUI();
+      if (G.touchUI && !document.fullscreenElement && document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape')).catch(() => {});
+      }
+      lockPointer();
+      syncWeaponButtons();
+    }
+
+    // Somewhere on the map, as far as possible from everyone else.
+    function spawnPoint() {
+      let best = [0, 0], bestD = -1;
+      for (let k = 0; k < 20; k++) {
+        const a = random() * TAU, d = rnd(80, BOUND - 80), x = sin(a) * d, z = cos(a) * d;
+        const near = min(1e9, ...G.mechs.filter(m => m.alive && m !== G.player).map(m => hypot(m.x - x, m.z - z)));
+        if (near > bestD) { bestD = near; best = [x, z]; }
+      }
+      return best;
+    }
+    function respawn() {
+      const P = G.player, [x, z] = spawnPoint();
+      Object.assign(P, { x, z, y: ter.height(x, z), vy: 0, yaw: atan2(-x, -z), twist: 0, pitch: 0, speed: 0, throttle: 0,
+        heat: 0, fuel: 1, shutdown: false, alive: true, air: false, hp: { ...P.max }, spawnT: 2 });
+      P.weapons.forEach(w => { w.cd = 0; w.dead = false; w.ammo = w.def.ammo || null; });
+      initFeet(P); P.lastYaw = P.yaw;
+      G.respawnAt = 0; G.flash = 0; G.killer = 0;
+      G.eye = eyeOf(P); G.view = dirOf(P.yaw, 0); G.aim = add(G.eye, mul(G.view, 100));
+      sendState();
+    }
+
+    function sendState() {
+      const P = G.player;
+      netSend({ t: 's', ch: P.type, x: r2(P.x), y: r2(P.y), z: r2(P.z), yaw: r2(P.yaw), tw: r2(P.twist), p: r2(P.pitch), sp: r2(P.speed),
+        air: P.air ? 1 : 0, al: P.alive ? 1 : 0, sd: P.shutdown ? 1 : 0, hp: HPK.map(k => r2(P.hp[k])),
+        bm: P.beaming ? 1 : 0, be: P.beaming && P.beamEnd ? P.beamEnd.map(r2) : 0, bf: r2(beamMult(P)) });
+    }
+
+    function netState(s) {
+      let r = G.mechs.find(m => m.netId === s.id);
+      if (!r) {
+        const ch = CHASSIS[s.ch] ? s.ch : 'kestrel';
+        r = newMech(ch, s.id, s.x, s.z, s.yaw, { partsKey: partsKeyFor(Net.info.get(s.id)?.color ?? 0, ch) });
+        Object.assign(r, { netId: s.id, remote: true, net: null });
+        G.mechs.push(r);
+      }
+      const first = !r.net;
+      r.net = { ...s, at: performance.now() };
+      if (Array.isArray(s.hp)) HPK.forEach((k, i) => { r.hp[k] = +s.hp[i] || 0; });
+      if (first || (s.al && !r.alive)) {
+        // Appeared or respawned: jump straight there.
+        Object.assign(r, { x: s.x, y: s.y, z: s.z, yaw: s.yaw, twist: s.tw, pitch: s.p, alive: !!s.al });
+        initFeet(r); r.lastYaw = r.yaw;
+      } else if (!s.al && r.alive) {
+        // Its own client says it's dead: show the kill.
+        r.alive = false;
+        explode(center(r), true);
+        explode(add(center(r), [rnd(-3, 3), 2, rnd(-3, 3)]), false);
+        G.wrecks.push({ x: r.x, y: r.y, z: r.z, yaw: r.yaw, type: r.partsKey, scale: r.ch.scale, t: 0, roll: rnd(-0.6, 0.6) });
+        if (G.target === r) G.target = null;
+      }
+    }
+
+    // Glide toward the latest report, projected forward by its speed so a
+    // late packet doesn't leave the mech standing still; snap if far off.
+    function netInterp(r, dt) {
+      const n = r.net;
+      if (!n) return;
+      const age = min(0.25, (performance.now() - n.at) / 1000);
+      const tx = n.x + sin(n.yaw) * n.sp * age, tz = n.z + cos(n.yaw) * n.sp * age;
+      const k = 1 - Math.exp(-dt * 12);
+      if (hypot(tx - r.x, tz - r.z) > 30) { r.x = tx; r.z = tz; } else { r.x += (tx - r.x) * k; r.z += (tz - r.z) * k; }
+      r.y += (n.y - r.y) * k;
+      r.yaw += wrapA(n.yaw - r.yaw) * k;
+      r.twist += wrapA(n.tw - r.twist) * k;
+      r.pitch += (n.p - r.pitch) * k;
+      r.speed = n.sp; r.air = !!n.air; r.shutdown = !!n.sd;
+    }
+
+    function netFx(f) {
+      const src = mechById(f.id) || null;
+      if (f.k === 'b') {
+        const d = WEAPONS[f.w] || WEAPONS.laser;
+        G.beams.push({ a: f.a, b: f.b, col: d.col, w: d.w, life: 0.14, max: 0.14 });
+        for (let i = 0; i < 4; i++) particle(f.b, [rnd(-4, 4), rnd(1, 6), rnd(-4, 4)], 0.25, 0.35, d.col, 'fire');
+        sfx.laser(f.a, d === WEAPONS.mlaser);
+      } else if (f.k === 's') {
+        G.shots.push({ kind: 'shell', p: f.p, v: f.v, owner: src, dmg: 0, life: WEAPONS.ac.range / WEAPONS.ac.speed, ghost: true });
+        sfx.cannon(f.p);
+      } else if (f.k === 'm') {
+        const d = WEAPONS.lrm, target = f.tg ? mechById(f.tg) : null;
+        for (let i = 0; i < d.count; i++) {
+          const spread = norm(add(f.d, [rnd(-0.08, 0.08), rnd(0, 0.12), rnd(-0.08, 0.08)]));
+          G.shots.push({ kind: 'missile', p: add(f.p, [rnd(-0.6, 0.6), rnd(-0.4, 0.4), rnd(-0.6, 0.6)]), v: mul(spread, d.speed * rnd(0.85, 1.1)),
+            owner: src, dmg: 0, life: d.range / d.speed + 1, target, smoke: 0, age: 1, ghost: true, vid: f.v, from: f.id });
+        }
+        sfx.missile(f.p);
+      } else if (f.k === 'mg' || f.k === 'md') {
+        // Another pilot is flying a volley (mg: where it is and where it's
+        // heading) or has detonated it (md). Their client scores the damage.
+        const ghosts = G.shots.filter(s => s.ghost && s.from === f.id && s.vid === f.v && s.life > 0);
+        if (!ghosts.length) return;
+        if (f.k === 'md') { for (const s of ghosts) { s.life = -1; explode(s.p, false); } return; }
+        const shift = mul(sub(f.p, centroid(ghosts)), 0.5);
+        for (const s of ghosts) { s.p = add(s.p, shift); s.v = mul(norm(f.d), len(s.v)); s.target = null; s.life = max(s.life, 2); }
+      }
+    }
+
     /* ---------- loop & lifecycle ---------- */
 
-    let raf = 0, last = 0;
+    let raf = 0, last = 0, lastAudioCheck = 0;
     const loop = ts => {
       raf = requestAnimationFrame(loop);
       const dt = min(0.05, (ts - last) / 1000 || 0);
       last = ts;
-      if (document.hidden) { for (const k of Object.keys(loops)) loopSet(k, 0); return; }
+      if (document.hidden) { for (const k of Object.keys(loops)) loopSet(k, 0); beamSound(false, 1); return; }
+      if (ts - lastAudioCheck > 1000) {
+        lastAudioCheck = ts;
+        const c = Sound.ctx;
+        if (c && settings.sound && c.state !== 'running' && c.state !== 'closed') { try { c.resume()?.catch?.(() => {}); } catch { /* next tap */ } }
+      }
       if (G.state === 'play' && !document.hasFocus() && !G.paused) pause(true);
-      if ((G.state === 'play' && !G.paused) || G.state === 'over') update(dt);
-      else for (const k of Object.keys(loops)) loopSet(k, 0);
+      if (G.state === 'menu') menuTick(dt);
+      if ((G.state === 'play' && (!G.paused || mp())) || G.state === 'over') update(dt);
+      else { for (const k of Object.keys(loops)) loopSet(k, 0); beamSound(false, 1); }
       render();
     };
 
-    briefing();
+    mainMenu();
     raf = requestAnimationFrame(loop);
     setTimeout(() => wrap.focus(), 0);
   }

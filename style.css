@@ -27,7 +27,8 @@ html, body {
   font: 13px/1.45 "Lucida Console", "Courier New", monospace;
   overflow: auto;
 }
-.mech-overlay[hidden] { display: none; }
+/* !important: layout classes like .menu set display, and must never un-hide it. */
+.mech-overlay[hidden] { display: none !important; }
 /* Centre when it fits, scroll from the top when it doesn't: plain
    justify-content:center pushes the top of a tall briefing off-screen where
    it can't be scrolled back to (a phone held sideways). */
@@ -66,19 +67,19 @@ html, body {
 }
 .tbtn.on { background: rgba(95, 255, 95, .45); color: #031; }
 
+/* JUMP / TGT / ZOOM along the top; ENERGY big under the thumb, with
+   MISSILE and BALLISTIC to its left. All three fire buttons are hold-to-fire,
+   and two can be held at once. */
 .tcluster {
   position: absolute;
   right: calc(12px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom));
-  display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px); gap: 8px;
+  display: grid; grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(3, 52px); gap: 8px;
 }
-.tcluster [data-t="alpha"] { grid-column: 1; grid-row: 2; }
-.tcluster [data-t="jump"] { grid-column: 1; grid-row: 3; }
-.tfire {
-  grid-column: 2 / span 2; grid-row: 2 / span 2;
-  border-radius: 50%; font-size: 16px; color: #fc3;
-  border-color: rgba(255, 204, 51, .7); background: rgba(60, 30, 0, .35);
-}
-.tfire.on { background: rgba(255, 204, 51, .5); color: #310; }
+.tfire { border-radius: 50%; font-size: 10px; letter-spacing: 0; --c: 95, 255, 95; color: rgb(var(--c)); border-color: rgba(var(--c), .7); background: rgba(var(--c), .12); }
+.tfire.on { background: rgba(var(--c), .5); color: #000; }
+.t-energy { grid-column: 2 / span 2; grid-row: 2 / span 2; font-size: 15px; --c: 92, 204, 255; }
+.t-missile { grid-column: 1; grid-row: 2; --c: 255, 120, 70; }
+.t-ballistic { grid-column: 1; grid-row: 3; --c: 255, 204, 51; }
 
 .tpause {
   position: absolute; left: calc(12px + env(safe-area-inset-left)); top: calc(10px + env(safe-area-inset-top));
@@ -125,4 +126,103 @@ html, body {
   .mech-overlay h1 { font-size: 26px; }
   .mech-keys td { display: block; padding: 0; }
   .mech-keys td:nth-child(odd) { margin-top: 4px; }
+}
+
+/* ---------- arena lobby ---------- */
+
+.lobby-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.callsign {
+  font: bold 16px "Lucida Console", "Courier New", monospace; text-transform: uppercase;
+  background: #000; color: #fc3; border: 1px solid #5f5; padding: 6px 8px; width: 13ch;
+  -webkit-user-select: text; user-select: text;
+}
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+.swatch { width: 36px; height: 36px; border: 2px solid #000; outline: 1px solid #2a7a2a; cursor: pointer; padding: 0; }
+.swatch.on { outline: 3px solid #fc3; }
+
+.scoreboard td:nth-child(odd) { color: #7f7; }
+.scoreboard tr.me td { color: #fc3; }
+.scoreboard .dot { display: inline-block; width: 10px; height: 10px; margin-right: 8px; vertical-align: -1px; }
+
+/* ---------- main menu ---------- */
+
+/* The menu overlay is see-through: the 3D mech behind it is the real game
+   renderer. A dark fade on the left keeps the menu readable. */
+.mech-overlay.menu {
+  padding: 0; display: block; overflow: hidden; touch-action: none;
+  background: linear-gradient(90deg, rgba(0, 0, 0, .85) 0%, rgba(0, 0, 0, .6) 32%, rgba(0, 0, 0, 0) 58%);
+}
+.mm { display: grid; grid-template-columns: minmax(300px, 42%) 1fr; height: 100%; margin: 0 !important; }
+.mm-left {
+  display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: auto; touch-action: pan-y;
+  padding: calc(22px + env(safe-area-inset-top)) 28px calc(22px + env(safe-area-inset-bottom)) calc(30px + env(safe-area-inset-left));
+}
+/* After the mockup's hollow, chunky letters: amber fill, heavy dark outline. */
+.mm-title {
+  font: 900 68px/0.95 "Arial Black", Impact, "Helvetica Neue", sans-serif; letter-spacing: 3px;
+  color: #ffcc33; -webkit-text-stroke: 3px #3a0d06; paint-order: stroke fill;
+  text-shadow: 5px 5px 0 #7a1d10, 0 0 28px rgba(255, 140, 40, .35);
+  transform: rotate(-2deg); transform-origin: left; margin-bottom: 6px;
+}
+.mm-items { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.mm-item {
+  font: bold 24px "Lucida Console", "Courier New", monospace; letter-spacing: 2px; color: #7f7;
+  background: none; border: 0; padding: 5px 0 5px 28px; position: relative; cursor: pointer; text-align: left;
+}
+.mm-item:hover { color: #bfb; }
+.mm-item.on { color: #fc3; }
+.mm-item.on::before { content: '▶'; position: absolute; left: 2px; font-size: 18px; top: 9px; }
+.mm-detail { font-size: 12px; max-width: 52ch; color: #7f7; }
+.mm-detail p { margin: 6px 0; }
+.mm-detail .dim { color: #2a9a2a; }
+.mm-detail .opts { justify-content: flex-start; margin: 4px 0 10px; }
+.mm-controls { max-height: 40vh; overflow: auto; border: 1px solid #1a4a1a; padding: 6px 8px; background: rgba(0, 10, 0, .5); }
+.mm-pick { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+.mm-pick span { width: 9ch; color: #2a9a2a; }
+.mm-pick b { min-width: 16ch; text-align: center; color: #fc3; font-weight: normal; }
+.mm-pick button, .mm-mech button {
+  background: none; border: 0; color: #fc3; cursor: pointer; font-size: 18px; padding: 2px 8px;
+}
+.mm-launch {
+  margin-top: auto; align-self: flex-start;
+  font: 900 26px "Arial Black", Impact, sans-serif; letter-spacing: 3px; color: #031;
+  background: #fc3; border: 3px solid #3a0d06; box-shadow: 5px 5px 0 #7a1d10; padding: 12px 38px; cursor: pointer;
+}
+.mm-launch:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 #7a1d10; }
+
+.mm-right { display: flex; align-items: flex-end; justify-content: flex-end; pointer-events: none;
+  padding: 0 calc(26px + env(safe-area-inset-right)) calc(22px + env(safe-area-inset-bottom)) 0; }
+.mm-select {
+  pointer-events: auto; text-align: center; min-width: 270px;
+  background: rgba(0, 0, 0, .55); border: 1px solid #2a7a2a; padding: 10px 16px 12px;
+}
+.mm-label { color: #2a9a2a; letter-spacing: 3px; font-size: 11px; }
+.mm-mech { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0; }
+.mm-mech span { font: 900 26px "Arial Black", Impact, sans-serif; letter-spacing: 3px; color: #fff; }
+.mm-mech button { font-size: 26px; }
+.mm-role { color: #fc3; font-size: 11px; letter-spacing: 1px; }
+.mm-kit { color: #7f7; font-size: 11px; margin: 2px 0 8px; }
+.mm-stats { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: center; font-size: 10px; color: #2a9a2a; text-align: left; }
+.mm-stats i { display: block; height: 6px; background: #031203; border: 1px solid #1a4a1a; }
+.mm-stats i b { display: block; height: 100%; background: #5f5; }
+
+/* Phones held sideways: everything smaller and tighter. */
+@media (max-height: 500px) {
+  .mm { grid-template-columns: minmax(260px, 46%) 1fr; }
+  .mm-left { gap: 6px; padding: calc(10px + env(safe-area-inset-top)) 14px calc(10px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left)); }
+  .mm-title { font-size: 38px; -webkit-text-stroke: 2px #3a0d06; text-shadow: 3px 3px 0 #7a1d10; margin-bottom: 2px; }
+  .mm-item { font-size: 16px; padding: 3px 0 3px 22px; }
+  .mm-item.on::before { font-size: 13px; top: 5px; }
+  .mm-detail { font-size: 10.5px; }
+  .mm-launch { font-size: 18px; padding: 8px 24px; box-shadow: 3px 3px 0 #7a1d10; }
+  .mm-select { min-width: 210px; padding: 6px 10px 8px; }
+  .mm-mech span { font-size: 18px; }
+  .mm-mech button { font-size: 20px; }
+  .mm-controls { max-height: 30vh; }
+}
+/* Upright phones: the mech stands behind the menu instead of beside it. */
+@media (max-aspect-ratio: 1/1) {
+  .mm { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  .mech-overlay.menu { background: linear-gradient(180deg, rgba(0, 0, 0, .8) 0%, rgba(0, 0, 0, .5) 60%, rgba(0, 0, 0, .7) 100%); }
+  .mm-right { justify-content: center; padding: 0 0 calc(14px + env(safe-area-inset-bottom)); }
 }
