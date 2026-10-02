@@ -1,0 +1,56 @@
+/* Stompy fills the whole page: one canvas for the world, one for the HUD,
+   and an overlay for briefing / pause / debrief. */
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #7f7;
+}
+
+#app { position: fixed; inset: 0; display: flex; }
+
+.mech-wrap { position: relative; flex: 1; background: #000; overflow: hidden; cursor: crosshair; outline: none; }
+.mech-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+.mech-overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 16px;
+  background: rgba(0, 0, 0, .8); color: #7f7; cursor: default;
+  font: 13px/1.45 "Lucida Console", "Courier New", monospace;
+  overflow: auto;
+}
+.mech-overlay[hidden] { display: none; }
+.mech-overlay h1 {
+  font: bold 34px "Arial Black", Arial, sans-serif; color: #fc3; letter-spacing: 3px;
+  margin: 0; text-shadow: 3px 3px #840; text-align: center;
+}
+.mech-overlay .panel { border: 1px solid #2a7a2a; padding: 10px 14px; max-width: 640px; width: 100%; box-sizing: border-box; background: #010a01; }
+.mech-overlay p { margin: 8px 0; }
+.mech-overlay .k { color: #fc3; }
+.mech-overlay a { color: #9f9; }
+
+.mech-overlay .go {
+  font: bold 14px "Lucida Console", monospace; background: #031; color: #9f9;
+  border: 1px solid #5f5; padding: 7px 20px; cursor: pointer;
+}
+.mech-overlay .go:hover, .mech-overlay .opt:hover { background: #052; }
+
+.mech-overlay .opts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.mech-overlay .opt {
+  font: 11px "Lucida Console", monospace; background: #010a01; color: #7f7;
+  border: 1px solid #2a7a2a; padding: 4px 10px; cursor: pointer;
+}
+.mech-overlay .credits { color: #2a7a2a; font-size: 11px; text-align: center; max-width: 640px; }
+
+.mech-keys { border-collapse: collapse; width: 100%; margin-top: 6px; }
+.mech-keys td { padding: 1px 6px 1px 0; vertical-align: top; }
+.mech-keys td:nth-child(odd) { color: #fc3; white-space: nowrap; }
+
+@media (max-width: 600px) {
+  .mech-overlay h1 { font-size: 26px; }
+  .mech-keys td { display: block; padding: 0; }
+  .mech-keys td:nth-child(odd) { margin-top: 4px; }
+}
