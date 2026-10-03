@@ -5,6 +5,7 @@ import { center, eyeOf, muzzle, rayHit, viewYaw } from './geom.js';
 import { stepMech } from './mech.js';
 import { gait } from './gait.js';
 import { think } from './ai.js';
+import { groupPass } from './ai/group.js';
 import { stepShots, stepDying } from './combat.js';
 import { beamTick, coolArmour, remoteBeam } from './beams.js';
 import { fusionTick, updatePulses } from './fusion.js';
@@ -61,6 +62,7 @@ export function update(G, input, dt) {
   missileTrigger(G, armed && (input.held.missile || input.missileTap));
   if (G.guide) steerVolley(G, dt);
 
+  groupPass(G, dt);
   for (const m of G.mechs) {
     if (m.remote) {
       if (m.alive) { netInterp(m, dt, G.clock); stepFeel(m, dt); gait(G, m, dt); meleeGhost(m, dt, m.net?.pu || 0); }
