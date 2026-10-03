@@ -157,9 +157,23 @@ export function createHud(app) {
     }
   }
 
+  // ?debug=1: frame time over the last 2 s, draw calls, particles, the seed.
+  const frames = [];
+  let lastFrameAt = 0;
+  function drawDebug() {
+    const now = performance.now();
+    if (lastFrameAt) frames.push(now - lastFrameAt);
+    lastFrameAt = now;
+    while (frames.length > 120) frames.shift();
+    const sorted = [...frames].sort((a, b) => a - b), q = f => (sorted.length ? sorted[min(sorted.length - 1, floor(sorted.length * f))] : 0);
+    ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'left'; ctx.fillStyle = '#9f9';
+    const lines = [`FRAME ${q(0.5).toFixed(1)} ms  P95 ${q(0.95).toFixed(1)} ms`, `DRAWS ${app.R.draws}  PARTICLES ${G.parts.length}  MECHS ${G.mechs.length}`, `SEED ${G.ter?.seed ?? '-'}  T ${G.time.toFixed(1)}  STATE ${G.state}`];
+    lines.forEach((l, i) => ctx.fillText(l, 12, app.scene.view.H * 0.5 + i * 13));
+  }
   function drawHUD() {
     ctx.setTransform(app.scene.view.dpr, 0, 0, app.scene.view.dpr, 0, 0);
     ctx.clearRect(0, 0, app.scene.view.W, app.scene.view.H);
+    if (app.params.has('debug')) drawDebug();
     if (G.state === 'menu') return;
     if (G.guide) { drawGuideHUD(); return; }
     ctx.translate(0, G.kick * 3);  // the dashboard jolts with each step

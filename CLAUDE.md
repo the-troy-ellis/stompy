@@ -27,9 +27,10 @@ Rules that are easy to miss:
 - Balance numbers change only in issues about balance.
 - Any change to a network message bumps `PROTOCOL` and updates
   `docs/architecture.md`.
-- Before M0 (the module split) lands, do not open feature PRs against
-  `stompy.js`.
+- The sim (`src/sim`, `src/data`, `src/world`) never imports the DOM, GL,
+  audio, UI or input; lint enforces it. New sim logic gets a headless test.
 
-Run it: `python3 -m http.server 8000` and open `http://localhost:8000`.
-Arena: also `python3 server.py`. After M0: `npm run serve`, `npm test`,
-`npm run build`.
+Run it: `npm run serve` (or any static server) and open
+`http://localhost:8000`. Arena: also `python3 server/server.py`. Check it:
+`npm test`, `npm run test:server`, `npm run test:smoke`, `npm run lint`,
+`npm run build`. See `docs/workflow.md` for the definition of done.

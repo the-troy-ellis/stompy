@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ready |
+| Status | shipped (branch `m0/foundations`); later milestones add their tests |
 | Milestone | M0 (extended by every later milestone) |
 | Size | M |
 | Depends on | [00-module-split.md](00-module-split.md) stages 1–3 |
@@ -59,11 +59,16 @@ criteria that *can* be asserted headlessly *are*.
 4. Inject `window.__stompy` (exposed by `main.js` only when
    `?debug=1`) to read `game.player.x/z` and the frame counter.
 5. Hold `KeyW` for 2 s of frames; assert the player moved more than 10 m and
-   `game.frame` advanced; assert zero console errors and zero page errors.
+   `game.frame` advanced; then fire every weapon by key with the enemies
+   awake, pause and resume, and win the mission through the real destroy
+   path (`window.__stompy.kill`) to reach the debrief; assert zero console
+   errors and zero page errors.
 6. Screenshot to `test-results/` as a CI artifact.
 
-A second scenario loads with `?touch=1` (forces `G.touchUI`) and asserts the
-touch cluster is visible and the dashboard HUD is not drawn.
+A second scenario loads with `?touch=1` (forces `G.touchUI`) and taps through
+to a mission, asserting the touch cluster is visible. A third starts the real
+relay (`server/server.py`) and joins two pilots from one browser, asserting
+each sees the other on the board and walking.
 
 ### Server tests
 

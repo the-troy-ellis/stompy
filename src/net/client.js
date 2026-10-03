@@ -13,7 +13,7 @@ import { damage, destroy } from '../sim/combat.js';
 import { beamMult } from '../sim/beams.js';
 import { launchPulse } from '../sim/fusion.js';
 import { SEND_HZ } from '../sim/missiles.js';
-import { r2 } from './protocol.js';
+import { PROTOCOL, r2, stateMessage } from './protocol.js';
 
 const { sin, cos, atan2, min, max, random, hypot } = Math;
 
@@ -50,7 +50,7 @@ export function createNet(app) {
     try { ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:${NET_PORT}/ws`); }
     catch { app.ui.setStatus('COULD NOT CONNECT'); return; }
     Net.ws = ws;
-    ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', name: prefs.mpName, color: prefs.mpColor }));
+    ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', v: PROTOCOL, name: prefs.mpName, color: prefs.mpColor }));
     ws.onmessage = e => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.t === 'welcome') welcomed = true;
@@ -134,7 +134,7 @@ export function createNet(app) {
     G.player.netId = Net.id;
     G.mechs.push(G.player);
     respawn();
-    app.ui.app.ui.hideOverlay(); app.wrap.focus();
+    app.ui.hideOverlay(); app.wrap.focus();
     G.state = 'play'; G.paused = false;
     app.input.syncTouchUI();
     if (G.touchUI && !document.fullscreenElement && document.documentElement.requestFullscreen) {
@@ -165,15 +165,7 @@ export function createNet(app) {
     sendState();
   }
 
-  function sendState() {
-    const P = G.player;
-    netSend({ t: 's', ch: P.type, x: r2(P.x), y: r2(P.y), z: r2(P.z), yaw: r2(P.yaw), tw: r2(P.twist), p: r2(P.pitch), sp: r2(P.speed),
-      air: P.air ? 1 : 0, al: P.alive ? 1 : 0, sd: P.shutdown ? 1 : 0, hp: HPK.map(k => r2(P.hp[k])),
-      bm: P.beaming ? 1 : 0, be: P.beaming && P.beamEnd ? P.beamEnd.map(r2) : 0, bf: r2(beamMult(P)),
-      fl: P.fusion?.on && P.fusion.end ? P.fusion.end.map(r2) : 0, sc: P.fusion?.mech?.netId || 0,
-      // eslint-disable-next-line no-dupe-keys -- the duplicate `sp` is the known wire bug fixed with the protocol move (M0 stage 5)
-      sp: P.fusion?.mech ? r2(min(1, P.fusion.t / WEAPONS.fusion.scan)) : 0 });
-  }
+  function sendState() { netSend(stateMessage(G.player, beamMult(G.player))); }
 
   function netState(s) {
     let r = G.mechs.find(m => m.netId === s.id);
@@ -186,9 +178,9 @@ export function createNet(app) {
     const first = !r.net;
     r.net = { ...s, at: performance.now() };
     // Someone's resonance scan is on us: warn, with an alarm.
-    if (s.sc === Net.id && s.sp > 0) {
+    if (s.sc === Net.id && s.sq > 0) {
       if (!G.scanWarn || performance.now() - G.scanWarn.at > 1000) app.audio.say('Warning. Resonance scan.', true);
-      G.scanWarn = { by: s.id, p: s.sp, at: performance.now() };
+      G.scanWarn = { by: s.id, p: s.sq, at: performance.now() };
       if (random() < 0.3) app.audio.sfx.beep();
     }
     if (Array.isArray(s.hp)) HPK.forEach((k, i) => { r.hp[k] = +s.hp[i] || 0; });
@@ -253,8 +245,8 @@ export function createNet(app) {
     if (!P.alive && G.respawnAt && G.clock >= G.respawnAt) respawn();
     if ((Net.sendT += dt) >= 1 / SEND_HZ) { Net.sendT = 0; sendState(); flushHits(); }
   }
-  const arenaBoard = () => [...app.net.Net.info.values()].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
-  const boardHTML = () => `<table class="mech-keys scoreboard">${arenaBoard().map((p, i) => `<tr${p.id === app.net.Net.id ? ' class="me"' : ''}>
+  const arenaBoard = () => [...Net.info.values()].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+  const boardHTML = () => `<table class="mech-keys scoreboard">${arenaBoard().map((p, i) => `<tr${p.id === Net.id ? ' class="me"' : ''}>
     <td>${i + 1}.</td><td><span class="dot" style="background:${MP_COLORS[p.color]?.css}"></span>${esc(p.name)}</td><td>${p.kills} / ${p.deaths}</td></tr>`).join('')}</table>`;
 
 

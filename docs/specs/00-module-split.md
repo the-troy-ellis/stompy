@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (stages 1–3 shipped on `m0/foundations`) |
+| Status | shipped (branch `m0/foundations`) |
 | Milestone | M0 |
 | Size | L, split into the five stages below (each its own issue and PR) |
 | Depends on | none |

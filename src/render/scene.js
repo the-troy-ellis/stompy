@@ -67,6 +67,7 @@ export function createScene(app) {
 
   function render() {
     resize();
+    R.draws = 0;
     if (!G.ter) return;
     R.gl.viewport(0, 0, cv.width, cv.height);
     const P = G.player, gd = G.guide, ir = !!gd;

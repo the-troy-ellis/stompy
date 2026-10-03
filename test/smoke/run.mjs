@@ -70,6 +70,44 @@ try {
     console.log(`touch: cluster visible ${ok}`);
     if (!ok) { failed = true; console.error('FAIL: touch UI not shown'); }
   });
+  // The arena: the real relay, two pilots in one browser, each sees the other walk.
+  const relay = spawn('python3', ['server/server.py', '8096'], { stdio: 'ignore', env: { ...process.env, STOMPY_ROUND_GAP: '1' } });
+  await new Promise(r => setTimeout(r, 600));
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 640 } });
+    const pages = [];
+    for (const name of ['ONE', 'TWO']) {
+      const page = await ctx.newPage();
+      page.on('pageerror', e => errors.push(`arena ${name}: ${e.message}`));
+      page.on('console', m => { if (m.type() === 'error') errors.push(`arena ${name}: console ${m.text()}`); });
+      await page.goto(URL_);
+      await page.waitForSelector('.mm-title', { timeout: 15000 });
+      await page.click('[data-sel="mp"]');
+      await page.fill('#callsign', name);
+      await page.click('[data-a="go"]');
+      await page.waitForFunction(() => window.__stompy?.game?.mode === 'mp' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+      pages.push(page);
+    }
+    await pages[1].waitForFunction(() => window.__stompy.game.mechs.length === 2 && window.__stompy.game.mechs.some(m => m.remote && m.alive), null, { timeout: 8000 });
+    // Opening TWO's tab blurred ONE's, and a blurred cockpit pauses: bring ONE back before driving.
+    await pages[0].bringToFront();
+    await pages[0].evaluate(() => { window.focus(); document.querySelector('.mech-wrap').focus(); });
+    await pages[0].waitForTimeout(300);
+    await pages[0].evaluate(() => window.__stompy.app.ui.pause(false));
+    await pages[0].keyboard.down('KeyW'); await pages[0].waitForTimeout(1800);
+    // Read ONE's relayed speed while the key is still down (the old duplicate `sp` key made this 0).
+    const own = await pages[0].evaluate(() => ({ speed: window.__stompy.game.player.speed, paused: window.__stompy.game.paused }));
+    const seen = await pages[1].evaluate(() => { const r = window.__stompy.game.mechs.find(m => m.remote); return { speed: r.speed, raw: r.net?.sp, net: !!r.net, players: window.__stompy.app.net.Net.info.size }; });
+    await pages[0].keyboard.up('KeyW');
+    console.log(`arena: ONE at ${own.speed.toFixed(1)} m/s (paused=${own.paused}); TWO sees ONE at ${seen.speed.toFixed(1)} m/s (raw sp ${seen.raw}), ${seen.players} pilots on the board`);
+    if (!(seen.players === 2 && seen.net && seen.speed > 1)) { failed = true; console.error('FAIL: the arena did not relay the second pilot moving'); }
+    await pages[0].keyboard.down('Digit1'); await pages[0].waitForTimeout(700); await pages[0].keyboard.up('Digit1');
+    await pages[1].waitForTimeout(500);
+    await pages[0].screenshot({ path: 'test-results/smoke-arena.png' });
+    await pages[1].keyboard.press('F2');
+    await pages[1].waitForFunction(() => window.__stompy.game.state === 'menu', null, { timeout: 5000 });
+    await ctx.close();
+  } finally { relay.kill(); }
   await browser.close();
   if (errors.length) { failed = true; console.error('FAIL: page errors:\n  ' + errors.join('\n  ')); }
 } catch (e) {
