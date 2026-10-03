@@ -10,6 +10,20 @@ const { sin, cos, atan2, min, max, PI, random, hypot, floor } = Math;
 // the quarters, otherwise the heading in tens (030, 120...) as two digits.
 export const compassLabel = d => ({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[d] || String(d / 10).padStart(2, '0'));
 
+// The ?debug=1 label over an enemy: its state, its profile, its group (with
+// a star on the flanker), and what it is up to right now.
+export function aiLabel(e) {
+  const a = e.ai || {}, g = a.group;
+  let s = `${(a.state || 'patrol').toUpperCase()} ${e.ch?.ai?.profile || 'baseline'}`;
+  if (g && g.size > 1) s += ` G${g.id}${g.flank ? '*' : ''}`;
+  if (a.cover) s += ' COVER';
+  if (a.ridge) s += ' RIDGE';
+  if (a.jump) s += ' JUMP';
+  if (e.melee) s += ' SWING';
+  if (a.hot) s += ' HOT';
+  return s;
+}
+
 // The cockpit instruments on the 2D canvas over the GL view: crosshair and
 // scan rings, target brackets, compass, radar, damage, heat, weapons,
 // throttle, messages, the arena board, and the missile camera's IR feed.
@@ -174,6 +188,31 @@ export function createHud(app) {
     ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'left'; ctx.fillStyle = '#9f9';
     const lines = [`FRAME ${q(0.5).toFixed(1)} ms  P95 ${q(0.95).toFixed(1)} ms`, `DRAWS ${app.R.draws}  PARTICLES ${G.parts.length}  MECHS ${G.mechs.length}`, `SEED ${G.ter?.seed ?? '-'}  T ${G.time.toFixed(1)}  STATE ${G.state}`];
     lines.forEach((l, i) => ctx.fillText(l, 12, app.scene.view.H * 0.5 + i * 13));
+    drawAIDebug();
+  }
+  // The enemies' minds (docs/specs/05-ai.md § Debug view): the label over each
+  // head, a square where it believes you are with a line to it (red), a line
+  // to its cover point (amber) or its ridge (violet), and its patrol waypoint
+  // (dim) while unaware.
+  function drawAIDebug() {
+    if (G.state === 'menu' || !G.VP) return;
+    ctx.font = '10px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.lineWidth = 1;
+    const at = (x, z) => [x, G.ter.height(x, z) + 1, z];
+    for (const e of G.mechs) {
+      if (e.team === 0 || e.remote || !e.alive) continue;
+      const a = e.ai, head = project([e.x, e.y + 9.5 * e.ch.scale, e.z]), foot = project([e.x, e.y + 1, e.z]);
+      if (head) { ctx.fillStyle = a.seen && a.aware ? '#f66' : a.aware ? AMBER : '#9f9'; ctx.fillText(aiLabel(e), head[0], head[1]); }
+      const line = (p, col) => {
+        const q = project(p);
+        if (!q || !foot) return null;
+        ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(foot[0], foot[1]); ctx.lineTo(q[0], q[1]); ctx.stroke();
+        return q;
+      };
+      if (a.aware && a.belief) { const q = line(at(a.belief.x, a.belief.z), 'rgba(255,90,90,0.6)'); if (q) ctx.strokeRect(q[0] - 3, q[1] - 3, 6, 6); }
+      if (a.cover) line(at(a.cover.x, a.cover.z), AMBER);
+      if (a.ridge) line(at(a.ridge.x, a.ridge.z), '#c8f');
+      if (a.wp && (!a.aware || a.state === 'search')) line(at(a.wp[0], a.wp[1]), DIM);
+    }
   }
   function drawHUD() {
     ctx.setTransform(app.scene.view.dpr, 0, 0, app.scene.view.dpr, 0, 0);
