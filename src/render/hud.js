@@ -404,6 +404,8 @@ export function createHud(app) {
     }
     ctx.globalAlpha = 1;
     if (P.shutdown) {
+      // Power's gone: the instruments go dark under a veil; only the warning stays bright.
+      ctx.fillStyle = 'rgba(0,0,0,0.42)'; ctx.fillRect(0, 0, app.scene.view.W, app.scene.view.H);
       ctx.font = 'bold 22px "Lucida Console", monospace';
       ctx.fillStyle = floor(G.time * 3) % 2 ? RED : AMBER;
       ctx.fillText('REACTOR SHUTDOWN', app.scene.view.W / 2, L.viewBottom * 0.4);
