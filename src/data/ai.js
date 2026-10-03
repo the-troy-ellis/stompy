@@ -26,6 +26,11 @@ export const BEHAVIOUR = {
   allyGap: 6,         // m of clearance avoidAllies steers for
 };
 
+export const GROUP = {
+  range: 200,   // m: enemies this close to one another form a group
+  every: 0.5,   // s between group passes
+};
+
 export const PERCEPTION = {
   lookEvery: 0.15,    // s between line-of-sight checks per enemy (staggered)
   lostAfter: 8,       // s without line of sight before an aware enemy goes searching

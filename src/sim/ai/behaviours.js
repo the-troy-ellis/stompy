@@ -30,7 +30,7 @@ export function strafeTick(G, e, dt) {
 // Today's dance: approach above the band, back off below it, orbit inside it.
 export const keepRange = (pref, band = [0.6, 1.35]) => (G, e, ctx) => {
   const s = e.ai.strafe, { dist, toYaw } = ctx;
-  if (dist > pref * band[1]) return { moveYaw: toYaw + s * 0.35, thr: 1 };
+  if (dist > pref * band[1]) return { moveYaw: toYaw + (e.ai.group?.flank ? s * PI / 2 : s * 0.35), thr: 1 };   // the group's lightest comes round the side
   if (dist < pref * band[0]) return { moveYaw: toYaw + PI - s * 0.6, thr: 1 };
   return { moveYaw: toYaw + s * PI / 2, thr: 0.75 };
 };
