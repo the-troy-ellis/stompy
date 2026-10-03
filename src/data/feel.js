@@ -17,6 +17,8 @@
 export const FEEL = {
   // k = 0.35 + 0.65 * pace, scaled by the chassis (scale^2) in footDown
   step:        { kick: 1.0, shake: 0.12, flash: 0, white: 0, squash: 0.03, wobble: 0, bass: 0.4, duck: 0, dust: 1, haptic: 10 },
+  // Another mech's footfall felt through the ground: k = (1 - d / 40) * scale^2, heavies only
+  nearStep:    { kick: 0.15, shake: 0.12, flash: 0, white: 0, squash: 0, wobble: 0.05, bass: 0.3, duck: 0, dust: 0, haptic: 8 },
   // k = landing force 0.25..1
   land:        { kick: 1.0, shake: 0.6, flash: 0, white: 0, squash: 0.25, wobble: 0.4, bass: 1.0, duck: 0.3, dust: 3, haptic: 40 },
   // k = 1 per shot (the player's own weapons)

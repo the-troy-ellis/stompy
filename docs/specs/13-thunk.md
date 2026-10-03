@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ready |
+| Status | in progress (#2 feel table and springs shipped; #3 footfalls and landing shipped; #4–#9 open) |
 | Milestone | M1 (the table and the first pass); every later feature adds rows |
 | Size | M (split: feel table + footfalls + landing; hit wobble + recoil + knockback; shutdown + death; audio layer; reduced motion) |
 | Depends on | M0 |
