@@ -101,3 +101,23 @@ export function cycleSystem(loadout, key, d) {
   const n = SYSTEMS[key].max + 1;
   return { hp: { ...loadout.hp }, sys: { ...loadout.sys, [key]: ((loadout.sys[key] || 0) + d + n) % n } };
 }
+
+// The tables and a set of answered cases for the arena server's copy of
+// validate() (server/data.py); scripts/loadout-fixture.mjs writes them out
+// and a test on each side keeps the two in step.
+export function loadoutFixture() {
+  const chassis = Object.fromEntries(Object.entries(CHASSIS).map(([k, c]) => [k, {
+    tons: c.tons, frame: c.frame, systems: c.systems, hardpoints: c.hardpoints.map(({ id, cat, stock }) => ({ id, cat, stock })) }]));
+  const weapons = Object.fromEntries(Object.entries(WEAPONS).map(([k, w]) => [k, { cat: CAT_OF[k], tons: w.tons ?? 0 }]));
+  const systems = Object.fromEntries(SYSTEM_KEYS.map(k => [k, { max: SYSTEMS[k].max, tons: SYSTEMS[k].tons }]));
+  const inputs = [
+    ['kestrel', null], ['kestrel', 'junk'], ['kestrel', { hp: { la: 'mlaser', ra: 'ac', t1: 'nope', t2: null, zz: 'laser' }, sys: { sinks: 9, armour: -1, jets: 1.5 } }],
+    ['kestrel', { hp: { la: 'fusion', ra: 5 }, sys: { sinks: true, armour: '2', jets: 2 } }],
+    ['jackal', { hp: { la: 'laser', ra: 'laser' }, sys: { sinks: 3, armour: 2, jets: 2 } }],
+    ['jackal', { hp: { la: 'mlaser', ra: 'mlaser' }, sys: { sinks: 3, armour: 0, jets: 0 } }],
+    ['warden', { hp: { t1: null, ra: 'ac', la: 'mlaser' }, sys: { sinks: 1, armour: 1, jets: 1 } }],
+    ['warden', { hp: [], sys: [] }],
+  ];
+  const cases = inputs.map(([ch, input]) => ({ ch, input, want: validate(ch, input) }));
+  return { chassis, weapons, systems, cases };
+}

@@ -14,6 +14,7 @@ import unittest
 os.environ.setdefault("STOMPY_ROUND_GAP", "0")
 sys.path.insert(0, os.path.dirname(__file__))
 import server as relay  # noqa: E402
+import data  # noqa: E402
 
 
 class Helpers(unittest.TestCase):
@@ -37,6 +38,26 @@ class Helpers(unittest.TestCase):
         self.assertEqual(relay.num(99, 0, 10), 10)
         self.assertEqual(relay.num("nope", 0, 10, 7), 7)
         self.assertEqual(relay.num(float("nan"), 0, 10, 1), 1)
+
+    def test_loadout_validation_matches_the_game(self):
+        # Every case in the fixture was answered by the JS validate(); the Python must agree.
+        for case in data.TABLES["cases"]:
+            norm, tons, ok = data.validate_loadout(case["ch"], case["input"])
+            want = case["want"]
+            self.assertEqual(norm, want["loadout"], case)
+            self.assertEqual(tons, want["tons"], case)
+            self.assertEqual(ok, want["ok"], case)
+
+    def test_check_loadout_passes_clean_and_stocks_the_rest(self):
+        stock = data.stock_loadout("kestrel")
+        lo, rejected = data.check_loadout("kestrel", stock)
+        self.assertEqual((lo, rejected), (stock, False))
+        custom = {"hp": {"la": "mlaser", "ra": "laser", "t1": None, "t2": "lrm"}, "sys": {"sinks": 2, "armour": 0, "jets": 1}}
+        self.assertEqual(data.check_loadout("kestrel", custom), (custom, False))
+        self.assertEqual(data.check_loadout("kestrel", {"hp": {"la": "ac"}, "sys": stock["sys"]}), (stock, True))   # wrong category
+        heavy = {"hp": {"la": "laser", "ra": "laser"}, "sys": {"sinks": 3, "armour": 2, "jets": 2}}
+        self.assertEqual(data.check_loadout("jackal", heavy), (data.stock_loadout("jackal"), True))           # over tonnage
+        self.assertEqual(data.check_loadout("nope", stock), (None, True))
 
     def test_frame_roundtrip_sizes(self):
         for n in (0, 10, 125, 126, 70000):
@@ -141,6 +162,19 @@ class Session(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(msg["x"], 1)
         with self.assertRaises(asyncio.TimeoutError):
             await a.recv(timeout=0.3)
+
+    async def test_an_invalid_loadout_is_relayed_as_stock_and_the_sender_told(self):
+        a, _ = await self.join("A")
+        b, _ = await self.join("B")
+        await a.recv()
+        good = {"hp": {"la": "mlaser", "ra": "laser", "t1": "ac", "t2": "lrm"}, "sys": {"sinks": 1, "armour": 0, "jets": 1}}
+        await a.send({"t": "s", "ch": "kestrel", "x": 0, "lo": good})
+        self.assertEqual((await b.recv())["lo"], good)
+        await a.send({"t": "s", "ch": "jackal", "x": 0, "lo": {"hp": {"la": "laser", "ra": "laser"}, "sys": {"sinks": 3, "armour": 2, "jets": 2}}})
+        self.assertEqual((await b.recv())["lo"], data.stock_loadout("jackal"))
+        self.assertEqual(await a.recv(), {"t": "note", "k": "lo"})
+        await a.send({"t": "s", "ch": "nope", "x": 0, "lo": good})
+        self.assertNotIn("lo", await b.recv())
 
     async def test_hit_is_clamped_and_fusion_passes(self):
         a, _ = await self.join("A")

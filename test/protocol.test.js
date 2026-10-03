@@ -34,7 +34,7 @@ test('a hit carries knockback and the melee flags only when they are set', () =>
   assert.deepEqual(P.hit(2, 6, [0, 0, 0], false, { kb: [0, 0], st: 1 }), { t: 'hit', to: 2, amt: 6, p: [0, 0, 0], st: 1 });
   assert.deepEqual(P.hit(2, 6, [0, 0, 0], false, { amt: 6, p: [0, 0, 0] }), { t: 'hit', to: 2, amt: 6, p: [0, 0, 0] });
   assert.deepEqual(P.died(3, true), { t: 'died', by: 3, me: 1 });
-  assert.equal(P.PROTOCOL, 2);
+  assert.ok(P.PROTOCOL >= 2);
 });
 
 test('the state message carries the punch phase', () => {
@@ -66,4 +66,13 @@ test('the state message carries speed and scan progress under different keys', (
   const src = P.stateMessage.toString();
   const keys = [...src.matchAll(/\b([a-z]{1,3}):/g)].map(m => m[1]);
   assert.equal(new Set(keys).size, keys.length, 'duplicate key in stateMessage');
+});
+
+test('the state message carries the loadout only when asked', async () => {
+  const G = createTestGame();
+  assert.equal('lo' in P.stateMessage(G.player, 1), false);
+  const s = P.stateMessage(G.player, 1, true);
+  assert.deepEqual(s.lo, G.player.loadout);
+  roundTrip(s);
+  assert.equal(P.PROTOCOL, 3);
 });

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#62 data model, #63 FIT screen shipped; #64 arena, #76 KNUCKLES open) |
+| Status | in progress (#62 data model, #63 FIT screen, #64 arena shipped; #76 KNUCKLES open) |
 | Milestone | M2 |
 | Size | L (split: data model + validation; UI; arena transport) |
 | Depends on | M0; [06-chassis-and-weapons.md](06-chassis-and-weapons.md) for the weapon list (can ship with today's five) |
