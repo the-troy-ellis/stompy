@@ -4,7 +4,7 @@
 import { HPK } from '../data/chassis.js';
 import { WEAPONS } from '../data/weapons.js';
 
-export const PROTOCOL = 3;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server
+export const PROTOCOL = 4;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s; zap on hit
 export const r2 = v => Math.round(v * 100) / 100;
 const v3 = p => p.map(r2);
 
@@ -28,7 +28,7 @@ export function stateMessage(P, bf, withLoadout = false) {
 
 // Weapon effects: drawn by everyone, scored by the shooter.
 export const fxBeam = (type, a, b) => ({ t: 'fx', k: 'b', w: type, a: v3(a), b: v3(b) });
-export const fxShell = (p, v) => ({ t: 'fx', k: 's', p: v3(p), v: v3(v) });
+export const fxShell = (p, v, w = 'ac') => ({ t: 'fx', k: 's', p: v3(p), v: v3(v), w });
 export const fxMissiles = (p, d, targetId, vid) => ({ t: 'fx', k: 'm', p: v3(p), d: v3(d), tg: targetId || 0, v: vid });
 export const fxGuide = (vid, p, d) => ({ t: 'fx', k: 'mg', v: vid, p: v3(p), d: v3(d) });
 export const fxDetonate = vid => ({ t: 'fx', k: 'md', v: vid });
@@ -38,11 +38,12 @@ export const fxPunch = () => ({ t: 'fx', k: 'pu' });   // the swing starts: othe
 // Damage to another pilot (the victim applies it); fu: a fusion kill.
 // kb: a knockback impulse [vx, vz] the victim adds to its push (the server
 // clamps each part to +-30); me: it was a punch; st: it was a stomp.
-export function hit(to, amt, p, fu = false, { kb, me, st } = {}) {
+export function hit(to, amt, p, fu = false, { kb, me, st, zap } = {}) {
   const m = fu ? { t: 'hit', to, amt: 40, p: v3(p), fu: 1 } : { t: 'hit', to, amt: r2(amt), p: v3(p) };
   if (kb && (kb[0] || kb[1])) m.kb = [r2(kb[0]), r2(kb[1])];
   if (me) m.me = 1;
   if (st) m.st = 1;
+  if (zap) m.zap = 1;   // a bolt: the victim's HUD scrambles
   return m;
 }
 export const died = (by, me = false) => (me ? { t: 'died', by: by || 0, me: 1 } : { t: 'died', by: by || 0 });

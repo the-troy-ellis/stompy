@@ -100,7 +100,7 @@ test('one tap cycles a hardpoint through its category and EMPTY, wrapping, and t
   let lo = stockLoadout('kestrel');
   const seen = new Set();
   for (let i = 0; i < choicesFor(CHASSIS.kestrel.hardpoints[0]).length; i++) { seen.add(lo.hp.la); lo = cycleWeapon('kestrel', lo, 'la', 1); }
-  assert.deepEqual([...seen].sort(), ['laser', 'mlaser', null].sort());
+  assert.deepEqual([...seen].sort(), choicesFor(CHASSIS.kestrel.hardpoints[0]).sort());
   assert.equal(lo.hp.la, 'laser', 'a full lap comes back to stock');
   assert.equal(cycleWeapon('kestrel', lo, 'la', -1).hp.la, null, 'backwards from the first is EMPTY');
   assert.equal(cycleWeapon('kestrel', lo, 'nope', 1), lo);

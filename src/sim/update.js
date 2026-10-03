@@ -58,6 +58,7 @@ export function update(G, input, dt) {
   const armed = live && !P.melee;   // no guns during a swing or its recovery
   P.beamOn = armed && input.held.energy && !G.guide;
   fusionTick(G, P, dt, armed && input.held.fusion && !G.guide);
+  if (armed && input.held.energy && !G.guide) fireCat(G, 'energy');   // energy weapons that are not beams (bolts); beams skip themselves
   if (armed && input.held.ballistic) fireCat(G, 'ballistic');
   missileTrigger(G, armed && (input.held.missile || input.missileTap));
   if (G.guide) steerVolley(G, dt);
