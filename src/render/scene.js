@@ -10,7 +10,7 @@ import { BARREL_AT } from '../mesh/mechParts.js';
 import { WEAPONS } from '../data/weapons.js';
 
 // An arm gun's proportions by weapon: [thickness, length] against the stock barrel.
-const BARREL = { laser: [1, 1], mlaser: [0.8, 0.7], ac: [1.45, 1.1], gauss: [0.8, 1.9], lrm: [1.7, 0.55] };
+const BARREL = { laser: [1, 1], mlaser: [0.8, 0.7], ac: [1.45, 1.1], gauss: [0.8, 1.9], mg: [0.6, 0.75], lrm: [1.7, 0.55] };
 
 const { sin, cos, atan2, min, max, abs, PI, floor } = Math;
 
@@ -230,7 +230,7 @@ export function createScene(app) {
       const d = norm(s.v), yw = atan2(d[0], d[2]), pt = Math.asin(clampN(d[1], -1, 1));
       const sd = WEAPONS[s.type];
       if (sd?.bolt) { R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.7, 0.7, 3.4)), sd.col, 1); R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(1.3, 1.3, 1.6)), [0.8, 0.9, 1], 1); }
-      else if (sd?.tracer) R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.4, 0.4, 9)), sd.tracer, 1);   // a long bright streak
+      else if (sd?.tracer) R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(sd.tw ?? 0.4, sd.tw ?? 0.4, sd.tl ?? 9)), sd.tracer, 1);   // a bright streak
       else if (s.kind === 'shell') R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.25, 0.25, 2.2)), [1, 0.85, 0.4], 1);
       else R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.35, 0.35, 1.2)), [1, 0.55, 0.25], 1);
     }

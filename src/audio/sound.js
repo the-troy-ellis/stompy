@@ -234,8 +234,14 @@ export function createAudio(app) {
       this.osc('sawtooth', 1900, 180, 0.28, 0.05, at); this.osc('sine', 900, 120, 0.3, 0.05, at);
     },
     // The autocannon is a thunk first and a bang second. Heavy (BIG BONKER)
-    // is the same thunk an octave down, carrying twice as far, with a crack on top.
-    cannon(p, heavy) {
+    // is the same thunk an octave down, carrying twice as far, with a crack on
+    // top; light (PEASHOOTER) is one tick of a rattle, per round.
+    cannon(p, size) {
+      const heavy = size === 'heavy';
+      if (size === 'light') {
+        if (!play('crunch', { at: p, ref: 30, vol: 0.2, rate: 2.6, vary: 0.2 })) this.noise(0.05, 0.12, 2500, 900, 'bandpass', { at: p, ref: 30 });
+        return;
+      }
       const at = { at: p, ref: heavy ? 80 : 40 };
       play('punch', { ...at, vol: heavy ? 1.1 : 0.9, rate: heavy ? 0.5 : 0.7 });
       play('crunch', { ...at, vol: 0.45, rate: 1.25 });

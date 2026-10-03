@@ -14,7 +14,10 @@ export const WEAPONS = {
   // The autocannon is the opposite: big individual hits, little heat, ammo.
   // The sniper's gun: a bright tracer, a heavy `recoil` that rocks the shooter
   // back a step (m/s on its push), and a `knock` on the target worth a shove.
-  gauss:  { name: n.gauss, kind: 'shell', dmg: 20, heat: 1, cd: 3.2, range: 800, speed: 700, ammo: 12, knock: 6, recoil: 1.6, tracer: [0.85, 0.95, 1], tons: 12, fp: 6.3 },
+  gauss:  { name: n.gauss, kind: 'shell', dmg: 20, heat: 1, cd: 3.2, range: 800, speed: 700, ammo: 12, knock: 6, recoil: 1.6, tracer: [0.85, 0.95, 1], sound: 'heavy', tons: 12, fp: 6.3 },
+  // Strips a melted section fast: each trigger pull is a `burst` of n rounds,
+  // dt apart (ammo and heat are per burst, damage per round), with a little jitter.
+  mg:     { name: n.mg, kind: 'shell', dmg: 0.8, heat: 0.2, cd: 0.5, range: 220, speed: 520, ammo: 60, burst: { n: 6, dt: 0.05 }, jitter: 0.012, tracer: [1, 0.85, 0.45], tw: 0.18, tl: 3.5, sound: 'light', tons: 1, fp: 9.6 },
   ac:     { name: n.ac, kind: 'shell',  dmg: 11,  heat: 2,  cd: 1.1, range: 650, speed: 340, ammo: 30, tons: 8, fp: 10 },
   // A slow blue bolt: a shell with `bolt` set (drawn as a bolt, fired with the
   // energy weapons). Its hit scrambles the target's HUD for `scramble` s and
@@ -44,6 +47,6 @@ export const WEAPONS = {
 // Three fire controls, one per kind of weapon: lasers are energy (no ammo,
 // lots of heat), the autocannon is ballistic, LRMs are missiles.
 export const CATS = ['energy', 'ballistic', 'missile', 'fusion'];
-export const CAT_OF = { laser: 'energy', mlaser: 'energy', ppc: 'energy', plaser: 'energy', ac: 'ballistic', gauss: 'ballistic', lrm: 'missile', srm: 'missile', fusion: 'fusion' };
+export const CAT_OF = { laser: 'energy', mlaser: 'energy', ppc: 'energy', plaser: 'energy', ac: 'ballistic', gauss: 'ballistic', mg: 'ballistic', lrm: 'missile', srm: 'missile', fusion: 'fusion' };
 export const CAT_LABEL = NAMES.cats;
 export const CAT_KEY = { energy: 'LMB 1', ballistic: 'RMB 2', missile: 'SPC 3', fusion: 'G 4' };

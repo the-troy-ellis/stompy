@@ -194,15 +194,10 @@ export function fire(G, m, w, aim, target) {
   const dir = norm(sub(aim, mz));
   w.cd = d.cd; m.heat += d.heat;
   if (d.ammo) w.ammo--;
-  if (m === G.player) G.stats.shots += d.count || 1;   // each missile can hit, so each counts
+  if (m === G.player) G.stats.shots += d.count || 1;   // each missile can hit, so each counts (burst rounds count as they fly)
   if (d.kind === 'shell') {
-    G.shots.push({ kind: 'shell', type: w.type, p: mz, v: mul(dir, d.speed), owner: m, dmg: d.dmg, life: d.range / d.speed });
-    if (mp(G) && m === G.player) G.fx.netSend(fxShell(mz, mul(dir, d.speed), w.type));
-    for (let i = 0; i < 5; i++) particle(G, add(mz, mul(dir, 1.5)), add(mul(dir, r.range(4, 12)), [r.range(-2, 2), r.range(-1, 2), r.range(-2, 2)]), 0.15, 0.6, [1, 0.8, 0.3], 'fire');
-    G.fx.sfx.cannon(mz, !!d.recoil);
-    m.flash = { frame: G.frame, p: mz, dir, big: true };   // muzzle flash, drawn for two frames
-    if (m === G.player) feel(G, d.bolt ? 'fireBolt' : d.recoil ? 'fireGauss' : 'fireAc', { mech: m, dir: [-dir[0], -dir[2]] });
-    if (d.recoil) { const h = Math.hypot(dir[0], dir[2]) || 1; m.push[0] -= dir[0] / h * d.recoil; m.push[1] -= dir[2] / h * d.recoil; }   // rocks the shooter back a step, whoever it is
+    round(G, m, w, mz, dir);
+    if (d.burst) w.burst = { left: d.burst.n - 1, t: d.burst.dt, aim: [...aim] };   // the rest follow in stepBursts
   } else {
     const vid = ++G.volleySeq;
     for (let i = 0; i < d.count; i++) {
@@ -217,6 +212,41 @@ export function fire(G, m, w, aim, target) {
     if (mp(G) && m === G.player) G.fx.netSend(fxMissiles(mz, dir, d.homing === false ? 0 : target?.netId, G.lastVolley, w.type));
   }
   return true;
+}
+
+// Live shots are capped: past this, the oldest unguided one is dropped silently.
+export const MAX_SHOTS = 200;
+
+// One shell out of the muzzle: a single shot, or one round of a burst.
+function round(G, m, w, mz, dir) {
+  const d = w.def, r = G.rng;
+  if (d.jitter) dir = norm(add(dir, [r.range(-d.jitter, d.jitter), r.range(-d.jitter, d.jitter), r.range(-d.jitter, d.jitter)]));
+  if (G.shots.length >= MAX_SHOTS) { const i = G.shots.findIndex(s => !s.guided); if (i >= 0) G.shots.splice(i, 1); }
+  G.shots.push({ kind: 'shell', type: w.type, p: mz, v: mul(dir, d.speed), owner: m, dmg: d.dmg, life: d.range / d.speed });
+  if (mp(G) && m === G.player) G.fx.netSend(fxShell(mz, mul(dir, d.speed), w.type));
+  for (let i = 0; i < (d.burst ? 2 : 5); i++) particle(G, add(mz, mul(dir, 1.5)), add(mul(dir, r.range(4, 12)), [r.range(-2, 2), r.range(-1, 2), r.range(-2, 2)]), 0.15, 0.6, [1, 0.8, 0.3], 'fire');
+  G.fx.sfx.cannon(mz, d.sound);
+  m.flash = { frame: G.frame, p: mz, dir, big: !d.burst };   // muzzle flash, drawn for two frames
+  if (m === G.player) feel(G, d.bolt ? 'fireBolt' : d.recoil ? 'fireGauss' : d.burst ? 'fireMg' : 'fireAc', { mech: m, dir: [-dir[0], -dir[2]] });
+  if (d.recoil) { const h = Math.hypot(dir[0], dir[2]) || 1; m.push[0] -= dir[0] / h * d.recoil; m.push[1] -= dir[2] / h * d.recoil; }   // rocks the shooter back a step, whoever it is
+}
+
+// The rest of each burst, one round every burst.dt, at the point the
+// trigger was pulled at. A dead, shut-down or wrecked-arm gun stops short.
+export function stepBursts(G, dt) {
+  for (const m of G.mechs) for (const w of m.weapons) {
+    const b = w.burst;
+    if (!b) continue;
+    if (!m.alive || m.shutdown || w.dead || m.remote) { w.burst = null; continue; }
+    b.t -= dt;
+    while (b.left > 0 && b.t <= 0) {
+      const mz = muzzle(m, w);
+      round(G, m, w, mz, norm(sub(b.aim, mz)));
+      if (m === G.player) G.stats.shots++;
+      b.left--; b.t += w.def.burst.dt;
+    }
+    if (b.left <= 0) w.burst = null;
+  }
 }
 
 // Shells and missiles, one frame: steer, fly, hit, splash.

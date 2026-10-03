@@ -96,6 +96,10 @@
    "cat": "ballistic",
    "tons": 12
   },
+  "mg": {
+   "cat": "ballistic",
+   "tons": 1
+  },
   "ac": {
    "cat": "ballistic",
    "tons": 8
