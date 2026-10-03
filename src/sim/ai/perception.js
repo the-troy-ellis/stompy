@@ -49,7 +49,7 @@ export function alertEnemy(G, e, P, at = null) {
 export function perceive(G, e, P, dt) {
   const a = e.ai;
   if (a.state == null) a.state = a.aware ? 'engage' : 'patrol';
-  if (a.aware && !a.belief) a.belief = { x: P.x, z: P.z, vx: 0, vz: 0, at: G.time };   // set aware from outside: treat as a fresh contact
+  if (a.aware && !a.belief) { a.belief = { x: P.x, z: P.z, vx: 0, vz: 0, at: G.time }; a.lastSeen = G.time; }   // set aware from outside: treat as a fresh contact
   if (a.shoutAt != null && G.time >= a.shoutAt) {
     a.shoutAt = null;
     const caller = G.mechs.find(o => o !== e && o.team === e.team && o.alive && o.ai.belief);

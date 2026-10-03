@@ -66,8 +66,9 @@ export function findCover(G, e, target) {
   }
   return best;
 }
-export const useCover = (G, e, ctx) => {
-  const a = e.ai, hot = e.heat > B.coverHeat, hurt = e.hp.T < e.max.T * B.coverTorso;
+// `hurt: false` makes a profile that only hides from its own heat (the JACKAL).
+export const cover = ({ hurt: byTorso = true } = {}) => (G, e, ctx) => {
+  const a = e.ai, hot = e.heat > B.coverHeat, hurt = byTorso && e.hp.T < e.max.T * B.coverTorso;
   if (!a.cover) {
     if (!(hot || (hurt && !(a.coverCd > G.time)))) return null;
     if (a.coverLookT > G.time) return null;
@@ -82,6 +83,8 @@ export const useCover = (G, e, ctx) => {
   if (d < B.coverArrive) return { moveYaw: e.yaw, thr: 0 };
   return { moveYaw: towards(e, a.cover.x, a.cover.z), thr: 1 };
 };
+export const useCover = cover();
+export const coverWhenHot = cover({ hurt: false });
 
 // Snipers: a spot well above the target with line of sight, re-sampled on a
 // slow timer from a ring around the target. No opinion once it is there.
@@ -155,6 +158,6 @@ export function steer(G, e, ctx, dt, plan) {
   return out;
 }
 
-// Until #19 gives each chassis a profile: today's dance, cover when hot or
-// hurt, and the two steering shapers.
+// The baseline: today's dance, cover when hot or hurt, and the two steering
+// shapers. Profiles (ai/profiles.js) compose the rest.
 export const defaultPlan = e => ({ drive: [useCover, keepRange(e.ch.pref)], shape: [avoidAllies, avoidEdge] });
