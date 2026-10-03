@@ -39,7 +39,7 @@ export const FEEL = {
   // the fusion discharge: the frame shakes, the screen whites out, the feedback hurts
   fusionFire:  { kick: 0.6, shake: 1.2, flash: 0.4, white: 0.7, squash: 0.1, wobble: 0.8, bass: 1.2, duck: 1.0, dust: 0, haptic: 80, push: 0 },
   // How the view reads the springs and caps.
-  view: { wobble: 0.6, shakeMax: 1.2, flashMax: 0.6 },
+  view: { wobble: 0.6, shakeMax: 1.2, flashMax: 0.6, reducedScale: 0.3 },   // reducedScale: REDUCED MOTION's multiplier on the camera columns
   // Spring stiffness and damping ratio for the body springs.
   spring: { squashK: 160, squashZeta: 0.7, wobbleK: 90, wobbleZeta: 0.35, sagK: 45, sagZeta: 1 },
 };

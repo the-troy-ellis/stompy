@@ -106,10 +106,10 @@ export function update(G, input, dt) {
   }
   for (const m of G.msgs) m.t -= dt;
   G.msgs = G.msgs.filter(m => m.t > 0);
-  G.flash = max(0, G.flash - dt * 1.2);
+  G.flash = max(0, G.flash - dt * (G.reducedMotion ? 2.4 : 1.2));   // reduced motion: shorter flashes
   G.shake = max(0, G.shake - dt * 2.2);
   G.kick = max(0, G.kick - dt * 5);
-  G.whiteFlash = max(0, (G.whiteFlash || 0) - dt * 1.6);
+  G.whiteFlash = max(0, (G.whiteFlash || 0) - dt * (G.reducedMotion ? 3.2 : 1.6));
   G.hitMark = max(0, (G.hitMark || 0) - dt);
   G.twistRate = abs(P.twist - G.lastTwist) / max(dt, 1e-3);
   G.lastTwist = P.twist;
