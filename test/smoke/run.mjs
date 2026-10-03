@@ -30,8 +30,12 @@ try {
   };
   await run('desktop', URL_, async page => {
     await page.click('[data-sel="free"]');
+    await page.click('[data-fp="diff"][data-d="1"]');   // NORMAL -> HARD
     await page.click('[data-a="go"]');
     await page.waitForFunction(() => window.__stompy?.game?.state === 'play', null, { timeout: 10000 });
+    const diff = await page.evaluate(() => [window.__stompy.app.prefs.diff, window.__stompy.game.diff]);
+    console.log(`desktop: difficulty ${diff[0]} / game ${diff[1]}`);
+    if (!(diff[0] === 'hard' && diff[1] === 'hard')) { failed = true; console.error('FAIL: the difficulty picker did not reach the game'); }
     const x0 = await page.evaluate(() => [window.__stompy.game.player.x, window.__stompy.game.player.z, window.__stompy.game.frame]);
     await page.keyboard.down('KeyW');
     await page.waitForTimeout(2500);

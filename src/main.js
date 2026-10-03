@@ -25,6 +25,7 @@ import { createInput } from './input/input.js';
 import { createUi } from './ui/screens.js';
 import { createNet } from './net/client.js';
 import { createFeelPanel } from './ui/feelPanel.js';
+import { DIFF } from './data/ai.js';
 
 // Settings and progress, from localStorage. Each screen writes back the key
 // it owns (store.set) when the player changes something.
@@ -37,6 +38,7 @@ function loadPrefs() {
     chassis: MECH_ORDER.includes(store.get('mech.chassis')) ? store.get('mech.chassis') : 'kestrel',
     menuSel: store.get('menu.sel', 'campaign'),
     fpMap: store.get('fp.map', 0), fpFoes: store.get('fp.foes', 3),
+    diff: DIFF[store.get('diff')] ? store.get('diff') : 'normal',
     mpName: store.get('mp.name', ''), mpColor: store.get('mp.color', Math.floor(Math.random() * MP_COLORS.length)),
   };
 }

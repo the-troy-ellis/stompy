@@ -10,6 +10,7 @@ import { makeTerrain } from '../world/terrain.js';
 import { newMech, startMatch } from '../sim/state.js';
 import { initFeet } from '../sim/gait.js';
 import { endGuide } from '../sim/missiles.js';
+import { DIFF, DIFF_ORDER } from '../data/ai.js';
 
 const { sin, max, random, floor } = Math;
 
@@ -20,6 +21,7 @@ export function createUi(app) {
   void CATS; void CAT_OF; void clampN;
   function startMission(n) {
     prefs.mission = n; store.set('mech.mission', max(store.get('mech.mission', 0), n));
+    G.diff = prefs.diff;
     startMatch(G, missionDef(n), 7 + n * 13, n === 0, prefs.chassis);
     G.kind = 'campaign';
     app.scene.uploadWorld();
@@ -28,6 +30,7 @@ export function createUi(app) {
   function startSkirmish() {
     const pk = FP_MAPS[prefs.fpMap] === 'random' ? ['dusk', 'ice', 'volcanic'][floor(random() * 3)] : FP_MAPS[prefs.fpMap];
     const foes = Array.from({ length: prefs.fpFoes }, () => (random() < 0.35 ? 'warden' : 'jackal'));
+    G.diff = prefs.diff;
     startMatch(G, { name: 'Free Play', pal: pk, foes, intel: '' }, 1 + floor(random() * 1e5), false, prefs.chassis);
     G.kind = 'free';
     app.scene.uploadWorld();
@@ -66,7 +69,11 @@ export function createUi(app) {
     invert: ['INVERT AIM', () => prefs.invert, v => { prefs.invert = v; store.set('mech.invert', v); }],
   };
   const optLabel = k => `${OPTS[k][0]}: ${OPTS[k][1]() ? 'ON' : 'OFF'}`;
+  // Difficulty scales the enemies' skill, never their stats (docs/specs/05-ai.md § Difficulty).
+  const diffLabel = () => `DIFFICULTY: ${DIFF[prefs.diff].label}`;
+  const cycleDiff = d => { prefs.diff = DIFF_ORDER[(DIFF_ORDER.indexOf(prefs.diff) + d + DIFF_ORDER.length) % DIFF_ORDER.length]; store.set('diff', prefs.diff); };
   const options = () => `<div class="opts">${Object.keys(OPTS).map(k => `<button class="opt" data-opt="${k}">${optLabel(k)}</button>`).join('')}
+    <button class="opt" data-a="diff">${diffLabel()}</button>
     <button class="opt" data-a="full">FULL SCREEN</button></div>`;
 
   function showOverlay(html, cls = '') { ov.innerHTML = html; ov.className = 'mech-overlay' + (cls ? ' ' + cls : ''); ov.hidden = false; }
@@ -121,7 +128,8 @@ export function createUi(app) {
       const mapName = FP_MAPS[prefs.fpMap] === 'random' ? 'RANDOM' : PALS[FP_MAPS[prefs.fpMap]].name.toUpperCase();
       return `<p>One battle, your rules.</p>
         <div class="mm-pick"><span>MAP</span><button data-fp="map" data-d="-1">◀</button><b>${mapName}</b><button data-fp="map" data-d="1">▶</button></div>
-        <div class="mm-pick"><span>HOSTILES</span><button data-fp="foes" data-d="-1">◀</button><b>${prefs.fpFoes}</b><button data-fp="foes" data-d="1">▶</button></div>`;
+        <div class="mm-pick"><span>HOSTILES</span><button data-fp="foes" data-d="-1">◀</button><b>${prefs.fpFoes}</b><button data-fp="foes" data-d="1">▶</button></div>
+        <div class="mm-pick"><span>DIFFICULTY</span><button data-fp="diff" data-d="-1">◀</button><b>${DIFF[prefs.diff].label}</b><button data-fp="diff" data-d="1">▶</button></div>`;
     }
     if (prefs.menuSel === 'mp') {
       return `<p>Free-for-all for up to 8 pilots on this network. First to ${app.net.Net.limit} kills wins the round.</p>
@@ -231,6 +239,7 @@ export function createUi(app) {
     if (opt) { const [, get, set] = OPTS[opt.dataset.opt]; set(!get()); opt.textContent = optLabel(opt.dataset.opt); return; }
     const a = e.target.closest('[data-a]')?.dataset.a;
     if (a === 'full') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); return; }
+    if (a === 'diff') { cycleDiff(1); e.target.closest('[data-a]').textContent = diffLabel(); return; }
     if (e.target.closest('a')) return;
     const sw = e.target.closest('[data-col]');
     if (sw) { prefs.mpColor = +sw.dataset.col; store.set('mp.color', prefs.mpColor); ov.querySelectorAll('.swatch').forEach(b => b.classList.toggle('on', b === sw)); if (G.state === 'menu') showMech(); return; }
@@ -242,6 +251,7 @@ export function createUi(app) {
       if (fp) {
         const d = +fp.dataset.d;
         if (fp.dataset.fp === 'map') prefs.fpMap = (prefs.fpMap + d + FP_MAPS.length) % FP_MAPS.length;
+        else if (fp.dataset.fp === 'diff') cycleDiff(d);
         else prefs.fpFoes = clampN(prefs.fpFoes + d, 1, 8);
         store.set('fp.map', prefs.fpMap); store.set('fp.foes', prefs.fpFoes);
         renderMenu(); return;
