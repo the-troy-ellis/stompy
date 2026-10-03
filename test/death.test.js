@@ -4,6 +4,7 @@ import { createTestGame, stepFor, foes, freeze } from './helpers.js';
 import { damage, DEATH_BEAT, DEATH_TOPPLE } from '../src/sim/combat.js';
 import { toppleOf } from '../src/render/scene.js';
 import { M } from '../src/util/math.js';
+import { VOICE } from '../src/data/voice.js';
 
 test('a kill is a beat of silence, then the blast, then a topple, then a wreck that pops', () => {
   const G = createTestGame({ foes: ['jackal', 'jackal'] });
@@ -35,7 +36,7 @@ test('a kill is a beat of silence, then the blast, then a topple, then a wreck t
   assert.ok(G.fx.calls('sfx.boom').length > before, 'no secondaries');
   assert.equal(G.wrecks[0].pops, 0);
   // The voice waits for the bang.
-  const said = G.fx.calls('say').find(c => c.args[0] === 'Target destroyed.');
+  const said = G.fx.calls('say').find(c => VOICE.kill.includes(c.args[0]));
   assert.ok(said && said.args[2] >= DEATH_BEAT * 1000);
 });
 

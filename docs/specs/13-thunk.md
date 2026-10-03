@@ -103,6 +103,18 @@ everyone's hits look alike.
 - **UI.** Menu selections and launches get a dull click with bass; the
   LAUNCH button already "presses" in CSS; FIT (M2) row cycles tick.
 
+### Hit feedback (M1 #23, shipped)
+
+Every non-beam hit on a mech throws section-specific effects from
+`hitSparks` (`src/sim/effects.js`): sparks fan off the armour away from the
+blow; a leg hit kicks dust up at the feet; a torso hit leaves a little smoke.
+A blow of `PLATE_DMG` (6) or more knocks an armour plate loose, a thin slab
+in the body colour that tumbles with the other debris, bounces once and lies
+there. The hit row's strength is scaled by section (`HIT_BY_SECTION`: legs
+1.2, torso 1, arms 0.7), and when your own shot lands the crosshair holds
+still for `HIT_STOP` (80 ms): a hit-stop you feel in the hand before you see
+the sparks. Beams keep their own sparks and the melt sway.
+
 ### Audio layer
 
 `src/audio/thump.js`: one sub-bass voice (sine at 45–60 Hz with a 10 ms
