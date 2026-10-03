@@ -68,6 +68,7 @@ export function createUi(app) {
     sound: ['SOUND', () => prefs.sound, v => { prefs.sound = v; store.set('sound', v); }],
     voice: ['VOICE', () => prefs.voice, v => { prefs.voice = v; store.set('mech.voice', v); }],
     invert: ['INVERT AIM', () => prefs.invert, v => { prefs.invert = v; store.set('mech.invert', v); }],
+    frameTime: ['FRAME TIME', () => prefs.frameTime, v => { prefs.frameTime = v; store.set('debug.frametime', v); }],   // the in-game readout, for playtests on real phones
   };
   const optLabel = k => `${OPTS[k][0]}: ${OPTS[k][1]() ? 'ON' : 'OFF'}`;
   // Difficulty scales the enemies' skill, never their stats (docs/specs/05-ai.md § Difficulty).

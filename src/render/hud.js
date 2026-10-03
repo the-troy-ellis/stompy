@@ -177,7 +177,9 @@ export function createHud(app) {
     }
   }
 
-  // ?debug=1: frame time over the last 2 s, draw calls, particles, the seed.
+  // The frame-time readout: median and 95th percentile over the last 2 s, draw
+  // calls, particles. On with ?debug=1 or the FRAME TIME setting (for playtests
+  // on real phones); ?debug=1 adds the seed, the state and the AI overlay.
   const frames = [];
   let lastFrameAt = 0, stopAt = null, rangeMemo = { t: null, r: 0, at: 0, rate: 0 };
   function drawDebug() {
@@ -187,9 +189,11 @@ export function createHud(app) {
     while (frames.length > 120) frames.shift();
     const sorted = [...frames].sort((a, b) => a - b), q = f => (sorted.length ? sorted[min(sorted.length - 1, floor(sorted.length * f))] : 0);
     ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'left'; ctx.fillStyle = '#9f9';
-    const lines = [`FRAME ${q(0.5).toFixed(1)} ms  P95 ${q(0.95).toFixed(1)} ms`, `DRAWS ${app.R.draws}  PARTICLES ${G.parts.length}  MECHS ${G.mechs.length}`, `SEED ${G.ter?.seed ?? '-'}  T ${G.time.toFixed(1)}  STATE ${G.state}`];
+    const full = app.params.has('debug');
+    const lines = [`FRAME ${q(0.5).toFixed(1)} ms  P95 ${q(0.95).toFixed(1)} ms`, `DRAWS ${app.R.draws}  PARTICLES ${G.parts.length}  MECHS ${G.mechs.length}`];
+    if (full) lines.push(`SEED ${G.ter?.seed ?? '-'}  T ${G.time.toFixed(1)}  STATE ${G.state}`);
     lines.forEach((l, i) => ctx.fillText(l, 12, app.scene.view.H * 0.5 + i * 13));
-    drawAIDebug();
+    if (full) drawAIDebug();
   }
   // The enemies' minds (docs/specs/05-ai.md § Debug view): the label over each
   // head, a square where it believes you are with a line to it (red), a line
@@ -218,7 +222,7 @@ export function createHud(app) {
   function drawHUD() {
     ctx.setTransform(app.scene.view.dpr, 0, 0, app.scene.view.dpr, 0, 0);
     ctx.clearRect(0, 0, app.scene.view.W, app.scene.view.H);
-    if (app.params.has('debug')) drawDebug();
+    if (app.params.has('debug') || app.prefs.frameTime) drawDebug();
     if (G.state === 'menu') return;
     if (G.guide) { drawGuideHUD(); return; }
     ctx.translate(0, G.kick * 3);  // the dashboard jolts with each step

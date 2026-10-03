@@ -30,6 +30,7 @@ try {
   };
   await run('desktop', URL_, async page => {
     await page.click('[data-sel="settings"]');
+    await page.click('[data-opt="frameTime"]');   // the readout on, through the setting rather than ?debug
     await page.click('[data-set="fov"][data-d="1"]');
     const fov = await page.evaluate(() => window.__stompy.app.prefs.fov);
     if (fov !== 67) { failed = true; console.error(`FAIL: the FOV dial read ${fov}, not 67`); }
