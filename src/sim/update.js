@@ -80,7 +80,8 @@ export function update(G, input, dt) {
   const alive = G.mechs.filter(m => m.alive);
   for (let i = 0; i < alive.length; i++) for (let j = i + 1; j < alive.length; j++) {
     const a = alive[i], b = alive[j], dx = b.x - a.x, dz = b.z - a.z, d = hypot(dx, dz), r = geoOf(a).radius * a.ch.scale + geoOf(b).radius * b.ch.scale;
-    if (d < r && d > 0.01 && !(a.remote && b.remote)) {
+    const over = a.y > b.y + geoOf(b).height * b.ch.scale - 0.5 || b.y > a.y + geoOf(a).height * a.ch.scale - 0.5;   // one is clear above the other
+    if (d < r && d > 0.01 && !over && !(a.remote && b.remote)) {
       // Only move mechs this client owns; other pilots' clients move theirs.
       const fa = a.remote ? 0 : b.remote ? 1 : 0.5, fb = b.remote ? 0 : a.remote ? 1 : 0.5, gap = r - d;
       a.x -= (dx / d) * gap * fa; a.z -= (dz / d) * gap * fa; b.x += (dx / d) * gap * fb; b.z += (dz / d) * gap * fb;

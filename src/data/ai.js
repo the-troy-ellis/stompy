@@ -8,6 +8,15 @@ export const DIFF = {
 };
 export const diffOf = G => DIFF[G.diff] || DIFF.normal;
 
+export const BEHAVIOUR = {
+  coverHeat: 60, coverTorso: 0.4, coverLeave: 35,   // enter cover hot or hurt; leave cool
+  coverDists: [40, 80, 120], coverEvery: 2, coverArrive: 8, coverMaxWait: 12, coverRetry: 20,
+  ridgeAbove: 15, ridgeRadii: [80, 120, 160, 200, 240, 300], ridgeEvery: 4, ridgeArrive: 10,
+  harassBand: [140, 200], jumpWithin: 60, jumpFor: 1.2, jumpCooldown: 6,
+  lineRange: 150,     // m: holdLine matches the slowest ally this close
+  allyGap: 6,         // m of clearance avoidAllies steers for
+};
+
 export const PERCEPTION = {
   lookEvery: 0.15,    // s between line-of-sight checks per enemy (staggered)
   lostAfter: 8,       // s without line of sight before an aware enemy goes searching

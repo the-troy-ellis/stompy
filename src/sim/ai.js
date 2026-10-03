@@ -6,6 +6,7 @@ import { geoOf } from '../data/geo.js';
 import { AI_PUNCH, meleeOf } from '../data/melee.js';
 import { canPunch, meleePress, meleeTarget } from './melee.js';
 import { perceive } from './ai/perception.js';
+import { defaultPlan, steer, strafeTick } from './ai/behaviours.js';
 import { PERCEPTION as K } from '../data/ai.js';
 
 const { sin, cos, atan2, abs, hypot, max, PI } = Math;
@@ -31,22 +32,23 @@ export function think(G, e, dt) {
     }
     moveYaw = atan2(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z); thr = 0.7;
   } else {
-    e.ai.strafeT -= dt;
-    if (e.ai.strafeT <= 0) { e.ai.strafe *= -1; e.ai.strafeT = r.range(3, 7); }
-    const pref = e.ch.pref;
+    strafeTick(G, e, dt);
     // The player's reach, skin to skin: stay out of it unless they are shut
     // down, in which case walk up and shove them. A JACKAL punching a
     // shut-down player is correct Stompy behaviour.
     const reachP = meleeOf(P).reach * P.ch.scale + geoOf(e).radius * e.ch.scale, tooClose = seen && dist < reachP * AI_PUNCH.keepOut;
+    const reachE = meleeOf(e).reach * e.ch.scale + geoOf(P).radius * P.ch.scale;
     const punchable = P.alive && canPunch(G, e) && meleeTarget(G, e) === P;
+    const plan = e.ai.plan || defaultPlan(e), brawling = plan.brawler;
+    let jets = false;
     if (P.shutdown && P.alive) { moveYaw = toYaw; thr = dist < reachP * 0.6 ? 0 : 1; }
     else if (punchable || e.melee) { moveYaw = toYaw; thr = 0; }   // square up and decide (below); the swing holds it there
-    else if (tooClose) moveYaw = toYaw + PI - e.ai.strafe * 0.6;
-    else if (dist > pref * 1.35) moveYaw = toYaw + e.ai.strafe * 0.35;
-    else if (dist < pref * 0.6) moveYaw = toYaw + PI - e.ai.strafe * 0.6;
-    else { moveYaw = toYaw + e.ai.strafe * PI / 2; thr = 0.75; }
-    // Steer away from the map edge.
-    if (abs(e.x) > BOUND - 60 || abs(e.z) > BOUND - 60) moveYaw = atan2(-e.x, -e.z);
+    else if (tooClose && !brawling) moveYaw = toYaw + PI - e.ai.strafe * 0.6;
+    else {
+      const out = steer(G, e, { P, tx, tz, dist, toYaw, seen, reachP, reachE }, dt, plan);
+      moveYaw = out.moveYaw; thr = out.thr; jets = out.jets;
+    }
+    e.jetting = jets;
   }
   e.yaw += clampN(wrapA(moveYaw - e.yaw), -e.ch.turn * dt, e.ch.turn * dt);
   e.throttle = thr;
