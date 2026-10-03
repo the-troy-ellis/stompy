@@ -10,7 +10,7 @@ match [roadmap.md](roadmap.md). Labels to create first:
   checklist), `platform:desktop`.
 - Size: `size:S`, `size:M`, `size:L`.
 - State: `blocked`, `needs-owner` (an open question must be answered first),
-  `good-first-issue`.
+  `good first issue`.
 
 Body template for every issue:
 
@@ -28,7 +28,7 @@ to it.
 
 ## M0 — Foundations
 
-Shipped on branch `m0/foundations` (all rows below), except branch protection, which the owner sets once CI is green on `main`.
+Shipped in #1 (all rows below), except branch protection, which the owner sets once CI is green on `main`.
 
 | # | Title | Labels | Size | Spec |
 |---|---|---|---|---|
@@ -52,34 +52,34 @@ Shipped on branch `m0/foundations` (all rows below), except branch protection, w
 
 | # | Title | Labels | Size | Spec |
 |---|---|---|---|---|
-| | M1: feel table (data/feel.js), spring helper, FEEL debug panel | sim, render, tooling | S | 13 §Feel table |
-| | M1: footfalls and landing squash with scale, dust, bass, haptics | sim, render, audio, platform:touch | M | 13 §Pass |
-| | M1: hit wobble (body and view), recoil, muzzle flash | sim, render | M | 13 §Pass |
-| | M1: shutdown sag, restart overshoot, HUD dim and hum duck | sim, render, hud, audio | S | 13 §Pass |
-| | M1: section loss as debris; limp with one leg; sit down with none and keep firing | sim, render | M | 13 §Pass |
-| | M1: death beat and topple | sim, render | S | 13 §Pass |
-| | M1: sub-bass thump voice and hum ducking | audio | S | 13 §Audio layer |
-| | M1: REDUCED MOTION and HAPTICS settings | ui | S | 13 §Reduced motion |
-| | M1: knockback (push field, mass scaling, blast knockback) | sim | S | 12 §Knockback |
-| | M1: shove and stomp (resolution, recover state, feedback) | sim, render, audio | M | 12 §Punch resolution, §Stomp |
-| | M1: PUNCH input: E / mouse 4 / touch button / fist icon | ui, hud, platform:touch | S | 12 §Player experience |
-| | M1: melee in the arena (pu, kb, me, st; server clamps) | net, server | S | 12 §Arena |
-| | M1: AI punches and reach avoidance | ai | S | 12 §AI |
-| | M1: voice line pools with once-per-minute limiter and seeded pick | audio | S | vision §The voice |
-| | M1: AI perception (line of sight, last-known position, shout, search) | ai, sim | M | 05 §Perception |
-| | M1: AI behaviour library (keepRange, useCover, ridge, harass, holdLine, avoid*) | ai, sim | M | 05 §Movement |
-| | M1: AI fire discipline and section targeting | ai, sim | S | 05 §Fire discipline |
-| | M1: per-chassis AI profiles for KESTREL, JACKAL, WARDEN | ai, content | S | 05 §Profiles |
-| | M1: group behaviour (shared awareness, focus, flank) | ai, sim | S | 05 §Group |
-| | M1: difficulty setting (EASY/NORMAL/HARD) in settings and Free Play | ui, ai | S | 05 §Difficulty |
-| | M1: AI debug overlay | hud | S | 05 §Debug |
-| | M1: hit feedback (section sparks, plate debris, crosshair hit-stop, shake by section) | render, hud | M | roadmap §M1 |
-| | M1: multi-stage mech destruction | render, sim | M | roadmap §M1 |
-| | M1: walking feel (footfall dust, slope slowdown, landing dig-in) | sim, render | S | roadmap §M1 |
-| | M1: heat feel (view warp over 85, hum, HUD flicker) | render, hud, audio | S | roadmap §M1 |
-| | M1: target info panel with section diagram and autocannon lead indicator | hud | S | roadmap §M1 |
-| | M1: settings: mouse/touch sensitivity, FOV, voice volume | ui, platform:touch | S | roadmap §M1 |
-| | M1: in-game frame-time readout toggle in settings | hud | S | 01 |
+| #2 | M1: feel table (data/feel.js), spring helper, FEEL debug panel | sim, render, tooling | S | 13 §Feel table |
+| #3 | M1: footfalls and landing squash with scale, dust, bass, haptics | sim, render, audio, platform:touch | M | 13 §Pass |
+| #4 | M1: hit wobble (body and view), recoil, muzzle flash | sim, render | M | 13 §Pass |
+| #5 | M1: shutdown sag, restart overshoot, HUD dim and hum duck | sim, render, hud, audio | S | 13 §Pass |
+| #6 | M1: section loss as debris; limp with one leg; sit down with none and keep firing | sim, render | M | 13 §Pass |
+| #7 | M1: death beat and topple | sim, render | S | 13 §Pass |
+| #8 | M1: sub-bass thump voice and hum ducking | audio | S | 13 §Audio layer |
+| #9 | M1: REDUCED MOTION and HAPTICS settings | ui | S | 13 §Reduced motion |
+| #10 | M1: knockback (push field, mass scaling, blast knockback) | sim | S | 12 §Knockback |
+| #11 | M1: shove and stomp (resolution, recover state, feedback) | sim, render, audio | M | 12 §Punch resolution, §Stomp |
+| #12 | M1: PUNCH input: E / mouse 4 / touch button / fist icon | ui, hud, platform:touch | S | 12 §Player experience |
+| #13 | M1: melee in the arena (pu, kb, me, st; server clamps) | net, server | S | 12 §Arena |
+| #14 | M1: AI punches and reach avoidance | ai | S | 12 §AI |
+| #15 | M1: voice line pools with once-per-minute limiter and seeded pick | audio | S | vision §The voice |
+| #16 | M1: AI perception (line of sight, last-known position, shout, search) | ai, sim | M | 05 §Perception |
+| #17 | M1: AI behaviour library (keepRange, useCover, ridge, harass, holdLine, avoid*) | ai, sim | M | 05 §Movement |
+| #18 | M1: AI fire discipline and section targeting | ai, sim | S | 05 §Fire discipline |
+| #19 | M1: per-chassis AI profiles for KESTREL, JACKAL, WARDEN | ai, content | S | 05 §Profiles |
+| #20 | M1: group behaviour (shared awareness, focus, flank) | ai, sim | S | 05 §Group |
+| #21 | M1: difficulty setting (EASY/NORMAL/HARD) in settings and Free Play | ui, ai | S | 05 §Difficulty |
+| #22 | M1: AI debug overlay | hud | S | 05 §Debug |
+| #23 | M1: hit feedback (section sparks, plate debris, crosshair hit-stop, shake by section) | render, hud | M | roadmap §M1 |
+| #24 | M1: multi-stage mech destruction | render, sim | M | roadmap §M1 |
+| #25 | M1: walking feel (footfall dust, slope slowdown, landing dig-in) | sim, render | S | roadmap §M1 |
+| #26 | M1: heat feel (view warp over 85, hum, HUD flicker) | render, hud, audio | S | roadmap §M1 |
+| #27 | M1: target info panel with section diagram and autocannon lead indicator | hud | S | roadmap §M1 |
+| #28 | M1: settings: mouse/touch sensitivity, FOV, voice volume | ui, platform:touch | S | roadmap §M1 |
+| #29 | M1: in-game frame-time readout toggle in settings | hud | S | 01 |
 
 ## M2 — Content and mechlab
 
