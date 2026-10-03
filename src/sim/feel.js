@@ -44,7 +44,7 @@ export function feel(G, event, { mech = null, k = 1, roll = 0, dir = null, at = 
       // Enough upward velocity to carry a critically damped spring from where it
       // sags now through standing height to about `overshoot` above it.
       const w = Math.sqrt(mech.sag.k);
-      kickSpring(mech.sag, -(w * Math.max(0, mech.sag.x) + row.overshoot * mech.ch.scale * w * Math.E) - mech.sag.v);
+      kickSpring(mech.sag, -(w * Math.max(0, mech.sag.x) + row.overshoot * mech.ch.scale * w * Math.E * 1.6) - mech.sag.v);   // 1.6: ~4 cm past standing for overshoot 0.1
     }
   }
   if (row.bass || row.duck || row.haptic) G.fx.thump(row.bass * k, row.duck * k, mine ? row.haptic * k : 0, at);

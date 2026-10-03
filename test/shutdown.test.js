@@ -17,7 +17,7 @@ test('a shut-down mech sags by the table within a second and stands back up afte
   let lowest = 1;
   for (let i = 0; i < 90; i++) { stepFor(G, 1 / 30); lowest = Math.min(lowest, P.sag.x); }
   assert.equal(P.shutdown, false);
-  assert.ok(lowest < -0.01, `no overshoot (lowest ${lowest})`);
+  assert.ok(lowest < -0.02 && lowest > -0.12, `overshoot out of range (lowest ${lowest})`);
   assert.ok(Math.abs(P.sag.x) < 0.02, `did not settle: ${P.sag.x}`);
   assert.ok(G.fx.calls('thump').some(c => c.args[1] >= FEEL.shutdown.duck - 1e-9), 'shutdown did not duck the hum');
 });
