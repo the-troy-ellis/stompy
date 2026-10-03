@@ -2,6 +2,7 @@ import { clampN, rnd, wrapA } from '../util/math.js';
 import { msg } from '../sim/effects.js';
 import { viewYaw } from '../sim/geom.js';
 import { MELT_MAX, beamMult } from '../sim/beams.js';
+import { createThump } from './thump.js';
 
 const { sin, cos, atan2, min, max, abs, PI, random, hypot, floor } = Math;
 
@@ -107,6 +108,8 @@ export function createAudio(app) {
     n.connect(out());
   }
 
+  const thumper = createThump({ ctx: ac, out, spatial });
+
   // name -> number of takes (files name0..nameN-1, or just name.mp3 for 1).
   const SAMPLES = { step: 5, punch: 3, plate: 2, laser: 5, mlaser: 5, crunch: 5, boom_big: 1, boom_low: 1,
     missile: 1, jet_loop: 1, hum_loop: 1, servo_loop: 1, powerdown: 1, powerup: 1, beep: 1 };
@@ -191,7 +194,7 @@ export function createAudio(app) {
       const src = c.createBufferSource(), g = c.createGain();
       src.buffer = buf; src.loop = true;   // already made seamless at load: loop the whole buffer
       g.gain.value = 0;
-      src.connect(g).connect(out());
+      src.connect(g).connect(thumper.loopBus() || out());   // through the duckable bus
       src.start(c.currentTime);
       l = loops[name] = { src, g };
     }
@@ -360,11 +363,12 @@ export function createAudio(app) {
   }
 
 
-  // The feel table's sound columns. bass: a short sub thump (the dedicated
-  // voice and hum ducking arrive with issue #8); haptic: a buzz on touch.
+  // The feel table's sound columns: bass is the sub thump voice, duck pulls
+  // the loops down for a moment, haptic is a buzz on touch (phone speakers
+  // can't do the bass; the buzz does that job there).
   function thump(bass, duck, haptic, at) {
-    if (bass > 0.03) sfx.osc('sine', 58, 30, 0.18 + 0.12 * min(1, bass), 0.22 * min(1.5, bass), { at, ref: 30 });
-    void duck;
+    thumper.hit(bass, at);
+    thumper.duck(duck);
     if (haptic > 2 && G.touchUI && prefs.haptics !== false) { try { navigator.vibrate?.(min(100, Math.round(haptic))); } catch { /* unsupported */ } }
   }
   return { Sound, settings, loadSamples, play, loopSet, loops, sfx, say, beamSound, fusionSound, thump, tick: audioTick };
