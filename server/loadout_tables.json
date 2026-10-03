@@ -88,6 +88,10 @@
    "cat": "energy",
    "tons": 2
   },
+  "plaser": {
+   "cat": "energy",
+   "tons": 3
+  },
   "ac": {
    "cat": "ballistic",
    "tons": 8

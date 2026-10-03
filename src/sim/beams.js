@@ -23,7 +23,7 @@ export const beamMult = m => (m.beamMech ? meltMult(m.beamMech.melt || 0) : 1);
 export function beamTick(G, m, dt, aim) {
   const lasers = m.weapons.filter(w => w.def.kind === 'beam' && !w.dead), r = G.rng;
   if (!lasers.length || m.shutdown || !m.alive) { m.beaming = false; m.beamMech = null; return; }
-  if (!m.beaming) G.fx.sfx.laser(m === G.player ? null : muzzle(m, lasers[0]), lasers[0].type === 'mlaser');
+  if (!m.beaming) G.fx.sfx.laser(m === G.player ? null : muzzle(m, lasers[0]), lasers[0].def.tons < 5);   // the small zap for the light ones
   m.beaming = true;
   m.beamEnd = aim;
   m.beamMech = null;
@@ -40,7 +40,10 @@ export function beamTick(G, m, dt, aim) {
     if (t) {
       m.beamMech = t;
       damage(G, t, end, w.def.dps * mult * dt, m, true);
-      if (t.meltFrame !== G.frame) { t.meltFrame = G.frame; t.melt = min(MELT_T, (t.melt || 0) + dt); }
+      // Melt rises once per frame however many beams are on it, at the fastest rate among them.
+      const rate = w.def.meltRate || 1;
+      if (t.meltFrame !== G.frame) { t.meltFrame = G.frame; t.meltRate = rate; t.melt = min(MELT_T, (t.melt || 0) + dt * rate); }
+      else if (rate > t.meltRate) { t.melt = min(MELT_T, t.melt + dt * (rate - t.meltRate)); t.meltRate = rate; }
       t.meltAt = G.time;
       if (m === G.player) G.stats.hits += dt * 4;
     }
@@ -54,7 +57,8 @@ export function coolArmour(G, dt) {
 // whiter as the focus climbs.
 export function drawBeam(G, a, b, def, mult) {
   const k = (mult - 1) / (MELT_MAX - 1);
-  G.cbeams.push({ a, b, col: mix3(def.col, [1, 1, 1], 0.2 + 0.45 * k), w: def.w * (0.8 + 0.9 * k) * G.rng.range(0.85, 1.15) });
+  const stut = def.stutter && Math.sin(G.time * Math.PI * 2 * def.stutter) < 0 ? 0.35 : 1;   // a stuttering beam thins on the off-beat
+  G.cbeams.push({ a, b, col: mix3(def.col, [1, 1, 1], 0.2 + 0.45 * k), w: def.w * (0.8 + 0.9 * k) * G.rng.range(0.85, 1.15) * stut });
 }
 // Another pilot's beam, drawn from their lasers to where they say it ends.
 // Visual only: their client scores it.

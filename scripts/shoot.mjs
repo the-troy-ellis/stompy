@@ -30,13 +30,15 @@ try {
     for (const m of G.mechs) if (m.team && m !== e) m.alive = false, m.gone = true;
     Object.assign(e, { x: P.x + Math.sin(P.yaw) * 120, z: P.z + Math.cos(P.yaw) * 120, yaw: P.yaw + Math.PI, shutdown: true, heat: 1000 });
     e.y = G.ter.height(e.x, e.z); e.ai.aware = false;
+    P.twist = 0; P.pitch = Math.atan2(e.y + 4.2 * e.ch.scale - (P.y + 7), 120);   // the crosshair on its middle
     P.weapons.forEach(w => { w.cd = 0; });
   });
   await page.waitForTimeout(400);
   const cat = await page.evaluate(k => ({ ppc: 'Digit1', plaser: 'Digit1', flamer: 'Digit1', gauss: 'Digit2', mg: 'Digit2', srm: 'Space' })[k] || 'Digit1', key);
   // Freeze time just after the shot so the round is in the air for the picture.
+  const beam = await page.evaluate(async k => (await import('/src/data/weapons.js')).WEAPONS[k].kind === 'beam', key);
   await page.keyboard.down(cat);
-  await page.waitForTimeout(60);
+  await page.waitForTimeout(beam ? 1500 : 60);   // a beam is held until the armour glows
   await page.evaluate(() => window.__stompy.app.ui.pause(true));
   await page.evaluate(() => { document.querySelector('.mech-overlay').hidden = true; });
   await page.screenshot({ path: `test-results/shot-${key}-fire.png` });
