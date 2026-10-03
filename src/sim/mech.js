@@ -33,6 +33,12 @@ export function stepMech(G, m, dt) {
   m.z = clampN(m.z + (cos(m.yaw) * m.speed + push[1]) * dt, -BOUND, BOUND);
   const keep = max(0, 1 - 4 * dt);
   push[0] *= keep; push[1] *= keep;
+  // Skidding: dust streaks behind the feet while the push is strong.
+  const skid = Math.hypot(push[0], push[1]);
+  if (skid > 2 && m.alive && !m.air && r.chance(dt * FEEL.knock.skidDust * min(1, skid / 10))) {
+    particle(G, [m.x - push[0] / skid * 1.5 * m.ch.scale + r.range(-1, 1), m.y + 0.3, m.z - push[1] / skid * 1.5 * m.ch.scale + r.range(-1, 1)],
+      [-push[0] * 0.3 + r.range(-1, 1), r.range(1, 2.5), -push[1] * 0.3 + r.range(-1, 1)], r.range(0.5, 0.9), r.range(0.6, 1.1) * m.ch.scale, mul(G.pal.low, 0.8), 'smoke');
+  }
 
   const ground = G.ter.height(m.x, m.z);
   const jets = m.jetting && m.fuel > 0 && !m.shutdown && m.alive;

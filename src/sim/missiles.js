@@ -4,6 +4,8 @@ import { CAT_OF } from '../data/weapons.js';
 import { damage, fire } from './combat.js';
 import { explode } from './effects.js';
 import { r2 } from '../net/protocol.js';
+import { knock } from './knock.js';
+import { FEEL } from '../data/feel.js';
 
 const { atan2, hypot, max } = Math;
 
@@ -85,6 +87,8 @@ export function blast(G, p, dmg, owner, direct) {
     const nx = hd > 0.01 ? hx / hd : 1, nz = hd > 0.01 ? hz / hd : 0;
     const at = [m.x + nx * R, clampN(p[1], m.y + 1, top - 1), m.z + nz * R];
     damage(G, m, at, dmg * 0.8 * (1 - d / BLAST_R), owner);
+    // The blast shoves too: away from it, falling off with distance, by the masses involved.
+    if (m.alive) knock(G, { target: m, attacker: owner, base: FEEL.blast.push * (1 - d / BLAST_R), dir: [-nx, -nz], recoil: false });   // the firer is far away
   }
 }
 
