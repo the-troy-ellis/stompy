@@ -89,3 +89,12 @@ test('in play: landing squashes and thumps, a hit wobbles toward the blow, footf
   assert.ok(mine.length >= 6, `only ${mine.length} step thumps`);
   assert.ok(theirs.every(c => Array.isArray(c.args[3]) && c.args[3].length === 3), 'another mech\'s step must carry a position');
 });
+
+test('hotFrac is 0 up to 85 heat, 1 at shutdown, and linear between', async () => {
+  const { hotFrac, HEAT } = await import('../src/data/feel.js');
+  assert.equal(hotFrac(0), 0);
+  assert.equal(hotFrac(HEAT.from), 0);
+  assert.ok(Math.abs(hotFrac((HEAT.from + HEAT.to) / 2) - 0.5) < 1e-9);
+  assert.equal(hotFrac(HEAT.to), 1);
+  assert.equal(hotFrac(140), 1);
+});

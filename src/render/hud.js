@@ -3,6 +3,7 @@ import { WEAPONS, CATS, CAT_OF, CAT_LABEL, CAT_KEY } from '../data/weapons.js';
 import { MP_COLORS } from '../data/colors.js';
 import { center, viewYaw } from '../sim/geom.js';
 import { MELT_MAX, beamMult } from '../sim/beams.js';
+import { HEAT, hotFrac } from '../data/feel.js';
 
 const { sin, cos, atan2, min, max, PI, random, hypot, floor } = Math;
 
@@ -384,8 +385,12 @@ export function createHud(app) {
       ctx.fillStyle = DIM; ctx.fillText(label, x - 1, top + bh + 8);
     };
     const lx = L.bars.x;
+    // Near shutdown the instruments brown out: the bars flicker harder the hotter it runs.
+    const hot = P.shutdown ? 0 : hotFrac(P.heat), browned = hot > 0 && (floor(G.time * 17) % 4 === 0 || (hot > 0.6 && floor(G.time * 23) % 5 === 0));
+    if (browned) ctx.globalAlpha = 1 - HEAT.flicker * hot;
     bar(lx, 'HT', P.heat / 100, P.heat > 80 ? RED : P.heat > 55 ? AMBER : GREEN, P.heat > 85);
     bar(lx + 18, 'JJ', P.fuel, '#3cf');
+    ctx.globalAlpha = 1;
 
     // Right: weapons.
     const wx = L.weapons.x;

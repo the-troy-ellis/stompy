@@ -135,6 +135,15 @@ feet in: it takes up to 60% of the forward speed and holds the legs at 30%
 for up to 0.35 s, scaled by the landing force, before they drive again. The
 landing squash already shows it; this makes it felt in the throttle.
 
+### Heat feel (M1 #26, shipped)
+
+From 85 heat to shutdown (`hotFrac`, `HEAT` in `src/data/feel.js`) the view
+swims: a slow breath in the field of view and a sway, scaled down under
+REDUCED MOTION; the reactor hum rises in volume and pitch; and the HUD bars
+brown out in flickers that get harder the hotter it runs. The heat bar
+itself has flashed red over 85 since M0. All of it stops the moment the
+reactor trips, which is the point: the quiet after is the shutdown.
+
 ### Audio layer
 
 `src/audio/thump.js`: one sub-bass voice (sine at 45–60 Hz with a 10 ms
