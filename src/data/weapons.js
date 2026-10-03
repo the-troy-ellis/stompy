@@ -5,11 +5,12 @@ export const WEAPONS = {
   // Lasers are continuous beams: damage per second (dps) climbs the longer
   // a beam stays on one mech -- its armour melts (see MELT_T / MELT_MAX) -- and heat per second
   // (hps) is the price -- two large lasers outrun the heat sinks.
-  laser:  { name: n.laser,  kind: 'beam',    dps: 3.5, hps: 12, range: 520, col: [1, 0.25, 0.2], w: 0.22, cd: 1 },
-  mlaser: { name: n.mlaser, kind: 'beam',    dps: 2.0, hps: 6,  range: 360, col: [0.3, 1, 0.35], w: 0.16, cd: 1 },
+  // tons: what it costs in the mechlab; fp: its firepower score for the FIT screen's bars (about damage per second).
+  laser:  { name: n.laser,  kind: 'beam',    dps: 3.5, hps: 12, range: 520, col: [1, 0.25, 0.2], w: 0.22, cd: 1, tons: 5, fp: 3.5 },
+  mlaser: { name: n.mlaser, kind: 'beam',    dps: 2.0, hps: 6,  range: 360, col: [0.3, 1, 0.35], w: 0.16, cd: 1, tons: 2, fp: 2 },
   // The autocannon is the opposite: big individual hits, little heat, ammo.
-  ac:     { name: n.ac, kind: 'shell',  dmg: 11,  heat: 2,  cd: 1.1, range: 650, speed: 340, ammo: 30 },
-  lrm:    { name: n.lrm, kind: 'missile', dmg: 1.9, heat: 6,  cd: 4.5, range: 850, speed: 120, ammo: 14, count: 10 },
+  ac:     { name: n.ac, kind: 'shell',  dmg: 11,  heat: 2,  cd: 1.1, range: 650, speed: 340, ammo: 30, tons: 8, fp: 10 },
+  lrm:    { name: n.lrm, kind: 'missile', dmg: 1.9, heat: 6,  cd: 4.5, range: 850, speed: 120, ammo: 14, count: 10, tons: 6, fp: 4.2 },
   // Hold a targeting laser on one mech for `scan` seconds -- any break and it
   // starts over -- and the reactor discharges at the target's resonant
   // frequency: an outright kill. The price: heat jumps to `overload` (a

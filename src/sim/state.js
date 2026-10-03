@@ -1,4 +1,3 @@
-import { WEAPONS } from '../data/weapons.js';
 import { CHASSIS } from '../data/chassis.js';
 import { PALS } from '../data/palettes.js';
 import { makeTerrain, BOUND } from '../world/terrain.js';
@@ -8,6 +7,7 @@ import { add, mul, dirOf, TAU } from '../util/math.js';
 import { initFeet } from './gait.js';
 import { eyeOf } from './geom.js';
 import { initFeel } from './feel.js';
+import { applyLoadout, stockLoadout } from './loadout.js';
 
 const { sin, cos, atan2 } = Math;
 
@@ -34,10 +34,10 @@ export function newMech(G, type, team, x, z, yaw, opts = {}) {
   const m = {
     type, ch, team, partsKey: opts.partsKey || type, netId: 0, remote: false, spawnT: 0, x, z, y: G.ter.height(x, z), vy: 0, yaw, twist: 0, pitch: 0, speed: 0, throttle: 0, heat: 0,
     fuel: 1, jetting: false, air: false, shutdown: false, alive: true,
-    hp: { ...ch.hp }, max: { ...ch.hp },
-    weapons: ch.weapons.map(([w, mount], i) => ({ type: w, def: WEAPONS[w], mount, cd: rng.next() * 0.5, ammo: WEAPONS[w].ammo || null, dead: false, side: i })),
-    ai: { aware: false, strafe: rng.sign(), strafeT: rng.range(2, 5), jitter: rng.range(0.2, 0.8), wp: null },
+    hp: null, max: null, weapons: null, ai: null,
   };
+  applyLoadout(G, m, opts.loadout || stockLoadout(ch));   // weapons, armour, sink, speed, jets; draws the cooldown stagger first, as always
+  m.ai = { aware: false, strafe: rng.sign(), strafeT: rng.range(2, 5), jitter: rng.range(0.2, 0.8), wp: null };
   initFeet(G, m);
   initFeel(m);
   return m;

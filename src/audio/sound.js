@@ -360,7 +360,7 @@ export function createAudio(app) {
 
   // Continuous layers follow the sim state: reactor hum, jets, torso servo, laser bite.
   function audioTick() {
-    const P = G.player, live = P.alive && !P.shutdown, pace = min(1, abs(P.speed) / P.ch.speed);
+    const P = G.player, live = P.alive && !P.shutdown, pace = min(1, abs(P.speed) / (P.maxSpeed ?? P.ch.speed));
     const hot = P.shutdown ? 0 : hotFrac(P.heat);   // the reactor hum rises as it runs hot
     loopSet('hum_loop', P.alive ? (P.shutdown ? 0.03 : (0.07 + 0.13 * pace) * (1 + HEAT.hum * hot)) : 0, P.shutdown ? 0.5 : (0.72 + 0.4 * pace) * (1 + HEAT.humRate * hot));
     const jetting = live && P.jetting && P.fuel > 0;

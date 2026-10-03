@@ -122,12 +122,13 @@ export const brawler = (G, e, ctx) => ({ moveYaw: ctx.toYaw, thr: ctx.dist > ctx
 
 // Heavies advance together: no faster than the slowest ally within 150 m.
 export const holdLine = (G, e, ctx, out) => {
-  let slowest = e.ch.speed;
+  const top = m => m.maxSpeed ?? m.ch.speed;
+  let slowest = top(e);
   for (const o of G.mechs) {
     if (o === e || o.team !== e.team || !o.alive) continue;
-    if (hypot(o.x - e.x, o.z - e.z) <= B.lineRange) slowest = min(slowest, o.ch.speed);
+    if (hypot(o.x - e.x, o.z - e.z) <= B.lineRange) slowest = min(slowest, top(o));
   }
-  return slowest < e.ch.speed ? { ...out, thr: min(out.thr, slowest / e.ch.speed) } : out;
+  return slowest < top(e) ? { ...out, thr: min(out.thr, slowest / top(e)) } : out;
 };
 
 // Turn for home well before the fence.
