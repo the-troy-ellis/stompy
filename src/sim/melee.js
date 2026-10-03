@@ -65,7 +65,7 @@ export function meleeTick(G, m, dt) {
       // The blow lands on the target's skin, facing the attacker, at fist height.
       const dx = t.x - m.x, dz = t.z - m.z, hd = hypot(dx, dz) || 1, nx = dx / hd, nz = dz / hd;
       const R = geoOf(t).radius * t.ch.scale, p = [t.x - nx * R, clampN(m.y + 5 * m.ch.scale, t.y + 1, t.y + geoOf(t).height * t.ch.scale - 1), t.z - nz * R];
-      t.lastHitMelee = true;
+      t.lastHitMelee = 'punch';
       damage(G, t, p, def.dmg, m, false, true);
       const v = knock(G, { target: t, attacker: m, base: def.knock, dir: [nx, nz] });
       st.hit = { mech: t, p, v };
@@ -95,7 +95,7 @@ export function tryStomp(G, m, airT) {
     // Feet passing through the top of the target this frame, and over it.
     if (hd > (rm + gt.radius * t.ch.scale) * 1.2 || m.y < top - 1.5 || m.y > top + 1.0) continue;
     const nx = hd > 0.01 ? dx / hd : 1, nz = hd > 0.01 ? dz / hd : 0;
-    t.lastHitMelee = true;
+    t.lastHitMelee = 'stomp';
     damage(G, t, [t.x, top - 0.5, t.z], def.stompDmg, m, false, true);
     knock(G, { target: t, attacker: m, base: def.stompKnock, dir: [nx, nz] });
     if (t.remote) { const q = G.pendingHits.get(t.netId); if (q) q.st = 1; }

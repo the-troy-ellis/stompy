@@ -20,7 +20,7 @@ test('on HARD an adjacent enemy punches the player within 3 s', () => {
   G.diff = 'hard';
   stepFor(G, 3);
   assert.ok(G.fx.calls('sfx.punch').some(c => c.args[1] === true), 'no punch landed');
-  assert.equal(P.lastHitMelee, true);
+  assert.equal(P.lastHitMelee, 'punch');
   assert.ok(e.meleeCd > 0 || e.melee, 'the swing left a cooldown behind');
 });
 

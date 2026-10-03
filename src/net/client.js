@@ -12,6 +12,7 @@ import { msg, particle, explode } from '../sim/effects.js';
 import { beginDeath, damage, destroy, shedSection } from '../sim/combat.js';
 import { knock } from '../sim/knock.js';
 import { feel } from '../sim/feel.js';
+import { voice } from '../sim/voice.js';
 import { beamMult } from '../sim/beams.js';
 import { launchPulse } from '../sim/fusion.js';
 import { SEND_HZ } from '../sim/missiles.js';
@@ -107,6 +108,7 @@ export function createNet(app) {
         if (m.fu && G.player.spawnT <= 0 && !G.roundOver) { G.whiteFlash = 1; destroy(G, G.player, mechById(m.from) || null); }
         else {
           const melee = !!(m.me || m.st);
+          if (melee) G.player.lastHitMelee = m.st ? 'stomp' : 'punch';
           damage(G, G.player, m.p, m.amt, mechById(m.from) || null, false, melee);
           // A shove or a stomp: the push, the aim jolt and the lurch happen here, on the victim's screen.
           if (Array.isArray(m.kb) && G.player.alive && G.player.spawnT <= 0 && !G.roundOver) {
@@ -120,7 +122,7 @@ export function createNet(app) {
         setScores(m.scores);
         const mine = m.killer === Net.id || m.victim === Net.id;
         msg(G, m.killer ? `${pilotName(m.killer)} ${m.me ? 'PUNCHED OUT' : 'DESTROYED'} ${pilotName(m.victim)}` : `${pilotName(m.victim)} WENT DOWN`, mine ? '#fc3' : '#7f7');
-        if (m.killer === Net.id) { G.stats.kills++; app.audio.say(m.me ? 'Target punched.' : 'Target destroyed.', true); }
+        if (m.killer === Net.id) { G.stats.kills++; voice(G, m.me ? 'killPunch' : 'kill'); }
         break;
       }
       case 'roundover':

@@ -5,6 +5,7 @@ import { gait } from './gait.js';
 import { feel, stepFeel } from './feel.js';
 import { FEEL } from '../data/feel.js';
 import { tryStomp } from './melee.js';
+import { voice } from './voice.js';
 
 const { sin, cos, min, max } = Math;
 
@@ -81,11 +82,11 @@ function finishStep(G, m, dt) {
   if (!m.shutdown && m.heat >= 100) {
     m.shutdown = true;
     feel(G, 'shutdown', { mech: m, at: m === G.player ? null : [m.x, m.y, m.z] });
-    if (m === G.player) { G.fx.sfx.powerdown(); G.fx.say('Reactor shutdown.', true); }
+    if (m === G.player) { G.fx.sfx.powerdown(); voice(G, 'shutdown'); }
   } else if (m.shutdown && m.heat < 45) {
     m.shutdown = false;
     feel(G, 'restart', { mech: m, at: m === G.player ? null : [m.x, m.y, m.z] });
-    if (m === G.player) { G.fx.sfx.powerup(); G.fx.say('Reactor online.', true); }
+    if (m === G.player) { G.fx.sfx.powerup(); voice(G, 'online'); }
   }
   if (m === G.player && m.heat > 80 && !m.shutdown) G.fx.say('Warning. Heat critical.');
   for (const w of m.weapons) w.cd = max(0, w.cd - dt);

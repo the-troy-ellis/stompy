@@ -9,6 +9,7 @@ import { torsoFrame } from './geom.js';
 import { died, fxShell, fxMissiles } from '../net/protocol.js';
 import { blast, endGuide } from './missiles.js';
 import { feel } from './feel.js';
+import { voice } from './voice.js';
 
 const { sin, cos } = Math;
 
@@ -62,7 +63,11 @@ export function damage(G, m, p, amt, src, beam = false, melee = false) {
   shedSection(G, m, sec, p);
   feel(G, 'sectionLost', { mech: m, roll: sec === 'LA' || sec === 'LL' ? -1 : sec === 'RA' || sec === 'RL' ? 1 : 0, at: m === G.player ? null : p });
   explode(G, p, false);
-  if (m === G.player) G.fx.say(m.hp.LL <= 0 && m.hp.RL <= 0 && (sec === 'LL' || sec === 'RL') ? 'Legs destroyed. We are now a turret.' : `${SECT_NAME[sec]} destroyed.`, true);
+  if (m === G.player) {
+    const leg = sec === 'LL' || sec === 'RL';
+    if (leg && m.hp.LL <= 0 && m.hp.RL <= 0) voice(G, 'legsLost');
+    else voice(G, leg ? 'legLost' : 'armLost', { flat: `${SECT_NAME[sec]} destroyed.` });
+  }
   else if (src === G.player) msg(G, `${m.ch.name}: ${SECT_NAME[sec].toUpperCase()} DESTROYED`);
   if (over > 0) { m.hp.T -= over; if (m.hp.T <= 0) { m.hp.T = 0; destroy(G, m, src); } }
 }
@@ -142,10 +147,10 @@ export function destroy(G, m, src) {
     return;
   }
   if (src === G.player) G.stats.kills++;
-  G.fx.say(m.lastHitMelee ? 'Target punched.' : 'Target destroyed.', true, DEATH_BEAT * 1000);   // after the bang, not before
+  voice(G, m.lastHitMelee === 'stomp' ? 'killStomp' : m.lastHitMelee ? 'killPunch' : 'kill', {}, true, DEATH_BEAT * 1000);   // after the bang, not before
   if (G.player.alive && !G.mechs.some(e => e.team !== 0 && e.alive)) {
     G.state = 'over'; G.endT = 3.5; G.won = true;
-    G.fx.say('Mission objectives complete.', true, 1400);
+    voice(G, 'complete', {}, true, 1400);
   }
 }
 
