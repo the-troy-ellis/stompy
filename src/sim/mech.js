@@ -4,6 +4,7 @@ import { particle } from './effects.js';
 import { gait } from './gait.js';
 import { feel, stepFeel } from './feel.js';
 import { FEEL } from '../data/feel.js';
+import { WALK } from '../data/walk.js';
 import { tryStomp } from './melee.js';
 import { voice } from './voice.js';
 
@@ -11,6 +12,14 @@ const { sin, cos, min, max } = Math;
 
 // How fast a push dies out, per second: an impulse of v m/s moves the mech about v / PUSH_DECAY metres.
 export const PUSH_DECAY = 2.5;
+
+// The grade under the mech along its heading, as a speed factor: uphill
+// slow, downhill a touch quick. Sampled two metres fore and aft.
+export function slopeFactor(G, m) {
+  const fx = sin(m.yaw), fz = cos(m.yaw);
+  const grade = (G.ter.height(m.x + fx * 2, m.z + fz * 2) - G.ter.height(m.x - fx * 2, m.z - fz * 2)) / 4;
+  return clampN(grade > 0 ? 1 - grade * WALK.slopeUp : 1 - grade * WALK.slopeDown, WALK.slopeMin, WALK.slopeMax);
+}
 
 // Touchdown dust: a puff under the feet, and for a hard landing (force over
 // 0.7) a ring that races outward along the ground. (The shockwave mesh is M4.)
@@ -31,6 +40,10 @@ export function stepMech(G, m, dt) {
   const r = G.rng, legs = (m.hp.LL > 0 ? 0.5 : 0) + (m.hp.RL > 0 ? 0.5 : 0);
   let maxS = m.ch.speed * (legs >= 1 ? 1 : legs > 0 ? 0.45 : 0);   // no legs: sat down, a turret
   if (m.heat > 85) maxS *= 0.65;
+  // The ground: a grade under the heading slows the climb and hurries the descent,
+  // and a landing holds the legs for a moment while the feet dig in.
+  if (!m.air) maxS *= slopeFactor(G, m);
+  if (m.dig > 0) { m.dig = max(0, m.dig - dt); maxS *= WALK.digSlow; }
   const target = !m.alive || m.shutdown ? 0 : m.throttle * maxS;
   m.speed += clampN(target - m.speed, -11 * dt, 7 * dt);
   const push = m.push || (m.push = [0, 0]);
@@ -68,6 +81,8 @@ export function stepMech(G, m, dt) {
       if (m === G.player) G.fx.sfx.land(force);
       else G.fx.sfx.step(m, force * 0.8);
       landingDust(G, m, ground, force);
+      // Dig-in: the landing takes the run out of the legs for a beat.
+      m.speed *= 1 - WALK.digCut * force; m.dig = WALK.digHold * force;
     }
     m.y = ground; m.vy = 0; m.air = false;
   } else if (m.y > ground + 1.2) m.air = true;
