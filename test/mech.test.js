@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestGame, stepFor, input, foes } from './helpers.js';
+import { VOICE } from '../src/data/voice.js';
 
 test('heat 100 shuts the reactor down and 45 brings it back, with the voice lines once each', () => {
   const G = createTestGame();
@@ -9,14 +10,14 @@ test('heat 100 shuts the reactor down and 45 brings it back, with the voice line
   P.heat = 99.5;
   stepFor(G, 0.5, input({ held: { energy: true } }));
   assert.ok(P.shutdown, 'did not shut down');
-  const down = G.fx.calls('say').filter(c => c.args[0] === 'Reactor shutdown.');
+  const down = G.fx.calls('say').filter(c => VOICE.shutdown.includes(c.args[0]));
   assert.equal(down.length, 1);
   stepFor(G, 1, input({ held: { energy: true } }));   // held fire does nothing while down
   assert.ok(P.shutdown && P.heat < 100);
   stepFor(G, 5);
   assert.equal(P.shutdown, false);
   assert.ok(P.heat < 45);
-  assert.equal(G.fx.calls('say').filter(c => c.args[0] === 'Reactor online.').length, 1);
+  assert.equal(G.fx.calls('say').filter(c => VOICE.online.includes(c.args[0])).length, 1);
 });
 
 test('losing a leg caps speed at 45%, both legs at a crawl', () => {

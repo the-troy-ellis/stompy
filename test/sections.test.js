@@ -4,6 +4,7 @@ import { createTestGame, stepFor, input, foes, freeze } from './helpers.js';
 import { damage } from '../src/sim/combat.js';
 import { DEBRIS_LIFE } from '../src/sim/effects.js';
 import { geoOf } from '../src/data/geo.js';
+import { VOICE } from '../src/data/voice.js';
 
 const armPoint = (m, side) => [m.x + side * 2.5 * m.ch.scale, m.y + (geoOf(m).legTop + 1) * m.ch.scale, m.z];
 
@@ -38,7 +39,7 @@ test('a lost leg sheds thigh, shin and foot, the mech limps with a dip and a lea
   assert.ok(lean > 0.1, `no lean (${lean})`);
   assert.ok(P.speed > 0 && P.speed < P.ch.speed * 0.5);
   assert.ok(P.feet[0].lifted === false);
-  assert.ok(G.fx.calls('say').some(c => c.args[0] === 'Left leg destroyed.'));
+  assert.ok(G.fx.calls('say').some(c => c.args[0] === 'Left leg destroyed.' || VOICE.legLost.includes(c.args[0])));
 });
 
 test('with both legs gone the mech sits down, cannot move, still turns and fires, and the voice says so', () => {
@@ -50,7 +51,7 @@ test('with both legs gone the mech sits down, cannot move, still turns and fires
   damage(G, P, [P.x - 1, P.y + 1, P.z], P.hp.RL, e);
   assert.equal(P.hp.LL + P.hp.RL, 0);
   assert.ok(P.alive);
-  assert.ok(G.fx.calls('say').some(c => c.args[0] === 'Legs destroyed. We are now a turret.'));
+  assert.ok(G.fx.calls('say').some(c => VOICE.legsLost.includes(c.args[0])));
   const z0 = P.z;
   stepFor(G, 2, input({ thrUp: true, twist: 1 }));
   assert.ok(Math.abs(P.z - z0) < 0.05, `moved ${P.z - z0}`);

@@ -124,7 +124,8 @@ hopping.` Rules:
 - Never a line longer than six words plus a period. Never an exclamation
   mark. Never addresses the player by a name.
 
-Starter pool (the owner edits; agents add to `src/audio/voice.js` from here):
+Starter pool (the owner edits `src/data/voice.js`; `src/sim/voice.js` does the
+picking and the limiting; agents propose additions in a PR's NAMING section):
 
 | Event | Lines |
 |---|---|
