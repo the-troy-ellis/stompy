@@ -9,6 +9,34 @@ export function particle(G, p, v, life, size, col, kind, grav = 0) {
   if (G.parts.length > 420) G.parts.shift();
   G.parts.push({ p: [...p], v, life, max: life, size, col, kind, grav, spin: G.rng.next() * TAU });
 }
+// A piece of a mech (an arm, a thigh, a shin, a foot) that fell off: it
+// tumbles, bounces once, and lies there for `life` seconds. Drawn from the
+// mech's own part meshes by the renderer. Capped so a long fight stays cheap.
+export const DEBRIS_MAX = 40, DEBRIS_LIFE = 20;
+export function shedPart(G, m, part, p, v) {
+  const r = G.rng;
+  if (G.debris.length >= DEBRIS_MAX) G.debris.shift();
+  G.debris.push({ part, partsKey: m.partsKey, scale: m.ch.scale, p: [...p], v: [...v], rot: [r.range(0, 6.28), m.yaw, r.range(0, 6.28)],
+    spin: [r.range(-6, 6), r.range(-3, 3), r.range(-6, 6)], landed: false, bounced: false, t: 0, life: DEBRIS_LIFE });
+}
+export function stepDebris(G, dt) {
+  for (const d of G.debris) {
+    d.t += dt;
+    if (!d.landed) {
+      d.v[1] -= 18 * dt;
+      d.p = add(d.p, mul(d.v, dt));
+      for (let i = 0; i < 3; i++) d.rot[i] += d.spin[i] * dt;
+      const g = G.ter.height(d.p[0], d.p[2]) + 0.4 * d.scale;
+      if (d.p[1] <= g) {
+        d.p[1] = g;
+        if (!d.bounced && -d.v[1] > 3) { d.bounced = true; d.v = [d.v[0] * 0.5, -d.v[1] * 0.3, d.v[2] * 0.5]; d.spin = mul(d.spin, 0.4); }
+        else { d.landed = true; d.v = [0, 0, 0]; d.spin = [0, 0, 0]; }
+      }
+    }
+  }
+  G.debris = G.debris.filter(d => d.t < d.life);
+}
+
 export function explode(G, p, big) {
   const r = G.rng, n = big ? 34 : 10, s = big ? 1.6 : 0.7;
   for (let i = 0; i < n; i++) {
