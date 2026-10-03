@@ -1,4 +1,4 @@
-import { M, add, chain, mul } from '../util/math.js';
+import { M, add, chain, mul, sub, len } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 
 const { sqrt, min } = Math;
@@ -6,6 +6,14 @@ const { sqrt, min } = Math;
 export const frame = m => chain(M.T(m.x, m.y + (m.bob || 0), m.z), M.RY(m.yaw), M.S(m.ch.scale));
 export const torsoFrame = m => chain(frame(m), M.T(0, geoOf(m).torsoY, 0), M.RY(m.twist));
 export const center = m => [m.x, m.y + 4.2 * m.ch.scale, m.z];
+// Where a shell fired now from `from` at `speed` m/s meets a mech walking
+// on its heading: two passes of time-of-flight are plenty at these ranges.
+export function leadPoint(from, t, speed) {
+  const c = center(t), v = [Math.sin(t.yaw) * t.speed, 0, Math.cos(t.yaw) * t.speed];
+  let p = c;
+  for (let i = 0; i < 2; i++) { const tof = len(sub(p, from)) / speed; p = add(c, mul(v, tof)); }
+  return p;
+}
 export function muzzle(m, w) {
   const tf = torsoFrame(m), g = geoOf(m);
   if (w.mount === 'T') return M.apply(tf, w.type === 'lrm' ? [w.side % 2 ? -1.25 : 1.25, g.rackY, 0.6] : [-0.9, g.acY, 1.6]);

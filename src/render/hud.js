@@ -1,7 +1,7 @@
 import { TAU, clampN, len, rnd, sub } from '../util/math.js';
 import { WEAPONS, CATS, CAT_OF, CAT_LABEL, CAT_KEY } from '../data/weapons.js';
 import { MP_COLORS } from '../data/colors.js';
-import { center, viewYaw } from '../sim/geom.js';
+import { center, leadPoint, viewYaw } from '../sim/geom.js';
 import { MELT_MAX, beamMult } from '../sim/beams.js';
 import { HEAT, hotFrac } from '../data/feel.js';
 
@@ -179,7 +179,7 @@ export function createHud(app) {
 
   // ?debug=1: frame time over the last 2 s, draw calls, particles, the seed.
   const frames = [];
-  let lastFrameAt = 0, stopAt = null;
+  let lastFrameAt = 0, stopAt = null, rangeMemo = { t: null, r: 0, at: 0, rate: 0 };
   function drawDebug() {
     const now = performance.now();
     if (lastFrameAt) frames.push(now - lastFrameAt);
@@ -322,6 +322,16 @@ export function createHud(app) {
         ctx.textAlign = 'center';
         ctx.fillText(G.lock ? 'LOCK' : t.remote ? app.net.pilotName(t.netId) : t.ch.name, a[0], y0 - 8);
       }
+      // Autocannon lead: a small diamond where a shell fired now would meet it, while it is moving and in range.
+      const ac = P.weapons.find(w => w.def.kind === 'shell' && !w.dead && (w.ammo == null || w.ammo > 0));
+      if (ac && Math.abs(t.speed) > 1 && hypot(t.x - P.x, t.z - P.z) < ac.def.range) {
+        const lp = project(leadPoint(G.eye, t, ac.def.speed));
+        if (lp) {
+          ctx.strokeStyle = AMBER; ctx.beginPath();
+          ctx.moveTo(lp[0], lp[1] - 6); ctx.lineTo(lp[0] + 6, lp[1]); ctx.lineTo(lp[0], lp[1] + 6); ctx.lineTo(lp[0] - 6, lp[1]); ctx.closePath(); ctx.stroke();
+          ctx.fillStyle = AMBER; ctx.fillRect(lp[0] - 1, lp[1] - 1, 2, 2);
+        }
+      }
     }
     // Enemy markers in view (small chevrons), so far-off mechs can be found.
     for (const m of G.mechs) {
@@ -447,8 +457,15 @@ export function createHud(app) {
       ctx.textAlign = 'left'; ctx.fillStyle = AMBER;
       ctx.fillText(`TGT ${t.remote ? app.net.pilotName(t.netId) : t.ch.name}`, px + 6, py + 10);
       ctx.fillStyle = GREEN;
-      ctx.fillText(`RNG ${Math.round(hypot(t.x - P.x, t.z - P.z))}m`, px + 6, py + 24);
+      const rng = hypot(t.x - P.x, t.z - P.z);
+      // Closing rate, smoothed: the number that tells you whether to lead or to run.
+      if (rangeMemo.t !== t || G.time - rangeMemo.at > 1) rangeMemo = { t, r: rng, at: G.time, rate: 0 };
+      else if (G.time > rangeMemo.at) { const inst = (rng - rangeMemo.r) / (G.time - rangeMemo.at); rangeMemo.rate += (inst - rangeMemo.rate) * 0.15; rangeMemo.r = rng; rangeMemo.at = G.time; }
+      ctx.fillText(`RNG ${Math.round(rng)}m`, px + 6, py + 24);
       ctx.fillText(t.shutdown ? 'SHUTDOWN' : `${Math.round(t.speed * 5.4)} KPH`, px + 6, py + 38);
+      const rate = rangeMemo.rate;
+      ctx.fillStyle = Math.abs(rate) < 1 ? DIM : GREEN;
+      ctx.fillText(Math.abs(rate) < 1 ? 'HOLDING' : `${rate < 0 ? 'CLOSING' : 'OPENING'} ${Math.round(Math.abs(rate))} m/s`, px + 6, py + 52);
       mechDiagram(t, px + pw - 32, py + 14, 6);
     }
 
