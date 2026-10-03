@@ -1,0 +1,68 @@
+import { add, mix3, mul, norm, sub } from '../util/math.js';
+import { muzzle, rayHit } from './geom.js';
+import { damage } from './combat.js';
+import { particle } from './effects.js';
+
+const { min, max } = Math;
+
+// Lasers: continuous beams whose damage climbs while they stay on target.
+// The ramp lives in the target, not the shooter: a mech's armour "melt"
+// rises while any beam is on it (once per frame, however many beams) and
+// cools whenever nothing is hitting it, whoever is aiming where. Damage is
+// dps x meltMult(target). Two pilots on one mech share its melt.
+export const MELT_T = 3;         // seconds of beam to melt armour fully
+export const MELT_MAX = 3.5;     // damage multiplier at full melt
+export const MELT_COOL = 1.5;    // melt-seconds lost per second off the beam: full to cold in 2 s
+export const meltMult = t => 1 + (MELT_MAX - 1) * (t => t * t * (3 - 2 * t))(min(1, t / MELT_T));
+export const meltFrac = m => min(1, (m?.melt || 0) / MELT_T);
+export const beamMult = m => (m.beamMech ? meltMult(m.beamMech.melt || 0) : 1);
+
+// One frame of a mech's lasers firing at `aim`: every live laser draws a
+// beam to whatever it hits and costs heat; a mech it hits takes damage
+// scaled by that mech's melt, and its melt goes up.
+export function beamTick(G, m, dt, aim) {
+  const lasers = m.weapons.filter(w => w.def.kind === 'beam' && !w.dead), r = G.rng;
+  if (!lasers.length || m.shutdown || !m.alive) { m.beaming = false; m.beamMech = null; return; }
+  if (!m.beaming) G.fx.sfx.laser(m === G.player ? null : muzzle(m, lasers[0]), lasers[0].type === 'mlaser');
+  m.beaming = true;
+  m.beamEnd = aim;
+  m.beamMech = null;
+  for (const w of lasers) {
+    const mz = muzzle(m, w), dir = norm(sub(aim, mz));
+    const hit = rayHit(G, mz, dir, w.def.range, m);
+    const end = hit ? hit.point : add(mz, mul(dir, w.def.range));
+    const t = hit?.mech, mult = t ? meltMult(t.melt || 0) : 1;
+    drawBeam(G, mz, end, w.def, mult);
+    m.heat += w.def.hps * dt;
+    if (m === G.player) G.stats.shots += dt * 4;   // accuracy counts beam time in quarter-seconds
+    if (!hit) continue;
+    if (r.chance(dt * 25)) particle(G, end, [r.range(-3, 3), r.range(1, 5), r.range(-3, 3)], 0.25, 0.3 + 0.1 * mult, w.def.col, 'fire');
+    if (t) {
+      m.beamMech = t;
+      damage(G, t, end, w.def.dps * mult * dt, m, true);
+      if (t.meltFrame !== G.frame) { t.meltFrame = G.frame; t.melt = min(MELT_T, (t.melt || 0) + dt); }
+      t.meltAt = G.time;
+      if (m === G.player) G.stats.hits += dt * 4;
+    }
+  }
+}
+// Armour cools whenever no beam touched it this frame.
+export function coolArmour(G, dt) {
+  for (const m of G.mechs) if (m.melt && m.meltAt !== G.time) m.melt = max(0, m.melt - MELT_COOL * dt);
+}
+// A beam lasts one frame; it's redrawn every frame it's on. Thicker and
+// whiter as the focus climbs.
+export function drawBeam(G, a, b, def, mult) {
+  const k = (mult - 1) / (MELT_MAX - 1);
+  G.cbeams.push({ a, b, col: mix3(def.col, [1, 1, 1], 0.2 + 0.45 * k), w: def.w * (0.8 + 0.9 * k) * G.rng.range(0.85, 1.15) });
+}
+// Another pilot's beam, drawn from their lasers to where they say it ends.
+// Visual only: their client scores it.
+export function remoteBeam(G, m, end) {
+  const lasers = m.weapons.filter(w => w.def.kind === 'beam' && m.hp[w.mount] > 0), r = G.rng;
+  if (!lasers.length) return;
+  if (!m.beaming) G.fx.sfx.laser(muzzle(m, lasers[0]), false);
+  m.beaming = true;
+  for (const w of lasers) drawBeam(G, muzzle(m, w), end, w.def, m.net.bf || 1);   // bf: how melted their target is
+  if (r.chance(0.4)) particle(G, end, [r.range(-3, 3), r.range(1, 5), r.range(-3, 3)], 0.25, 0.4, lasers[0].def.col, 'fire');
+}

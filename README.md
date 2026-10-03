@@ -12,12 +12,20 @@ plays the cockpit computer.
 
 | File | What |
 |---|---|
-| `index.html` | Shell page. |
-| `stompy.js` | The whole game: maths, mesh builder, terrain, mechs, AI, weapons, HUD, sound, input. |
-| `style.css` | Full-page layout and the briefing / pause / debrief overlay. |
+| `index.html` | Shell page. Loads `src/main.js` as an ES module. |
+| `src/main.js` | Boots the game and runs the frame loop. Everything else is a module under `src/`. |
+| `src/sim/` | The simulation: state, mechs, gait, combat, beams, the fusion cannon, missiles, the AI, the per-frame update. No DOM, no GL: it runs headless in the tests. |
+| `src/render/` | WebGL setup, the 3D scene, the 2D HUD. |
+| `src/audio/` | Sound effects over Kenney's clips, the loops, the cockpit voice. |
+| `src/input/` | Keyboard, mouse and touch, merged into one per-frame snapshot. |
+| `src/ui/` | The main menu, briefing, pause and debrief screens. |
+| `src/net/` | The arena client, the wire format, remote-mech interpolation. |
+| `src/data/` | Weapons, chassis, body plans, palettes, missions, colours, and `names.js` with every display name. |
+| `src/world/`, `src/mesh/` | Terrain generation and the flat-shaded mesh builders. |
+| `style.css` | Full-page layout and the overlays. |
 | `sounds/` | CC0 clips from Kenney's Sci-fi and Impact packs. Sources and mapping in `sounds/README.txt`. |
-| `favicon.svg` | The mech icon. |
-| `server.py` | The multiplayer arena: a stdlib WebSocket relay (port 8096). |
+| `server/server.py` | The multiplayer arena: a stdlib WebSocket relay (port 8096). Tests alongside. |
+| `test/` | Headless unit tests (`node --test`) and the browser smoke test (Playwright). |
 | `docs/` | The development plan: vision, architecture map, roadmap, workflow and per-feature specs. Start at `docs/README.md`. |
 
 ## Main menu
@@ -105,14 +113,14 @@ screen and landscape, and a phone held upright is told to turn sideways.
 
 ## Multiplayer arena
 
-Title screen > MULTIPLAYER ARENA: up to 8 pilots on the LAN (or tailnet), free-for-all, everyone in a
-KESTREL told apart by colour. First to 10 kills wins the round; then a new map after 10 s. You respawn
+Title screen > MULTIPLAYER: up to 8 pilots on the LAN (or tailnet), free-for-all, each in the chassis
+they picked, told apart by colour. First to 10 kills wins the round; then a new map after 10 s. You respawn
 5 s after going down, shielded for 2 s. The in-match menu has the full scoreboard and LEAVE MATCH; the
 match doesn't pause.
 
 How it works:
 
-- `server.py` simulates nothing. Each client is the authority for its own mech and sends its state
+- `server/server.py` simulates nothing. Each client is the authority for its own mech and sends its state
   15x/s; the server stamps the sender's id and relays it. Other pilots are drawn from their latest
   state, smoothed and extrapolated (`netInterp`), and walk with the same gait.
 - Shots are relayed as effects (`netFx`): drawn everywhere, scored only by the shooter. A hit the
@@ -131,11 +139,12 @@ It's a static site: any web server will do, and there is no build step.
 python3 -m http.server 8000        # then open http://localhost:8000
 ```
 
-Single player needs nothing else. For the multiplayer arena, also run the relay
-(stdlib Python 3, no dependencies) on the same machine:
+(or `npm run serve`, which needs no install). Single player needs nothing
+else. For the multiplayer arena, also run the relay (stdlib Python 3, no
+dependencies) on the same machine:
 
 ```sh
-python3 server.py                  # listens on :8096; the game connects to ws://<page host>:8096/ws
+python3 server/server.py           # listens on :8096; the game connects to ws://<page host>:8096/ws
 ```
 
 Phones on the same network can then open `http://<that machine's IP>:8000`.
@@ -145,6 +154,23 @@ named `stompy.*` (its `Origin` check). `STOMPY_SCORE_LIMIT` and
 
 Settings and mission progress are kept in each browser's localStorage under
 `stompy.*`.
+
+## Developing it
+
+`npm install` once (esbuild, ESLint and Playwright, dev-only; the game itself
+has no dependencies). Then:
+
+```sh
+npm test            # headless unit tests of the simulation and data
+npm run test:server # the relay's tests
+npm run test:smoke  # plays a mission, and an arena round, in headless Chromium
+npm run lint
+npm run build       # one minified file plus the static assets, in dist/
+```
+
+`?debug=1` on the URL shows frame time, draw calls and the seed, and exposes
+the state as `window.__stompy`. `?touch=1` forces the touch layout. The plan,
+the architecture map and the per-feature specs are in `docs/`.
 
 ## How it works, briefly
 

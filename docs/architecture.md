@@ -4,55 +4,51 @@ Two halves: **what exists** (so you can find things and not break them) and
 **where it is going** (the module split that milestone M0 performs). Line
 numbers are as of commit `b4c6315`; use them as landmarks, then search.
 
-## What exists
+## What exists (after M0)
 
-Four source files, no build step.
+The game is ES modules under `src/`, served as-is (`index.html` loads
+`src/main.js`; no bundler to play). `npm run build` makes one minified file
+in `dist/` for releases. Node 22 runs the headless tests; Python 3 runs the
+relay and its tests.
 
-| File | Lines | Role |
+| Path | Lines | Role |
 |---|---|---|
-| `index.html` | 18 | Shell: one `<main id="app">`, loads `style.css` and `stompy.js`. |
-| `stompy.js` | ~2990 | The whole game in one IIFE. |
-| `style.css` | 233 | Page layout, the overlay (briefing, pause, debrief, main menu), touch controls. |
-| `server.py` | 296 | The arena relay: stdlib asyncio WebSocket server, scores and rounds. |
-| `sounds/` | | 36 CC0 MP3 clips from Kenney, mapped in `sounds/README.txt`. |
+| `src/main.js` | ~120 | Bootstrap: builds the page, creates everything below, wires them through one `app` object, runs the frame loop. |
+| `src/sim/` | ~900 | **The simulation.** `state.js` (`createGame`, `newMech`, `startMatch`, `resetMatch`), `update.js` (`update(game, input, dt)`), `geom.js`, `effects.js`, `combat.js`, `mech.js`, `gait.js`, `beams.js`, `fusion.js`, `missiles.js`, `ai.js`, `rng.js`, `fx.js`. No DOM, GL, audio or input imports (lint enforces it). |
+| `src/data/` | ~200 | Weapons, chassis, body plans (`geo.js`), palettes, missions, arena colours, and `names.js` (every display name, keyed). |
+| `src/world/` | ~110 | `terrain.js` (heights, `height(x, z)`, `BOUND`, a `flat` option for tests), `terrainMesh.js`. |
+| `src/mesh/` | ~140 | `builder.js` (flat-shaded triangle soup), `mechParts.js` (the three chassis' parts). |
+| `src/render/` | ~730 | `gl.js` (`createRenderer`: context, shaders, `upload`, `draw`, mesh sets), `scene.js` (`createScene`: camera, sky, world, mechs with IK, effects), `hud.js` (`createHud`: the 2D instruments, the missile camera feed, the `?debug=1` readout). |
+| `src/audio/` | ~360 | `sound.js` (`createAudio`: unlock dance, samples over synthesis, spatialisation, loops, `sfx.*`, the voice `say`, the beam and scan tones, `tick`). |
+| `src/input/` | ~220 | `input.js` (`createInput`: keyboard, mouse with pointer lock, touch stick/aim/buttons, one per-frame `snapshot()`). |
+| `src/ui/` | ~280 | `screens.js` (`createUi`: main menu with the live mech, briefing detail, settings, pause, debrief, mission and skirmish start, click routing). |
+| `src/net/` | ~330 | `protocol.js` (`PROTOCOL`, message builders, `parse`), `client.js` (`createNet`: join, handler, spawn, 15 Hz state, relayed effects, `tick`), `interp.js` (`netInterp`). |
+| `src/util/` | ~70 | `math.js` (scalars, vec3, `M` matrices, `chain`, cosmetic `rnd`), `store.js`, `dom.js`. |
+| `server/` | 300 + tests | `server.py` the relay (unchanged logic), `test_server.py`. |
+| `test/` | | `*.test.js` headless (`helpers.js` builds a flat-ground game with a recording fx), `smoke/run.mjs` (Playwright: desktop mission, touch layout, two-pilot arena against the real relay). |
+| `scripts/` | | `serve.mjs` (static server), `build.mjs` (esbuild). |
+| `.github/workflows/` | | `ci.yml` (lint, test, build, server tests, smoke), `pages.yml` (gated by the `STOMPY_DEPLOY_PAGES` variable). |
 
-### Shape of `stompy.js`
+### How the pieces talk
 
-The file is one IIFE. The first ~420 lines are module-level helpers and
-**data**. Everything else lives inside `start(root)` (line 421), which closes
-over the GL context, the game state and every subsystem. That closure is why
-the file cannot be split by moving functions around; see M0 below.
-
-Sections, by the comment banners in the file:
-
-| Lines | Section | Key names |
-|---|---|---|
-| 13–59 | DOM helpers, `store` (localStorage under `stompy.*`), `Sound` audio unlock (iOS rules documented inline) | `$`, `esc`, `store`, `settings`, `Sound.unlock` |
-| 60–106 | Maths: scalars, 3-vectors as plain arrays, 4×4 column-major matrices | `clampN lerp wrapA rnd add sub mul dot cross len norm mix3 dirOf`, `M.{id mul T S RX RY RZ persp lookAt apply}`, `chain` |
-| 110–133 | `Builder`: flat-shaded triangle soup (pos, normal, colour per vertex), `tri`, `quad`, `cube` with tapered top | `Builder` |
-| 135–231 | **Game data**: weapons, fire categories, chassis, mech info, palettes, missions, MP colours, section names | `WEAPONS CATS CAT_OF CHASSIS MECH_ORDER MECH_INFO PALS MISSIONS missionDef MP_COLORS HPK SECT_NAME` |
-| 233–305 | Terrain: 96×96 grid of 24 m cells, value-noise heights, flat start zone, `height(x,z)` on the same triangle split as the mesh; rocks and four "outposts" baked into the terrain mesh | `N CELL HALF BOUND makeTerrain buildTerrainMesh` |
-| 307–420 | Body plans per leg type and the mesh builders for each | `GEO geoOf buildMechParts buildReverseParts buildQuadParts` |
-| 449–551 | GL setup: one lit shader with fog, emissive and an IR path (`uIR`, per-draw `heat`), one sky shader, `upload`, `draw` | `prog skyProg U A SU upload meshes mechParts partsKeyFor draw drawHeat` |
-| 552–802 | Sound and voice: sample loading, spatialisation, loops, `sfx.*`, speech synthesis with de-duplication | `loadSamples play loopSet sfx say` |
-| 803–874 | **Game state** and match setup | `G`, `keys`, `held`, `newMech`, `startMission`, `startSkirmish`, `startMatch` |
-| 875–931 | Geometry helpers: frames, muzzle, eye, ray vs cylinder, ray vs terrain, `rayHit` | `frame torsoFrame center muzzle eyeOf viewYaw rayCyl rayTerrain rayHit` |
-| 932–954 | Effects: messages, particles, explosions | `msg particle explode` |
-| 955–1071 | **Combat**: section routing, damage, destruction, win/lose, firing | `sectionHit damage destroy fire` |
-| 1072–1116 | **Simulation** of one mech: speed, jets, gravity, heat, shutdown, cooldowns | `stepMech` |
-| 1117–1226 | Legs: planted feet, swing windows, two-bone IK | `restFoot initFeet swingTarget gait footDown solveKnee limb` |
-| 1227–1276 | **AI**: one function, state in `m.ai` | `think` |
-| 1277–1409 | **`update(dt)`**: input → player, aim ray, per-mech tick, collisions, projectiles, particles, wrecks, MP send cadence, audio loops, end-of-match timer | `update` |
-| 1410–1455 | Continuous laser beams and armour melt | `MELT_T MELT_MAX MELT_COOL meltMult beamTick coolArmour beamMult` |
-| 1456–1620 | Fusion cannon: scan, lock help, discharge pulse, sounds | `fusionTick nearMiss fusionFire launchPulse updatePulses fusionSound remoteBeam flushHits beamSound drawBeam` |
-| 1621–1721 | Missiles: tap vs hold, guided camera, blast radius, fire-by-category, alpha, target cycling | `HOLD_TO_GUIDE BLAST_R missileTrigger startGuide steerVolley steerBy endGuide blast fireCat alpha cycleTarget` |
-| 1722–1901 | **Rendering**: resize, `drawMech` (legs via IK), `render()` (camera per state, sky, world, mechs, wrecks, shots, pulses, beams, particles) | `resize drawMech render` |
-| 1902–2297 | **HUD** on a 2D canvas: layout for desktop vs touch, radar, bars, mech diagram, weapons, arena board, guide HUD | `project hudLayout mechDiagram drawArenaHUD drawGuideHUD drawHUD` |
-| 2298–2548 | Screens: controls tables, options, overlay, **main menu** with live mech, launch, debrief, pause, overlay click handling, mech cycling | `showOverlay mainMenu renderMenu menuDetail go launch debrief pause cycleMech` |
-| 2549–2626 | Input: pointer lock, mouse, keyboard | `lockPointer onMouseMove onKeyDown onKeyUp GAME_KEYS` |
-| 2627–2721 | Touch: floating stick, aim drag, buttons, per-finger tracking | `touchButton syncTouchUI` |
-| 2722–2960 | **Multiplayer** client: join, protocol handler, arena setup, spawn, state send/receive, interpolation, relayed effects | `Net join netSend onNet startArena spawnPoint respawn sendState netState netInterp netFx` |
-| 2961–2987 | Frame loop: variable `dt` capped at 50 ms, pause on blur, audio keep-alive | `loop` |
+- **`app`** (built in `main.js`): `{ root, wrap, cv, hud, ov, ctx, R, prefs, params, G, audio, scene, hud, input, net, ui }`.
+  Page-side modules receive it and call each other through it at event time
+  (`app.ui.pause(true)`, `app.net.send(...)`), which is what lets them be
+  created in any order.
+- **`G`** (`createGame`) is the one state object. Only the sim mutates
+  gameplay state; render, HUD and net read it; input writes nothing to it
+  directly (it produces a snapshot). `G.fx` is the effects sink the sim talks
+  through (`say`, `sfx.*`, `fusionSound`, `netSend`); `G.hooks` holds the two
+  callbacks the page installs (`debrief`, `arenaDeath`). `G.rng` is the
+  seeded randomness; `G.clock` is real time in ms, set by the loop.
+- **Input snapshot** (`src/input/input.js` → `update`): `{ thrUp, thrDown,
+  stop, turn, twist, pitch, centre, jets, held: {energy, ballistic, missile,
+  fusion}, missileTap }`. The HUD reads the last one from `G.input`.
+- **prefs** (`main.js` `loadPrefs`): `{ sound, voice, invert, mission, chassis,
+  menuSel, fpMap, fpFoes, mpName, mpColor }`, persisted under the same
+  `stompy.*` keys as before.
+- **Frame**: `update(G, input, dt)` → `net.tick(dt)` (arena cadence, respawn)
+  → `audio.tick()` (loops follow the state) → `scene.render()` → `hud.draw()`.
 
 ### The data model
 
@@ -126,7 +122,7 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
 
 ### The network protocol (as it is)
 
-Client → server: `hello {name, color}`, `s {state...}` (15 Hz), `fx {k, ...}`
+Client → server: `hello {v, name, color}`, `s {state...}` (15 Hz), `fx {k, ...}`
 (`b` beam flash, `s` shell, `m` missile volley, `fu` fusion discharge, `mg`
 guided volley update, `md` detonate), `hit {to, amt, p, fu}`, `died {by}`.
 
@@ -135,16 +131,17 @@ Server → client: `welcome {id, seed, pal, limit, over, scores}`, `full
 fu}`, `kill {victim, killer, scores}`, `roundover {winner, name, next,
 scores}`, `newround {seed, pal, scores}`.
 
-The state message (`sendState`, line 2873) carries chassis `ch`, pose, speed,
-alive/shutdown flags, per-section hp, beam state (`bm`, `be`, `bf`), fusion
-scan state (`fl`, `sc`, `sp`). Note `sp` is used twice in that object (speed
-and scan progress); the second wins. Fixing that is in the M5a issue list.
+The state message (`stateMessage` in `src/net/protocol.js`) carries chassis
+`ch`, pose, speed `sp`, alive/shutdown flags, per-section hp, beam state
+(`bm`, `be`, `bf`), fusion scan state (`fl`, `sc`, `sq`). (`sq` was `sp`
+before M0, which overwrote the speed; the client reads whichever it sent, so
+there was never a cross-version issue.) `hello` carries `v: PROTOCOL`; the
+server ignores it until M5a enforces it.
 
-## Where it is going (M0)
+## How M0 split it (kept for the record)
 
-M0 splits `stompy.js` into ES modules without changing behaviour, so that sim
-code can be tested headlessly and later features land in files of a few
-hundred lines. The constraints:
+M0 split the original single `stompy.js` into the modules above without
+changing behaviour. The constraints it worked under:
 
 - Served as-is in development: `index.html` loads `src/main.js` with `<script
   type="module">`. No bundler needed to play.
@@ -154,7 +151,7 @@ hundred lines. The constraints:
 - Pure modules (no `document`, `window`, `gl`, `AudioContext`) are the ones
   tests import. The split is designed around that boundary.
 
-### Target layout
+### Layout (as built, with the files later milestones add marked)
 
 ```
 index.html
@@ -239,7 +236,8 @@ that with two objects passed explicitly:
   beam, netSend }`. The real app passes the audio/visual implementations; tests
   pass a recorder or no-ops. Sim code never touches audio or GL directly.
 
-`update(game, input, dt, fx)` is then a pure-ish function of its arguments.
+`update(game, input, dt)` is then a pure-ish function of its arguments (the
+sink lives at `game.fx` rather than being a fourth argument).
 `render(game, gl...)` reads `game` and draws. The HUD reads `game`. The
 network layer reads/writes `game.mechs`. This is the whole trick; it is a
 mechanical refactor but a large one, and it is the only M0 item that touches
@@ -248,11 +246,11 @@ staged order that keeps the game playable at every commit.
 
 ### Determinism
 
-`Math.random` is used throughout the sim (spawn angles, AI jitter, spread,
-particles). M0 introduces `sim/rng.js` (a small xorshift or mulberry32 seeded
+`Math.random` was used throughout the sim (spawn angles, AI jitter, spread,
+particles). M0 introduced `sim/rng.js` (a small xorshift or mulberry32 seeded
 from the match seed) and routes every sim-side call through `game.rng`.
-Particles and sound variation may keep `Math.random`; anything that affects
-hit outcomes, AI decisions or spawn positions must not. This is what makes
+Everything inside `src/sim` draws from it, particles included; render and
+audio keep `Math.random` (`rnd` in `util/math.js`) for cosmetic jitter. This is what makes
 tests reproducible and what co-op (M5b) later needs so that the host and
 guests agree on terrain and spawns.
 
