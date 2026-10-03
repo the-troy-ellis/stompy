@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestGame, stepFor, foes, freeze } from './helpers.js';
-import { damage, DEATH_BEAT, DEATH_TOPPLE } from '../src/sim/combat.js';
+import { damage, DEATH_BEAT, DEATH_BUCKLE, DEATH_TOPPLE, WRECK_SETTLE } from '../src/sim/combat.js';
 import { toppleOf } from '../src/render/scene.js';
 import { M } from '../src/util/math.js';
 import { VOICE } from '../src/data/voice.js';
@@ -25,12 +25,24 @@ test('a kill is a beat of silence, then the blast, then a topple, then a wreck t
   const booms = G.fx.calls('sfx.boom');
   assert.ok(booms.length >= 2, 'the torso blew');
   assert.ok(booms[0].t - t0 >= DEATH_BEAT - 1e-6, `bang at +${(booms[0].t - t0).toFixed(3)} s`);
+  // The blast takes the arms and a shower of plates with it.
+  assert.equal(e.hp.LA, 0); assert.equal(e.hp.RA, 0);
+  assert.equal(G.debris.filter(d => d.part === 'arm').length, 2, 'both arms should be flying');
+  assert.ok(G.debris.filter(d => d.part === 'plate').length >= 4, 'plates should be flying');
+  // The legs buckle before the topple: the hull drops, the body only leans.
+  assert.ok(e.dying.drop > 0 && e.dying.buckle > 0 && e.dying.buckle < 1, `buckling: drop ${e.dying.drop} buckle ${e.dying.buckle}`);
   assert.ok(e.dying.angle > 0 && e.dying.angle < 0.3);
+  stepFor(G, DEATH_BUCKLE);
+  assert.equal(e.dying.buckle, 1);
+  assert.ok(e.dying.angle < 0.4, 'still mostly upright as the topple starts');
   stepFor(G, DEATH_TOPPLE);
   assert.equal(e.dying, null);
   assert.ok(e.gone);
   assert.equal(G.wrecks.length, 1);
   assert.ok(G.wrecks[0].pops >= 2);
+  assert.ok(G.wrecks[0].settle < 1, 'a fresh wreck is still settling');
+  stepFor(G, WRECK_SETTLE + 0.1);
+  assert.equal(G.wrecks[0].settle, 1);
   const before = G.fx.calls('sfx.boom').length;
   stepFor(G, 4);
   assert.ok(G.fx.calls('sfx.boom').length > before, 'no secondaries');
@@ -58,7 +70,7 @@ test('the player dies the same way and the match still ends on time', () => {
   damage(G, P, [P.x, P.y + 5, P.z], 1000, e);
   assert.equal(G.state, 'over');
   assert.ok(P.dying);
-  stepFor(G, 1.2);
+  stepFor(G, DEATH_BEAT + DEATH_BUCKLE + DEATH_TOPPLE + 0.05);
   assert.ok(P.gone && G.wrecks.length === 1);
   assert.ok(G.fx.calls('thump').some(c => c.args[0] >= 1), 'the death row did not thump');
   stepFor(G, 2.5);

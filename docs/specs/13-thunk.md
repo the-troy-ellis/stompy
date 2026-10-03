@@ -115,6 +115,17 @@ there. The hit row's strength is scaled by section (`HIT_BY_SECTION`: legs
 still for `HIT_STOP` (80 ms): a hit-stop you feel in the hand before you see
 the sparks. Beams keep their own sparks and the melt sway.
 
+### Death, stage by stage (M1 #7 and #24, shipped)
+
+Torso at zero: a quarter-second beat with only a rising whine; the torso
+blows and takes both arms and four plates with it; the legs buckle for
+0.3 s (the hull drops a third of the hip height as the knees fold out and
+the body starts to lean); the body topples rigidly about the ground under it
+for 0.8 s; then it is a wreck that rocks and sinks for a second and pops a
+few more times. Gameplay changes at once (dead, scored, the match ending);
+only the show waits. The player goes down the same way, eye and all. A mech
+that loses both legs sits down and keeps firing until it goes.
+
 ### Audio layer
 
 `src/audio/thump.js`: one sub-bass voice (sine at 45–60 Hz with a 10 ms
