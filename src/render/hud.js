@@ -6,6 +6,10 @@ import { MELT_MAX, beamMult } from '../sim/beams.js';
 
 const { sin, cos, atan2, min, max, PI, random, hypot, floor } = Math;
 
+// The compass tape's label for a heading in degrees: a cardinal letter on
+// the quarters, otherwise the heading in tens (030, 120...) as two digits.
+export const compassLabel = d => ({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[d] || String(d / 10).padStart(2, '0'));
+
 // The cockpit instruments on the 2D canvas over the GL view: crosshair and
 // scan rings, target brackets, compass, radar, damage, heat, weapons,
 // throttle, messages, the arena board, and the missile camera's IR feed.
@@ -287,7 +291,7 @@ export function createHud(app) {
     for (let dgr = floor((hdg - 70) / 10) * 10; dgr <= hdg + 70; dgr += 10) {
       const x = app.scene.view.W / 2 + (dgr - hdg) * pxPerDeg, d = ((dgr % 360) + 360) % 360;
       ctx.beginPath(); ctx.moveTo(x, ty + 18); ctx.lineTo(x, ty + (d % 30 ? 22 : 15)); ctx.stroke();
-      if (d % 30 === 0) ctx.fillText({ 0: 'N', 90: 'E', 180: 'S', 270: 'app.scene.view.W' }[d] || String(d / 10).padStart(2, '0'), x, ty + 8);
+      if (d % 30 === 0) ctx.fillText(compassLabel(d), x, ty + 8);
     }
     ctx.restore();
     ctx.fillStyle = AMBER;
