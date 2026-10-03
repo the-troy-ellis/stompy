@@ -6,7 +6,7 @@ import { viewYaw } from '../src/sim/geom.js';
 import { damage } from '../src/sim/combat.js';
 import { wrapA } from '../src/util/math.js';
 import { canSee } from '../src/sim/ai/perception.js';
-import { PERCEPTION } from '../src/data/ai.js';
+import { PERCEPTION, DIFF, DIFF_ORDER } from '../src/data/ai.js';
 
 // A wall `h` high over x in (lo, hi), running the length of the map, on
 // otherwise flat ground. Nobody in these tests walks through it.
@@ -29,7 +29,7 @@ test('a JACKAL on NORMAL cannot track the player through a hill: its belief stay
   const G = createTestGame({ foes: ['jackal'] });
   const P = G.player, e = foes(G)[0];
   e.ai.aware = false; place(G, e, 0, 350, Math.PI);
-  stepFor(G, 1);
+  stepFor(G, 1.5);   // sight, then NORMAL's 0.8 s to react
   assert.equal(e.ai.state, 'engage', 'should have spotted the player in the open');
   wall(G, 40, 80);
   place(G, P, 120, 0, 0);   // behind the wall, as seen from the enemy
@@ -49,7 +49,7 @@ test('after 8 s without line of sight it searches where it last saw you, then gi
   const G = createTestGame({ foes: ['warden'] });
   const P = G.player, e = foes(G)[0];
   e.ai.aware = false; place(G, e, 0, 300, Math.PI);
-  stepFor(G, 1);
+  stepFor(G, 1.5);
   assert.equal(e.ai.state, 'engage');
   wall(G, 40, 80);
   place(G, P, 120, 0, 0);
@@ -66,7 +66,7 @@ test('after 8 s without line of sight it searches where it last saw you, then gi
   assert.equal(e.ai.aware, false);
 });
 
-test('a contact is shouted to allies within 200 m, a second later', () => {
+test('a contact reaches allies within 200 m that cannot see it themselves, with the place', () => {
   const G = createTestGame({ foes: ['jackal', 'jackal'] });
   const [a, b] = foes(G);
   a.ai.aware = false; b.ai.aware = false;
@@ -75,10 +75,11 @@ test('a contact is shouted to allies within 200 m, a second later', () => {
   place(G, b, 180, 200, 0);          // the wall is between it and the player; 180 m from a
   assert.equal(canSee(G, b, G.player), false);
   stepFor(G, 0.5);
+  assert.equal(a.ai.aware, false, 'NORMAL takes 0.8 s to react');
+  assert.equal(b.ai.aware, false);
+  stepFor(G, 2);
   assert.equal(a.ai.aware, true);
-  assert.equal(b.ai.aware, false, 'the shout takes a second');
-  stepFor(G, 1);
-  assert.equal(b.ai.aware, true);
+  assert.equal(b.ai.aware, true, 'the group pass or the shout should have told it');
   assert.ok(hypot(b.ai.belief.x, b.ai.belief.z) < 5, 'it was told where');
 });
 
@@ -93,4 +94,33 @@ test('being hit is a contact even out of sight, and the shooter is where it look
   assert.ok(hypot(e.ai.belief.x - P.x, e.ai.belief.z - P.z) < 1);
   stepFor(G, 0.5);
   assert.equal(e.ai.state, 'engage');
+});
+
+test('first sight takes a beat to react to, shorter on harder settings, and resets if you duck away', () => {
+  for (const k of DIFF_ORDER) for (const key of ['sight', 'heatCap', 'aimErr', 'react', 'label']) assert.ok(DIFF[k][key] != null, `${k}.${key}`);
+  const seen = diff => {
+    const G = createTestGame({ foes: ['jackal'] });
+    G.diff = diff;
+    const e = foes(G)[0];
+    e.ai.aware = false; place(G, e, 0, 200, Math.PI);
+    let at = null;
+    for (let t = 0; t < 3 && at == null; t += 1 / 60) { stepFor(G, 1 / 60); if (e.ai.aware) at = G.time; }
+    return at;
+  };
+  const easy = seen('easy'), hard = seen('hard');
+  assert.ok(hard < DIFF.hard.react + 0.4, `HARD reacted at ${hard}`);
+  assert.ok(easy >= DIFF.easy.react, `EASY reacted at ${easy}, before its ${DIFF.easy.react} s`);
+  assert.ok(easy > hard);
+  // Duck behind a wall halfway through the beat: the clock starts over.
+  const G = createTestGame({ foes: ['jackal'] });
+  G.diff = 'easy';
+  const e = foes(G)[0];
+  e.ai.aware = false; place(G, e, 0, 200, Math.PI);
+  stepFor(G, 0.8);
+  assert.equal(e.ai.aware, false);
+  assert.ok(e.ai.reactAt != null, 'it should be counting');
+  wall(G, 40, 80); place(G, G.player, 120, 0, 0);
+  stepFor(G, 0.5);
+  assert.equal(e.ai.reactAt, null, 'out of sight: the count should reset');
+  assert.equal(e.ai.aware, false);
 });

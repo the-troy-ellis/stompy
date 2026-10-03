@@ -34,7 +34,7 @@ test('a group shares the freshest fix: a member that cannot see gets the contact
   place(G, a, 0, 200, Math.PI);
   place(G, b, 180, 200, 0);
   assert.equal(canSee(G, b, G.player), false);
-  stepFor(G, 0.7);   // before the one-second shout would land
+  stepFor(G, 1.7);   // NORMAL's 0.8 s to react, then the next group pass; the shout would land at 1.8 s at the earliest
   assert.equal(a.ai.aware, true);
   assert.equal(b.ai.aware, true, 'the group should have told it');
   assert.ok(hypot(b.ai.belief.x, b.ai.belief.z) < 5, 'and where');
