@@ -100,7 +100,7 @@ test('one tap cycles a hardpoint through its category and EMPTY, wrapping, and t
   let lo = stockLoadout('kestrel');
   const seen = new Set();
   for (let i = 0; i < choicesFor(CHASSIS.kestrel.hardpoints[0]).length; i++) { seen.add(lo.hp.la); lo = cycleWeapon('kestrel', lo, 'la', 1); }
-  assert.deepEqual([...seen].sort(), ['laser', 'mlaser', null].sort());
+  assert.deepEqual([...seen].sort(), choicesFor(CHASSIS.kestrel.hardpoints[0]).sort());
   assert.equal(lo.hp.la, 'laser', 'a full lap comes back to stock');
   assert.equal(cycleWeapon('kestrel', lo, 'la', -1).hp.la, null, 'backwards from the first is EMPTY');
   assert.equal(cycleWeapon('kestrel', lo, 'nope', 1), lo);
@@ -109,4 +109,11 @@ test('one tap cycles a hardpoint through its category and EMPTY, wrapping, and t
   assert.equal(s.sys.sinks, 0, 'four taps on a 0-3 slot wrap round');
   assert.equal(cycleSystem(s, 'jets', -1).sys.jets, 0);
   assert.equal(stockLoadout('kestrel').hp.la, 'laser', 'cycling never mutates its input');
+});
+
+test('the server\'s copy of the mechlab tables is up to date with the game (npm run fixture:loadout)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { loadoutFixture } = await import('../src/sim/loadout.js');
+  const onDisk = JSON.parse(readFileSync(new URL('../server/loadout_tables.json', import.meta.url), 'utf8'));
+  assert.deepEqual(onDisk, JSON.parse(JSON.stringify(loadoutFixture())), 'server/loadout_tables.json is stale: run npm run fixture:loadout');
 });

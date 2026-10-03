@@ -7,6 +7,7 @@ import { meltFrac } from '../sim/beams.js';
 import { FEEL, HEAT, hotFrac } from '../data/feel.js';
 import { meleeOf } from '../data/melee.js';
 import { BARREL_AT } from '../mesh/mechParts.js';
+import { WEAPONS } from '../data/weapons.js';
 
 // An arm gun's proportions by weapon: [thickness, length] against the stock barrel.
 const BARREL = { laser: [1, 1], mlaser: [0.8, 0.7], ac: [1.45, 1.1], lrm: [1.7, 0.55] };
@@ -227,7 +228,9 @@ export function createScene(app) {
       // The nose camera can't see its own volley flying alongside it.
       if (gd && s.guided && len(sub(s.p, eye)) < 8) continue;
       const d = norm(s.v), yw = atan2(d[0], d[2]), pt = Math.asin(clampN(d[1], -1, 1));
-      if (s.kind === 'shell') R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.25, 0.25, 2.2)), [1, 0.85, 0.4], 1);
+      const sd = WEAPONS[s.type];
+      if (sd?.bolt) { R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.7, 0.7, 3.4)), sd.col, 1); R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(1.3, 1.3, 1.6)), [0.8, 0.9, 1], 1); }
+      else if (s.kind === 'shell') R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.25, 0.25, 2.2)), [1, 0.85, 0.4], 1);
       else R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.35, 0.35, 1.2)), [1, 0.55, 0.25], 1);
     }
     // Fusion pulses: six sine waves, each in its own plane with its own

@@ -107,6 +107,7 @@ function finishStep(G, m, dt) {
   }
   if (m === G.player && m.heat > 80 && !m.shutdown) G.fx.say('Warning. Heat critical.');
   for (const w of m.weapons) w.cd = max(0, w.cd - dt);
+  if (m.scramble > 0) m.scramble = max(0, m.scramble - dt);
 
   stepFeel(m, dt);
   gait(G, m, dt);

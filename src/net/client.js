@@ -9,7 +9,7 @@ import { newMech, resetMatch } from '../sim/state.js';
 import { eyeOf } from '../sim/geom.js';
 import { initFeet } from '../sim/gait.js';
 import { msg, particle, explode } from '../sim/effects.js';
-import { beginDeath, damage, destroy, shedSection } from '../sim/combat.js';
+import { beginDeath, damage, destroy, scramble, shedSection } from '../sim/combat.js';
 import { knock } from '../sim/knock.js';
 import { feel } from '../sim/feel.js';
 import { voice } from '../sim/voice.js';
@@ -18,6 +18,7 @@ import { launchPulse } from '../sim/fusion.js';
 import { SEND_HZ } from '../sim/missiles.js';
 import { PROTOCOL, hit, stateMessage } from './protocol.js';
 import { fitOf } from '../ui/mechlab.js';
+import { applyLoadout, stockLoadout, validate } from '../sim/loadout.js';
 
 const { sin, cos, atan2, min, max, random, hypot } = Math;
 const clamp30 = v => max(-30, min(30, +v || 0));
@@ -37,7 +38,7 @@ export function createNet(app) {
   // extrapolated, and walk with the same gait. Their shots arrive as effects
   // ("ghosts") that look real but never score -- their shooter scores them.
   const NET_PORT = 8096;
-  const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10 };
+  const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10, loSent: '', loN: 0 };
   const mp = () => G.mode === 'mp';
   const pilotName = id => Net.info.get(id)?.name || `PILOT ${id}`;
   const pilotCss = id => MP_COLORS[Net.info.get(id)?.color ?? 0]?.css || '#f44';
@@ -102,6 +103,17 @@ export function createNet(app) {
         break;
       }
       case 's': netState(m); break;
+      case 'note':
+        // The server would not take our loadout (a version mismatch, or a fit
+        // over its tonnage): fight in stock, as everyone else now sees us.
+        if (m.k === 'lo') {
+          const P = G.player, hp = { ...P.hp };
+          applyLoadout(G, P, stockLoadout(P.type));
+          for (const k of HPK) P.hp[k] = Math.min(hp[k], P.max[k]);
+          Net.loSent = JSON.stringify(P.loadout);
+          msg(G, 'LOADOUT REJECTED', '#f44');
+        }
+        break;
       case 'fx': netFx(m); break;
       case 'hit':
         if (!G.player.alive) break;
@@ -111,6 +123,7 @@ export function createNet(app) {
           const melee = !!(m.me || m.st);
           if (melee) G.player.lastHitMelee = m.st ? 'stomp' : 'punch';
           damage(G, G.player, m.p, m.amt, mechById(m.from) || null, false, melee);
+          if (m.zap && G.player.alive) scramble(G, G.player, WEAPONS.ppc.scramble, m.p);
           // A shove or a stomp: the push, the aim jolt and the lurch happen here, on the victim's screen.
           if (Array.isArray(m.kb) && G.player.alive && G.player.spawnT <= 0 && !G.roundOver) {
             const kb = [clamp30(m.kb[0]), clamp30(m.kb[1])], v = hypot(kb[0], kb[1]);
@@ -180,7 +193,14 @@ export function createNet(app) {
     sendState();
   }
 
-  function sendState() { netSend(stateMessage(G.player, beamMult(G.player))); }
+  // The loadout rides the state message when it changes, and every LOADOUT_EVERY
+  // messages (2 s) so a pilot who joins late learns it too.
+  const LOADOUT_EVERY = 30;
+  function sendState() {
+    const lo = JSON.stringify(G.player.loadout || null), withLo = lo !== Net.loSent || ++Net.loN >= LOADOUT_EVERY;
+    if (withLo) { Net.loSent = lo; Net.loN = 0; }
+    netSend(stateMessage(G.player, beamMult(G.player), withLo));
+  }
 
   function netState(s) {
     let r = G.mechs.find(m => m.netId === s.id);
@@ -192,6 +212,11 @@ export function createNet(app) {
     }
     const first = !r.net;
     r.net = { ...s, at: performance.now() };
+    // Their mechlab fit: weapons drawn and fired as they carry them, armour to scale.
+    if (s.lo) {
+      const key = JSON.stringify(s.lo);
+      if (key !== r.loKey) { r.loKey = key; applyLoadout(G, r, validate(r.type, s.lo).loadout); }
+    }
     // Someone's resonance scan is on us: warn, with an alarm.
     if (s.sc === Net.id && s.sq > 0) {
       if (!G.scanWarn || performance.now() - G.scanWarn.at > 1000) app.audio.say('Warning. Resonance scan.', true);
@@ -222,7 +247,8 @@ export function createNet(app) {
       for (let i = 0; i < 4; i++) particle(G, f.b, [rnd(-4, 4), rnd(1, 6), rnd(-4, 4)], 0.25, 0.35, d.col, 'fire');
       app.audio.sfx.laser(f.a, d === WEAPONS.mlaser);
     } else if (f.k === 's') {
-      G.shots.push({ kind: 'shell', p: f.p, v: f.v, owner: src, dmg: 0, life: WEAPONS.ac.range / WEAPONS.ac.speed, ghost: true });
+      const d = WEAPONS[f.w]?.kind === 'shell' ? WEAPONS[f.w] : WEAPONS.ac;
+      G.shots.push({ kind: 'shell', type: WEAPONS[f.w] ? f.w : 'ac', p: f.p, v: f.v, owner: src, dmg: 0, life: d.range / d.speed, ghost: true });
       app.audio.sfx.cannon(f.p);
     } else if (f.k === 'm') {
       const d = WEAPONS.lrm, target = f.tg ? mechById(f.tg) : null;

@@ -122,7 +122,7 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
 
 ### The network protocol (as it is)
 
-`PROTOCOL` is 2 (M1: melee).
+`PROTOCOL` is 4 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell effect so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim).
 
 Client → server: `hello {v, name, color}`, `s {state...}` (15 Hz), `fx {k, ...}`
 (`b` beam flash, `s` shell, `m` missile volley, `fu` fusion discharge, `mg`
@@ -130,7 +130,7 @@ guided volley update, `md` detonate, `pu` a punch starts), `hit {to, amt, p,
 fu, kb?, me?, st?}`, `died {by, me?}`.
 
 Server → client: `welcome {id, seed, pal, limit, over, scores}`, `full
-{max}`, `join`, `leave`, `s` and `fx` stamped with `id`, `hit {from, amt, p,
+{max}`, `join`, `leave`, `note {k}` (`k: 'lo'`: your loadout was rejected), `s` and `fx` stamped with `id`, `hit {from, amt, p,
 fu, kb?, me?, st?}`, `kill {victim, killer, scores, me?}`, `roundover {winner,
 name, next, scores}`, `newround {seed, pal, scores}`.
 
@@ -146,7 +146,17 @@ The state message (`stateMessage` in `src/net/protocol.js`) carries chassis
 (`bm`, `be`, `bf`), fusion scan state (`fl`, `sc`, `sq`), and the punch phase
 `pu` (0 none, 1 wind-up, 2 recovery), which `meleeGhost` turns into the
 swing pose on other screens; `fx {k: 'pu'}` starts the wind-up without
-waiting for the next report. (`sq` was `sp`
+waiting for the next report.
+
+Mechlab loadouts (`docs/specs/02-mechlab.md` § Arena): `s` carries `lo`, the
+validated loadout, whenever it changes and every 30th message (2 s) so late
+joiners learn it. Receivers refit the remote mech when `lo` differs from the
+last one they applied. The relay checks every `lo` with `server/data.py`,
+which loads `server/loadout_tables.json`, a fixture written from the game's
+own tables by `npm run fixture:loadout` (a Node test fails if it is stale; a
+Python test replays its answered cases). A malformed or overweight loadout is
+relayed as stock and the sender gets `note {k: 'lo'}`, refits to stock and
+shows LOADOUT REJECTED. (`sq` was `sp`
 before M0, which overwrote the speed; the client reads whichever it sent, so
 there was never a cross-version issue.) `hello` carries `v: PROTOCOL`; the
 server ignores it until M5a enforces it.

@@ -12,6 +12,7 @@ import { feel } from './feel.js';
 import { HIT_BY_SECTION, HIT_STOP } from '../data/feel.js';
 import { voice } from './voice.js';
 import { alertEnemy } from './ai/perception.js';
+import { WEAPONS } from '../data/weapons.js';
 
 const { sin, cos } = Math;
 
@@ -26,6 +27,19 @@ const mp = G => G.mode === 'mp';
 
 // `beam`: a slice of continuous laser damage (one frame's worth) -- it
 // isn't a "hit" for accuracy, and mustn't ring the armour every frame.
+// What a shell does beyond its damage, by weapon: a bolt scrambles and rattles.
+export function onShellHit(G, s, t, p) {
+  const d = WEAPONS[s.type];
+  if (!d || !t.alive && !t.dying) return;
+  if (d.scramble) scramble(G, t, d.scramble, p);
+}
+export function scramble(G, t, secs, p) {
+  if (t.remote) { const q = G.pendingHits.get(t.netId); if (q) q.zap = 1; return; }   // their client scrambles itself
+  t.scramble = Math.max(t.scramble || 0, secs);
+  const a = viewYaw(t), side = -Math.sign((p[0] - t.x) * cos(a) - (p[2] - t.z) * sin(a)) || 1;
+  feel(G, 'bolt', { mech: t, k: 1, roll: side, at: t === G.player ? null : p });
+}
+
 export function damage(G, m, p, amt, src, beam = false, melee = false) {
   if (!m.alive) return;
   if (!melee) m.lastHitMelee = false;
@@ -179,12 +193,12 @@ export function fire(G, m, w, aim, target) {
   if (d.ammo) w.ammo--;
   if (m === G.player) G.stats.shots += d.count || 1;   // each missile can hit, so each counts
   if (d.kind === 'shell') {
-    G.shots.push({ kind: 'shell', p: mz, v: mul(dir, d.speed), owner: m, dmg: d.dmg, life: d.range / d.speed });
-    if (mp(G) && m === G.player) G.fx.netSend(fxShell(mz, mul(dir, d.speed)));
+    G.shots.push({ kind: 'shell', type: w.type, p: mz, v: mul(dir, d.speed), owner: m, dmg: d.dmg, life: d.range / d.speed });
+    if (mp(G) && m === G.player) G.fx.netSend(fxShell(mz, mul(dir, d.speed), w.type));
     for (let i = 0; i < 5; i++) particle(G, add(mz, mul(dir, 1.5)), add(mul(dir, r.range(4, 12)), [r.range(-2, 2), r.range(-1, 2), r.range(-2, 2)]), 0.15, 0.6, [1, 0.8, 0.3], 'fire');
     G.fx.sfx.cannon(mz);
     m.flash = { frame: G.frame, p: mz, dir, big: true };   // muzzle flash, drawn for two frames
-    if (m === G.player) feel(G, 'fireAc', { mech: m, dir: [-dir[0], -dir[2]] });
+    if (m === G.player) feel(G, d.bolt ? 'fireBolt' : 'fireAc', { mech: m, dir: [-dir[0], -dir[2]] });
   } else {
     const vid = ++G.volleySeq;
     for (let i = 0; i < d.count; i++) {
@@ -223,7 +237,7 @@ export function stepShots(G, dt) {
     const hit = rayHit(G, s.p, dir, stepL, s.owner);
     if (hit) {
       s.life = -1;
-      if (hit.mech && !s.ghost) damage(G, hit.mech, hit.point, s.dmg, s.owner);   // ghosts are other pilots' shots: theirs to score
+      if (hit.mech && !s.ghost) { damage(G, hit.mech, hit.point, s.dmg, s.owner); onShellHit(G, s, hit.mech, hit.point); }   // ghosts are other pilots' shots: theirs to score
       if (s.kind === 'missile' && !s.ghost) blast(G, hit.point, s.dmg, s.owner, hit.mech);
       explode(G, hit.point, false);
     } else s.p = add(s.p, mul(s.v, dt));

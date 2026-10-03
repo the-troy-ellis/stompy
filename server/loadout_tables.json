@@ -1,0 +1,347 @@
+{
+ "chassis": {
+  "kestrel": {
+   "tons": 45,
+   "frame": 12.5,
+   "systems": {
+    "sinks": 0,
+    "armour": 0,
+    "jets": 1
+   },
+   "hardpoints": [
+    {
+     "id": "la",
+     "cat": "energy",
+     "stock": "laser"
+    },
+    {
+     "id": "ra",
+     "cat": "energy",
+     "stock": "laser"
+    },
+    {
+     "id": "t1",
+     "cat": "ballistic",
+     "stock": "ac"
+    },
+    {
+     "id": "t2",
+     "cat": "missile",
+     "stock": "lrm"
+    }
+   ]
+  },
+  "jackal": {
+   "tons": 25,
+   "frame": 15.5,
+   "systems": {
+    "sinks": 0,
+    "armour": 0,
+    "jets": 1
+   },
+   "hardpoints": [
+    {
+     "id": "la",
+     "cat": "energy",
+     "stock": "mlaser"
+    },
+    {
+     "id": "ra",
+     "cat": "energy",
+     "stock": "mlaser"
+    }
+   ]
+  },
+  "warden": {
+   "tons": 60,
+   "frame": 30.5,
+   "systems": {
+    "sinks": 0,
+    "armour": 0,
+    "jets": 1
+   },
+   "hardpoints": [
+    {
+     "id": "t1",
+     "cat": "missile",
+     "stock": "lrm"
+    },
+    {
+     "id": "ra",
+     "cat": "ballistic",
+     "stock": "ac"
+    },
+    {
+     "id": "la",
+     "cat": "energy",
+     "stock": "laser"
+    }
+   ]
+  }
+ },
+ "weapons": {
+  "laser": {
+   "cat": "energy",
+   "tons": 5
+  },
+  "mlaser": {
+   "cat": "energy",
+   "tons": 2
+  },
+  "plaser": {
+   "cat": "energy",
+   "tons": 3
+  },
+  "ac": {
+   "cat": "ballistic",
+   "tons": 8
+  },
+  "ppc": {
+   "cat": "energy",
+   "tons": 7
+  },
+  "lrm": {
+   "cat": "missile",
+   "tons": 6
+  },
+  "fusion": {
+   "cat": "fusion",
+   "tons": 0
+  }
+ },
+ "systems": {
+  "sinks": {
+   "max": 3,
+   "tons": 1
+  },
+  "armour": {
+   "max": 2,
+   "tons": 2
+  },
+  "jets": {
+   "max": 2,
+   "tons": 1.5
+  }
+ },
+ "cases": [
+  {
+   "ch": "kestrel",
+   "input": null,
+   "want": {
+    "loadout": {
+     "hp": {
+      "la": "laser",
+      "ra": "laser",
+      "t1": "ac",
+      "t2": "lrm"
+     },
+     "sys": {
+      "sinks": 0,
+      "armour": 0,
+      "jets": 1
+     }
+    },
+    "tons": 38,
+    "ok": true
+   }
+  },
+  {
+   "ch": "kestrel",
+   "input": "junk",
+   "want": {
+    "loadout": {
+     "hp": {
+      "la": "laser",
+      "ra": "laser",
+      "t1": "ac",
+      "t2": "lrm"
+     },
+     "sys": {
+      "sinks": 0,
+      "armour": 0,
+      "jets": 1
+     }
+    },
+    "tons": 38,
+    "ok": true
+   }
+  },
+  {
+   "ch": "kestrel",
+   "input": {
+    "hp": {
+     "la": "mlaser",
+     "ra": "ac",
+     "t1": "nope",
+     "t2": null,
+     "zz": "laser"
+    },
+    "sys": {
+     "sinks": 9,
+     "armour": -1,
+     "jets": 1.5
+    }
+   },
+   "want": {
+    "loadout": {
+     "hp": {
+      "la": "mlaser",
+      "ra": "laser",
+      "t1": "ac",
+      "t2": null
+     },
+     "sys": {
+      "sinks": 3,
+      "armour": 0,
+      "jets": 1
+     }
+    },
+    "tons": 32,
+    "ok": true
+   }
+  },
+  {
+   "ch": "kestrel",
+   "input": {
+    "hp": {
+     "la": "fusion",
+     "ra": 5
+    },
+    "sys": {
+     "sinks": true,
+     "armour": "2",
+     "jets": 2
+    }
+   },
+   "want": {
+    "loadout": {
+     "hp": {
+      "la": "laser",
+      "ra": "laser",
+      "t1": "ac",
+      "t2": "lrm"
+     },
+     "sys": {
+      "sinks": 0,
+      "armour": 0,
+      "jets": 2
+     }
+    },
+    "tons": 39.5,
+    "ok": true
+   }
+  },
+  {
+   "ch": "jackal",
+   "input": {
+    "hp": {
+     "la": "laser",
+     "ra": "laser"
+    },
+    "sys": {
+     "sinks": 3,
+     "armour": 2,
+     "jets": 2
+    }
+   },
+   "want": {
+    "loadout": {
+     "hp": {
+      "la": "laser",
+      "ra": "laser"
+     },
+     "sys": {
+      "sinks": 3,
+      "armour": 2,
+      "jets": 2
+     }
+    },
+    "tons": 35.5,
+    "ok": false
+   }
+  },
+  {
+   "ch": "jackal",
+   "input": {
+    "hp": {
+     "la": "mlaser",
+     "ra": "mlaser"
+    },
+    "sys": {
+     "sinks": 3,
+     "armour": 0,
+     "jets": 0
+    }
+   },
+   "want": {
+    "loadout": {
+     "hp": {
+      "la": "mlaser",
+      "ra": "mlaser"
+     },
+     "sys": {
+      "sinks": 3,
+      "armour": 0,
+      "jets": 0
+     }
+    },
+    "tons": 22.5,
+    "ok": true
+   }
+  },
+  {
+   "ch": "warden",
+   "input": {
+    "hp": {
+     "t1": null,
+     "ra": "ac",
+     "la": "mlaser"
+    },
+    "sys": {
+     "sinks": 1,
+     "armour": 1,
+     "jets": 1
+    }
+   },
+   "want": {
+    "loadout": {
+     "hp": {
+      "t1": null,
+      "ra": "ac",
+      "la": "mlaser"
+     },
+     "sys": {
+      "sinks": 1,
+      "armour": 1,
+      "jets": 1
+     }
+    },
+    "tons": 45,
+    "ok": true
+   }
+  },
+  {
+   "ch": "warden",
+   "input": {
+    "hp": [],
+    "sys": []
+   },
+   "want": {
+    "loadout": {
+     "hp": {
+      "t1": "lrm",
+      "ra": "ac",
+      "la": "laser"
+     },
+     "sys": {
+      "sinks": 0,
+      "armour": 0,
+      "jets": 1
+     }
+    },
+    "tons": 51,
+    "ok": true
+   }
+  }
+ ]
+}

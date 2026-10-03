@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (names and numbers are proposals; PURPLE PUNCHER is confirmed) |
+| Status | in progress (#65 THUNDERCLAP, #66 PEPPER LASER shipped; names and numbers are proposals; PURPLE PUNCHER is confirmed) |
 | Milestone | M2 |
 | Size | L (each chassis is an M issue; each weapon an S issue) |
 | Depends on | M0; AI profiles from [05-ai.md](05-ai.md); melee from [12-melee.md](12-melee.md) for PURPLE PUNCHER |

@@ -3,7 +3,8 @@
 // here and nowhere else (docs/workflow.md, "Naming things").
 export const NAMES = {
   chassis: { kestrel: 'KESTREL', jackal: 'JACKAL', warden: 'WARDEN' },
-  weapons: { laser: 'LG LASER', mlaser: 'MED LASER', ac: 'AUTOCANNON', lrm: 'LRM-10', fusion: 'FUSION CANNON' },
+  // ppc and the rest of M2's weapons carry placeholder names until the owner picks (docs/workflow.md § Naming).
+  weapons: { laser: 'LG LASER', mlaser: 'MED LASER', ac: 'AUTOCANNON', lrm: 'LRM-10', fusion: 'FUSION CANNON', ppc: 'THUNDERCLAP', plaser: 'PEPPER LASER' },
   // What the menu says about each selectable mech.
   roles: {
     kestrel: { role: 'REVERSE-JOINT · MEDIUM ALL-ROUNDER', kit: '2x LG LASER · AUTOCANNON · LRM-10 · FUSION', fire: 0.75 },

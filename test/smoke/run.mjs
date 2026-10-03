@@ -115,8 +115,11 @@ try {
       await page.waitForSelector('.mm-title', { timeout: 15000 });
       await page.click('[data-sel="mp"]');
       await page.fill('#callsign', name);
+      // ONE joins in a custom fit (the two tabs share storage, so it is cleared again for TWO).
+      if (name === 'ONE') await page.evaluate(() => localStorage.setItem('stompy.fit.kestrel', JSON.stringify({ hp: { la: 'mlaser', ra: 'mlaser', t1: null, t2: 'lrm' }, sys: { sinks: 2, armour: 0, jets: 1 } })));
       await page.click('[data-a="go"]');
       await page.waitForFunction(() => window.__stompy?.game?.mode === 'mp' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+      if (name === 'ONE') await page.evaluate(() => localStorage.removeItem('stompy.fit.kestrel'));
       pages.push(page);
     }
     await pages[1].waitForFunction(() => window.__stompy.game.mechs.length === 2 && window.__stompy.game.mechs.some(m => m.remote && m.alive), null, { timeout: 8000 });
@@ -139,6 +142,10 @@ try {
     const swung = await pages[1].waitForFunction(() => { const r = window.__stompy.game.mechs.find(m => m.remote); return r?.melee ? r.melee.phase : null; }, null, { timeout: 2000 }).then(h => h.jsonValue()).catch(() => null);
     console.log(`arena: TWO sees ONE's swing as ${swung}`);
     if (!swung) { failed = true; console.error('FAIL: the arena did not relay the punch'); }
+    const fit = await pages[1].waitForFunction(() => { const r = window.__stompy.game.mechs.find(m => m.remote); const t = r?.weapons.map(w => w.type).join(','); return t === 'mlaser,mlaser,lrm,fusion' ? t : null; }, null, { timeout: 4000 }).then(h => h.jsonValue()).catch(() => null);
+    const twoKit = await pages[1].evaluate(() => window.__stompy.game.player.weapons.map(w => w.type).join(','));
+    console.log(`arena: TWO sees ONE fitted as ${fit}; TWO itself carries ${twoKit}`);
+    if (!fit || twoKit !== 'laser,laser,ac,lrm,fusion') { failed = true; console.error('FAIL: the arena did not carry the mechlab loadout'); }
     await pages[0].screenshot({ path: 'test-results/smoke-arena.png' });
     await pages[1].keyboard.press('F2');
     await pages[1].waitForFunction(() => window.__stompy.game.state === 'menu', null, { timeout: 5000 });
