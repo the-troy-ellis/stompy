@@ -9,7 +9,7 @@ import { stepShots } from './combat.js';
 import { beamTick, coolArmour, remoteBeam } from './beams.js';
 import { fusionTick, updatePulses } from './fusion.js';
 import { fireCat, missileTrigger, steerVolley } from './missiles.js';
-import { particle } from './effects.js';
+import { particle, stepDebris } from './effects.js';
 import { stepFeel } from './feel.js';
 import { netInterp } from '../net/interp.js';
 
@@ -96,6 +96,7 @@ export function update(G, input, dt) {
     p.spin += dt * 3;
   }
   G.parts = G.parts.filter(p => p.life > 0);
+  stepDebris(G, dt);
   for (const w of G.wrecks) {
     w.t += dt;
     if (w.t < 30 && rng.chance(dt * 5)) particle(G, [w.x + rng.range(-2, 2), w.y + 2, w.z + rng.range(-2, 2)], [rng.range(-0.5, 0.5), rng.range(3, 5), rng.range(-0.5, 0.5)], rng.range(2, 3.5), rng.range(1, 2.2), [0.18, 0.17, 0.17], 'smoke');

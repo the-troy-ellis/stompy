@@ -9,7 +9,7 @@ import { newMech, resetMatch } from '../sim/state.js';
 import { center, eyeOf } from '../sim/geom.js';
 import { initFeet } from '../sim/gait.js';
 import { msg, particle, explode } from '../sim/effects.js';
-import { damage, destroy } from '../sim/combat.js';
+import { damage, destroy, shedSection } from '../sim/combat.js';
 import { beamMult } from '../sim/beams.js';
 import { launchPulse } from '../sim/fusion.js';
 import { SEND_HZ } from '../sim/missiles.js';
@@ -183,7 +183,11 @@ export function createNet(app) {
       G.scanWarn = { by: s.id, p: s.sq, at: performance.now() };
       if (random() < 0.3) app.audio.sfx.beep();
     }
-    if (Array.isArray(s.hp)) HPK.forEach((k, i) => { r.hp[k] = +s.hp[i] || 0; });
+    if (Array.isArray(s.hp)) HPK.forEach((k, i) => {
+      const v = +s.hp[i] || 0;
+      if (r.alive && !first && r.hp[k] > 0 && v <= 0 && k !== 'T') { r.hp[k] = 0; shedSection(G, r, k, [r.x, r.y + 4, r.z]); }
+      r.hp[k] = v;
+    });
     if (first || (s.al && !r.alive)) {
       // Appeared or respawned: jump straight there.
       Object.assign(r, { x: s.x, y: s.y, z: s.z, yaw: s.yaw, twist: s.tw, pitch: s.p, alive: !!s.al });

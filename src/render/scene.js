@@ -39,7 +39,8 @@ export function createScene(app) {
   function drawMech(m, VPtint) {
     // The hips drop by the sag spring (reactor down); the feet stay put and the knees take it up.
     const sag = m.sag ? m.sag.x : 0;
-    const parts = R.mechParts[m.partsKey], B = chain(M.T(0, -sag, 0), frame(m)), sc = m.ch.scale;
+    // A one-legged mech leans toward the gap (m.lean, radians of roll about its heading).
+    const parts = R.mechParts[m.partsKey], B = chain(M.T(0, -sag, 0), frame(m), M.RZ(m.lean || 0)), sc = m.ch.scale;
     const fwd = [sin(m.yaw), 0, cos(m.yaw)];
     // Armour under a beam glows orange as it melts, and runs hotter in IR.
     const mf = meltFrac(m), heatWas = R.drawHeat;
@@ -52,7 +53,8 @@ export function createScene(app) {
     // backward (bird legs) or out and up (the quadruped's spider legs).
     m.feet.forEach((f, i) => {
       const leg = g.legs[i];
-      const legTint = m.hp[leg.hx > 0 ? 'LL' : 'RL'] > 0 ? tint : mul(tint, 0.35);
+      if (m.hp[leg.hx > 0 ? 'LL' : 'RL'] <= 0) return;   // the leg came off; it's lying somewhere behind
+      const legTint = tint;
       const H = M.apply(B, [leg.hx, g.hip, leg.hz]);
       const out = norm([H[0] - hull[0], 0, H[2] - hull[2]]), splay = legSplay(m.squash ? m.squash.x : 0);
       let pole = g.knee === 'forward' ? fwd : g.knee === 'back' ? back : norm(add(out, [0, 0.9, 0]));
@@ -150,6 +152,14 @@ export function createScene(app) {
     // In the missile camera your own mech is out there too.
     R.drawHeat = 1;
     for (const m of G.mechs) if (m.alive && (m !== P || gd || G.state === 'menu')) drawMech(m);
+    // Shed arms and legs, tumbling or lying where they fell.
+    R.drawHeat = 0.6;
+    for (const d of G.debris) {
+      const parts = R.mechParts[d.partsKey];
+      if (!parts || !parts[d.part]) continue;
+      const fade = d.t > d.life - 2 ? (d.life - d.t) / 2 : 1;
+      R.draw(parts[d.part], chain(M.T(...d.p), M.RY(d.rot[1]), M.RX(d.rot[0]), M.RZ(d.rot[2]), M.S(d.scale * (0.6 + 0.4 * fade))), [0.6, 0.58, 0.56]);
+    }
     R.drawHeat = 0.45;
     for (const w of G.wrecks) {
       const parts = R.mechParts[w.type], B = chain(M.T(w.x, w.y, w.z), M.RY(w.yaw), M.S(w.scale));

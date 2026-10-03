@@ -24,7 +24,7 @@ function landingDust(G, m, ground, force) {
 // One mech, one frame: speed, jets, gravity, heat, shutdown, cooldowns, legs.
 export function stepMech(G, m, dt) {
   const r = G.rng, legs = (m.hp.LL > 0 ? 0.5 : 0) + (m.hp.RL > 0 ? 0.5 : 0);
-  let maxS = m.ch.speed * (legs >= 1 ? 1 : legs > 0 ? 0.45 : 0.04);
+  let maxS = m.ch.speed * (legs >= 1 ? 1 : legs > 0 ? 0.45 : 0);   // no legs: sat down, a turret
   if (m.heat > 85) maxS *= 0.65;
   const target = !m.alive || m.shutdown ? 0 : m.throttle * maxS;
   m.speed += clampN(target - m.speed, -11 * dt, 7 * dt);

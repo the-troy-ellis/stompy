@@ -38,6 +38,16 @@ function swingTarget(G, m, i, u, D, dir) {
 
 export function gait(G, m, dt) {
   const s = m.ch.scale, pace = min(1, abs(m.speed) / m.ch.speed), crouch = -0.35 * s * pace;
+  const g0 = geoOf(m), legOk = i => m.hp[g0.legs[i].hx > 0 ? 'LL' : 'RL'] > 0;
+  // No legs left: the hull sits on the ground, the torso still turns and fires.
+  if (m.hp.LL <= 0 && m.hp.RL <= 0) {
+    m.feet.forEach((f, i) => { f.pos = restFoot(G, m, i); f.lifted = false; f.yaw = m.yaw; });
+    m.bob = -(g0.hip - 0.9) * s; m.lean = 0; m.lastYaw = m.yaw;
+    return;
+  }
+  // One leg gone: lean toward the gap, about 8 degrees.
+  const missing = m.hp.LL <= 0 ? 1 : m.hp.RL <= 0 ? -1 : 0;
+  m.lean = missing * 0.14;
   const dyaw = abs(wrapA(m.yaw - (m.lastYaw ?? m.yaw)));
   m.lastYaw = m.yaw;
   if (m.air) {
@@ -62,6 +72,12 @@ export function gait(G, m, dt) {
   m.bob = crouch;
   m.feet.forEach((f, i) => {
     const u = swingOf(i);
+    if (!legOk(i)) {
+      // The leg is gone: nothing swings, and the body dips where its step would have carried it.
+      f.lifted = false;
+      if (u != null) m.bob = min(m.bob, crouch - sin(PI * u) * 0.35 * s);
+      return;
+    }
     if (u == null) {
       if (before[i] != null) {   // the swing just ended: put it down exactly on target
         f.pos = swingTarget(G, m, i, 1, D, dir);

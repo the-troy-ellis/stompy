@@ -2,7 +2,10 @@ import { add, mul, norm, sub } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { SECT_NAME } from '../data/chassis.js';
 import { center, muzzle, rayHit, viewYaw } from './geom.js';
-import { explode, msg, particle } from './effects.js';
+import { explode, msg, particle, shedPart } from './effects.js';
+import { M } from '../util/math.js';
+import { geoOf as geo } from '../data/geo.js';
+import { torsoFrame } from './geom.js';
 import { r2 } from '../net/protocol.js';
 import { blast, endGuide } from './missiles.js';
 import { feel } from './feel.js';
@@ -54,12 +57,33 @@ export function damage(G, m, p, amt, src, beam = false) {
   m.hp[sec] = 0;
   if (sec === 'T') return destroy(G, m, src);
   m.weapons.forEach(w => { if (w.mount === sec) w.dead = true; });
+  shedSection(G, m, sec, p);
   feel(G, 'sectionLost', { mech: m, roll: sec === 'LA' || sec === 'LL' ? -1 : sec === 'RA' || sec === 'RL' ? 1 : 0, at: m === G.player ? null : p });
   explode(G, p, false);
-  if (m === G.player) G.fx.say(`${SECT_NAME[sec]} destroyed.`, true);
+  if (m === G.player) G.fx.say(m.hp.LL <= 0 && m.hp.RL <= 0 && (sec === 'LL' || sec === 'RL') ? 'Legs destroyed. We are now a turret.' : `${SECT_NAME[sec]} destroyed.`, true);
   else if (src === G.player) msg(G, `${m.ch.name}: ${SECT_NAME[sec].toUpperCase()} DESTROYED`);
   if (over > 0) { m.hp.T -= over; if (m.hp.T <= 0) { m.hp.T = 0; destroy(G, m, src); } }
 }
+
+// The part comes off: an arm as one piece from the shoulder, a leg as thigh,
+// shin and foot from where they are. Each flies away from the hit and tumbles.
+export function shedSection(G, m, sec, p) {
+  const r = G.rng, g = geo(m), s = m.ch.scale, away = norm([m.x - p[0], 0.4, m.z - p[2]]);
+  const fling = () => add(mul(away, -r.range(3, 7)), [r.range(-2, 2), r.range(4, 8), r.range(-2, 2)]);
+  if (sec === 'LA' || sec === 'RA') {
+    const at = M.apply(torsoFrame(m), [(sec === 'LA' ? 1 : -1) * g.armX, g.armY, 0]);
+    shedPart(G, m, 'arm', at, fling());
+    return;
+  }
+  const feet = m.feet.filter((f, i) => (g.legs[i].hx > 0) === (sec === 'LL'));
+  for (const f of feet) {
+    const hip = [m.x, m.y + g.hip * s, m.z];
+    shedPart(G, m, 'uleg', lerp3(hip, f.pos, 0.3), fling());
+    shedPart(G, m, 'lleg', lerp3(hip, f.pos, 0.7), fling());
+    shedPart(G, m, 'foot', f.pos, fling());
+  }
+}
+const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
 export function destroy(G, m, src) {
   const r = G.rng;
