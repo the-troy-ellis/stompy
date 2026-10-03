@@ -1,6 +1,5 @@
 import { TAU, add, clampN, len, mul, norm, sub } from '../util/math.js';
-
-const { min } = Math;
+import { feel } from './feel.js';
 
 export function msg(G, text, col = '#7f7') {
   G.msgs.push({ text, col, t: 3.5 });
@@ -19,6 +18,6 @@ export function explode(G, p, big) {
   for (let i = 0; i < n / 2; i++) particle(G, add(p, [r.range(-2, 2), r.range(0, 2), r.range(-2, 2)]), [r.range(-1, 1), r.range(2, 5), r.range(-1, 1)], r.range(1.5, 3), r.range(1, 2.4) * s, [0.25, 0.23, 0.22], 'smoke');
   if (big) for (let i = 0; i < 12; i++) particle(G, p, [r.range(-9, 9), r.range(8, 20), r.range(-9, 9)], r.range(1.5, 2.6), r.range(0.4, 1.1), [0.2, 0.2, 0.2], 'debris', 26);
   const d = len(sub(p, G.eye));
-  G.shake = min(1.2, G.shake + (big ? 1 : 0.35) * clampN(1 - d / 220, 0, 1));
+  feel(G, 'explosion', { mech: G.player, k: (big ? 1 : 0.35) * clampN(1 - d / 220, 0, 1), at: p });
   G.fx.sfx.boom(p, big);
 }

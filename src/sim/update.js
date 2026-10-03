@@ -10,6 +10,7 @@ import { beamTick, coolArmour, remoteBeam } from './beams.js';
 import { fusionTick, updatePulses } from './fusion.js';
 import { fireCat, missileTrigger, steerVolley } from './missiles.js';
 import { particle } from './effects.js';
+import { stepFeel } from './feel.js';
 import { netInterp } from '../net/interp.js';
 
 const { sin, abs, min, max, hypot, cos } = Math;
@@ -58,7 +59,7 @@ export function update(G, input, dt) {
 
   for (const m of G.mechs) {
     if (m.remote) {
-      if (m.alive) { netInterp(m, dt, G.clock); gait(G, m, dt); }
+      if (m.alive) { netInterp(m, dt, G.clock); stepFeel(m, dt); gait(G, m, dt); }
       if (m.alive && m.net?.bm && m.net.be) remoteBeam(G, m, m.net.be); else m.beaming = false;
       if (m.alive && m.net?.fl) G.cbeams.push({ a: muzzle(m, m.weapons.find(w => w.def.kind === 'fusion')), b: m.net.fl, col: WEAPONS.fusion.col, w: 0.05 + 0.035 * abs(sin(G.time * 37)) });
       continue;

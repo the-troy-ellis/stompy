@@ -1,8 +1,10 @@
 import { add, clampN, cross, dot, len, lerp, mul, norm, sub, wrapA } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { particle } from './effects.js';
+import { feel } from './feel.js';
+import { FEEL } from '../data/feel.js';
 
-const { sin, cos, abs, min, max, hypot, PI } = Math;
+const { sin, cos, abs, min, hypot, PI } = Math;
 
 // Legs: planted feet + two-bone IK.
 // A planted foot stays exactly where it landed while the body moves over
@@ -87,13 +89,12 @@ export function gait(G, m, dt) {
 // Touchdown: the sound, the cockpit jolt, a puff of dust.
 function footDown(G, m, f, pace) {
   const P = G.player, r = G.rng, d = P ? hypot(m.x - P.x, m.z - P.z) : 1e9;
-  if (m === P) {
-    G.shake = min(1.2, G.shake + 0.12 * pace);
-    G.kick = max(G.kick, 0.35 + 0.65 * pace);
-    G.fx.sfx.step(m, 0.4 + 0.55 * pace);
-  } else if (d < 350) G.fx.sfx.step(m, 0.3 + 0.45 * pace);
+  // Heavier mechs thump harder; a planted foot's weight scales with scale^2.
+  feel(G, 'step', { mech: m, k: (0.35 + 0.65 * pace) * m.ch.scale * m.ch.scale, at: m === P ? null : f.pos });
+  if (m === P) G.fx.sfx.step(m, 0.4 + 0.55 * pace);
+  else if (d < 350) G.fx.sfx.step(m, 0.3 + 0.45 * pace);
   if (pace > 0.25 && d < 260 && m !== P) {
-    for (let i = 0; i < 3; i++) particle(G, add(f.pos, [r.range(-1, 1), 0.3, r.range(-1, 1)]), [r.range(-2, 2), r.range(0.5, 1.5), r.range(-2, 2)], r.range(0.6, 1), r.range(0.5, 0.9) * m.ch.scale, mul(G.pal.low, 0.8), 'smoke');
+    for (let i = 0; i < 3 * FEEL.step.dust; i++) particle(G, add(f.pos, [r.range(-1, 1), 0.3, r.range(-1, 1)]), [r.range(-2, 2), r.range(0.5, 1.5), r.range(-2, 2)], r.range(0.6, 1), r.range(0.5, 0.9) * m.ch.scale, mul(G.pal.low, 0.8), 'smoke');
   }
 }
 

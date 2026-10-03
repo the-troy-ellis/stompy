@@ -231,3 +231,17 @@ html, body {
   .mech-overlay.menu { background: linear-gradient(180deg, rgba(0, 0, 0, .8) 0%, rgba(0, 0, 0, .5) 60%, rgba(0, 0, 0, .7) 100%); }
   .mm-right { justify-content: center; padding: 0 0 calc(14px + env(safe-area-inset-bottom)); }
 }
+
+/* ---------- ?debug=1: the FEEL panel ---------- */
+.feel-panel {
+  position: absolute; right: 8px; top: 48px; z-index: 4; max-height: 70vh; overflow: auto;
+  background: rgba(0, 10, 0, .85); border: 1px solid #2a7a2a; color: #9f9;
+  font: 10px "Lucida Console", "Courier New", monospace; padding: 4px 6px;
+}
+.feel-head { display: flex; gap: 6px; align-items: center; }
+.feel-panel button { font: inherit; background: #031; color: #9f9; border: 1px solid #5f5; padding: 1px 6px; cursor: pointer; }
+.feel-panel table { border-collapse: collapse; margin-top: 4px; }
+.feel-panel th { text-align: left; padding: 1px 4px; color: #fc3; font-weight: normal; }
+.feel-panel td { padding: 0 1px; }
+.feel-panel input { width: 44px; font: inherit; background: #010a01; color: #9f9; border: 1px solid #1a4a1a; }
+.feel-out { display: block; width: 100%; height: 120px; margin-top: 4px; font: inherit; background: #010a01; color: #9f9; border: 1px solid #1a4a1a; }

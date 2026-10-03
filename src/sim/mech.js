@@ -2,6 +2,7 @@ import { add, clampN } from '../util/math.js';
 import { BOUND } from '../world/terrain.js';
 import { particle } from './effects.js';
 import { gait } from './gait.js';
+import { feel, stepFeel } from './feel.js';
 
 const { sin, cos, min, max } = Math;
 
@@ -28,7 +29,8 @@ export function stepMech(G, m, dt) {
   if (!jets && m.vy <= 0 && m.y - ground < 1.2) {
     if (m.air) {
       const force = clampN(-m.vy / 20, 0.25, 1);
-      if (m === G.player) { G.shake = min(1.2, G.shake + 0.6 * force); G.kick = 1; G.fx.sfx.land(force); }
+      feel(G, 'land', { mech: m, k: force, at: m === G.player ? null : [m.x, m.y, m.z] });
+      if (m === G.player) G.fx.sfx.land(force);
       else G.fx.sfx.step(m, force * 0.8);
     }
     m.y = ground; m.vy = 0; m.air = false;
@@ -38,13 +40,16 @@ export function stepMech(G, m, dt) {
   m.heat = max(0, m.heat - (m.shutdown ? 20 : m.ch.sink) * dt);
   if (!m.shutdown && m.heat >= 100) {
     m.shutdown = true;
+    feel(G, 'shutdown', { mech: m, at: m === G.player ? null : [m.x, m.y, m.z] });
     if (m === G.player) { G.fx.sfx.powerdown(); G.fx.say('Reactor shutdown.', true); }
   } else if (m.shutdown && m.heat < 45) {
     m.shutdown = false;
+    feel(G, 'restart', { mech: m, at: m === G.player ? null : [m.x, m.y, m.z] });
     if (m === G.player) { G.fx.sfx.powerup(); G.fx.say('Reactor online.', true); }
   }
   if (m === G.player && m.heat > 80 && !m.shutdown) G.fx.say('Warning. Heat critical.');
   for (const w of m.weapons) w.cd = max(0, w.cd - dt);
 
+  stepFeel(m, dt);
   gait(G, m, dt);
 }
