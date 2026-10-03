@@ -29,7 +29,7 @@ test('a shoved mech skids that way and its aim jolts toward the blow, then it co
   assert.ok(e.twist !== 0 && e.pitch > 0, 'no aim jolt');
   stepFor(G, 2);
   assert.ok(e.x > 2, `skidded ${e.x}`);
-  assert.ok(Math.hypot(...e.push) < 0.05, 'still sliding');
+  assert.ok(Math.hypot(...e.push) < 0.15, 'still sliding');
 });
 
 test('a missile blast shoves mechs away from it, falling off with distance, never the firer', () => {

@@ -4,8 +4,12 @@ import { particle } from './effects.js';
 import { gait } from './gait.js';
 import { feel, stepFeel } from './feel.js';
 import { FEEL } from '../data/feel.js';
+import { tryStomp } from './melee.js';
 
 const { sin, cos, min, max } = Math;
+
+// How fast a push dies out, per second: an impulse of v m/s moves the mech about v / PUSH_DECAY metres.
+export const PUSH_DECAY = 2.5;
 
 // Touchdown dust: a puff under the feet, and for a hard landing (force over
 // 0.7) a ring that races outward along the ground. (The shockwave mesh is M4.)
@@ -31,7 +35,7 @@ export function stepMech(G, m, dt) {
   const push = m.push || (m.push = [0, 0]);
   m.x = clampN(m.x + (sin(m.yaw) * m.speed + push[0]) * dt, -BOUND, BOUND);
   m.z = clampN(m.z + (cos(m.yaw) * m.speed + push[1]) * dt, -BOUND, BOUND);
-  const keep = max(0, 1 - 4 * dt);
+  const keep = max(0, 1 - PUSH_DECAY * dt);   // a push carries about PUSH_DECAY^-1 of its speed in metres
   push[0] *= keep; push[1] *= keep;
   // Skidding: dust streaks behind the feet while the push is strong.
   const skid = Math.hypot(push[0], push[1]);
@@ -50,9 +54,15 @@ export function stepMech(G, m, dt) {
   } else m.fuel = min(1, m.fuel + dt * 0.12);
   m.vy -= 18 * dt;
   m.y += m.vy * dt;
+  if (m.air) {
+    m.airT = (m.airT || 0) + dt;
+    // Coming down onto a mech: a stomp, and a bounce back up off it.
+    if (m.vy < 0 && !jets && tryStomp(G, m, m.airT)) m.airT = 0;
+  }
   if (!jets && m.vy <= 0 && m.y - ground < 1.2) {
     if (m.air) {
       const force = clampN(-m.vy / 20, 0.25, 1);
+      m.airT = 0;
       feel(G, 'land', { mech: m, k: force, at: m === G.player ? null : [m.x, m.y, m.z] });
       if (m === G.player) G.fx.sfx.land(force);
       else G.fx.sfx.step(m, force * 0.8);
@@ -62,6 +72,11 @@ export function stepMech(G, m, dt) {
   } else if (m.y > ground + 1.2) m.air = true;
   if (m.y < ground) { m.y = ground; m.vy = max(0, m.vy); }
 
+  return finishStep(G, m, dt);
+}
+
+// Heat, shutdown, cooldowns, springs and legs: the second half of a step.
+function finishStep(G, m, dt) {
   m.heat = max(0, m.heat - (m.shutdown ? 20 : m.ch.sink) * dt);
   if (!m.shutdown && m.heat >= 100) {
     m.shutdown = true;
