@@ -124,6 +124,7 @@ export function createNet(app) {
           if (melee) G.player.lastHitMelee = m.st ? 'stomp' : 'punch';
           damage(G, G.player, m.p, m.amt, mechById(m.from) || null, false, melee);
           if (m.zap && G.player.alive) scramble(G, G.player, WEAPONS.ppc.scramble, m.p);
+          if (m.hh > 0 && G.player.alive) G.player.heat += Math.min(m.hh, 20);
           // A shove or a stomp: the push, the aim jolt and the lurch happen here, on the victim's screen.
           if (Array.isArray(m.kb) && G.player.alive && G.player.spawnT <= 0 && !G.roundOver) {
             const kb = [clamp30(m.kb[0]), clamp30(m.kb[1])], v = hypot(kb[0], kb[1]);

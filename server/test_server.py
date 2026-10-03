@@ -195,6 +195,13 @@ class Session(unittest.IsolatedAsyncioTestCase):
         hit = await b.recv()
         self.assertEqual(hit["st"], 1)
         self.assertNotIn("kb", hit)
+        self.assertNotIn("hh", hit)
+        await a.send({"t": "hit", "to": 2, "amt": 1, "p": [0, 0, 0], "hh": 999})   # a flamer's heat, clamped
+        hit = await b.recv()
+        self.assertEqual(hit["hh"], 20)
+        await a.send({"t": "hit", "to": 2, "amt": 1, "p": [0, 0, 0], "hh": -5})
+        hit = await b.recv()
+        self.assertNotIn("hh", hit)
         await a.send({"t": "hit", "to": 1, "amt": 10, "p": [0, 0, 0]})  # never to yourself
         with self.assertRaises(asyncio.TimeoutError):
             await a.recv(timeout=0.3)
