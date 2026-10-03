@@ -92,6 +92,10 @@
    "cat": "energy",
    "tons": 3
   },
+  "gauss": {
+   "cat": "ballistic",
+   "tons": 12
+  },
   "ac": {
    "cat": "ballistic",
    "tons": 8

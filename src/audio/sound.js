@@ -233,12 +233,14 @@ export function createAudio(app) {
       if (play(small ? 'mlaser' : 'laser', { ...at, vol: small ? 0.35 : 0.5, rate: small ? 1 : 0.85 })) return;
       this.osc('sawtooth', 1900, 180, 0.28, 0.05, at); this.osc('sine', 900, 120, 0.3, 0.05, at);
     },
-    // The autocannon is a thunk first and a bang second.
-    cannon(p) {
-      const at = { at: p, ref: 40 };
-      play('punch', { ...at, vol: 0.9, rate: 0.7 });
+    // The autocannon is a thunk first and a bang second. Heavy (BIG BONKER)
+    // is the same thunk an octave down, carrying twice as far, with a crack on top.
+    cannon(p, heavy) {
+      const at = { at: p, ref: heavy ? 80 : 40 };
+      play('punch', { ...at, vol: heavy ? 1.1 : 0.9, rate: heavy ? 0.5 : 0.7 });
       play('crunch', { ...at, vol: 0.45, rate: 1.25 });
-      this.osc('sine', 110, 32, 0.32, 0.3, at);
+      if (heavy) play('plate', { ...at, vol: 0.5, rate: 1.6 });
+      this.osc('sine', heavy ? 70 : 110, heavy ? 24 : 32, heavy ? 0.5 : 0.32, heavy ? 0.45 : 0.3, at);
       if (!buffers.punch) this.noise(0.35, 0.3, 900, 80, 'lowpass', at);
     },
     missile(p) { if (!play('missile', { at: p, ref: 30, vol: 0.35, rate: 1.25, vary: 0.15 })) this.noise(0.7, 0.12, 3000, 400, 'bandpass', { at: p, ref: 30 }); },
