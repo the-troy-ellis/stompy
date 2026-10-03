@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ready |
+| Status | in progress (stages 1–3 shipped on `m0/foundations`) |
 | Milestone | M0 |
 | Size | L, split into the five stages below (each its own issue and PR) |
 | Depends on | none |
@@ -98,7 +98,10 @@ Move into `src/sim/`:
   fireCat alpha cycleTarget` with the guide's *state* only; the camera reads
   `game.guide` in render.
 - `ai.js`: `think`.
-- `update.js`: `update(game, input, dt, fx)`. `input` is a snapshot object
+- `update.js`: `update(game, input, dt)`. (Built this way: the sink lives at
+  `game.fx`, set by `createGame({ fx })`, rather than being threaded as a
+  fourth argument through every sim function. Same testability, half the
+  parameters.) `input` is a snapshot object
   (`{ throttleUp, throttleDown, stop, turn, twistKeys, pitchKeys, jets,
   centre, held: {energy, ballistic, missile, fusion}, missileTap, aimDelta }`)
   built by `src/input/input.js` from keyboard, mouse and touch each frame.

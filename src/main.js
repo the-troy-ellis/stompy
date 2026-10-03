@@ -8,21 +8,31 @@
 'use strict';
 import { $, esc } from './util/dom.js';
 import { store } from './util/store.js';
-import { TAU, clampN, lerp, wrapA, rnd, add, sub, mul, dot, cross, len, norm, mix3, dirOf, M, chain } from './util/math.js';
+import { TAU, clampN, wrapA, rnd, add, sub, mul, cross, len, norm, mix3, dirOf, M, chain } from './util/math.js';
 import { Builder } from './mesh/builder.js';
 import { buildMechParts } from './mesh/mechParts.js';
 import { WEAPONS, CATS, CAT_OF, CAT_LABEL, CAT_KEY } from './data/weapons.js';
-import { CHASSIS, MECH_ORDER, MECH_INFO, HPK, SECT_NAME } from './data/chassis.js';
+import { CHASSIS, MECH_ORDER, MECH_INFO, HPK } from './data/chassis.js';
 import { geoOf } from './data/geo.js';
 import { PALS } from './data/palettes.js';
 import { missionDef, FP_MAPS } from './data/missions.js';
 import { MP_COLORS } from './data/colors.js';
 import { BOUND, makeTerrain } from './world/terrain.js';
 import { buildTerrainMesh } from './world/terrainMesh.js';
+import { createGame, newMech, startMatch, resetMatch } from './sim/state.js';
+import { update } from './sim/update.js';
+import { center, frame, eyeOf, viewYaw } from './sim/geom.js';
+import { initFeet, solveKnee, limb } from './sim/gait.js';
+import { msg, particle, explode } from './sim/effects.js';
+import { damage, destroy } from './sim/combat.js';
+import { MELT_MAX, beamMult, meltFrac } from './sim/beams.js';
+import { launchPulse } from './sim/fusion.js';
+import { SEND_HZ, steerBy, endGuide, alpha, cycleTarget } from './sim/missiles.js';
+import { r2 } from './net/protocol.js';
 
 
 (() => {
-  const { sin, cos, atan2, sqrt, min, max, abs, PI, random, hypot, floor } = Math;
+  const { sin, cos, atan2, min, max, abs, PI, random, hypot, floor } = Math;
 
   /* ---- the little the page needs: DOM helpers, storage, audio unlock ---- */
   const settings = { sound: store.get('sound', true) };
@@ -430,8 +440,9 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
     const said = {};
     let lastSaid = 0;
     // The cockpit computer. Each line at most every 6s, and never on top of itself.
-    function say(text, force) {
-      msg(text.toUpperCase(), '#fc3');
+    function say(text, force, delay) {
+      if (delay) { setTimeout(() => say(text, force), delay); return; }
+      msg(G, text.toUpperCase(), '#fc3');
       if (!voiceOn || !settings.sound || !window.speechSynthesis) return;
       const now = performance.now();
       if (!force && (now - (said[text] || 0) < 6000 || now - lastSaid < 1200)) return;
@@ -456,751 +467,39 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
     let menuSel = store.get('menu.sel', 'campaign');
     let fpMap = store.get('fp.map', 0), fpFoes = store.get('fp.foes', 3);
     const params = new URLSearchParams(location.search);
-    const G = { state: 'brief', paused: false, mechs: [], shots: [], beams: [], parts: [], wrecks: [], msgs: [],
-      eye: [0, 0, 0], view: [0, 0, 1], flash: 0, shake: 0, kick: 0, lastTwist: 0, cbeams: [], pendingHits: new Map(), pulses: [],
-      touchUI: params.has('touch') || matchMedia('(pointer: coarse)').matches, touchTurn: 0, zoom: false, target: null, sel: 0, endT: 0 };
+    const fx = { say, sfx, fusionSound: (on, p) => fusionSound(on, p), netSend: obj => netSend(obj) };
+    const G = createGame({ fx, touchUI: params.has('touch') || matchMedia('(pointer: coarse)').matches });
     // ?debug=1 exposes the state for the smoke test and for poking at in the console.
-    if (params.has('debug')) window.__stompy = { game: G };
-    let ter = null, world = null, pal = null;
+    if (params.has('debug')) window.__stompy = { game: G, kill: m => destroy(G, m, G.player) };
+    let world = null;
     const keys = {};
     // Which fire controls are held: by touch button, mouse button or key.
     const held = { energy: false, ballistic: false, missile: false, fusion: false };
     const clearHeld = () => { for (const c of CATS) held[c] = false; };
-    let volleySeq = 0;
     const KEY_FOR = { energy: ['Digit1'], ballistic: ['Digit2'], missile: ['Digit3', 'Space'], fusion: ['Digit4', 'KeyG'] };
     const isHeld = c => held[c] || KEY_FOR[c].some(k => keys[k]);
     // A missile press is latched until the next frame sees it, so a tap
     // shorter than a frame (a slow phone, a quick thumb) still fires.
     let missileTap = false;
 
-    function newMech(type, team, x, z, yaw, opts = {}) {
-      const ch = CHASSIS[type];
-      const m = {
-        type, ch, team, partsKey: opts.partsKey || type, netId: 0, remote: false, spawnT: 0, x, z, y: ter.height(x, z), vy: 0, yaw, twist: 0, pitch: 0, speed: 0, throttle: 0, heat: 0,
-        fuel: 1, jetting: false, air: false, shutdown: false, alive: true,
-        hp: { ...ch.hp }, max: { ...ch.hp },
-        weapons: ch.weapons.map(([w, mount], i) => ({ type: w, def: WEAPONS[w], mount, cd: random() * 0.5, ammo: WEAPONS[w].ammo || null, dead: false, side: i })),
-        ai: { aware: false, strafe: random() < 0.5 ? 1 : -1, strafeT: rnd(2, 5), jitter: rnd(0.2, 0.8), wp: null },
-      };
-      initFeet(m);
-      return m;
-    }
-
     function startMission(n) {
       missionN = n; store.set('mech.mission', max(store.get('mech.mission', 0), n));
-      startMatch(missionDef(n), 7 + n * 13, n === 0);
+      startMatch(G, missionDef(n), 7 + n * 13, n === 0, chassis);
       G.kind = 'campaign';
+      uploadWorld();
     }
     // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
     function startSkirmish() {
       const pk = FP_MAPS[fpMap] === 'random' ? ['dusk', 'ice', 'volcanic'][floor(random() * 3)] : FP_MAPS[fpMap];
       const foes = Array.from({ length: fpFoes }, () => (random() < 0.35 ? 'warden' : 'jackal'));
-      startMatch({ name: 'Free Play', pal: pk, foes, intel: '' }, 1 + floor(random() * 1e5), false);
+      startMatch(G, { name: 'Free Play', pal: pk, foes, intel: '' }, 1 + floor(random() * 1e5), false, chassis);
       G.kind = 'free';
+      uploadWorld();
     }
-    function startMatch(def, seed, gentle) {
-      G.worldKind = 'match';
-      pal = PALS[def.pal];
-      ter = makeTerrain(seed);
+    // The terrain mesh on the GPU, rebuilt whenever the sim builds a new world.
+    function uploadWorld() {
       if (world) gl.deleteBuffer(world.buf);
-      world = upload(buildTerrainMesh(ter, pal, seed));
-      G.mechs = []; G.shots = []; G.beams = []; G.parts = []; G.wrecks = []; G.msgs = []; G.pulses = [];
-      G.target = null; G.flash = 0; G.shake = 0; G.kick = 0; G.zoom = false; G.endT = 0; G.time = 0; G.guide = null; G.mDown = false;
-      G.stats = { shots: 0, hits: 0, dealt: 0, taken: 0, kills: 0 };
-      G.def = def;
-      G.player = newMech(chassis, 0, 0, 0, 0);
-      G.mechs.push(G.player);
-      G.eye = eyeOf(G.player); G.view = dirOf(0, 0); G.aim = add(G.eye, mul(G.view, 100));
-      def.foes.forEach((t, i) => {
-        const a = (i / def.foes.length) * TAU + rnd(-0.4, 0.4) + PI * 0.6, d = rnd(520, 760);
-        const x = clampN(sin(a) * d, -BOUND, BOUND), z = clampN(cos(a) * d, -BOUND, BOUND);
-        const e = newMech(t, 1, x, z, atan2(-x, -z) + rnd(-1, 1));
-        e.ai.aware = i === 0 && gentle ? false : random() < 0.3;
-        G.mechs.push(e);
-      });
-    }
-
-    /* ---------- geometry helpers ---------- */
-
-    const frame = m => chain(M.T(m.x, m.y + (m.bob || 0), m.z), M.RY(m.yaw), M.S(m.ch.scale));
-    const torsoFrame = m => chain(frame(m), M.T(0, geoOf(m).torsoY, 0), M.RY(m.twist));
-    const center = m => [m.x, m.y + 4.2 * m.ch.scale, m.z];
-    function muzzle(m, w) {
-      const tf = torsoFrame(m), g = geoOf(m);
-      if (w.mount === 'T') return M.apply(tf, w.type === 'lrm' ? [w.side % 2 ? -1.25 : 1.25, g.rackY, 0.6] : [-0.9, g.acY, 1.6]);
-      return M.apply(tf, [(w.mount === 'LA' ? 1 : -1) * g.armX, g.armY - 1.2, 2.4]);
-    }
-    const eyeOf = m => M.apply(torsoFrame(m), geoOf(m).eye);
-    const viewYaw = m => m.yaw + m.twist;
-
-    function rayCyl(o, d, m) {
-      const g = geoOf(m), R = g.radius * m.ch.scale, Hh = g.height * m.ch.scale;
-      const ox = o[0] - m.x, oz = o[2] - m.z, a = d[0] * d[0] + d[2] * d[2];
-      if (a < 1e-8) return null;
-      const b = 2 * (ox * d[0] + oz * d[2]), c = ox * ox + oz * oz - R * R, disc = b * b - 4 * a * c;
-      if (disc < 0) return null;
-      const sq = sqrt(disc);
-      for (const t of [(-b - sq) / (2 * a), (-b + sq) / (2 * a)]) {
-        if (t < 0) continue;
-        const y = o[1] + d[1] * t;
-        if (y >= m.y && y <= m.y + Hh) return t;
-      }
-      return null;
-    }
-    function rayTerrain(o, d, maxT) {
-      const step = 4;
-      let prev = 0;
-      for (let t = min(step, maxT); ; t = min(t + step, maxT)) {
-        const p = add(o, mul(d, t));
-        if (p[1] < ter.height(p[0], p[2])) {
-          let lo = prev, hi = t;
-          for (let k = 0; k < 8; k++) {
-            const mid = (lo + hi) / 2, q = add(o, mul(d, mid));
-            if (q[1] < ter.height(q[0], q[2])) hi = mid; else lo = mid;
-          }
-          return hi;
-        }
-        if (t >= maxT) return null;
-        prev = t;
-      }
-    }
-    function rayHit(o, d, maxT, ignore) {
-      let best = null;
-      for (const m of G.mechs) {
-        if (!m.alive || m === ignore) continue;
-        const t = rayCyl(o, d, m);
-        if (t != null && t <= maxT && (!best || t < best.t)) best = { t, mech: m };
-      }
-      const tt = rayTerrain(o, d, best ? best.t : maxT);
-      if (tt != null) best = { t: tt, mech: null };
-      if (best) best.point = add(o, mul(d, best.t));
-      return best;
-    }
-
-    /* ---------- effects ---------- */
-
-    function msg(text, col = '#7f7') {
-      G.msgs.push({ text, col, t: 3.5 });
-      if (G.msgs.length > 4) G.msgs.shift();
-    }
-    function particle(p, v, life, size, col, kind, grav = 0) {
-      if (G.parts.length > 420) G.parts.shift();
-      G.parts.push({ p: [...p], v, life, max: life, size, col, kind, grav, spin: random() * TAU });
-    }
-    function explode(p, big) {
-      const n = big ? 34 : 10, s = big ? 1.6 : 0.7;
-      for (let i = 0; i < n; i++) {
-        const v = mul(norm([rnd(-1, 1), rnd(-0.2, 1), rnd(-1, 1)]), rnd(3, 14) * s);
-        particle(p, v, rnd(0.35, 0.9), rnd(0.6, 1.6) * s, [1, rnd(0.45, 0.9), 0.1], 'fire');
-      }
-      for (let i = 0; i < n / 2; i++) particle(add(p, [rnd(-2, 2), rnd(0, 2), rnd(-2, 2)]), [rnd(-1, 1), rnd(2, 5), rnd(-1, 1)], rnd(1.5, 3), rnd(1, 2.4) * s, [0.25, 0.23, 0.22], 'smoke');
-      if (big) for (let i = 0; i < 12; i++) particle(p, [rnd(-9, 9), rnd(8, 20), rnd(-9, 9)], rnd(1.5, 2.6), rnd(0.4, 1.1), [0.2, 0.2, 0.2], 'debris', 26);
-      const d = len(sub(p, G.eye));
-      G.shake = min(1.2, G.shake + (big ? 1 : 0.35) * clampN(1 - d / 220, 0, 1));
-      sfx.boom(p, big);
-    }
-
-    /* ---------- combat ---------- */
-
-    function sectionHit(m, p) {
-      const dx = p[0] - m.x, dz = p[2] - m.z, ly = (p[1] - m.y) / m.ch.scale;
-      if (ly < geoOf(m).legTop) { const a = m.yaw; return dx * cos(a) - dz * sin(a) > 0 ? 'LL' : 'RL'; }
-      const a = viewYaw(m), lx = (dx * cos(a) - dz * sin(a)) / m.ch.scale;
-      return lx > 1.6 ? 'LA' : lx < -1.6 ? 'RA' : 'T';
-    }
-
-    // `beam`: a slice of continuous laser damage (one frame's worth) -- it
-    // isn't a "hit" for accuracy, and mustn't ring the armour every frame.
-    function damage(m, p, amt, src, beam = false) {
-      if (!m.alive) return;
-      if (m.remote) {
-        // Another pilot: what the shooter sees counts, and the victim's own
-        // client applies it. Hits are batched (a beam deals damage every
-        // frame) and flushed a few times a second -- see flushHits.
-        if (G.roundOver) return;
-        const q = G.pendingHits.get(m.netId) || { amt: 0, p };
-        q.amt += amt; q.p = p;
-        G.pendingHits.set(m.netId, q);
-        if (src === G.player) { if (!beam) G.stats.hits++; G.stats.dealt += amt; G.hitMark = 0.25; }
-        return;
-      }
-      if (m === G.player && mp() && (m.spawnT > 0 || G.roundOver)) return;
-      let sec = sectionHit(m, p);
-      if (m.hp[sec] <= 0) sec = 'T';
-      m.hp[sec] -= amt;
-      if (src === G.player && m !== G.player) { if (!beam) G.stats.hits++; G.stats.dealt += amt; }
-      if (m === G.player) {
-        G.stats.taken += amt;
-        G.flash = min(0.55, G.flash + amt * 0.04);
-        G.shake = min(1.2, G.shake + amt * 0.05);
-        if (!beam || G.time - (G.lastClang || 0) > 0.35) { G.lastClang = G.time; sfx.clang(); }
-        if (!G.target && src && src.alive) G.target = src;
-      } else m.ai.aware = true;
-      if (m.hp[sec] > 0) {
-        if (m === G.player && sec === 'T' && m.hp.T < m.max.T * 0.3) say('Warning. Critical damage.');
-        return;
-      }
-      const over = -m.hp[sec];
-      m.hp[sec] = 0;
-      if (sec === 'T') return destroy(m, src);
-      m.weapons.forEach(w => { if (w.mount === sec) w.dead = true; });
-      explode(p, false);
-      if (m === G.player) say(`${SECT_NAME[sec]} destroyed.`, true);
-      else if (src === G.player) msg(`${m.ch.name}: ${SECT_NAME[sec].toUpperCase()} DESTROYED`);
-      if (over > 0) { m.hp.T -= over; if (m.hp.T <= 0) { m.hp.T = 0; destroy(m, src); } }
-    }
-
-    function destroy(m, src) {
-      if (m === G.player) { endGuide(true); G.mDown = false; }
-      m.alive = false;
-      explode(center(m), true);
-      explode(add(center(m), [rnd(-3, 3), 2, rnd(-3, 3)]), false);
-      G.wrecks.push({ x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.partsKey, scale: m.ch.scale, t: 0, roll: rnd(-0.6, 0.6) });
-      if (G.target === m) G.target = null;
-      if (mp() && m === G.player) {
-        // In the arena your own client declares your death; the server scores it.
-        netSend({ t: 'died', by: src?.netId || 0 });
-        sendState();
-        // Real time, not game time: a slow phone shouldn't make the wait longer.
-        G.respawnAt = performance.now() + 5000; G.killer = src?.netId || 0;
-        msg('MECH DESTROYED', '#f44');
-        return;
-      }
-      if (m === G.player) {
-        G.state = 'over'; G.endT = 3.2; G.won = false;
-        msg('MECH DESTROYED', '#f44');
-        return;
-      }
-      if (src === G.player) G.stats.kills++;
-      say('Target destroyed.', true);
-      if (G.player.alive && !G.mechs.some(e => e.team !== 0 && e.alive)) {
-        G.state = 'over'; G.endT = 3.5; G.won = true;
-        setTimeout(() => say('Mission objectives complete.', true), 1400);
-      }
-    }
-
-    function fire(m, w, aim, target) {
-      const d = w.def;
-      if (d.kind === 'beam' || d.kind === 'fusion') return false;   // continuous: see beamTick / fusionTick
-      if (!m.alive || m.shutdown || w.dead || w.cd > 0 || (d.ammo && w.ammo <= 0)) return false;
-      const mz = muzzle(m, w);
-      const dir = norm(sub(aim, mz));
-      w.cd = d.cd; m.heat += d.heat;
-      if (d.ammo) w.ammo--;
-      if (m === G.player) G.stats.shots += d.count || 1;   // each missile can hit, so each counts
-      if (d.kind === 'beam') {
-        const hit = rayHit(mz, dir, d.range, m);
-        const end = hit ? hit.point : add(mz, mul(dir, d.range));
-        G.beams.push({ a: mz, b: end, col: d.col, w: d.w, life: 0.14, max: 0.14 });
-        if (mp() && m === G.player) netSend({ t: 'fx', k: 'b', w: w.type, a: mz.map(r2), b: end.map(r2) });
-        if (hit) {
-          for (let i = 0; i < 4; i++) particle(end, [rnd(-4, 4), rnd(1, 6), rnd(-4, 4)], 0.25, 0.35, d.col, 'fire');
-          if (hit.mech) damage(hit.mech, end, d.dmg, m);
-        }
-        sfx.laser(mz, d === WEAPONS.mlaser);
-      } else if (d.kind === 'shell') {
-        G.shots.push({ kind: 'shell', p: mz, v: mul(dir, d.speed), owner: m, dmg: d.dmg, life: d.range / d.speed });
-        if (mp() && m === G.player) netSend({ t: 'fx', k: 's', p: mz.map(r2), v: mul(dir, d.speed).map(r2) });
-        for (let i = 0; i < 5; i++) particle(add(mz, mul(dir, 1.5)), add(mul(dir, rnd(4, 12)), [rnd(-2, 2), rnd(-1, 2), rnd(-2, 2)]), 0.15, 0.6, [1, 0.8, 0.3], 'fire');
-        sfx.cannon(mz);
-      } else {
-        const vid = ++volleySeq;
-        for (let i = 0; i < d.count; i++) {
-          const spread = norm(add(dir, [rnd(-0.08, 0.08), rnd(0, 0.12), rnd(-0.08, 0.08)]));
-          G.shots.push({ kind: 'missile', p: add(mz, [rnd(-0.6, 0.6), rnd(-0.4, 0.4), rnd(-0.6, 0.6)]), v: mul(spread, d.speed * rnd(0.85, 1.1)),
-            owner: m, dmg: d.dmg, life: d.range / d.speed + 1, target, smoke: 0, age: 0, vid });
-        }
-        if (m === G.player) G.lastVolley = vid;
-        sfx.missile(mz);
-        if (mp() && m === G.player) netSend({ t: 'fx', k: 'm', p: mz.map(r2), d: dir.map(r2), tg: target?.netId || 0, v: G.lastVolley });
-      }
-      return true;
-    }
-
-    /* ---------- simulation ---------- */
-
-    function stepMech(m, dt) {
-      const legs = (m.hp.LL > 0 ? 0.5 : 0) + (m.hp.RL > 0 ? 0.5 : 0);
-      let maxS = m.ch.speed * (legs >= 1 ? 1 : legs > 0 ? 0.45 : 0.04);
-      if (m.heat > 85) maxS *= 0.65;
-      const target = !m.alive || m.shutdown ? 0 : m.throttle * maxS;
-      m.speed += clampN(target - m.speed, -11 * dt, 7 * dt);
-      m.x = clampN(m.x + sin(m.yaw) * m.speed * dt, -BOUND, BOUND);
-      m.z = clampN(m.z + cos(m.yaw) * m.speed * dt, -BOUND, BOUND);
-
-      const ground = ter.height(m.x, m.z);
-      const jets = m.jetting && m.fuel > 0 && !m.shutdown && m.alive;
-      if (jets) {
-        m.vy = min(m.vy + 30 * dt, 12);
-        m.fuel = max(0, m.fuel - dt * 0.32);
-        m.heat += 10 * dt;
-        if (random() < 0.6) particle(add([m.x, m.y + 1.5, m.z], [rnd(-1, 1), 0, rnd(-1, 1)]), [rnd(-1, 1), -8, rnd(-1, 1)], 0.35, 0.7, [1, 0.6, 0.2], 'fire');
-      } else m.fuel = min(1, m.fuel + dt * 0.12);
-      m.vy -= 18 * dt;
-      m.y += m.vy * dt;
-      if (!jets && m.vy <= 0 && m.y - ground < 1.2) {
-        if (m.air) {
-          const force = clampN(-m.vy / 20, 0.25, 1);
-          if (m === G.player) { G.shake = min(1.2, G.shake + 0.6 * force); G.kick = 1; sfx.land(force); }
-          else sfx.step(m, force * 0.8);
-        }
-        m.y = ground; m.vy = 0; m.air = false;
-      } else if (m.y > ground + 1.2) m.air = true;
-      if (m.y < ground) { m.y = ground; m.vy = max(0, m.vy); }
-
-      m.heat = max(0, m.heat - (m.shutdown ? 20 : m.ch.sink) * dt);
-      if (!m.shutdown && m.heat >= 100) {
-        m.shutdown = true;
-        if (m === G.player) { sfx.powerdown(); say('Reactor shutdown.', true); }
-      } else if (m.shutdown && m.heat < 45) {
-        m.shutdown = false;
-        if (m === G.player) { sfx.powerup(); say('Reactor online.', true); }
-      }
-      if (m === G.player && m.heat > 80 && !m.shutdown) say('Warning. Heat critical.');
-      for (const w of m.weapons) w.cd = max(0, w.cd - dt);
-
-      gait(m, dt);
-    }
-
-    /* ---------- legs: planted feet + two-bone IK ---------- */
-    // A planted foot stays exactly where it landed while the body moves over
-    // it. Once the hip has passed it by half a stride it lifts, arcs, and
-    // lands half a stride ahead of where the body will be at touchdown -- so
-    // feet never slide, and faster walking just means quicker steps.
-    // Where foot i would stand, `ahead` units along the heading.
-    function restFoot(m, i, ahead = 0) {
-      const s = m.ch.scale, leg = geoOf(m).legs[i], c = cos(m.yaw), sn = sin(m.yaw);
-      const lx = leg.fx * s, lz = leg.fz * s + ahead;
-      const x = m.x + c * lx + sn * lz, z = m.z - sn * lx + c * lz;
-      return [x, ter.height(x, z), z];
-    }
-    function initFeet(m) {
-      m.feet = geoOf(m).legs.map((_, i) => ({ pos: restFoot(m, i), from: null, lifted: false, yaw: m.yaw }));
-      m.bob = 0; m.cyc = 0.45;   // between swings: every foot planted
-    }
-
-    // One gait clock per mech, advanced by distance travelled (and turning),
-    // not time -- so the feet can't drift into step with each other, and a
-    // swing's landing spot can be predicted exactly. Each leg swings over
-    // [ph, ph + swing) of the cycle (bipeds: left at 0, right at 0.5; the
-    // quadruped trots, diagonal pairs together); between swings all feet are
-    // planted. Each swing aims, every frame, at where its rest spot will be
-    // at touchdown plus a stance's worth ahead.
-    function swingTarget(m, i, u, D, dir) {
-      const sw = geoOf(m).swing;
-      return restFoot(m, i, dir * ((1 - u) * sw * D + ((1 - sw) / 2) * D));
-    }
-
-    function gait(m, dt) {
-      const s = m.ch.scale, pace = min(1, abs(m.speed) / m.ch.speed), crouch = -0.35 * s * pace;
-      const dyaw = abs(wrapA(m.yaw - (m.lastYaw ?? m.yaw)));
-      m.lastYaw = m.yaw;
-      if (m.air) {
-        // Legs hang under the body until touchdown.
-        m.feet.forEach((f, i) => { const r = restFoot(m, i); f.pos = [r[0], m.y + 1.4 * s, r[2]]; f.lifted = false; f.yaw = m.yaw; });
-        m.bob = 0; m.wasAir = true;
-        return;
-      }
-      if (m.wasAir) { m.wasAir = false; m.cyc = 0.45; m.feet.forEach((f, i) => { f.pos = restFoot(m, i); f.yaw = m.yaw; }); }
-
-      // Cycle length in distance: longer strides when faster, but a planted
-      // foot never gets more than (1 - swing) / 2 * D from its hip (leg reach).
-      const g = geoOf(m), D = s * (g.stride[0] + g.stride[1] * pace);
-      const swingOf = i => { const u = (((m.cyc - g.legs[i].ph) % 1 + 1) % 1) / g.swing; return u < 1 ? u : null; };
-      const before = g.legs.map((_, i) => swingOf(i));
-      const moving = abs(m.speed) > 0.3 || dyaw > 1e-4;
-      // Stopped mid-stride: finish the step on the clock rather than freeze with a foot up.
-      let adv = moving ? (abs(m.speed) * dt + dyaw * 2.5 * s) / D : (before.some(u => u != null) ? dt / 0.6 : 0);
-      m.cyc = (m.cyc + min(adv, 0.2)) % 1;
-
-      const dir = abs(m.speed) > 0.3 ? Math.sign(m.speed) : 0;
-      m.bob = crouch;
-      m.feet.forEach((f, i) => {
-        const u = swingOf(i);
-        if (u == null) {
-          if (before[i] != null) {   // the swing just ended: put it down exactly on target
-            f.pos = swingTarget(m, i, 1, D, dir);
-            f.yaw = m.yaw; f.lifted = false;
-            footDown(m, f, pace);
-          }
-          return;
-        }
-        if (!f.lifted) { f.from = [...f.pos]; f.lifted = true; }
-        const t = swingTarget(m, i, u, D, dir), e = u * u * (3 - 2 * u);
-        if (hypot(f.from[0] - t[0], f.from[2] - t[2]) > 9 * s) f.from = [...t];   // shoved mid-stride
-        f.pos = [lerp(f.from[0], t[0], e), lerp(f.from[1], t[1], e) + sin(PI * u) * (0.5 + 1.1 * pace) * s, lerp(f.from[2], t[2], e)];
-        f.yaw += wrapA(m.yaw - f.yaw) * min(1, dt * 10);
-        // The body rises over the swinging leg and settles as it lands.
-        m.bob = crouch + sin(PI * u) * 0.3 * s * (0.3 + pace);
-      });
-      // A planted foot left hopelessly far away (shoved, respawned) just resets.
-      m.feet.forEach((f, i) => {
-        if (f.lifted) return;
-        const r = restFoot(m, i);
-        if (hypot(f.pos[0] - r[0], f.pos[2] - r[2]) > 7 * s) f.pos = r;
-      });
-    }
-
-    // Touchdown: the sound, the cockpit jolt, a puff of dust.
-    function footDown(m, f, pace) {
-      const d = hypot(m.x - G.player.x, m.z - G.player.z);
-      if (m === G.player) {
-        G.shake = min(1.2, G.shake + 0.12 * pace);
-        G.kick = max(G.kick, 0.35 + 0.65 * pace);
-        sfx.step(m, 0.4 + 0.55 * pace);
-      } else if (d < 350) sfx.step(m, 0.3 + 0.45 * pace);
-      if (pace > 0.25 && d < 260 && m !== G.player) {
-        for (let i = 0; i < 3; i++) particle(add(f.pos, [rnd(-1, 1), 0.3, rnd(-1, 1)]), [rnd(-2, 2), rnd(0.5, 1.5), rnd(-2, 2)], rnd(0.6, 1), rnd(0.5, 0.9) * m.ch.scale, mul(pal.low, 0.8), 'smoke');
-      }
-    }
-
-    // Knee position by the law of cosines, bending toward `pole` (forward).
-    function solveKnee(H, A, pole, l1, l2) {
-      const d = sub(A, H), raw = len(d), n = mul(d, 1 / (raw || 1));
-      const dist = clampN(raw, abs(l1 - l2) + 1e-3, (l1 + l2) * 0.999);
-      const a = Math.acos(clampN((l1 * l1 + dist * dist - l2 * l2) / (2 * l1 * dist), -1, 1));
-      let p = sub(pole, mul(n, dot(pole, n)));
-      p = len(p) < 1e-4 ? [0, 0, 1] : norm(p);
-      return add(H, add(mul(n, l1 * cos(a)), mul(p, l1 * sin(a))));
-    }
-    // A matrix that hangs a limb mesh (built along -y from its pivot) from P to Q.
-    function limb(P, Q, pole, s) {
-      const y = norm(sub(P, Q));
-      let z = sub(pole, mul(y, dot(pole, y)));
-      z = len(z) < 1e-4 ? [0, 0, 1] : norm(z);
-      const x = cross(y, z);
-      return new Float32Array([x[0] * s, x[1] * s, x[2] * s, 0, y[0] * s, y[1] * s, y[2] * s, 0, z[0] * s, z[1] * s, z[2] * s, 0, P[0], P[1], P[2], 1]);
-    }
-
-    function think(e, dt) {
-      const P = G.player, dx = P.x - e.x, dz = P.z - e.z, dist = hypot(dx, dz);
-      const toYaw = atan2(dx, dz);
-      if (!e.ai.aware && (dist < 600 || G.time > 25)) e.ai.aware = true;
-      let moveYaw, thr = 1;
-      if (!e.ai.aware) {
-        if (!e.ai.wp || hypot(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z) < 30) e.ai.wp = [clampN(e.x + rnd(-250, 250), -BOUND, BOUND), clampN(e.z + rnd(-250, 250), -BOUND, BOUND)];
-        moveYaw = atan2(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z); thr = 0.5;
-      } else {
-        e.ai.strafeT -= dt;
-        if (e.ai.strafeT <= 0) { e.ai.strafe *= -1; e.ai.strafeT = rnd(3, 7); }
-        const pref = e.ch.pref;
-        if (dist > pref * 1.35) moveYaw = toYaw + e.ai.strafe * 0.35;
-        else if (dist < pref * 0.6) moveYaw = toYaw + PI - e.ai.strafe * 0.6;
-        else { moveYaw = toYaw + e.ai.strafe * PI / 2; thr = 0.75; }
-        // Steer away from the map edge.
-        if (abs(e.x) > BOUND - 60 || abs(e.z) > BOUND - 60) moveYaw = atan2(-e.x, -e.z);
-      }
-      e.yaw += clampN(wrapA(moveYaw - e.yaw), -e.ch.turn * dt, e.ch.turn * dt);
-      e.throttle = thr;
-      if (!e.ai.aware) { e.twist *= 1 - dt; return; }
-      const wantTwist = clampN(wrapA(toYaw - e.yaw), -1.9, 1.9);
-      e.twist += clampN(wrapA(wantTwist - e.twist), -2 * dt, 2 * dt);
-      const pc = center(P);
-      e.pitch = atan2(pc[1] - (e.y + 6 * e.ch.scale), dist);
-      // Fire when the torso is on target, the weapon is in range, and heat allows.
-      const off = abs(wrapA(toYaw - viewYaw(e)));
-      e.ai.jitter -= dt;
-      // Lasers: hold the beam on in bursts while on target and cool enough,
-      // with an aim error that drifts, so the beam wanders on and off you.
-      const beam = e.weapons.find(w => w.def.kind === 'beam' && !w.dead);
-      if (beam && off < 0.3 && dist < beam.def.range * 0.95 && !e.shutdown && P.alive) {
-        if (e.heat > 70) e.ai.coolT = rnd(1.5, 3);
-        if ((e.ai.coolT = max(0, (e.ai.coolT || 0) - dt)) === 0) {
-          const err = dist * e.ch.acc0 * (1 + abs(P.speed) / 14) * (P.air ? 1.6 : 1), k = G.time * 0.9 + e.ai.strafeT;
-          e.ai.beamAim = add(pc, [sin(k * 1.3) * err, sin(k * 1.7) * err * 0.5, cos(k * 1.1) * err]);
-          e.beamOn = true;
-        }
-      }
-      if (off > 0.25 || e.heat > 72 || e.shutdown || e.ai.jitter > 0 || !P.alive) return;
-      for (const w of e.weapons) {
-        if (w.def.kind === 'beam' || w.def.kind === 'fusion' || w.dead || w.cd > 0 || dist > w.def.range * 0.95) continue;
-        let aim = pc;
-        if (w.def.kind === 'shell') { const t = dist / w.def.speed; aim = add(pc, [sin(P.yaw) * P.speed * t, 0, cos(P.yaw) * P.speed * t]); }
-        const err = dist * e.ch.acc0 * (1 + abs(P.speed) / 14) * (P.air ? 1.6 : 1);
-        aim = add(aim, [rnd(-err, err), rnd(-err, err) * 0.6, rnd(-err, err)]);
-        if (fire(e, w, aim, P)) { e.ai.jitter = rnd(0.15, 0.6); break; }
-      }
-    }
-
-    function update(dt) {
-      G.time += dt;
-      G.cbeams = [];   // continuous beams are redrawn every frame they're on
-      G.frame = (G.frame || 0) + 1;
-      const P = G.player;
-      if (P.alive && !P.shutdown && !G.paused) {
-        if (keys.KeyW) P.throttle = min(1, P.throttle + dt * 0.9);
-        if (keys.KeyS) P.throttle = max(-0.35, P.throttle - dt * 0.9);
-        if (keys.KeyX) P.throttle = 0;
-        const turn = clampN((keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0) + G.touchTurn, -1, 1);
-        P.yaw += turn * P.ch.turn * dt * (P.hp.LL > 0 && P.hp.RL > 0 ? 1 : 0.5);
-        const kt = (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0), kp = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0);
-        if (G.guide) { G.guide.yaw += kt * 1.4 * dt; G.guide.pitch = clampN(G.guide.pitch + kp * 1.0 * dt, -1.3, 1.3); }
-        else {
-          P.twist = clampN(P.twist + kt * 1.6 * dt, -1.9, 1.9);
-          P.pitch = clampN(P.pitch + kp * 0.9 * dt, -0.4, 0.45);
-        }
-        if (keys.KeyC) P.twist *= max(0, 1 - 6 * dt);
-        P.jetting = !!keys.KeyJ;
-      } else P.jetting = false;
-
-      G.eye = eyeOf(P);
-      G.view = dirOf(viewYaw(P), P.pitch);
-      const aimHit = rayHit(G.eye, G.view, 1100, P);
-      G.aim = aimHit ? aimHit.point : add(G.eye, mul(G.view, 1100));
-      G.aimMech = aimHit?.mech || null;
-      const t = G.target;
-      G.lock = !!(t && t.alive && len(sub(center(t), G.eye)) < WEAPONS.lrm.range && dot(norm(sub(center(t), G.eye)), G.view) > cos(0.3));
-
-      const armed = P.alive && !G.paused && !G.roundOver;
-      P.beamOn = armed && isHeld('energy') && !G.guide;
-      fusionTick(P, dt, armed && isHeld('fusion') && !G.guide);
-      if (armed && isHeld('ballistic')) fireCat('ballistic');
-      missileTrigger(armed && (isHeld('missile') || missileTap));
-      missileTap = false;
-      if (G.guide) steerVolley(dt);
-
-      for (const m of G.mechs) {
-        if (m.remote) {
-          if (m.alive) { netInterp(m, dt); gait(m, dt); }
-          if (m.alive && m.net?.bm && m.net.be) remoteBeam(m, m.net.be); else m.beaming = false;
-          if (m.alive && m.net?.fl) G.cbeams.push({ a: muzzle(m, m.weapons.find(w => w.def.kind === 'fusion')), b: m.net.fl, col: WEAPONS.fusion.col, w: 0.05 + 0.035 * abs(sin(G.time * 37)) });
-          continue;
-        }
-        if (m.team !== 0 && m.alive) think(m, dt);
-        if (m.alive) stepMech(m, dt);
-        if (m.alive && m.beamOn) beamTick(m, dt, m === P ? G.aim : m.ai.beamAim);
-        else m.beaming = false;
-        if (m !== P) m.beamOn = false;
-      }
-      coolArmour(dt);
-      beamSound(P.beaming && !G.paused, beamMult(P));
-      // Mechs don't walk through each other.
-      const alive = G.mechs.filter(m => m.alive);
-      for (let i = 0; i < alive.length; i++) for (let j = i + 1; j < alive.length; j++) {
-        const a = alive[i], b = alive[j], dx = b.x - a.x, dz = b.z - a.z, d = hypot(dx, dz), r = geoOf(a).radius * a.ch.scale + geoOf(b).radius * b.ch.scale;
-        if (d < r && d > 0.01 && !(a.remote && b.remote)) {
-          // Only move mechs this client owns; other pilots' clients move theirs.
-          const fa = a.remote ? 0 : b.remote ? 1 : 0.5, fb = b.remote ? 0 : a.remote ? 1 : 0.5, gap = r - d;
-          a.x -= (dx / d) * gap * fa; a.z -= (dz / d) * gap * fa; b.x += (dx / d) * gap * fb; b.z += (dz / d) * gap * fb;
-        }
-      }
-
-      for (const s of G.shots) {
-        s.life -= dt;
-        if (s.kind === 'missile') {
-          if (s.guided && G.guide && s.vid === G.guide.vid) {
-            // Flown by the pilot: turn hard toward where the camera points.
-            const sp = len(s.v);
-            s.v = mul(norm(add(norm(s.v), mul(G.guide.dir, dt * 7))), sp);
-          } else if (s.target && s.target.alive) {
-            const want = norm(sub(center(s.target), s.p)), sp = len(s.v);
-            s.v = mul(norm(add(norm(s.v), mul(want, dt * (s.owner === G.player ? 1.7 : 0.9)))), sp);
-          }
-          s.smoke += dt; s.age += dt;
-          // No trail for the first moments: the racks sit beside the cockpit,
-          // and smoke that close fills the whole screen.
-          if (s.smoke > 0.05 && (s.age > 0.3 || s.owner !== G.player)) { s.smoke = 0; particle(s.p, [rnd(-0.5, 0.5), rnd(0, 1), rnd(-0.5, 0.5)], 0.9, 0.5, [0.55, 0.53, 0.5], 'smoke'); }
-        } else s.v[1] -= 6 * dt;
-        const stepL = len(s.v) * dt, dir = norm(s.v);
-        const hit = rayHit(s.p, dir, stepL, s.owner);
-        if (hit) {
-          s.life = -1;
-          if (hit.mech && !s.ghost) damage(hit.mech, hit.point, s.dmg, s.owner);   // ghosts are other pilots' shots: theirs to score
-          if (s.kind === 'missile' && !s.ghost) blast(hit.point, s.dmg, s.owner, hit.mech);
-          explode(hit.point, false);
-        } else s.p = add(s.p, mul(s.v, dt));
-        if (s.life <= 0 && s.kind === 'missile' && !hit) { if (!s.ghost) blast(s.p, s.dmg, s.owner, null); explode(s.p, false); }
-      }
-      G.shots = G.shots.filter(s => s.life > 0);
-      updatePulses(dt);
-      for (const b of G.beams) b.life -= dt;
-      G.beams = G.beams.filter(b => b.life > 0);
-      for (const p of G.parts) {
-        p.life -= dt;
-        p.v[1] -= p.grav * dt;
-        if (p.kind === 'smoke') p.v = mul(p.v, 1 - dt * 0.6);
-        p.p = add(p.p, mul(p.v, dt));
-        if (p.kind === 'debris') { const g = ter.height(p.p[0], p.p[2]); if (p.p[1] < g) { p.p[1] = g; p.v = [p.v[0] * 0.5, -p.v[1] * 0.35, p.v[2] * 0.5]; } }
-        p.spin += dt * 3;
-      }
-      G.parts = G.parts.filter(p => p.life > 0);
-      for (const w of G.wrecks) {
-        w.t += dt;
-        if (w.t < 30 && random() < dt * 5) particle([w.x + rnd(-2, 2), w.y + 2, w.z + rnd(-2, 2)], [rnd(-0.5, 0.5), rnd(3, 5), rnd(-0.5, 0.5)], rnd(2, 3.5), rnd(1, 2.2), [0.18, 0.17, 0.17], 'smoke');
-      }
-      for (const m of G.msgs) m.t -= dt;
-      G.msgs = G.msgs.filter(m => m.t > 0);
-      if (mp()) {
-        if (P.spawnT > 0) P.spawnT -= dt;
-        if (!P.alive && G.respawnAt && performance.now() >= G.respawnAt) respawn();
-        G.hitMark = max(0, (G.hitMark || 0) - dt);
-        if ((Net.sendT += dt) >= 1 / SEND_HZ) { Net.sendT = 0; sendState(); flushHits(); }
-      }
-      G.flash = max(0, G.flash - dt * 1.2);
-      G.shake = max(0, G.shake - dt * 2.2);
-      G.kick = max(0, G.kick - dt * 5);
-      G.whiteFlash = max(0, (G.whiteFlash || 0) - dt * 1.6);
-
-      const live = P.alive && !P.shutdown, pace = min(1, abs(P.speed) / P.ch.speed);
-      loopSet('hum_loop', P.alive ? (P.shutdown ? 0.03 : 0.07 + 0.13 * pace) : 0, P.shutdown ? 0.5 : 0.72 + 0.4 * pace);
-      const jetting = live && P.jetting && P.fuel > 0;
-      loopSet('jet_loop', jetting ? 0.32 : G.guide ? 0.24 : 0, jetting ? 0.85 : G.guide ? 1.7 : 0.85);
-      const twistRate = abs(P.twist - G.lastTwist) / max(dt, 1e-3);
-      G.lastTwist = P.twist;
-      loopSet('servo_loop', live ? min(0.13, twistRate * 0.07) : 0, 0.75 + min(0.6, twistRate * 0.25));
-
-      if (G.state === 'over') {
-        G.endT -= dt;
-        if (G.endT <= 0) debrief();
-      }
-    }
-
-    /* ----- lasers: continuous beams whose damage climbs while they stay on target ----- */
-
-    // The ramp lives in the target, not the shooter: a mech's armour "melt"
-    // rises while any beam is on it (once per frame, however many beams) and
-    // cools whenever nothing is hitting it, whoever is aiming where. Damage is
-    // dps x meltMult(target). Two pilots on one mech share its melt.
-    const MELT_T = 3;         // seconds of beam to melt armour fully
-    const MELT_MAX = 3.5;     // damage multiplier at full melt
-    const MELT_COOL = 1.5;    // melt-seconds lost per second off the beam: full to cold in 2 s
-    const meltMult = t => 1 + (MELT_MAX - 1) * (t => t * t * (3 - 2 * t))(min(1, t / MELT_T));
-    const meltFrac = m => min(1, (m?.melt || 0) / MELT_T);
-
-    // One frame of a mech's lasers firing at `aim`: every live laser draws a
-    // beam to whatever it hits and costs heat; a mech it hits takes damage
-    // scaled by that mech's melt, and its melt goes up.
-    function beamTick(m, dt, aim) {
-      const lasers = m.weapons.filter(w => w.def.kind === 'beam' && !w.dead);
-      if (!lasers.length || m.shutdown || !m.alive) { m.beaming = false; m.beamMech = null; return; }
-      if (!m.beaming) sfx.laser(m === G.player ? null : muzzle(m, lasers[0]), lasers[0].type === 'mlaser');
-      m.beaming = true;
-      m.beamEnd = aim;
-      m.beamMech = null;
-      for (const w of lasers) {
-        const mz = muzzle(m, w), dir = norm(sub(aim, mz));
-        const hit = rayHit(mz, dir, w.def.range, m);
-        const end = hit ? hit.point : add(mz, mul(dir, w.def.range));
-        const t = hit?.mech, mult = t ? meltMult(t.melt || 0) : 1;
-        drawBeam(mz, end, w.def, mult);
-        m.heat += w.def.hps * dt;
-        if (m === G.player) G.stats.shots += dt * 4;   // accuracy counts beam time in quarter-seconds
-        if (!hit) continue;
-        if (random() < dt * 25) particle(end, [rnd(-3, 3), rnd(1, 5), rnd(-3, 3)], 0.25, 0.3 + 0.1 * mult, w.def.col, 'fire');
-        if (t) {
-          m.beamMech = t;
-          damage(t, end, w.def.dps * mult * dt, m, true);
-          if (t.meltFrame !== G.frame) { t.meltFrame = G.frame; t.melt = min(MELT_T, (t.melt || 0) + dt); }
-          t.meltAt = G.time;
-          if (m === G.player) G.stats.hits += dt * 4;
-        }
-      }
-    }
-    // Armour cools whenever no beam touched it this frame.
-    function coolArmour(dt) {
-      for (const m of G.mechs) if (m.melt && m.meltAt !== G.time) m.melt = max(0, m.melt - MELT_COOL * dt);
-    }
-    const beamMult = m => (m.beamMech ? meltMult(m.beamMech.melt || 0) : 1);
-    /* ----- fusion cannon: scan the resonant frequency, then dump the reactor into it ----- */
-
-    function fusionTick(m, dt, on) {
-      const w = m.weapons.find(w => w.def.kind === 'fusion' && !w.dead);
-      const st = m.fusion || (m.fusion = { mech: null, t: 0, on: false, end: null });
-      if (!on || !w || w.cd > 0 || m.shutdown || !m.alive) {
-        st.on = false; st.t = 0; st.mech = null; st.end = null;
-        if (m === G.player) fusionSound(false, 0);
-        return;
-      }
-      st.on = true;
-      const d = w.def, mz = muzzle(m, w), dir = norm(sub(G.aim, mz));
-      const hit = rayHit(mz, dir, d.range, m);
-      // What the laser is on: a direct hit, or a mech it passes within
-      // `slack` of (with clear line of sight to it).
-      const tgt = hit?.mech || nearMiss(m, mz, dir, d);
-      const end = tgt ? center(tgt) : hit ? hit.point : add(mz, mul(dir, d.range));
-      st.end = end;
-      m.heat += d.scanHeat * dt;
-      // A thin, flickering targeting laser, not a weapon beam.
-      G.cbeams.push({ a: mz, b: end, col: d.col, w: 0.05 + 0.035 * abs(sin(G.time * 37)) });
-      // The scan counts on one mech. A slip shorter than `grace` pauses it;
-      // longer, or onto another mech, and it starts over.
-      if (tgt && tgt === st.mech) { st.t += dt; st.off = 0; }
-      else if (st.mech && !tgt && (st.off = (st.off || 0) + dt) < d.grace) { /* slipping: hold */ }
-      else { st.mech = tgt || null; st.t = 0; st.off = 0; }
-      st.slipping = !!(st.mech && st.off > 0);
-      // Locked and on it: draw the torso gently toward the target.
-      if (m === G.player && st.mech && !st.slipping) {
-        const c = center(st.mech), e = G.eye, k = 1 - Math.exp(-d.assist * dt);
-        const wantTwist = wrapA(atan2(c[0] - e[0], c[2] - e[2]) - m.yaw);
-        const wantPitch = atan2(c[1] - e[1], hypot(c[0] - e[0], c[2] - e[2]));
-        m.twist = clampN(m.twist + wrapA(wantTwist - m.twist) * k, -1.9, 1.9);
-        m.pitch = clampN(m.pitch + (wantPitch - m.pitch) * k, -0.4, 0.45);
-      }
-      const p = st.mech ? min(1, st.t / d.scan) : 0;
-      if (st.mech && random() < dt * (20 + 60 * p)) particle(add(end, [rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)]), [rnd(-2, 2), rnd(0, 3), rnd(-2, 2)], 0.3, 0.3, w.def.col, 'fire');
-      if (m === G.player) fusionSound(true, p);
-      if (st.mech && st.t >= w.def.scan) fusionFire(m, w, mz, st.mech, end);
-    }
-
-    // The mech the laser passes closest to, if within its radius + slack and
-    // nothing (terrain) is in the way.
-    function nearMiss(m, mz, dir, d) {
-      let best = null, bestD = Infinity;
-      for (const t of G.mechs) {
-        if (!t.alive || t === m) continue;
-        const c = center(t), v = sub(c, mz), along = dot(v, dir);
-        if (along < 0 || along > d.range) continue;
-        const miss = len(sub(v, mul(dir, along))), lim = geoOf(t).radius * t.ch.scale + d.slack;
-        if (miss > lim || miss >= bestD) continue;
-        if (rayTerrain(mz, norm(v), len(v) - 1) != null) continue;
-        best = t; bestD = miss;
-      }
-      return best;
-    }
-
-    // Fire: launch the pulse down the beam, then the reactor pays for it --
-    // feedback into your own torso, a deep overload shutdown, a recharge.
-    function fusionFire(m, w, mz, t) {
-      const d = w.def;
-      launchPulse(mz, t, m, false);
-      if (mp() && m === G.player) netSend({ t: 'fx', k: 'fu', a: mz.map(r2), id2: t.netId || 0, b: center(t).map(r2) });
-      m.heat = d.overload; m.shutdown = true; w.cd = d.cd;
-      m.fusion.t = 0; m.fusion.mech = null; m.fusion.on = false;
-      if (m === G.player) {
-        G.whiteFlash = 0.7; G.shake = 1.2;
-        fusionSound(false, 0); sfx.fusionCrack(); sfx.powerdown();
-      }
-      const cost = m.max.T * d.feedback;
-      m.hp.T -= cost;
-      if (m === G.player) { G.stats.taken += cost; G.flash = min(0.6, G.flash + 0.4); sfx.clang(); }
-      if (m.hp.T <= 0) { m.hp.T = 0; destroy(m, null); return; }
-      if (m === G.player) say('Resonance discharge. Reactor overload. Torso damage.', true);
-    }
-
-    // The pulse: travels from the muzzle to the target (following it if it
-    // moves); kills on arrival. Ghost pulses are other pilots' -- visual only.
-    function launchPulse(a, target, shooter, ghost, b) {
-      const end = target ? center(target) : b;
-      G.pulses.push({ a, b: end, target, shooter, ghost, t: 0, dur: max(0.2, len(sub(end, a)) / WEAPONS.fusion.pulseSpeed), hit: false, seed: random() * 100 });
-    }
-    function updatePulses(dt) {
-      for (const pu of G.pulses) {
-        pu.t += dt;
-        if (pu.target && pu.target.alive) pu.b = center(pu.target);
-        if (pu.hit || pu.t < pu.dur) continue;
-        pu.hit = true;
-        explode(pu.b, true); explode(add(pu.b, [0, 3, 0]), true);
-        for (let i = 0; i < 14; i++) particle(add(pu.b, [rnd(-2, 2), rnd(-3, 3), rnd(-2, 2)]), [rnd(-16, 16), rnd(4, 20), rnd(-16, 16)], rnd(0.5, 1.1), rnd(0.8, 2.2), [0.95, 0.85, 1], 'fire');
-        sfx.fusion(pu.b);
-        if (pu.ghost || !pu.target || !pu.target.alive) continue;
-        // Resonance: the whole frame shakes itself apart, however much armour.
-        const t = pu.target;
-        if (t.remote) {
-          netSend({ t: 'hit', to: t.netId, amt: 40, p: pu.b.map(r2), fu: 1 });
-          if (pu.shooter === G.player) { G.stats.hits++; G.hitMark = 0.6; }
-        } else { t.hp.T = 0; destroy(t, pu.shooter); }
-      }
-      G.pulses = G.pulses.filter(pu => pu.t < pu.dur + 0.25);
+      world = upload(buildTerrainMesh(G.ter, G.pal, G.ter.seed));
     }
 
     // Scan tone: a pulsing whine that climbs as the scan converges.
@@ -1220,17 +519,6 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
       fhum.lg.gain.setTargetAtTime(on ? 0.03 : 0, t, 0.02);
       fhum.o.frequency.setTargetAtTime(320 + 1100 * p * p, t, 0.05);
       fhum.lfo.frequency.setTargetAtTime(6 + 22 * p, t, 0.05);
-    }
-
-    // Another pilot's beam, drawn from their lasers to where they say it ends.
-    // Visual only: their client scores it.
-    function remoteBeam(m, end) {
-      const lasers = m.weapons.filter(w => w.def.kind === 'beam' && m.hp[w.mount] > 0);
-      if (!lasers.length) return;
-      if (!m.beaming) sfx.laser(muzzle(m, lasers[0]), false);
-      m.beaming = true;
-      for (const w of lasers) drawBeam(muzzle(m, w), end, w.def, m.net.bf || 1);   // bf: how melted their target is
-      if (random() < 0.4) particle(end, [rnd(-3, 3), rnd(1, 5), rnd(-3, 3)], 0.25, 0.4, lasers[0].def.col, 'fire');
     }
 
     // Beam damage lands every frame; in the arena it's sent a few times a second.
@@ -1259,113 +547,6 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
       hum.f.frequency.setTargetAtTime(700 + 2200 * k, t, 0.08);
     }
 
-    // A beam lasts one frame; it's redrawn every frame it's on. Thicker and
-    // whiter as the focus climbs.
-    function drawBeam(a, b, def, mult) {
-      const k = (mult - 1) / (MELT_MAX - 1);
-      G.cbeams.push({ a, b, col: mix3(def.col, [1, 1, 1], 0.2 + 0.45 * k), w: def.w * (0.8 + 0.9 * k) * rnd(0.85, 1.15) });
-    }
-
-    /* ----- missiles: tap to fire, hold to fly them, let go to detonate ----- */
-
-    const HOLD_TO_GUIDE = 220;   // ms: shorter is a tap
-    const BLAST_R = 10;          // metres: a near miss still hurts
-
-    // Called every frame with whether the missile control is held. One volley
-    // per press; hold past HOLD_TO_GUIDE and you take over that volley.
-    function missileTrigger(down) {
-      if (down && !G.mDown) {
-        G.mDown = true; G.mAt = performance.now();
-        G.mVid = fireCat('missile') ? G.lastVolley : 0;
-      } else if (down) {
-        if (!G.guide && G.mVid && performance.now() - G.mAt >= HOLD_TO_GUIDE) startGuide(G.mVid);
-      } else if (G.mDown) {
-        G.mDown = false;
-        if (G.guide) endGuide(true);
-      }
-    }
-
-    const guidedLive = vid => G.shots.filter(s => s.vid === vid && s.owner === G.player && s.life > 0 && !s.ghost);
-    const centroid = list => mul(list.reduce((a, s) => add(a, s.p), [0, 0, 0]), 1 / list.length);
-
-    function startGuide(vid) {
-      const ms = guidedLive(vid);
-      if (!ms.length) return;
-      const d = norm(ms[0].v);
-      G.guide = { vid, yaw: atan2(d[0], d[2]), pitch: Math.asin(clampN(d[1], -1, 1)), dir: d, pos: centroid(ms), lost: 0, sendT: 0, n: ms.length };
-      for (const s of ms) { s.guided = true; s.target = null; s.life = max(s.life, 9); }
-      G.zoom = false;
-      sfx.beep();
-    }
-
-    // Each frame while flying: aim follows input, camera follows the volley.
-    function steerVolley(dt) {
-      const g = G.guide;
-      g.dir = dirOf(g.yaw, g.pitch);
-      const ms = guidedLive(g.vid);
-      g.n = ms.length;
-      if (ms.length) {
-        g.pos = centroid(ms); g.fuel = max(...ms.map(s => s.life));
-        // The camera rides in the nose of whichever missile is out in front,
-        // so the volley and its smoke trail are behind it, not in the shot.
-        g.nose = ms.reduce((a, s) => (dot(sub(s.p, g.pos), g.dir) > dot(sub(a.p, g.pos), g.dir) ? s : a)).p;
-      }
-      else if ((g.lost += dt) > 0.6) { endGuide(false); return; }   // all hit something: "signal lost", then home
-      if (mp() && (g.sendT += dt) >= 1 / SEND_HZ && ms.length) { g.sendT = 0; netSend({ t: 'fx', k: 'mg', v: g.vid, p: g.pos.map(r2), d: g.dir.map(r2) }); }
-    }
-    function steerBy(dx, dy, sens) {
-      const g = G.guide;
-      g.yaw -= dx * sens;
-      g.pitch = clampN(g.pitch - dy * sens * (invertY ? -1 : 1), -1.3, 1.3);
-    }
-
-    // Let go: every missile still flying blows up where it is. Then back to the cockpit.
-    function endGuide(detonate) {
-      const g = G.guide;
-      if (!g) return;
-      if (detonate) {
-        for (const s of guidedLive(g.vid)) { s.life = -1; blast(s.p, s.dmg, s.owner, null); explode(s.p, false); }
-        if (mp()) netSend({ t: 'fx', k: 'md', v: g.vid });
-      }
-      G.guide = null;
-    }
-
-    // Splash: anything within BLAST_R takes damage falling off with distance,
-    // on the side facing the blast. Not the mech it hit directly (that took
-    // the full hit), and never the mech that fired it.
-    function blast(p, dmg, owner, direct) {
-      for (const m of G.mechs) {
-        if (!m.alive || m === owner || m === direct) continue;
-        const g = geoOf(m), R = g.radius * m.ch.scale, top = m.y + g.height * m.ch.scale;
-        const hx = p[0] - m.x, hz = p[2] - m.z, hd = hypot(hx, hz);
-        const dy = p[1] < m.y ? m.y - p[1] : p[1] > top ? p[1] - top : 0;
-        const d = hypot(max(0, hd - R), dy);
-        if (d >= BLAST_R) continue;
-        const nx = hd > 0.01 ? hx / hd : 1, nz = hd > 0.01 ? hz / hd : 0;
-        const at = [m.x + nx * R, clampN(p[1], m.y + 1, top - 1), m.z + nz * R];
-        damage(m, at, dmg * 0.8 * (1 - d / BLAST_R), owner);
-      }
-    }
-
-    // Fire every weapon of one kind that's ready; held, each refires as it recharges.
-    function fireCat(cat) {
-      const P = G.player;
-      let any = false;
-      for (const w of P.weapons) if (CAT_OF[w.type] === cat) any = fire(P, w, G.aim, G.lock ? G.target : null) || any;
-      return any;
-    }
-    function alpha() {
-      const P = G.player;
-      for (const w of P.weapons) fire(P, w, G.aim, G.lock ? G.target : null);   // beams skip themselves
-    }
-    function cycleTarget() {
-      const foes = G.mechs.filter(m => m.alive && m.team !== 0)
-        .sort((a, b) => hypot(a.x - G.player.x, a.z - G.player.z) - hypot(b.x - G.player.x, b.z - G.player.z));
-      if (!foes.length) return;
-      const i = foes.indexOf(G.target);
-      G.target = foes[(i + 1) % foes.length];
-      sfx.beep();
-    }
 
     /* ---------- rendering ---------- */
 
@@ -1415,11 +596,11 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
 
     function render() {
       resize();
-      if (!ter) return;
+      if (!G.ter) return;
       gl.viewport(0, 0, cv.width, cv.height);
       const P = G.player, gd = G.guide, ir = !!gd;
       const IR_ZEN = [0.03, 0.03, 0.03], IR_HOR = [0.1, 0.1, 0.1];
-      const hor = ir ? IR_HOR : pal.hor;
+      const hor = ir ? IR_HOR : G.pal.hor;
       gl.clearColor(hor[0], hor[1], hor[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       let fov, yaw, pitch, eye, dir;
@@ -1457,7 +638,7 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
       const ap = gl.getAttribLocation(skyProg, 'aP');
       gl.enableVertexAttribArray(ap);
       gl.vertexAttribPointer(ap, 2, gl.FLOAT, false, 0, 0);
-      gl.uniform3fv(SU.zen, ir ? IR_ZEN : pal.zen); gl.uniform3fv(SU.hor, hor);
+      gl.uniform3fv(SU.zen, ir ? IR_ZEN : G.pal.zen); gl.uniform3fv(SU.hor, hor);
       gl.uniform1f(SU.h, 0.5 - 0.5 * Math.tan(pitch) / Math.tan(fov / 2)); gl.uniform1f(SU.res, cv.height);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       gl.disableVertexAttribArray(ap);
@@ -1467,9 +648,9 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
       curMesh = null;
       [A.pos, A.nrm, A.col].forEach(a => gl.enableVertexAttribArray(a));
       gl.uniformMatrix4fv(U.VP, false, VP);
-      gl.uniform3fv(U.light, pal.light);
+      gl.uniform3fv(U.light, G.pal.light);
       gl.uniform3fv(U.cam, eye);
-      gl.uniform2f(U.fog, pal.fog[0], pal.fog[1]);
+      gl.uniform2f(U.fog, G.pal.fog[0], G.pal.fog[1]);
       gl.uniform3fv(U.fogCol, hor);
       gl.uniform1f(U.ir, ir ? 1 : 0);
 
@@ -1538,7 +719,7 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
         const f = p.life / p.max;
         let size = p.size, tint = p.col, emis = 1;
         if (p.kind === 'fire') { size *= 0.4 + f * 0.8; tint = mix3([0.4, 0.1, 0.05], p.col, f); }
-        else if (p.kind === 'smoke') { size *= 1.6 - f * 0.8; tint = mix3(pal.hor, p.col, f); emis = 0.6; }
+        else if (p.kind === 'smoke') { size *= 1.6 - f * 0.8; tint = mix3(G.pal.hor, p.col, f); emis = 0.6; }
         else emis = 0;
         draw(meshes.cube, chain(M.T(...p.p), M.RY(p.spin), M.RX(p.spin * 0.7), M.S(size)), tint, emis, p.kind === 'fire' ? f : p.kind === 'smoke' ? 0.15 : 0.3);
       }
@@ -1628,7 +809,7 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
         ctx.font = 'bold 22px "Lucida Console", monospace'; ctx.fillStyle = RED;
         ctx.fillText(G.killer ? `DESTROYED BY ${pilotName(G.killer)}` : 'MECH DESTROYED', W / 2, mid);
         ctx.font = '14px "Lucida Console", monospace'; ctx.fillStyle = AMBER;
-        ctx.fillText(`RESPAWN IN ${Math.ceil(max(0, (G.respawnAt - performance.now()) / 1000))}`, W / 2, mid + 26);
+        ctx.fillText(`RESPAWN IN ${Math.ceil(max(0, (G.respawnAt - G.clock) / 1000))}`, W / 2, mid + 26);
       } else if (P.spawnT > 0) {
         ctx.font = '13px "Lucida Console", monospace'; ctx.fillStyle = '#3cf';
         ctx.fillText('SHIELDED', W / 2, mid + 40);
@@ -1687,7 +868,7 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
       ctx.fillText(`LRM ${g.n}/${WEAPONS.lrm.count}`, lx, 38);
       ctx.textAlign = 'right';
       const rx = G.touchUI ? W - 120 : W - 20;
-      ctx.fillText(`ALT ${Math.round(g.pos[1] - ter.height(g.pos[0], g.pos[2]))}m`, rx, 22);
+      ctx.fillText(`ALT ${Math.round(g.pos[1] - G.ter.height(g.pos[0], g.pos[2]))}m`, rx, 22);
       ctx.fillText(nearest < Infinity ? `TGT ${Math.round(nearest)}m` : 'TGT ---', rx, 38);
       ctx.fillText(`FUEL ${max(0, g.fuel || 0).toFixed(1)}s`, rx, 54);
       ctx.textAlign = 'center';
@@ -1865,7 +1046,7 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
       for (const cat of CATS) {
         const ws = P.weapons.filter(w => CAT_OF[w.type] === cat);
         if (!ws.length) continue;
-        const live = ws.filter(w => !w.dead), firingNow = isHeld(cat);
+        const live = ws.filter(w => !w.dead), firingNow = !!G.input?.held[cat];
         ctx.fillStyle = !live.length ? '#622' : firingNow ? AMBER : GREEN;
         ctx.fillText(`${G.touchUI ? '' : CAT_KEY[cat].padEnd(6)}${CAT_LABEL[cat]}`, wx, wy);
         const ammo = live.find(w => w.def.ammo);
@@ -1995,10 +1176,9 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
       // The backdrop: a quiet patch of desert, with your mech standing in it.
       if (G.worldKind !== 'menu') {
         G.worldKind = 'menu';
-        pal = PALS.dusk;
-        ter = makeTerrain(3);
-        if (world) gl.deleteBuffer(world.buf);
-        world = upload(buildTerrainMesh(ter, pal, 3));
+        G.pal = PALS.dusk;
+        G.ter = makeTerrain(3);
+        uploadWorld();
       }
       G.shots = []; G.beams = []; G.cbeams = []; G.parts = []; G.wrecks = []; G.msgs = [];
       showMech();
@@ -2007,7 +1187,7 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
     // The mech on show: multiplayer shows it in your arena colour.
     function showMech() {
       const key = menuSel === 'mp' ? partsKeyFor(mpColor, chassis) : chassis;
-      G.player = newMech(chassis, 0, 0, 0, 0, { partsKey: key });
+      G.player = newMech(G, chassis, 0, 0, 0, 0, { partsKey: key });
       G.mechs = [G.player];
       menuTick(0);
     }
@@ -2016,7 +1196,7 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
       if (!m) return;
       if (!G.menuDrag) G.showYaw = (G.showYaw ?? 2.6) + dt * 0.35;
       m.yaw = G.showYaw; m.twist = sin(t * 0.6) * 0.3; m.pitch = sin(t * 0.4) * 0.08;
-      initFeet(m);
+      initFeet(G, m);
       m.bob = sin(t * 1.7) * 0.06;   // idling: a slow breath
     }
 
@@ -2100,7 +1280,6 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
     }
 
     function debrief() {
-      G.state = 'debrief';
       syncTouchUI();
       exitLock();
       const s = G.stats, acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
@@ -2128,7 +1307,7 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
       clearHeld();
       if (on) {
         for (const k in keys) keys[k] = false;
-        endGuide(true); G.mDown = false;
+        endGuide(G, true); G.mDown = false;
         exitLock();   // give the cursor back, or nothing outside the game can be clicked
         syncTouchUI();
         showOverlay(`<h1>${mp() ? 'MENU' : 'PAUSED'}</h1>
@@ -2209,7 +1388,7 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
     const onMouseMove = e => {
       if (G.state !== 'play' || G.paused || !G.player.alive) return;
       if (!locked()) return;
-      if (G.guide) { steerBy(e.movementX, e.movementY, 0.0028); return; }
+      if (G.guide) { steerBy(G, e.movementX, e.movementY, 0.0028, invertY); return; }
       const sens = (G.zoom ? 0.0009 : 0.0024);
       const P = G.player;
       P.twist = clampN(P.twist - e.movementX * sens, -1.9, 1.9);
@@ -2240,7 +1419,7 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
     const onKeyDown = e => {
       if (e.target.closest?.('input')) { if (e.key === 'Enter' && G.state === 'menu') { e.preventDefault(); go(); } return; }
       if (e.key === 'F2') { e.preventDefault(); exitLock(); if (mp()) leaveArena(); else mainMenu(); return; }
-      if (e.code === 'KeyM') { OPTS.sound[2](!settings.sound); msg(settings.sound ? 'SOUND ON' : 'SOUND OFF'); return; }
+      if (e.code === 'KeyM') { OPTS.sound[2](!settings.sound); msg(G, settings.sound ? 'SOUND ON' : 'SOUND OFF'); return; }
       if (G.state === 'menu') {
         const i = MENU.findIndex(([k]) => k === menuSel);
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -2263,9 +1442,9 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
       if (e.repeat && keys[e.code]) return;
       keys[e.code] = true;
       if (KEY_FOR.missile.includes(e.code)) missileTap = true;
-      if (e.code === 'KeyT') cycleTarget();
+      if (e.code === 'KeyT') cycleTarget(G);
       if (e.code === 'KeyR' && G.aimMech && G.aimMech.team !== 0) { G.target = G.aimMech; sfx.beep(); }
-      if (e.code === 'KeyF') alpha();
+      if (e.code === 'KeyF') alpha(G);
       if (e.code === 'KeyZ') G.zoom = !G.zoom;
     };
     const onKeyUp = e => { keys[e.code] = false; };
@@ -2296,7 +1475,7 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
       if (CATS.includes(name)) { held[name] = down; if (down && name === 'missile') missileTap = true; }
       else if (name === 'jump') keys.KeyJ = down;
       if (!down) return;
-      if (name === 'tgt') cycleTarget();
+      if (name === 'tgt') cycleTarget(G);
       else if (name === 'zoom') G.zoom = !G.zoom;
       else if (name === 'stop') G.player.throttle = 0;
       else if (name === 'pause') pause(true);
@@ -2334,7 +1513,7 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
       } else if (G.guide && (f.kind === 'aim' || (f.kind === 'btn' && f.name === 'missile'))) {
         // Flying missiles: drag the missile button itself (the thumb is
         // already on it) or anywhere on the right side to steer.
-        steerBy(e.clientX - (f.lx ?? e.clientX), e.clientY - (f.ly ?? e.clientY), f.kind === 'btn' ? 0.009 : 0.006);
+        steerBy(G, e.clientX - (f.lx ?? e.clientX), e.clientY - (f.ly ?? e.clientY), f.kind === 'btn' ? 0.009 : 0.006, invertY);
         f.lx = e.clientX; f.ly = e.clientY;
       } else if (f.kind === 'btn' && f.name === 'fusion' && P.alive) {
         // Dragging the fusion button aims the scan (the thumb is already on it).
@@ -2376,10 +1555,9 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
     // own death. Other pilots are drawn from their latest state, smoothed and
     // extrapolated, and walk with the same gait. Their shots arrive as effects
     // ("ghosts") that look real but never score -- their shooter scores them.
-    const NET_PORT = 8096, SEND_HZ = 15;
+    const NET_PORT = 8096;
     const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10 };
     const mp = () => G.mode === 'mp';
-    const r2 = v => Math.round(v * 100) / 100;
     let mpName = store.get('mp.name', ''), mpColor = store.get('mp.color', floor(random() * MP_COLORS.length));
     const pilotName = id => Net.info.get(id)?.name || `PILOT ${id}`;
     const pilotCss = id => MP_COLORS[Net.info.get(id)?.color ?? 0]?.css || '#f44';
@@ -2435,9 +1613,9 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
           startArena(m.seed, m.pal);
           G.roundOver = !!m.over;
           break;
-        case 'join': setScores(m.scores); msg(`${pilotName(m.id)} JOINED`); break;
+        case 'join': setScores(m.scores); msg(G, `${pilotName(m.id)} JOINED`); break;
         case 'leave': {
-          msg(`${pilotName(m.id)} LEFT`);
+          msg(G, `${pilotName(m.id)} LEFT`);
           G.mechs = G.mechs.filter(x => x.netId !== m.id || x === G.player);
           if (G.target?.netId === m.id) G.target = null;
           setScores(m.scores);
@@ -2448,13 +1626,13 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
         case 'hit':
           if (!G.player.alive) break;
           // A fusion discharge isn't damage: it's the frame shaking apart.
-          if (m.fu && G.player.spawnT <= 0 && !G.roundOver) { G.whiteFlash = 1; destroy(G.player, mechById(m.from) || null); }
-          else damage(G.player, m.p, m.amt, mechById(m.from) || null);
+          if (m.fu && G.player.spawnT <= 0 && !G.roundOver) { G.whiteFlash = 1; destroy(G, G.player, mechById(m.from) || null); }
+          else damage(G, G.player, m.p, m.amt, mechById(m.from) || null);
           break;
         case 'kill': {
           setScores(m.scores);
           const mine = m.killer === Net.id || m.victim === Net.id;
-          msg(m.killer ? `${pilotName(m.killer)} DESTROYED ${pilotName(m.victim)}` : `${pilotName(m.victim)} WENT DOWN`, mine ? '#fc3' : '#7f7');
+          msg(G, m.killer ? `${pilotName(m.killer)} DESTROYED ${pilotName(m.victim)}` : `${pilotName(m.victim)} WENT DOWN`, mine ? '#fc3' : '#7f7');
           if (m.killer === Net.id) { G.stats.kills++; say('Target destroyed.', true); }
           break;
         }
@@ -2474,17 +1652,10 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
 
     function startArena(seed, palName) {
       G.mode = 'mp';
-      pal = PALS[palName] || PALS.dusk;
-      ter = makeTerrain(seed);
-      if (world) gl.deleteBuffer(world.buf);
-      world = upload(buildTerrainMesh(ter, pal, seed));
-      G.mechs = []; G.shots = []; G.beams = []; G.parts = []; G.wrecks = []; G.msgs = []; G.pulses = [];
-      G.target = null; G.flash = 0; G.shake = 0; G.kick = 0; G.zoom = false; G.time = 0; G.guide = null; G.mDown = false;
-      G.stats = { shots: 0, hits: 0, dealt: 0, taken: 0, kills: 0 };
-      G.def = { name: 'Arena', foes: [] };
-      G.roundOver = false; G.banner = null; G.respawnAt = 0; G.hitMark = 0;
-      G.worldKind = 'match';
-      G.player = newMech(chassis, 0, 0, 0, 0, { partsKey: partsKeyFor(mpColor, chassis) });
+      resetMatch(G, { def: { name: 'Arena', foes: [] }, seed, pal: palName });
+      uploadWorld();
+      G.banner = null;
+      G.player = newMech(G, chassis, 0, 0, 0, 0, { partsKey: partsKeyFor(mpColor, chassis) });
       G.player.netId = Net.id;
       G.mechs.push(G.player);
       respawn();
@@ -2510,10 +1681,10 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
     }
     function respawn() {
       const P = G.player, [x, z] = spawnPoint();
-      Object.assign(P, { x, z, y: ter.height(x, z), vy: 0, yaw: atan2(-x, -z), twist: 0, pitch: 0, speed: 0, throttle: 0,
+      Object.assign(P, { x, z, y: G.ter.height(x, z), vy: 0, yaw: atan2(-x, -z), twist: 0, pitch: 0, speed: 0, throttle: 0,
         heat: 0, fuel: 1, shutdown: false, alive: true, air: false, hp: { ...P.max }, spawnT: 2 });
       P.weapons.forEach(w => { w.cd = 0; w.dead = false; w.ammo = w.def.ammo || null; });
-      initFeet(P); P.lastYaw = P.yaw;
+      initFeet(G, P); P.lastYaw = P.yaw;
       G.respawnAt = 0; G.flash = 0; G.killer = 0;
       G.eye = eyeOf(P); G.view = dirOf(P.yaw, 0); G.aim = add(G.eye, mul(G.view, 100));
       sendState();
@@ -2533,7 +1704,7 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
       let r = G.mechs.find(m => m.netId === s.id);
       if (!r) {
         const ch = CHASSIS[s.ch] ? s.ch : 'kestrel';
-        r = newMech(ch, s.id, s.x, s.z, s.yaw, { partsKey: partsKeyFor(Net.info.get(s.id)?.color ?? 0, ch) });
+        r = newMech(G, ch, s.id, s.x, s.z, s.yaw, { partsKey: partsKeyFor(Net.info.get(s.id)?.color ?? 0, ch) });
         Object.assign(r, { netId: s.id, remote: true, net: null });
         G.mechs.push(r);
       }
@@ -2549,39 +1720,24 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
       if (first || (s.al && !r.alive)) {
         // Appeared or respawned: jump straight there.
         Object.assign(r, { x: s.x, y: s.y, z: s.z, yaw: s.yaw, twist: s.tw, pitch: s.p, alive: !!s.al });
-        initFeet(r); r.lastYaw = r.yaw;
+        initFeet(G, r); r.lastYaw = r.yaw;
       } else if (!s.al && r.alive) {
         // Its own client says it's dead: show the kill.
         r.alive = false;
-        explode(center(r), true);
-        explode(add(center(r), [rnd(-3, 3), 2, rnd(-3, 3)]), false);
+        explode(G, center(r), true);
+        explode(G, add(center(r), [rnd(-3, 3), 2, rnd(-3, 3)]), false);
         G.wrecks.push({ x: r.x, y: r.y, z: r.z, yaw: r.yaw, type: r.partsKey, scale: r.ch.scale, t: 0, roll: rnd(-0.6, 0.6) });
         if (G.target === r) G.target = null;
       }
     }
 
-    // Glide toward the latest report, projected forward by its speed so a
-    // late packet doesn't leave the mech standing still; snap if far off.
-    function netInterp(r, dt) {
-      const n = r.net;
-      if (!n) return;
-      const age = min(0.25, (performance.now() - n.at) / 1000);
-      const tx = n.x + sin(n.yaw) * n.sp * age, tz = n.z + cos(n.yaw) * n.sp * age;
-      const k = 1 - Math.exp(-dt * 12);
-      if (hypot(tx - r.x, tz - r.z) > 30) { r.x = tx; r.z = tz; } else { r.x += (tx - r.x) * k; r.z += (tz - r.z) * k; }
-      r.y += (n.y - r.y) * k;
-      r.yaw += wrapA(n.yaw - r.yaw) * k;
-      r.twist += wrapA(n.tw - r.twist) * k;
-      r.pitch += (n.p - r.pitch) * k;
-      r.speed = n.sp; r.air = !!n.air; r.shutdown = !!n.sd;
-    }
-
+    const centroid = list => mul(list.reduce((a, s) => add(a, s.p), [0, 0, 0]), 1 / list.length);
     function netFx(f) {
       const src = mechById(f.id) || null;
       if (f.k === 'b') {
         const d = WEAPONS[f.w] || WEAPONS.laser;
         G.beams.push({ a: f.a, b: f.b, col: d.col, w: d.w, life: 0.14, max: 0.14 });
-        for (let i = 0; i < 4; i++) particle(f.b, [rnd(-4, 4), rnd(1, 6), rnd(-4, 4)], 0.25, 0.35, d.col, 'fire');
+        for (let i = 0; i < 4; i++) particle(G, f.b, [rnd(-4, 4), rnd(1, 6), rnd(-4, 4)], 0.25, 0.35, d.col, 'fire');
         sfx.laser(f.a, d === WEAPONS.mlaser);
       } else if (f.k === 's') {
         G.shots.push({ kind: 'shell', p: f.p, v: f.v, owner: src, dmg: 0, life: WEAPONS.ac.range / WEAPONS.ac.speed, ghost: true });
@@ -2595,20 +1751,51 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
         }
         sfx.missile(f.p);
       } else if (f.k === 'fu') {
-        launchPulse(f.a, f.id2 ? mechById(f.id2) : null, src, true, f.b);
+        launchPulse(G, f.a, f.id2 ? mechById(f.id2) : null, src, true, f.b);
         sfx.fusionCrack();
       } else if (f.k === 'mg' || f.k === 'md') {
         // Another pilot is flying a volley (mg: where it is and where it's
         // heading) or has detonated it (md). Their client scores the damage.
         const ghosts = G.shots.filter(s => s.ghost && s.from === f.id && s.vid === f.v && s.life > 0);
         if (!ghosts.length) return;
-        if (f.k === 'md') { for (const s of ghosts) { s.life = -1; explode(s.p, false); } return; }
+        if (f.k === 'md') { for (const s of ghosts) { s.life = -1; explode(G, s.p, false); } return; }
         const shift = mul(sub(f.p, centroid(ghosts)), 0.5);
         for (const s of ghosts) { s.p = add(s.p, shift); s.v = mul(norm(f.d), len(s.v)); s.target = null; s.life = max(s.life, 2); }
       }
     }
 
     /* ---------- loop & lifecycle ---------- */
+
+    // What the sim sees this frame, from the keyboard, the mouse buttons and the touch controls.
+    function snapshotInput() {
+      const inp = {
+        thrUp: !!keys.KeyW, thrDown: !!keys.KeyS, stop: !!keys.KeyX,
+        turn: (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0) + G.touchTurn,
+        twist: (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0), pitch: (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0),
+        centre: !!keys.KeyC, jets: !!keys.KeyJ,
+        held: Object.fromEntries(CATS.map(c => [c, isHeld(c)])), missileTap,
+      };
+      missileTap = false;
+      return inp;
+    }
+    // The arena's per-frame housekeeping: respawn timer, spawn shield, state cadence.
+    function netTick(dt) {
+      if (!mp()) return;
+      const P = G.player;
+      if (P.spawnT > 0) P.spawnT -= dt;
+      if (!P.alive && G.respawnAt && G.clock >= G.respawnAt) respawn();
+      if ((Net.sendT += dt) >= 1 / SEND_HZ) { Net.sendT = 0; sendState(); flushHits(); }
+    }
+    // Continuous layers follow the sim state: reactor hum, jets, torso servo, laser bite.
+    function audioTick() {
+      const P = G.player, live = P.alive && !P.shutdown, pace = min(1, abs(P.speed) / P.ch.speed);
+      loopSet('hum_loop', P.alive ? (P.shutdown ? 0.03 : 0.07 + 0.13 * pace) : 0, P.shutdown ? 0.5 : 0.72 + 0.4 * pace);
+      const jetting = live && P.jetting && P.fuel > 0;
+      loopSet('jet_loop', jetting ? 0.32 : G.guide ? 0.24 : 0, jetting ? 0.85 : G.guide ? 1.7 : 0.85);
+      const twistRate = G.twistRate || 0;
+      loopSet('servo_loop', live ? min(0.13, twistRate * 0.07) : 0, 0.75 + min(0.6, twistRate * 0.25));
+      beamSound(P.beaming && !G.paused, beamMult(P));
+    }
 
     let last = 0, lastAudioCheck = 0;
     const loop = ts => {
@@ -2622,12 +1809,18 @@ import { buildTerrainMesh } from './world/terrainMesh.js';
         if (c && settings.sound && c.state !== 'running' && c.state !== 'closed') { try { c.resume()?.catch?.(() => {}); } catch { /* next tap */ } }
       }
       if (G.state === 'play' && !document.hasFocus() && !G.paused) pause(true);
+      G.clock = performance.now();
       if (G.state === 'menu') menuTick(dt);
-      if ((G.state === 'play' && (!G.paused || mp())) || G.state === 'over') update(dt);
-      else { for (const k of Object.keys(loops)) loopSet(k, 0); beamSound(false, 1); fusionSound(false, 0); }
+      if ((G.state === 'play' && (!G.paused || mp())) || G.state === 'over') {
+        update(G, snapshotInput(), dt);
+        netTick(dt);
+        audioTick();
+      } else { for (const k of Object.keys(loops)) loopSet(k, 0); beamSound(false, 1); fusionSound(false, 0); }
       render();
     };
 
+    G.hooks.debrief = debrief;
+    G.hooks.arenaDeath = () => sendState();
     mainMenu();
     requestAnimationFrame(loop);
     setTimeout(() => wrap.focus(), 0);
