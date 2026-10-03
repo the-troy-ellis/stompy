@@ -135,7 +135,7 @@ export function createScene(app) {
       eye = add(gd.nose || gd.pos, add(mul(dir, 1.5), [0, 0.3, 0]));
     } else {
       fov = G.zoom ? 0.42 : 1.08;
-      const sh = G.shake * 0.012, wv = FEEL.view.wobble, wp = P.wob ? P.wob.p.x : 0, wr = P.wob ? P.wob.r.x : 0;
+      const sh = G.shake * 0.012, wv = FEEL.view.wobble * (G.reducedMotion ? FEEL.view.reducedScale : 1), wp = P.wob ? P.wob.p.x : 0, wr = P.wob ? P.wob.r.x : 0;
       yaw = viewYaw(P) + rnd(-sh, sh) + wr * wv * 0.5; pitch = P.pitch + rnd(-sh, sh) - (P.alive || P.dying ? 0 : 0.15) + wp * wv;
       eye = add(G.eye, [0, -G.kick * 0.35 - (P.squash ? P.squash.x * 2 : 0) - (P.sag ? P.sag.x : 0), 0]); dir = dirOf(yaw, pitch - G.kick * 0.016);
       // Going down: the view goes with the body.

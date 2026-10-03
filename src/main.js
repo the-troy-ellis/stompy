@@ -38,6 +38,7 @@ function loadPrefs() {
     menuSel: store.get('menu.sel', 'campaign'),
     fpMap: store.get('fp.map', 0), fpFoes: store.get('fp.foes', 3),
     mpName: store.get('mp.name', ''), mpColor: store.get('mp.color', Math.floor(Math.random() * MP_COLORS.length)),
+    reducedMotion: store.get('motion.reduced', false), haptics: store.get('haptics', true),
   };
 }
 
@@ -73,6 +74,7 @@ function start(root) {
   const app = { root, wrap, cv, hud, ov, ctx: hud.getContext('2d'), R, prefs, params };
   app.G = createGame({ touchUI: params.has('touch') || matchMedia('(pointer: coarse)').matches });
   const G = app.G;
+  G.reducedMotion = prefs.reducedMotion;   // the sim reads a flag, never the prefs
   app.audio = createAudio(app);
   app.scene = createScene(app);
   app.hud = createHud(app);
