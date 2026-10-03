@@ -249,6 +249,12 @@ export function createAudio(app) {
       this.osc('sine', heavy ? 70 : 110, heavy ? 24 : 32, heavy ? 0.5 : 0.32, heavy ? 0.45 : 0.3, at);
       if (!buffers.punch) this.noise(0.35, 0.3, 900, 80, 'lowpass', at);
     },
+    // TOASTER lighting up: a breathy roar.
+    flame(p) {
+      const at = { at: p, ref: 30 };
+      play('missile', { ...at, vol: 0.3, rate: 0.55, vary: 0.1 });
+      this.noise(0.5, 0.25, 900, 250, 'lowpass', at);
+    },
     missile(p) { if (!play('missile', { at: p, ref: 30, vol: 0.35, rate: 1.25, vary: 0.15 })) this.noise(0.7, 0.12, 3000, 400, 'bandpass', { at: p, ref: 30 }); },
     boom(p, big) {
       const at = { at: p, ref: big ? 90 : 40 };

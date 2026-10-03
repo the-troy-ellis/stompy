@@ -4,7 +4,7 @@
 import { HPK } from '../data/chassis.js';
 import { WEAPONS } from '../data/weapons.js';
 
-export const PROTOCOL = 4;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit
+export const PROTOCOL = 5;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit. 5: hh (heat) on hit
 export const r2 = v => Math.round(v * 100) / 100;
 const v3 = p => p.map(r2);
 
@@ -38,12 +38,13 @@ export const fxPunch = () => ({ t: 'fx', k: 'pu' });   // the swing starts: othe
 // Damage to another pilot (the victim applies it); fu: a fusion kill.
 // kb: a knockback impulse [vx, vz] the victim adds to its push (the server
 // clamps each part to +-30); me: it was a punch; st: it was a stomp.
-export function hit(to, amt, p, fu = false, { kb, me, st, zap } = {}) {
+export function hit(to, amt, p, fu = false, { kb, me, st, zap, hh } = {}) {
   const m = fu ? { t: 'hit', to, amt: 40, p: v3(p), fu: 1 } : { t: 'hit', to, amt: r2(amt), p: v3(p) };
   if (kb && (kb[0] || kb[1])) m.kb = [r2(kb[0]), r2(kb[1])];
   if (me) m.me = 1;
   if (st) m.st = 1;
   if (zap) m.zap = 1;   // a bolt: the victim's HUD scrambles
+  if (hh > 0) m.hh = r2(hh);   // heat poured in (TOASTER): the victim adds it
   return m;
 }
 export const died = (by, me = false) => (me ? { t: 'died', by: by || 0, me: 1 } : { t: 'died', by: by || 0 });
