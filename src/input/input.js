@@ -80,6 +80,7 @@ export function createInput(app) {
     if (e.key === 'F2') { e.preventDefault(); exitLock(); if (app.net.mp()) app.net.leaveArena(); else app.ui.mainMenu(); return; }
     if (e.code === 'KeyM') { app.ui.OPTS.sound[2](!prefs.sound); msg(G, prefs.sound ? 'SOUND ON' : 'SOUND OFF'); return; }
     if (G.state === 'menu') {
+      if (app.mechlab.fit.open) { app.mechlab.key(e); return; }
       const i = app.ui.MENU.findIndex(([k]) => k === prefs.menuSel);
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
@@ -123,6 +124,8 @@ export function createInput(app) {
   const STICK_R = 56;
   const syncTouchUI = () => {
     tui.hidden = !(G.touchUI && (G.state === 'play' || G.state === 'over') && !G.paused);
+    const jump = root.querySelector('[data-t="jump"]');
+    if (jump) jump.hidden = G.player?.jets === 0;   // JUMP JETS NONE: no button
     if (tui.hidden) releaseFingers();
   };
   function releaseFingers() {

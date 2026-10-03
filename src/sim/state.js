@@ -57,9 +57,9 @@ export function resetMatch(G, { def, seed, pal, terrainOpts }) {
 }
 
 // A single-player match: the player at the origin, the foes on a ring.
-export function startMatch(G, def, seed, gentle, chassis, { partsKey, terrainOpts } = {}) {
+export function startMatch(G, def, seed, gentle, chassis, { partsKey, terrainOpts, loadout } = {}) {
   resetMatch(G, { def, seed, terrainOpts });
-  G.player = newMech(G, chassis, 0, 0, 0, 0, { partsKey });
+  G.player = newMech(G, chassis, 0, 0, 0, 0, { partsKey, loadout });
   G.mechs.push(G.player);
   G.eye = eyeOf(G.player); G.view = dirOf(0, 0); G.aim = add(G.eye, mul(G.view, 100));
   const rng = G.rng;

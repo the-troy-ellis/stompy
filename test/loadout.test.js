@@ -94,3 +94,19 @@ test('JUMP JETS 0 never lifts, 2 climbs higher and longer than stock', () => {
   assert.equal(none, 0);
   assert.ok(stock > 5 && boosted > stock * 1.15, `stock ${stock.toFixed(1)} m, boosted ${boosted.toFixed(1)} m`);
 });
+
+test('one tap cycles a hardpoint through its category and EMPTY, wrapping, and the systems through their levels', async () => {
+  const { cycleWeapon, cycleSystem } = await import('../src/sim/loadout.js');
+  let lo = stockLoadout('kestrel');
+  const seen = new Set();
+  for (let i = 0; i < choicesFor(CHASSIS.kestrel.hardpoints[0]).length; i++) { seen.add(lo.hp.la); lo = cycleWeapon('kestrel', lo, 'la', 1); }
+  assert.deepEqual([...seen].sort(), ['laser', 'mlaser', null].sort());
+  assert.equal(lo.hp.la, 'laser', 'a full lap comes back to stock');
+  assert.equal(cycleWeapon('kestrel', lo, 'la', -1).hp.la, null, 'backwards from the first is EMPTY');
+  assert.equal(cycleWeapon('kestrel', lo, 'nope', 1), lo);
+  let s = stockLoadout('kestrel');
+  for (let L = 0; L < 4; L++) s = cycleSystem(s, 'sinks', 1);
+  assert.equal(s.sys.sinks, 0, 'four taps on a 0-3 slot wrap round');
+  assert.equal(cycleSystem(s, 'jets', -1).sys.jets, 0);
+  assert.equal(stockLoadout('kestrel').hp.la, 'laser', 'cycling never mutates its input');
+});

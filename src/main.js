@@ -27,6 +27,7 @@ import { createNet } from './net/client.js';
 import { createFeelPanel } from './ui/feelPanel.js';
 import { DIFF } from './data/ai.js';
 import { SETTINGS, SETTING_KEYS, readSetting } from './data/settings.js';
+import { createMechlab } from './ui/mechlab.js';
 
 // Settings and progress, from localStorage. Each screen writes back the key
 // it owns (store.set) when the player changes something.
@@ -86,6 +87,7 @@ function start(root) {
   app.hud = createHud(app);
   app.input = createInput(app);
   app.net = createNet(app);
+  app.mechlab = createMechlab(app);
   app.ui = createUi(app);
   // The sim's effects sink: voice, sounds, the scan tone and arena messages.
   G.fx = { say: app.audio.say, sfx: app.audio.sfx, fusionSound: app.audio.fusionSound, netSend: app.net.send, thump: app.audio.thump };
