@@ -207,8 +207,17 @@ def handle_message(c, msg):
             p = msg.get("p") if isinstance(msg.get("p"), list) else [0, 0, 0]
             # fu: a fusion-cannon discharge -- the victim's client treats it as
             # a kill rather than damage (hit damage is capped at 40).
-            send(target, {"t": "hit", "from": c.id, "amt": num(msg.get("amt"), 0, 40),
-                          "p": [num(v, -1e4, 1e4) for v in p[:3]], "fu": 1 if msg.get("fu") else 0})
+            out = {"t": "hit", "from": c.id, "amt": num(msg.get("amt"), 0, 40),
+                   "p": [num(v, -1e4, 1e4) for v in p[:3]], "fu": 1 if msg.get("fu") else 0}
+            # kb: a shove [vx, vz] the victim adds to its push, clamped; me / st: punch / stomp.
+            kb = msg.get("kb")
+            if isinstance(kb, list) and len(kb) == 2:
+                out["kb"] = [num(v, -30, 30) for v in kb]
+            if msg.get("me"):
+                out["me"] = 1
+            if msg.get("st"):
+                out["st"] = 1
+            send(target, out)
     elif t == "died":
         c.deaths += 1
         killer = players.get(int(num(msg.get("by"), 0, 99)))
@@ -216,7 +225,10 @@ def handle_message(c, msg):
             killer = None
         if killer and not arena["over"]:
             killer.kills += 1
-        broadcast({"t": "kill", "victim": c.id, "killer": killer.id if killer else 0, "scores": scores()})
+        kill = {"t": "kill", "victim": c.id, "killer": killer.id if killer else 0, "scores": scores()}
+        if msg.get("me"):
+            kill["me"] = 1   # a punch: the kill feed says so
+        broadcast(kill)
         if killer and killer.kills >= SCORE_LIMIT and not arena["over"]:
             asyncio.ensure_future(end_round(killer))
 

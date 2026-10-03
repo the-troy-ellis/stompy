@@ -10,12 +10,15 @@ import { eyeOf } from '../sim/geom.js';
 import { initFeet } from '../sim/gait.js';
 import { msg, particle, explode } from '../sim/effects.js';
 import { beginDeath, damage, destroy, shedSection } from '../sim/combat.js';
+import { knock } from '../sim/knock.js';
+import { feel } from '../sim/feel.js';
 import { beamMult } from '../sim/beams.js';
 import { launchPulse } from '../sim/fusion.js';
 import { SEND_HZ } from '../sim/missiles.js';
-import { PROTOCOL, r2, stateMessage } from './protocol.js';
+import { PROTOCOL, hit, stateMessage } from './protocol.js';
 
 const { sin, cos, atan2, min, max, random, hypot } = Math;
+const clamp30 = v => max(-30, min(30, +v || 0));
 
 // The arena client: join, the message handler, spawn and respawn, the 15 Hz
 // state send, and relayed effects. The server relays; this client is the
@@ -102,13 +105,22 @@ export function createNet(app) {
         if (!G.player.alive) break;
         // A fusion discharge isn't damage: it's the frame shaking apart.
         if (m.fu && G.player.spawnT <= 0 && !G.roundOver) { G.whiteFlash = 1; destroy(G, G.player, mechById(m.from) || null); }
-        else damage(G, G.player, m.p, m.amt, mechById(m.from) || null);
+        else {
+          const melee = !!(m.me || m.st);
+          damage(G, G.player, m.p, m.amt, mechById(m.from) || null, false, melee);
+          // A shove or a stomp: the push, the aim jolt and the lurch happen here, on the victim's screen.
+          if (Array.isArray(m.kb) && G.player.alive && G.player.spawnT <= 0 && !G.roundOver) {
+            const kb = [clamp30(m.kb[0]), clamp30(m.kb[1])], v = hypot(kb[0], kb[1]);
+            if (v > 0.01) knock(G, { target: G.player, base: v, dir: [kb[0] / v, kb[1] / v], recoil: false });
+            if (melee) { feel(G, 'punched', { mech: G.player, k: m.st ? 1.2 : 1 }); app.audio.sfx.punch(null, true); }
+          }
+        }
         break;
       case 'kill': {
         setScores(m.scores);
         const mine = m.killer === Net.id || m.victim === Net.id;
-        msg(G, m.killer ? `${pilotName(m.killer)} DESTROYED ${pilotName(m.victim)}` : `${pilotName(m.victim)} WENT DOWN`, mine ? '#fc3' : '#7f7');
-        if (m.killer === Net.id) { G.stats.kills++; app.audio.say('Target destroyed.', true); }
+        msg(G, m.killer ? `${pilotName(m.killer)} ${m.me ? 'PUNCHED OUT' : 'DESTROYED'} ${pilotName(m.victim)}` : `${pilotName(m.victim)} WENT DOWN`, mine ? '#fc3' : '#7f7');
+        if (m.killer === Net.id) { G.stats.kills++; app.audio.say(m.me ? 'Target punched.' : 'Target destroyed.', true); }
         break;
       }
       case 'roundover':
@@ -220,6 +232,9 @@ export function createNet(app) {
     } else if (f.k === 'fu') {
       launchPulse(G, f.a, f.id2 ? mechById(f.id2) : null, src, true, f.b);
       app.audio.sfx.fusionCrack();
+    } else if (f.k === 'pu') {
+      // A swing starts: the wind-up shows now rather than at the next state report.
+      if (src && src.alive && !src.melee) src.melee = { t: 0, phase: 'windup', hit: null };
     } else if (f.k === 'mg' || f.k === 'md') {
       // Another pilot is flying a volley (mg: where it is and where it's
       // heading) or has detonated it (md). Their client scores the damage.
@@ -233,7 +248,7 @@ export function createNet(app) {
 
   // Beam damage lands every frame; in the arena it's sent a few times a second.
   function flushHits() {
-    for (const [to, q] of G.pendingHits) netSend({ t: 'hit', to, amt: r2(q.amt), p: q.p.map(r2) });
+    for (const [to, q] of G.pendingHits) netSend(hit(to, q.amt, q.p, false, q));
     G.pendingHits.clear();
   }
 
