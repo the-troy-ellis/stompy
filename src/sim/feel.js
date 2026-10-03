@@ -28,15 +28,17 @@ export function feel(G, event, { mech = null, k = 1, roll = 0, dir = null, at = 
   const row = FEEL[event];
   if (!row || !(k > 0)) return;
   const V = FEEL.view, mine = mech === G.player || mech === null;
+  // REDUCED MOTION: the player's camera and body response at 30%, no haptics; other mechs are untouched.
+  const rm = mine && G.reducedMotion ? V.reducedScale : 1;
   if (mine) {
-    if (row.kick) G.kick = max(G.kick, row.kick * k);
-    if (row.shake) G.shake = min(V.shakeMax, G.shake + row.shake * k);
+    if (row.kick) G.kick = max(G.kick, row.kick * k * rm);
+    if (row.shake) G.shake = min(V.shakeMax, G.shake + row.shake * k * rm);
     if (row.flash) G.flash = min(V.flashMax, G.flash + row.flash * k);
     if (row.white) G.whiteFlash = max(G.whiteFlash || 0, row.white * k);
   }
   if (mech) {
     if (!mech.squash) initFeel(mech);
-    if (row.squash) kickSpring(mech.squash, row.squash * k * 8);
+    if (row.squash) kickSpring(mech.squash, row.squash * k * 8 * rm);
     if (row.wobble) { kickSpring(mech.wob.p, row.wobble * k * (1 - 0.5 * Math.abs(roll))); if (roll) kickSpring(mech.wob.r, row.wobble * k * roll); }
     if (row.push && dir) { mech.push[0] += dir[0] * row.push * k; mech.push[1] += dir[1] * row.push * k; }
     // The restart snaps the body up past standing height before it settles.
@@ -47,5 +49,5 @@ export function feel(G, event, { mech = null, k = 1, roll = 0, dir = null, at = 
       kickSpring(mech.sag, -(w * Math.max(0, mech.sag.x) + row.overshoot * mech.ch.scale * w * Math.E * 1.6) - mech.sag.v);   // 1.6: ~4 cm past standing for overshoot 0.1
     }
   }
-  if (row.bass || row.duck || row.haptic) G.fx.thump(row.bass * k, row.duck * k, mine ? row.haptic * k : 0, at);
+  if (row.bass || row.duck || row.haptic) G.fx.thump(row.bass * k, row.duck * k, mine && !G.reducedMotion ? row.haptic * k : 0, at);
 }

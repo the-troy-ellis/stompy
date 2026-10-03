@@ -68,6 +68,9 @@ export function createUi(app) {
     sound: ['SOUND', () => prefs.sound, v => { prefs.sound = v; store.set('sound', v); }],
     voice: ['VOICE', () => prefs.voice, v => { prefs.voice = v; store.set('mech.voice', v); }],
     invert: ['INVERT AIM', () => prefs.invert, v => { prefs.invert = v; store.set('mech.invert', v); }],
+    // Less camera: kick, shake, view wobble and squash at 30%, flashes shorter, no buzz. The mechs still move.
+    motion: ['REDUCED MOTION', () => prefs.reducedMotion, v => { prefs.reducedMotion = v; G.reducedMotion = v; store.set('motion.reduced', v); }],
+    haptics: ['HAPTICS', () => prefs.haptics, v => { prefs.haptics = v; store.set('haptics', v); }],
     frameTime: ['FRAME TIME', () => prefs.frameTime, v => { prefs.frameTime = v; store.set('debug.frametime', v); }],   // the in-game readout, for playtests on real phones
   };
   const optLabel = k => `${OPTS[k][0]}: ${OPTS[k][1]() ? 'ON' : 'OFF'}`;
