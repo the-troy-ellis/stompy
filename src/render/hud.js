@@ -15,6 +15,7 @@ export const compassLabel = d => ({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[d] || 
 // throttle, messages, the arena board, and the missile camera's IR feed.
 export function createHud(app) {
   const G = app.G, ctx = app.ctx;
+  const punchBtn = app.root.querySelector('[data-t="punch"]');
 
   const project = p => {
     const v = G.VP, x = v[0] * p[0] + v[4] * p[1] + v[8] * p[2] + v[12], y = v[1] * p[0] + v[5] * p[1] + v[9] * p[2] + v[13];
@@ -208,6 +209,16 @@ export function createHud(app) {
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(ch[0] + dx * 5, ch[1] + dy * 5); ctx.lineTo(ch[0] + dx * 14, ch[1] + dy * 14); }
     ctx.stroke();
     ctx.strokeRect(ch[0] - 1, ch[1] - 1, 2, 2);
+    // Someone is in reach: a fist beside the crosshair, and the touch button wakes up.
+    if (punchBtn) punchBtn.classList.toggle('ready', !!G.punchReady);
+    if (G.punchReady || (P.melee && P.melee.phase === 'windup')) {
+      const fx0 = ch[0] + 24, fy0 = ch[1] + 18, winding = P.melee && P.melee.phase === 'windup';
+      ctx.fillStyle = winding ? '#fff' : AMBER;
+      ctx.fillRect(fx0, fy0 + 4, 12, 9);                                    // the palm
+      for (let i = 0; i < 4; i++) ctx.fillRect(fx0 + i * 3, fy0, 2, 5);     // the knuckles
+      ctx.fillRect(fx0 - 3, fy0 + 7, 3, 5);                                 // the thumb
+      ctx.textAlign = 'left'; ctx.fillText(winding ? 'SWING' : 'PUNCH', fx0 + 16, fy0 + 9);
+    }
     // Fusion scan: a violet ring filling over the scan, a frequency readout
     // that settles as it converges, and LOCK at the end.
     const fs = P.fusion;

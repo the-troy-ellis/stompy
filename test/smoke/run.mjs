@@ -43,7 +43,7 @@ try {
     if (!(x1[2] - x0[2] > 20)) { failed = true; console.error('FAIL: the frame counter barely advanced'); }
     // Every weapon, the jets, targeting and the pause, with the enemies awake.
     await page.evaluate(() => { for (const m of window.__stompy.game.mechs) if (m.team) m.ai.aware = true; });
-    for (const [key, ms] of [['Digit1', 900], ['Digit2', 200], ['Space', 100], ['Space', 700], ['KeyJ', 800], ['KeyT', 50], ['KeyF', 50], ['KeyZ', 50], ['KeyZ', 50], ['KeyG', 1200]]) {
+    for (const [key, ms] of [['Digit1', 900], ['Digit2', 200], ['Space', 100], ['Space', 700], ['KeyJ', 800], ['KeyT', 50], ['KeyE', 50], ['KeyF', 50], ['KeyZ', 50], ['KeyZ', 50], ['KeyG', 1200]]) {
       await page.keyboard.down(key); await page.waitForTimeout(ms); await page.keyboard.up(key); await page.waitForTimeout(150);
     }
     const st = await page.evaluate(() => { const g = window.__stompy.game; return { heat: g.player.heat, shots: g.stats.shots, state: g.state, parts: g.parts.length }; });

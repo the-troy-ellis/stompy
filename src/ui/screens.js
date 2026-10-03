@@ -41,6 +41,7 @@ export function createUi(app) {
       <tr><td>FUSION (hold)</td><td>keep the scan on a mech for 3 s (drag the button to aim; brief slips are forgiven): it dies outright -- and the feedback hurts your own torso and shuts your reactor down</td></tr>
       <tr><td>BALLISTIC (hold)</td><td>autocannon: big single hits, little heat, limited ammo</td></tr>
       <tr><td>MISSILE</td><td>tap: fire the LRMs (they home in on a locked target)<br>hold: fly them yourself in IR -- drag to steer, let go to detonate</td></tr>
+      <tr><td>PUNCH</td><td>shove whoever is in front of you (it lights up when someone is in reach; drop onto a mech from a jump to stomp it)</td></tr>
       <tr><td>TGT</td><td>next target</td></tr>
       <tr><td>JUMP (hold)</td><td>jump jets</td></tr>
       <tr><td>ZOOM / STOP / II</td><td>zoom, full stop, pause</td></tr>
@@ -53,7 +54,7 @@ export function createUi(app) {
       <tr><td>Left mouse / 1</td><td>laser beams (hold on target: damage climbs, so does heat)</td><td>Right mouse / 2</td><td>autocannon (big hits)</td></tr>
       <tr><td>G / 4 (hold)</td><td>fusion cannon: scan one mech for 3 s -- it dies; the feedback hurts your torso and shuts you down</td><td></td><td></td></tr>
       <tr><td>Space / 3</td><td>tap: fire missiles &middot; hold: fly them, release to detonate</td><td>F</td><td>fire everything</td></tr>
-      <tr><td>T</td><td>next target</td><td></td><td></td></tr>
+      <tr><td>E / Mouse 4</td><td>punch: a wind-up, a shove, a recovery -- the fist by the crosshair means someone is in reach; landing on a mech from a jump is a stomp</td><td>T</td><td>next target</td></tr>
       <tr><td>R</td><td>target under crosshair</td><td>J (hold)</td><td>jump jets</td></tr>
       <tr><td>C</td><td>centre torso on legs</td><td>Z</td><td>zoom</td></tr>
       <tr><td>Arrows</td><td>twist / aim without mouse</td><td>P / Esc</td><td>pause</td></tr>
