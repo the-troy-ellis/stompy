@@ -12,7 +12,11 @@ jobs:
   deploy:
     if: vars.STOMPY_DEPLOY_PAGES == 'true'
     runs-on: ubuntu-latest
-    environment: { name: github-pages, url: ${{ steps.deployment.outputs.page_url }} }
+    # Block style on purpose: a ${{ }} expression inside a { } flow mapping is
+    # a YAML error, which made every push log a failed Pages run.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
