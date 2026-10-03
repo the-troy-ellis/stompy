@@ -55,6 +55,7 @@ try {
     const { CAT_OF } = await import('/src/data/weapons.js');
     const G = window.__stompy.game, P = G.player, e = G.mechs.find(m => m.team && m.alive);
     const h = CHASSIS[e.type].hardpoints.find(x => x.cat === CAT_OF[k]);
+    if (!h) return;   // this enemy has nowhere to carry it
     applyLoadout(G, e, { hp: { ...e.loadout.hp, [h.id]: k }, sys: e.loadout.sys });
     e.shutdown = false; e.heat = 0;
     const w = e.weapons.find(x => x.type === k); w.cd = 0;

@@ -13,6 +13,7 @@ import { HIT_BY_SECTION, HIT_STOP } from '../data/feel.js';
 import { voice } from './voice.js';
 import { alertEnemy } from './ai/perception.js';
 import { WEAPONS } from '../data/weapons.js';
+import { knock } from './knock.js';
 
 const { sin, cos } = Math;
 
@@ -27,11 +28,13 @@ const mp = G => G.mode === 'mp';
 
 // `beam`: a slice of continuous laser damage (one frame's worth) -- it
 // isn't a "hit" for accuracy, and mustn't ring the armour every frame.
-// What a shell does beyond its damage, by weapon: a bolt scrambles and rattles.
-export function onShellHit(G, s, t, p) {
+// What a round does beyond its damage, by weapon: a bolt scrambles and
+// rattles; anything with `knock` shoves the mech it hits along its flight.
+export function onShotHit(G, s, t, p) {
   const d = WEAPONS[s.type];
   if (!d || !t.alive && !t.dying) return;
   if (d.scramble) scramble(G, t, d.scramble, p);
+  if (d.knock && t.alive) { const h = Math.hypot(s.v[0], s.v[2]) || 1; knock(G, { target: t, attacker: s.owner, base: d.knock, dir: [s.v[0] / h, s.v[2] / h], recoil: false }); }
 }
 export function scramble(G, t, secs, p) {
   if (t.remote) { const q = G.pendingHits.get(t.netId); if (q) q.zap = 1; return; }   // their client scrambles itself
@@ -202,14 +205,15 @@ export function fire(G, m, w, aim, target) {
   } else {
     const vid = ++G.volleySeq;
     for (let i = 0; i < d.count; i++) {
-      const spread = norm(add(dir, [r.range(-0.08, 0.08), r.range(0, 0.12), r.range(-0.08, 0.08)]));
-      G.shots.push({ kind: 'missile', p: add(mz, [r.range(-0.6, 0.6), r.range(-0.4, 0.4), r.range(-0.6, 0.6)]), v: mul(spread, d.speed * r.range(0.85, 1.1)),
-        owner: m, dmg: d.dmg, life: d.range / d.speed + 1, target, smoke: 0, age: 0, vid });
+      const sp = d.spread ?? 0.08, lift = d.lift ?? 0.12;   // homing volleys fan out and climb; they find their way down
+      const spread = norm(add(dir, [r.range(-sp, sp), r.range(0, lift), r.range(-sp, sp)]));
+      G.shots.push({ kind: 'missile', type: w.type, p: add(mz, [r.range(-0.6, 0.6), r.range(-0.4, 0.4), r.range(-0.6, 0.6)]), v: mul(spread, d.speed * r.range(0.85, 1.1)),
+        owner: m, dmg: d.dmg, life: d.range / d.speed + 1, target: d.homing === false ? null : target, smoke: 0, age: 0, vid });
     }
     m.flash = { frame: G.frame, p: mz, dir, big: false };
     if (m === G.player) { G.lastVolley = vid; feel(G, 'fireLrm', { mech: m, dir: [-dir[0], -dir[2]] }); }
     G.fx.sfx.missile(mz);
-    if (mp(G) && m === G.player) G.fx.netSend(fxMissiles(mz, dir, target?.netId, G.lastVolley));
+    if (mp(G) && m === G.player) G.fx.netSend(fxMissiles(mz, dir, d.homing === false ? 0 : target?.netId, G.lastVolley, w.type));
   }
   return true;
 }
@@ -237,7 +241,7 @@ export function stepShots(G, dt) {
     const hit = rayHit(G, s.p, dir, stepL, s.owner);
     if (hit) {
       s.life = -1;
-      if (hit.mech && !s.ghost) { damage(G, hit.mech, hit.point, s.dmg, s.owner); onShellHit(G, s, hit.mech, hit.point); }   // ghosts are other pilots' shots: theirs to score
+      if (hit.mech && !s.ghost) { damage(G, hit.mech, hit.point, s.dmg, s.owner); onShotHit(G, s, hit.mech, hit.point); }   // ghosts are other pilots' shots: theirs to score
       if (s.kind === 'missile' && !s.ghost) blast(G, hit.point, s.dmg, s.owner, hit.mech);
       explode(G, hit.point, false);
     } else s.p = add(s.p, mul(s.v, dt));

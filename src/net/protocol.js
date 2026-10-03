@@ -4,7 +4,7 @@
 import { HPK } from '../data/chassis.js';
 import { WEAPONS } from '../data/weapons.js';
 
-export const PROTOCOL = 4;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s; zap on hit
+export const PROTOCOL = 4;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit
 export const r2 = v => Math.round(v * 100) / 100;
 const v3 = p => p.map(r2);
 
@@ -29,7 +29,7 @@ export function stateMessage(P, bf, withLoadout = false) {
 // Weapon effects: drawn by everyone, scored by the shooter.
 export const fxBeam = (type, a, b) => ({ t: 'fx', k: 'b', w: type, a: v3(a), b: v3(b) });
 export const fxShell = (p, v, w = 'ac') => ({ t: 'fx', k: 's', p: v3(p), v: v3(v), w });
-export const fxMissiles = (p, d, targetId, vid) => ({ t: 'fx', k: 'm', p: v3(p), d: v3(d), tg: targetId || 0, v: vid });
+export const fxMissiles = (p, d, targetId, vid, w = 'lrm') => ({ t: 'fx', k: 'm', p: v3(p), d: v3(d), tg: targetId || 0, v: vid, w });
 export const fxGuide = (vid, p, d) => ({ t: 'fx', k: 'mg', v: vid, p: v3(p), d: v3(d) });
 export const fxDetonate = vid => ({ t: 'fx', k: 'md', v: vid });
 export const fxFusion = (a, targetId, b) => ({ t: 'fx', k: 'fu', a: v3(a), id2: targetId || 0, b: v3(b) });
