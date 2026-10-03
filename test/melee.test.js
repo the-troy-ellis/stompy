@@ -89,7 +89,7 @@ test('landing on a mech after a real fall is a stomp with a bounce; a hop is not
 test('a melee kill is announced as a punch, and the pose rears back then lunges', () => {
   const G = createTestGame({ foes: ['jackal'] });
   const e = foes(G)[0];
-  place(G, e, 0, 7); e.hp.T = 1;
+  place(G, e, 0, 7); e.hp.T = 1; e.hp.LA = 0; e.hp.RA = 0;   // one point of torso left and no arms to catch the blow
   stepFor(G, 1);
   stepFor(G, 1 / 60, input({ punch: true }));
   stepFor(G, 1.5);

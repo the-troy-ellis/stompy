@@ -2,13 +2,14 @@ import { add, mul, norm, sub } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { SECT_NAME } from '../data/chassis.js';
 import { center, muzzle, rayHit, viewYaw } from './geom.js';
-import { explode, msg, particle, shedPart } from './effects.js';
+import { explode, hitSparks, msg, particle, shedPart } from './effects.js';
 import { M } from '../util/math.js';
 import { geoOf as geo } from '../data/geo.js';
 import { torsoFrame } from './geom.js';
 import { died, fxShell, fxMissiles } from '../net/protocol.js';
 import { blast, endGuide } from './missiles.js';
 import { feel } from './feel.js';
+import { HIT_BY_SECTION, HIT_STOP } from '../data/feel.js';
 import { voice } from './voice.js';
 import { alertEnemy } from './ai/perception.js';
 
@@ -33,21 +34,23 @@ export function damage(G, m, p, amt, src, beam = false, melee = false) {
     // client applies it. Hits are batched (a beam deals damage every
     // frame) and flushed a few times a second -- see flushHits.
     if (G.roundOver) return;
+    if (!beam) hitSparks(G, m, p, sectionHit(m, p), amt);   // the shooter sees the sparks; the damage is the victim's to apply
     const q = G.pendingHits.get(m.netId) || { amt: 0, p };
     q.amt += amt; q.p = p;
     if (melee) q.me = 1;
     G.pendingHits.set(m.netId, q);
-    if (src === G.player) { if (!beam) G.stats.hits++; G.stats.dealt += amt; G.hitMark = 0.25; }
+    if (src === G.player) { if (!beam) { G.stats.hits++; G.hitStop = HIT_STOP; } G.stats.dealt += amt; G.hitMark = 0.25; }
     return;
   }
   if (m === G.player && mp(G) && (m.spawnT > 0 || G.roundOver)) return;
   let sec = sectionHit(m, p);
   if (m.hp[sec] <= 0) sec = 'T';
   m.hp[sec] -= amt;
-  if (src === G.player && m !== G.player) { if (!beam) G.stats.hits++; G.stats.dealt += amt; }
+  if (!beam) hitSparks(G, m, p, sec, amt);
+  if (src === G.player && m !== G.player) { if (!beam) { G.stats.hits++; G.hitStop = HIT_STOP; } G.stats.dealt += amt; }
   // Which side the blow came from, in torso space: the wobble leans away from it.
   const a = viewYaw(m), side = -Math.sign((p[0] - m.x) * cos(a) - (p[2] - m.z) * sin(a));
-  if (!beam) feel(G, 'hit', { mech: m, k: amt / 10, roll: side, at: m === G.player ? null : p });   // beams don't jolt: the renderer sways a melting mech instead
+  if (!beam) feel(G, 'hit', { mech: m, k: amt / 10 * (HIT_BY_SECTION[sec] || 1), roll: side, at: m === G.player ? null : p });   // beams don't jolt: the renderer sways a melting mech instead
   if (m === G.player) {
     G.stats.taken += amt;
     if (!beam || G.time - (G.lastClang || 0) > 0.35) { G.lastClang = G.time; G.fx.sfx.clang(sectionHit(m, p)); }   // arms ring, legs thud, the torso is dull
@@ -98,11 +101,15 @@ const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 
 // then the body topples about its feet over TOPPLE seconds, then it is a
 // wreck that pops a few more times. Gameplay (alive, scores, the match
 // ending) changes at once; only the show is staged.
-export const DEATH_BEAT = 0.25, DEATH_TOPPLE = 0.8;
+// The stages of a kill: a beat of silence, the torso blows (and sheds its
+// arms and a shower of plates), the legs buckle, the body topples, the wreck
+// settles and pops. Gameplay changes at once; only the show waits.
+export const DEATH_BEAT = 0.25, DEATH_BUCKLE = 0.3, DEATH_TOPPLE = 0.8, WRECK_SETTLE = 1.0;
+const BUCKLE_DROP = 0.4;   // fraction of the hip height the hull drops as the knees fold
 export function beginDeath(G, m) {
   const r = G.rng;
   m.alive = false;
-  m.dying = { t: 0, exploded: false, angle: 0, fallYaw: m.yaw + (r.chance(0.5) ? 0 : Math.PI) + r.range(-0.7, 0.7), roll: r.range(-0.6, 0.6) };
+  m.dying = { t: 0, exploded: false, angle: 0, drop: 0, buckle: 0, fallYaw: m.yaw + (r.chance(0.5) ? 0 : Math.PI) + r.range(-0.7, 0.7), roll: r.range(-0.6, 0.6) };
   G.fx.sfx.whine(m === G.player ? null : center(m));
   if (G.target === m) G.target = null;
 }
@@ -116,13 +123,20 @@ export function stepDying(G, dt) {
       const r = G.rng;
       explode(G, center(m), true);
       explode(G, add(center(m), [r.range(-3, 3), 2, r.range(-3, 3)]), false);
+      // The blast takes the arms off and strips plates; they land with the rest of the debris.
+      const c = center(m);
+      for (const sec of ['LA', 'RA']) if (m.hp[sec] > 0) { m.hp[sec] = 0; shedSection(G, m, sec, add(c, [r.range(-1, 1), 0, r.range(-1, 1)])); }
+      for (let i = 0; i < 4; i++) shedPart(G, m, 'plate', add(c, [r.range(-1, 1), r.range(-1, 1), r.range(-1, 1)]), [r.range(-8, 8), r.range(4, 12), r.range(-8, 8)]);
       if (m === G.player) feel(G, 'death', { mech: m });
     }
     if (d.exploded) {
-      const u = Math.min(1, (d.t - DEATH_BEAT) / DEATH_TOPPLE);
-      d.angle = u * u * (Math.PI / 2) * 0.95;   // falls faster as it goes
+      // The legs buckle: the hull drops as the knees fold and the body starts to lean.
+      const b = Math.min(1, (d.t - DEATH_BEAT) / DEATH_BUCKLE);
+      d.buckle = b; d.drop = b * b * BUCKLE_DROP * geo(m).hip * m.ch.scale;
+      const u = Math.max(0, Math.min(1, (d.t - DEATH_BEAT - DEATH_BUCKLE) / DEATH_TOPPLE));
+      d.angle = b * 0.12 + u * u * (Math.PI / 2 - 0.12) * 0.95;   // a lean during the buckle, then it falls faster as it goes
       if (u >= 1) {
-        G.wrecks.push({ x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.partsKey, scale: m.ch.scale, t: 0, roll: d.roll, pops: 2 + G.rng.int(3) });
+        G.wrecks.push({ x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.partsKey, scale: m.ch.scale, t: 0, roll: d.roll, pops: 2 + G.rng.int(3), settle: 0 });
         G.fx.sfx.boom([m.x, m.y, m.z], false);
         m.dying = null; m.gone = true;
       }

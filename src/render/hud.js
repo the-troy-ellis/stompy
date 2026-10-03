@@ -1,14 +1,29 @@
 import { TAU, clampN, len, rnd, sub } from '../util/math.js';
 import { WEAPONS, CATS, CAT_OF, CAT_LABEL, CAT_KEY } from '../data/weapons.js';
 import { MP_COLORS } from '../data/colors.js';
-import { center, viewYaw } from '../sim/geom.js';
+import { center, leadPoint, viewYaw } from '../sim/geom.js';
 import { MELT_MAX, beamMult } from '../sim/beams.js';
+import { HEAT, hotFrac } from '../data/feel.js';
 
 const { sin, cos, atan2, min, max, PI, random, hypot, floor } = Math;
 
 // The compass tape's label for a heading in degrees: a cardinal letter on
 // the quarters, otherwise the heading in tens (030, 120...) as two digits.
 export const compassLabel = d => ({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[d] || String(d / 10).padStart(2, '0'));
+
+// The ?debug=1 label over an enemy: its state, its profile, its group (with
+// a star on the flanker), and what it is up to right now.
+export function aiLabel(e) {
+  const a = e.ai || {}, g = a.group;
+  let s = `${(a.state || 'patrol').toUpperCase()} ${e.ch?.ai?.profile || 'baseline'}`;
+  if (g && g.size > 1) s += ` G${g.id}${g.flank ? '*' : ''}`;
+  if (a.cover) s += ' COVER';
+  if (a.ridge) s += ' RIDGE';
+  if (a.jump) s += ' JUMP';
+  if (e.melee) s += ' SWING';
+  if (a.hot) s += ' HOT';
+  return s;
+}
 
 // The cockpit instruments on the 2D canvas over the GL view: crosshair and
 // scan rings, target brackets, compass, radar, damage, heat, weapons,
@@ -162,9 +177,11 @@ export function createHud(app) {
     }
   }
 
-  // ?debug=1: frame time over the last 2 s, draw calls, particles, the seed.
+  // The frame-time readout: median and 95th percentile over the last 2 s, draw
+  // calls, particles. On with ?debug=1 or the FRAME TIME setting (for playtests
+  // on real phones); ?debug=1 adds the seed, the state and the AI overlay.
   const frames = [];
-  let lastFrameAt = 0;
+  let lastFrameAt = 0, stopAt = null, rangeMemo = { t: null, r: 0, at: 0, rate: 0 };
   function drawDebug() {
     const now = performance.now();
     if (lastFrameAt) frames.push(now - lastFrameAt);
@@ -172,13 +189,40 @@ export function createHud(app) {
     while (frames.length > 120) frames.shift();
     const sorted = [...frames].sort((a, b) => a - b), q = f => (sorted.length ? sorted[min(sorted.length - 1, floor(sorted.length * f))] : 0);
     ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'left'; ctx.fillStyle = '#9f9';
-    const lines = [`FRAME ${q(0.5).toFixed(1)} ms  P95 ${q(0.95).toFixed(1)} ms`, `DRAWS ${app.R.draws}  PARTICLES ${G.parts.length}  MECHS ${G.mechs.length}`, `SEED ${G.ter?.seed ?? '-'}  T ${G.time.toFixed(1)}  STATE ${G.state}`];
+    const full = app.params.has('debug');
+    const lines = [`FRAME ${q(0.5).toFixed(1)} ms  P95 ${q(0.95).toFixed(1)} ms`, `DRAWS ${app.R.draws}  PARTICLES ${G.parts.length}  MECHS ${G.mechs.length}`];
+    if (full) lines.push(`SEED ${G.ter?.seed ?? '-'}  T ${G.time.toFixed(1)}  STATE ${G.state}`);
     lines.forEach((l, i) => ctx.fillText(l, 12, app.scene.view.H * 0.5 + i * 13));
+    if (full) drawAIDebug();
+  }
+  // The enemies' minds (docs/specs/05-ai.md § Debug view): the label over each
+  // head, a square where it believes you are with a line to it (red), a line
+  // to its cover point (amber) or its ridge (violet), and its patrol waypoint
+  // (dim) while unaware.
+  function drawAIDebug() {
+    if (G.state === 'menu' || !G.VP) return;
+    ctx.font = '10px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.lineWidth = 1;
+    const at = (x, z) => [x, G.ter.height(x, z) + 1, z];
+    for (const e of G.mechs) {
+      if (e.team === 0 || e.remote || !e.alive) continue;
+      const a = e.ai, head = project([e.x, e.y + 9.5 * e.ch.scale, e.z]), foot = project([e.x, e.y + 1, e.z]);
+      if (head) { ctx.fillStyle = a.seen && a.aware ? '#f66' : a.aware ? AMBER : '#9f9'; ctx.fillText(aiLabel(e), head[0], head[1]); }
+      const line = (p, col) => {
+        const q = project(p);
+        if (!q || !foot) return null;
+        ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(foot[0], foot[1]); ctx.lineTo(q[0], q[1]); ctx.stroke();
+        return q;
+      };
+      if (a.aware && a.belief) { const q = line(at(a.belief.x, a.belief.z), 'rgba(255,90,90,0.6)'); if (q) ctx.strokeRect(q[0] - 3, q[1] - 3, 6, 6); }
+      if (a.cover) line(at(a.cover.x, a.cover.z), AMBER);
+      if (a.ridge) line(at(a.ridge.x, a.ridge.z), '#c8f');
+      if (a.wp && (!a.aware || a.state === 'search')) line(at(a.wp[0], a.wp[1]), DIM);
+    }
   }
   function drawHUD() {
     ctx.setTransform(app.scene.view.dpr, 0, 0, app.scene.view.dpr, 0, 0);
     ctx.clearRect(0, 0, app.scene.view.W, app.scene.view.H);
-    if (app.params.has('debug')) drawDebug();
+    if (app.params.has('debug') || app.prefs.frameTime) drawDebug();
     if (G.state === 'menu') return;
     if (G.guide) { drawGuideHUD(); return; }
     ctx.translate(0, G.kick * 3);  // the dashboard jolts with each step
@@ -203,7 +247,9 @@ export function createHud(app) {
     if (G.whiteFlash > 0) { ctx.fillStyle = `rgba(235,215,255,${G.whiteFlash * 0.85})`; ctx.fillRect(0, 0, app.scene.view.W, app.scene.view.H); }
 
     // Crosshair.
-    const ch = project(G.aim) || [app.scene.view.W / 2, app.scene.view.H / 2];
+    let ch = project(G.aim) || [app.scene.view.W / 2, app.scene.view.H / 2];
+    // Hit-stop: the crosshair holds where it was for a beat when your shot lands.
+    if (G.hitStop > 0) { if (!stopAt) stopAt = ch; ch = stopAt; } else stopAt = null;
     ctx.strokeStyle = G.aimMech ? RED : GREEN;
     ctx.beginPath();
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(ch[0] + dx * 5, ch[1] + dy * 5); ctx.lineTo(ch[0] + dx * 14, ch[1] + dy * 14); }
@@ -280,6 +326,16 @@ export function createHud(app) {
         ctx.textAlign = 'center';
         ctx.fillText(G.lock ? 'LOCK' : t.remote ? app.net.pilotName(t.netId) : t.ch.name, a[0], y0 - 8);
       }
+      // Autocannon lead: a small diamond where a shell fired now would meet it, while it is moving and in range.
+      const ac = P.weapons.find(w => w.def.kind === 'shell' && !w.dead && (w.ammo == null || w.ammo > 0));
+      if (ac && Math.abs(t.speed) > 1 && hypot(t.x - P.x, t.z - P.z) < ac.def.range) {
+        const lp = project(leadPoint(G.eye, t, ac.def.speed));
+        if (lp) {
+          ctx.strokeStyle = AMBER; ctx.beginPath();
+          ctx.moveTo(lp[0], lp[1] - 6); ctx.lineTo(lp[0] + 6, lp[1]); ctx.lineTo(lp[0], lp[1] + 6); ctx.lineTo(lp[0] - 6, lp[1]); ctx.closePath(); ctx.stroke();
+          ctx.fillStyle = AMBER; ctx.fillRect(lp[0] - 1, lp[1] - 1, 2, 2);
+        }
+      }
     }
     // Enemy markers in view (small chevrons), so far-off mechs can be found.
     for (const m of G.mechs) {
@@ -343,8 +399,12 @@ export function createHud(app) {
       ctx.fillStyle = DIM; ctx.fillText(label, x - 1, top + bh + 8);
     };
     const lx = L.bars.x;
+    // Near shutdown the instruments brown out: the bars flicker harder the hotter it runs.
+    const hot = P.shutdown ? 0 : hotFrac(P.heat), browned = hot > 0 && (floor(G.time * 17) % 4 === 0 || (hot > 0.6 && floor(G.time * 23) % 5 === 0));
+    if (browned) ctx.globalAlpha = 1 - HEAT.flicker * hot;
     bar(lx, 'HT', P.heat / 100, P.heat > 80 ? RED : P.heat > 55 ? AMBER : GREEN, P.heat > 85);
     bar(lx + 18, 'JJ', P.fuel, '#3cf');
+    ctx.globalAlpha = 1;
 
     // Right: weapons.
     const wx = L.weapons.x;
@@ -401,8 +461,15 @@ export function createHud(app) {
       ctx.textAlign = 'left'; ctx.fillStyle = AMBER;
       ctx.fillText(`TGT ${t.remote ? app.net.pilotName(t.netId) : t.ch.name}`, px + 6, py + 10);
       ctx.fillStyle = GREEN;
-      ctx.fillText(`RNG ${Math.round(hypot(t.x - P.x, t.z - P.z))}m`, px + 6, py + 24);
+      const rng = hypot(t.x - P.x, t.z - P.z);
+      // Closing rate, smoothed: the number that tells you whether to lead or to run.
+      if (rangeMemo.t !== t || G.time - rangeMemo.at > 1) rangeMemo = { t, r: rng, at: G.time, rate: 0 };
+      else if (G.time > rangeMemo.at) { const inst = (rng - rangeMemo.r) / (G.time - rangeMemo.at); rangeMemo.rate += (inst - rangeMemo.rate) * 0.15; rangeMemo.r = rng; rangeMemo.at = G.time; }
+      ctx.fillText(`RNG ${Math.round(rng)}m`, px + 6, py + 24);
       ctx.fillText(t.shutdown ? 'SHUTDOWN' : `${Math.round(t.speed * 5.4)} KPH`, px + 6, py + 38);
+      const rate = rangeMemo.rate;
+      ctx.fillStyle = Math.abs(rate) < 1 ? DIM : GREEN;
+      ctx.fillText(Math.abs(rate) < 1 ? 'HOLDING' : `${rate < 0 ? 'CLOSING' : 'OPENING'} ${Math.round(Math.abs(rate))} m/s`, px + 6, py + 52);
       mechDiagram(t, px + pw - 32, py + 14, 6);
     }
 

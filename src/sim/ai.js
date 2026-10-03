@@ -5,7 +5,8 @@ import { geoOf } from '../data/geo.js';
 import { AI_PUNCH, meleeOf } from '../data/melee.js';
 import { canPunch, meleePress, meleeTarget } from './melee.js';
 import { perceive } from './ai/perception.js';
-import { defaultPlan, steer, strafeTick } from './ai/behaviours.js';
+import { steer, strafeTick } from './ai/behaviours.js';
+import { planFor } from './ai/profiles.js';
 import { decideFire } from './ai/fire.js';
 import { PERCEPTION as K } from '../data/ai.js';
 
@@ -14,6 +15,7 @@ const { atan2, hypot, PI } = Math;
 // One enemy, one frame. State lives in e.ai.
 export function think(G, e, dt) {
   const P = G.player, r = G.rng;
+  const plan = e.ai.plan || (e.ai.plan = planFor(e)), brawling = plan.brawler;   // how this chassis fights
   // Where it believes the player is: the truth with line of sight, the last fix otherwise.
   const bp = perceive(G, e, P, dt), seen = !!e.ai.seen;
   const tx = bp ? bp[0] : P.x, tz = bp ? bp[1] : P.z;
@@ -39,7 +41,6 @@ export function think(G, e, dt) {
     const reachP = meleeOf(P).reach * P.ch.scale + geoOf(e).radius * e.ch.scale, tooClose = seen && dist < reachP * AI_PUNCH.keepOut;
     const reachE = meleeOf(e).reach * e.ch.scale + geoOf(P).radius * P.ch.scale;
     const punchable = P.alive && canPunch(G, e) && meleeTarget(G, e) === P;
-    const plan = e.ai.plan || defaultPlan(e), brawling = plan.brawler;
     let jets = false;
     if (P.shutdown && P.alive) { moveYaw = toYaw; thr = dist < reachP * 0.6 ? 0 : 1; }
     else if (punchable || e.melee) { moveYaw = toYaw; thr = 0; }   // square up and decide (below); the swing holds it there

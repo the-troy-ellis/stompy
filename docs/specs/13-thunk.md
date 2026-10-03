@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#2 feel table and springs, #3 footfalls and landing, #4 hit wobble and recoil, #5 shutdown sag, #6 section loss, #7 death beat, #8 sub-bass and ducking shipped; #9 open) |
+| Status | shipped for M1 (#2–#9, plus #23 hit feedback, #24 staged destruction, #25 walking feel) |
 | Milestone | M1 (the table and the first pass); every later feature adds rows |
 | Size | M (split: feel table + footfalls + landing; hit wobble + recoil + knockback; shutdown + death; audio layer; reduced motion) |
 | Depends on | M0 |
@@ -102,6 +102,47 @@ everyone's hits look alike.
   bounces.
 - **UI.** Menu selections and launches get a dull click with bass; the
   LAUNCH button already "presses" in CSS; FIT (M2) row cycles tick.
+
+### Hit feedback (M1 #23, shipped)
+
+Every non-beam hit on a mech throws section-specific effects from
+`hitSparks` (`src/sim/effects.js`): sparks fan off the armour away from the
+blow; a leg hit kicks dust up at the feet; a torso hit leaves a little smoke.
+A blow of `PLATE_DMG` (6) or more knocks an armour plate loose, a thin slab
+in the body colour that tumbles with the other debris, bounces once and lies
+there. The hit row's strength is scaled by section (`HIT_BY_SECTION`: legs
+1.2, torso 1, arms 0.7), and when your own shot lands the crosshair holds
+still for `HIT_STOP` (80 ms): a hit-stop you feel in the hand before you see
+the sparks. Beams keep their own sparks and the melt sway.
+
+### Death, stage by stage (M1 #7 and #24, shipped)
+
+Torso at zero: a quarter-second beat with only a rising whine; the torso
+blows and takes both arms and four plates with it; the legs buckle for
+0.3 s (the hull drops a third of the hip height as the knees fold out and
+the body starts to lean); the body topples rigidly about the ground under it
+for 0.8 s; then it is a wreck that rocks and sinks for a second and pops a
+few more times. Gameplay changes at once (dead, scored, the match ending);
+only the show waits. The player goes down the same way, eye and all. A mech
+that loses both legs sits down and keeps firing until it goes.
+
+### Walking feel (M1 #25, shipped)
+
+The ground pushes back (`src/data/walk.js`, `slopeFactor` in `mech.js`):
+the grade under the heading, sampled two metres fore and aft, scales top
+speed, a 20% climb to half and a descent up to 1.15×. A landing digs the
+feet in: it takes up to 60% of the forward speed and holds the legs at 30%
+for up to 0.35 s, scaled by the landing force, before they drive again. The
+landing squash already shows it; this makes it felt in the throttle.
+
+### Heat feel (M1 #26, shipped)
+
+From 85 heat to shutdown (`hotFrac`, `HEAT` in `src/data/feel.js`) the view
+swims: a slow breath in the field of view and a sway, scaled down under
+REDUCED MOTION; the reactor hum rises in volume and pitch; and the HUD bars
+brown out in flickers that get harder the hotter it runs. The heat bar
+itself has flashed red over 85 since M0. All of it stops the moment the
+reactor trips, which is the point: the quiet after is the shutdown.
 
 ### Audio layer
 

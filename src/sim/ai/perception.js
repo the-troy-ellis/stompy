@@ -27,7 +27,10 @@ export function spot(G, e, P) {
   const a = e.ai;
   a.belief = { x: P.x, z: P.z, vx: Math.sin(P.yaw) * P.speed, vz: Math.cos(P.yaw) * P.speed, at: G.time };
   a.lastSeen = G.time;
-  if (!a.aware) alertEnemy(G, e, P);
+  if (a.aware) return;
+  // First sight: a beat before it reacts, shorter on harder settings.
+  if (a.reactAt == null) a.reactAt = G.time + diffOf(G).react;
+  if (G.time >= a.reactAt) { a.reactAt = null; alertEnemy(G, e, P); }
 }
 
 // Become aware, from any cause, and tell nearby allies. `at` is where the
@@ -49,7 +52,7 @@ export function alertEnemy(G, e, P, at = null) {
 export function perceive(G, e, P, dt) {
   const a = e.ai;
   if (a.state == null) a.state = a.aware ? 'engage' : 'patrol';
-  if (a.aware && !a.belief) a.belief = { x: P.x, z: P.z, vx: 0, vz: 0, at: G.time };   // set aware from outside: treat as a fresh contact
+  if (a.aware && !a.belief) { a.belief = { x: P.x, z: P.z, vx: 0, vz: 0, at: G.time }; a.lastSeen = G.time; }   // set aware from outside: treat as a fresh contact
   if (a.shoutAt != null && G.time >= a.shoutAt) {
     a.shoutAt = null;
     const caller = G.mechs.find(o => o !== e && o.team === e.team && o.alive && o.ai.belief);
@@ -62,7 +65,7 @@ export function perceive(G, e, P, dt) {
     a.seen = canSee(G, e, P);
     if (a.seen) spot(G, e, P);
   }
-  if (!a.aware) { a.seen = false; return null; }
+  if (!a.aware) { if (!a.seen) a.reactAt = null; return null; }   // out of sight again before it reacted: start over (seen is the last look's answer)
   if (a.seen) { a.state = 'engage'; a.searchT = 0; }
   else if (a.state === 'engage' && G.time - (a.lastSeen ?? -Infinity) > K.lostAfter) { a.state = 'search'; a.searchT = 0; a.wp = null; }
   if (a.state === 'search') {

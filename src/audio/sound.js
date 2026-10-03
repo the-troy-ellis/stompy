@@ -3,6 +3,7 @@ import { msg } from '../sim/effects.js';
 import { viewYaw } from '../sim/geom.js';
 import { MELT_MAX, beamMult } from '../sim/beams.js';
 import { createThump } from './thump.js';
+import { HEAT, hotFrac } from '../data/feel.js';
 
 const { sin, cos, atan2, min, max, abs, PI, random, hypot, floor } = Math;
 
@@ -315,7 +316,7 @@ export function createAudio(app) {
       const v = voices.find(v => /^en/i.test(v.lang) && /female|zira|samantha|victoria|karen|serena|susan|hazel|libby|aria|jenny/i.test(v.name))
         || voices.find(v => /^en/i.test(v.lang));
       if (v) u.voice = v;
-      u.rate = 1.05; u.pitch = 1.05; u.volume = 0.9;
+      u.rate = 1.05; u.pitch = 1.05; u.volume = prefs.voiceVol ?? 0.9;
       speechSynthesis.speak(u);
     } catch { /* ignore */ }
   }
@@ -360,7 +361,8 @@ export function createAudio(app) {
   // Continuous layers follow the sim state: reactor hum, jets, torso servo, laser bite.
   function audioTick() {
     const P = G.player, live = P.alive && !P.shutdown, pace = min(1, abs(P.speed) / P.ch.speed);
-    loopSet('hum_loop', P.alive ? (P.shutdown ? 0.03 : 0.07 + 0.13 * pace) : 0, P.shutdown ? 0.5 : 0.72 + 0.4 * pace);
+    const hot = P.shutdown ? 0 : hotFrac(P.heat);   // the reactor hum rises as it runs hot
+    loopSet('hum_loop', P.alive ? (P.shutdown ? 0.03 : (0.07 + 0.13 * pace) * (1 + HEAT.hum * hot)) : 0, P.shutdown ? 0.5 : (0.72 + 0.4 * pace) * (1 + HEAT.humRate * hot));
     const jetting = live && P.jetting && P.fuel > 0;
     loopSet('jet_loop', jetting ? 0.32 : G.guide ? 0.24 : 0, jetting ? 0.85 : G.guide ? 1.7 : 0.85);
     const twistRate = G.twistRate || 0;

@@ -5,7 +5,8 @@ import { center, eyeOf, muzzle, rayHit, viewYaw } from './geom.js';
 import { stepMech } from './mech.js';
 import { gait } from './gait.js';
 import { think } from './ai.js';
-import { stepShots, stepDying } from './combat.js';
+import { groupPass } from './ai/group.js';
+import { stepShots, stepDying, WRECK_SETTLE } from './combat.js';
 import { beamTick, coolArmour, remoteBeam } from './beams.js';
 import { fusionTick, updatePulses } from './fusion.js';
 import { fireCat, missileTrigger, steerVolley } from './missiles.js';
@@ -61,6 +62,7 @@ export function update(G, input, dt) {
   missileTrigger(G, armed && (input.held.missile || input.missileTap));
   if (G.guide) steerVolley(G, dt);
 
+  groupPass(G, dt);
   for (const m of G.mechs) {
     if (m.remote) {
       if (m.alive) { netInterp(m, dt, G.clock); stepFeel(m, dt); gait(G, m, dt); meleeGhost(m, dt, m.net?.pu || 0); }
@@ -106,6 +108,7 @@ export function update(G, input, dt) {
   stepDebris(G, dt);
   for (const w of G.wrecks) {
     w.t += dt;
+    w.settle = min(1, w.t / WRECK_SETTLE);   // it rocks and sinks for a moment after it lands
     // Secondaries: a few more pops in the first seconds after it goes down.
     if (w.pops > 0 && w.t > 0.4 && rng.chance(dt * 1.3)) { w.pops--; explode(G, [w.x + rng.range(-2, 2), w.y + rng.range(1, 3), w.z + rng.range(-2, 2)], false); }
     if (w.t < 30 && rng.chance(dt * 5)) particle(G, [w.x + rng.range(-2, 2), w.y + 2, w.z + rng.range(-2, 2)], [rng.range(-0.5, 0.5), rng.range(3, 5), rng.range(-0.5, 0.5)], rng.range(2, 3.5), rng.range(1, 2.2), [0.18, 0.17, 0.17], 'smoke');
@@ -117,6 +120,7 @@ export function update(G, input, dt) {
   G.kick = max(0, G.kick - dt * 5);
   G.whiteFlash = max(0, (G.whiteFlash || 0) - dt * 1.6);
   G.hitMark = max(0, (G.hitMark || 0) - dt);
+  G.hitStop = max(0, (G.hitStop || 0) - dt);
   G.twistRate = abs(P.twist - G.lastTwist) / max(dt, 1e-3);
   G.lastTwist = P.twist;
 

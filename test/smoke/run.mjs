@@ -29,9 +29,18 @@ try {
     await page.close();
   };
   await run('desktop', URL_, async page => {
+    await page.click('[data-sel="settings"]');
+    await page.click('[data-opt="frameTime"]');   // the readout on, through the setting rather than ?debug
+    await page.click('[data-set="fov"][data-d="1"]');
+    const fov = await page.evaluate(() => window.__stompy.app.prefs.fov);
+    if (fov !== 67) { failed = true; console.error(`FAIL: the FOV dial read ${fov}, not 67`); }
     await page.click('[data-sel="free"]');
+    await page.click('[data-fp="diff"][data-d="1"]');   // NORMAL -> HARD
     await page.click('[data-a="go"]');
     await page.waitForFunction(() => window.__stompy?.game?.state === 'play', null, { timeout: 10000 });
+    const diff = await page.evaluate(() => [window.__stompy.app.prefs.diff, window.__stompy.game.diff]);
+    console.log(`desktop: difficulty ${diff[0]} / game ${diff[1]}`);
+    if (!(diff[0] === 'hard' && diff[1] === 'hard')) { failed = true; console.error('FAIL: the difficulty picker did not reach the game'); }
     const x0 = await page.evaluate(() => [window.__stompy.game.player.x, window.__stompy.game.player.z, window.__stompy.game.frame]);
     await page.keyboard.down('KeyW');
     await page.waitForTimeout(2500);

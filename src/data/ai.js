@@ -1,11 +1,13 @@
 // AI numbers that are not balance (docs/specs/05-ai.md). Difficulty scales
-// skill, never stats; `G.diff` picks the row (#21 adds the setting; NORMAL
-// until then).
+// skill, never stats; `G.diff` picks the row (the setting lives in prefs.diff
+// and the match copies it). `react` is the pause between first sight and
+// doing anything about it.
 export const DIFF = {
-  easy: { sight: 400, heatCap: 60, aimErr: 1.4, sections: false },
-  normal: { sight: 600, heatCap: 72, aimErr: 1.0, sections: false },
-  hard: { sight: 800, heatCap: 85, aimErr: 0.7, sections: true },
+  easy: { label: 'EASY', sight: 400, heatCap: 60, aimErr: 1.4, sections: false, react: 1.5 },
+  normal: { label: 'NORMAL', sight: 600, heatCap: 72, aimErr: 1.0, sections: false, react: 0.8 },
+  hard: { label: 'HARD', sight: 800, heatCap: 85, aimErr: 0.7, sections: true, react: 0.3 },
 };
+export const DIFF_ORDER = ['easy', 'normal', 'hard'];
 
 export const FIRE = {
   coolBelow: 15,      // heat under the cap before it opens up again after overheating
@@ -24,6 +26,11 @@ export const BEHAVIOUR = {
   harassBand: [140, 200], jumpWithin: 60, jumpFor: 1.2, jumpCooldown: 6,
   lineRange: 150,     // m: holdLine matches the slowest ally this close
   allyGap: 6,         // m of clearance avoidAllies steers for
+};
+
+export const GROUP = {
+  range: 200,   // m: enemies this close to one another form a group
+  every: 0.5,   // s between group passes
 };
 
 export const PERCEPTION = {

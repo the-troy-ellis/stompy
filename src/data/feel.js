@@ -15,6 +15,17 @@
 //   haptic  navigator.vibrate milliseconds on touch
 //   push    horizontal impulse on the mech in m/s along the event's direction (recoil, knockback); it decays over about a second (mech.js PUSH_DECAY)
 // Rows are plain mutable objects so the ?debug=1 FEEL panel can tune them live.
+// How hard a hit on each section lands, as a factor on the hit row: legs
+// thunk up through the frame, arms are out on the side.
+export const HIT_BY_SECTION = { T: 1, LA: 0.7, RA: 0.7, LL: 1.2, RL: 1.2 };
+export const HIT_STOP = 0.08;   // s the crosshair holds still after a hit lands
+
+// Heat feel (roadmap M1): from HEAT.from up to shutdown the view swims a
+// little, the reactor hum rises and the HUD bars flicker. hotFrac is 0 at
+// HEAT.from and 1 at shutdown.
+export const HEAT = { from: 85, to: 100, fov: 0.035, sway: 0.006, hum: 0.5, humRate: 0.3, flicker: 0.5 };
+export const hotFrac = heat => Math.min(1, Math.max(0, (heat - HEAT.from) / (HEAT.to - HEAT.from)));
+
 export const FEEL = {
   // k = 0.35 + 0.65 * pace, scaled by the chassis (scale^2) in footDown
   step:        { kick: 1.0, shake: 0.12, flash: 0, white: 0, squash: 0.03, wobble: 0, bass: 0.4, duck: 0, dust: 1, haptic: 10, push: 0 },

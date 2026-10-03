@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestGame, foes, stepFor } from './helpers.js';
-import { sectionHit, damage } from '../src/sim/combat.js';
+import { sectionHit, damage, DEATH_BEAT, DEATH_BUCKLE, DEATH_TOPPLE } from '../src/sim/combat.js';
 import { geoOf } from '../src/data/geo.js';
+import { VOICE } from '../src/data/voice.js';
 
 test('sectionHit routes by height and lateral offset in torso space', () => {
   const G = createTestGame();
@@ -43,10 +44,10 @@ test('torso at zero destroys the mech, leaves a wreck and ends a one-enemy match
   assert.equal(G.stats.kills, 1);
   assert.equal(G.state, 'over');
   assert.equal(G.won, true);
-  stepFor(G, 1.2);   // beat, blast, topple
+  stepFor(G, DEATH_BEAT + DEATH_BUCKLE + DEATH_TOPPLE + 0.05);   // beat, blast, buckle, topple
   assert.equal(G.wrecks.length, 1);
   assert.ok(G.fx.calls('sfx.boom').length >= 2);
-  assert.ok(G.fx.calls('say').some(c => c.args[0] === 'Target destroyed.'));
+  assert.ok(G.fx.calls('say').some(c => VOICE.kill.includes(c.args[0])));
 });
 
 test('the player taking damage records stats, flashes, and auto-targets the attacker', () => {
