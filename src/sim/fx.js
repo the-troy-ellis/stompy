@@ -9,7 +9,7 @@
 // @property {(obj: object) => void} netSend                        arena message (ignored outside the arena)
 // @property {(bass: number, duck: number, haptic: number, at?: number[]) => void} thump   the feel table's sound and haptic columns
 
-const SFX = ['laser', 'cannon', 'missile', 'boom', 'clang', 'step', 'land', 'fusionCrack', 'fusion', 'beep', 'powerdown', 'powerup'];
+const SFX = ['laser', 'cannon', 'missile', 'boom', 'clang', 'step', 'land', 'fusionCrack', 'fusion', 'beep', 'powerdown', 'powerup', 'whine'];
 
 export const nullFx = Object.freeze({
   say() {}, fusionSound() {}, netSend() {}, thump() {},
