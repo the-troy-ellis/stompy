@@ -6,6 +6,10 @@ import { solveKnee, limb } from '../sim/gait.js';
 import { meltFrac } from '../sim/beams.js';
 import { FEEL, HEAT, hotFrac } from '../data/feel.js';
 import { meleeOf } from '../data/melee.js';
+import { BARREL_AT } from '../mesh/mechParts.js';
+
+// An arm gun's proportions by weapon: [thickness, length] against the stock barrel.
+const BARREL = { laser: [1, 1], mlaser: [0.8, 0.7], ac: [1.45, 1.1], lrm: [1.7, 0.55] };
 
 const { sin, cos, atan2, min, max, abs, PI, floor } = Math;
 
@@ -109,7 +113,14 @@ export function createScene(app) {
     R.draw(parts.torso, TB, tint);
     for (const [s, k] of [[1, 'LA'], [-1, 'RA']]) {
       if (m.hp[k] <= 0) continue;
-      R.draw(parts.arm, chain(TB, M.T(s * g.armX, g.armY, 0), M.RX(-m.pitch + pose.arm)), tint);
+      const AM = chain(TB, M.T(s * g.armX, g.armY, 0), M.RX(-m.pitch + pose.arm));
+      R.draw(parts.arm, AM, tint);
+      // The arm's gun, shaped by what is fitted there; nothing for an EMPTY hardpoint.
+      const w = m.weapons.find(x => x.mount === k && x.def.kind !== 'fusion');
+      if (w && parts.barrel) {
+        const [bw, bl] = BARREL[w.type] || [1, 1], at = BARREL_AT[m.ch.legs] || BARREL_AT.forward;
+        R.draw(parts.barrel, chain(AM, M.T(...at), M.S(bw, bw, bl), M.T(-at[0], -at[1], -at[2])), tint);
+      }
     }
     // Muzzle flash: a hot streak out of the barrel for two frames.
     const fl = m.flash;

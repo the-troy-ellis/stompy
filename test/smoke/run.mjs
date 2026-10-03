@@ -29,6 +29,28 @@ try {
     await page.close();
   };
   await run('desktop', URL_, async page => {
+    // FIT: cycle the left arm, see the preview mech change, go overweight, reset, back.
+    await page.click('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way
+    await page.click('[data-a="fit"]');
+    await page.waitForSelector('.lab-row');
+    await page.click('[data-lab="hp"][data-id="la"][data-d="1"]');
+    const fitted = await page.evaluate(() => window.__stompy.game.player.weapons.map(w => w.type).join(','));
+    if (!fitted.startsWith('mlaser,laser')) { failed = true; console.error(`FAIL: FIT did not refit the preview (${fitted})`); }
+    await page.click('[data-lab="hp"][data-id="la"][data-d="-1"]');   // back to the stock laser
+    await page.click('[data-lab="sys"][data-id="jets"][data-d="1"]');
+    for (let i = 0; i < 2; i++) await page.click('[data-lab="sys"][data-id="armour"][data-d="1"]');
+    for (let i = 0; i < 3; i++) await page.click('[data-lab="sys"][data-id="sinks"][data-d="1"]');
+    await page.screenshot({ path: 'test-results/smoke-fit.png' });
+    const heavy = await page.evaluate(() => [document.querySelector('.mm-launch')?.disabled, document.querySelector('.lab-tons')?.textContent]);
+    console.log(`desktop: FIT ${fitted}; launch disabled=${heavy[0]} (${heavy[1].trim()})`);
+    if (heavy[0] !== true || !/OVERWEIGHT/.test(heavy[1])) { failed = true; console.error('FAIL: an overweight fit did not disable LAUNCH'); }
+    await page.setViewportSize({ width: 740, height: 360 });
+    await page.screenshot({ path: 'test-results/smoke-fit-phone.png' });
+    await page.setViewportSize({ width: 1024, height: 640 });
+    await page.click('[data-lab="reset"]');
+    const stock = await page.evaluate(() => [document.querySelector('.mm-launch')?.disabled, window.__stompy.game.player.weapons.map(w => w.type).join(',')]);
+    if (stock[0] || stock[1] !== 'laser,laser,ac,lrm,fusion') { failed = true; console.error(`FAIL: RESET did not restore stock (${stock})`); }
+    await page.click('[data-lab="back"]');
     await page.click('[data-sel="settings"]');
     await page.click('[data-opt="frameTime"]');   // the readout on, through the setting rather than ?debug
     await page.click('[data-set="fov"][data-d="1"]');

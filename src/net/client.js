@@ -17,6 +17,7 @@ import { beamMult } from '../sim/beams.js';
 import { launchPulse } from '../sim/fusion.js';
 import { SEND_HZ } from '../sim/missiles.js';
 import { PROTOCOL, hit, stateMessage } from './protocol.js';
+import { fitOf } from '../ui/mechlab.js';
 
 const { sin, cos, atan2, min, max, random, hypot } = Math;
 const clamp30 = v => max(-30, min(30, +v || 0));
@@ -144,7 +145,7 @@ export function createNet(app) {
     resetMatch(G, { def: { name: 'Arena', foes: [] }, seed, pal: palName });
     app.scene.uploadWorld();
     G.banner = null;
-    G.player = newMech(G, prefs.chassis, 0, 0, 0, 0, { partsKey: app.R.partsKeyFor(prefs.mpColor, prefs.chassis) });
+    G.player = newMech(G, prefs.chassis, 0, 0, 0, 0, { partsKey: app.R.partsKeyFor(prefs.mpColor, prefs.chassis), loadout: fitOf(prefs.chassis) });
     G.player.netId = Net.id;
     G.mechs.push(G.player);
     respawn();

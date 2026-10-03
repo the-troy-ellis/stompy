@@ -88,3 +88,16 @@ export function applyLoadout(G, m, loadout) {
   m.hp = { ...d.hp }; m.max = { ...d.hp };
   return m;
 }
+
+// One tap on a FIT row: the next (d = 1) or previous weapon of the
+// hardpoint's category, EMPTY included, wrapping round. Returns a new loadout.
+export function cycleWeapon(chassis, loadout, id, d) {
+  const h = chassisOf(chassis).hardpoints.find(x => x.id === id);
+  if (!h) return loadout;
+  const c = choicesFor(h), i = c.indexOf(loadout.hp[id] ?? null);
+  return { hp: { ...loadout.hp, [id]: c[(i + d + c.length) % c.length] }, sys: { ...loadout.sys } };
+}
+export function cycleSystem(loadout, key, d) {
+  const n = SYSTEMS[key].max + 1;
+  return { hp: { ...loadout.hp }, sys: { ...loadout.sys, [key]: ((loadout.sys[key] || 0) + d + n) % n } };
+}

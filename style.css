@@ -217,6 +217,25 @@ html, body {
 .mm-stats i { display: block; height: 6px; background: #031203; border: 1px solid #1a4a1a; }
 .mm-stats i b { display: block; height: 100%; background: #5f5; }
 
+/* FIT (mechlab): one row per hardpoint and system slot, a tonnage bar, the stat bars. */
+.mm-fit { margin-top: 8px; }
+.mm-launch[disabled] { background: #7a1d10; color: #fc3; cursor: not-allowed; box-shadow: none; }
+.mm-lab { max-width: none; }
+.lab { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; }
+.lab-gap { height: 6px; }
+.lab-row { display: grid; grid-template-columns: 1fr auto 15ch auto; align-items: center; gap: 4px; padding: 2px 4px; border-left: 2px solid transparent; }
+.lab-row.on { border-left-color: #fc3; background: rgba(255, 204, 51, .06); }
+.lab-row span { color: #2a9a2a; font-size: 11px; letter-spacing: 1px; }
+.lab-row b { color: #fc3; font-weight: normal; text-align: center; cursor: pointer; padding: 6px 0; }
+.lab-row button { background: none; border: 0; color: #fc3; cursor: pointer; font-size: 18px; padding: 4px 10px; }
+.lab-tons { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin: 6px 0; font-size: 11px; color: #7f7; }
+.lab-tons i { display: block; height: 8px; background: #031203; border: 1px solid #1a4a1a; }
+.lab-tons i b { display: block; height: 100%; background: #5f5; }
+.lab-tons.amber i b { background: #fc3; } .lab-tons.amber span { color: #fc3; }
+.lab-tons.red i b { background: #f44; } .lab-tons.red span { color: #f44; }
+.lab-stats { max-width: 34ch; }
+.lab-actions { justify-content: flex-start; margin-top: 6px; }
+
 /* Phones held sideways: everything smaller and tighter. */
 @media (max-height: 500px) {
   .mm { grid-template-columns: minmax(260px, 46%) 1fr; }
@@ -228,6 +247,9 @@ html, body {
   .mm-launch { font-size: 18px; padding: 8px 24px; box-shadow: 3px 3px 0 #7a1d10; }
   .mm-select { min-width: 210px; padding: 6px 10px 8px; }
   .mm-mech span { font-size: 18px; }
+  .lab-row { grid-template-columns: 1fr auto 13ch auto; }
+  .lab-row b { padding: 3px 0; }
+  .lab-row button { padding: 2px 8px; }
   .mm-mech button { font-size: 20px; }
   .mm-controls { max-height: 30vh; }
 }

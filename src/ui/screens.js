@@ -12,6 +12,7 @@ import { initFeet } from '../sim/gait.js';
 import { endGuide } from '../sim/missiles.js';
 import { DIFF, DIFF_ORDER } from '../data/ai.js';
 import { SETTINGS, SETTING_KEYS, stepSetting } from '../data/settings.js';
+import { fitOf, fitOk, kitLine } from './mechlab.js';
 
 const { sin, max, random, floor } = Math;
 
@@ -23,7 +24,7 @@ export function createUi(app) {
   function startMission(n) {
     prefs.mission = n; store.set('mech.mission', max(store.get('mech.mission', 0), n));
     G.diff = prefs.diff;
-    startMatch(G, missionDef(n), 7 + n * 13, n === 0, prefs.chassis);
+    startMatch(G, missionDef(n), 7 + n * 13, n === 0, prefs.chassis, { loadout: fitOf(prefs.chassis) });
     G.kind = 'campaign';
     app.scene.uploadWorld();
   }
@@ -32,7 +33,7 @@ export function createUi(app) {
     const pk = FP_MAPS[prefs.fpMap] === 'random' ? ['dusk', 'ice', 'volcanic'][floor(random() * 3)] : FP_MAPS[prefs.fpMap];
     const foes = Array.from({ length: prefs.fpFoes }, () => (random() < 0.35 ? 'warden' : 'jackal'));
     G.diff = prefs.diff;
-    startMatch(G, { name: 'Free Play', pal: pk, foes, intel: '' }, 1 + floor(random() * 1e5), false, prefs.chassis);
+    startMatch(G, { name: 'Free Play', pal: pk, foes, intel: '' }, 1 + floor(random() * 1e5), false, prefs.chassis, { loadout: fitOf(prefs.chassis) });
     G.kind = 'free';
     app.scene.uploadWorld();
   }
@@ -90,6 +91,7 @@ export function createUi(app) {
     if (app.net.Net.ws) { const ws = app.net.Net.ws; app.net.Net.ws = null; ws.close(); }
     G.mode = 'sp'; G.state = 'menu'; G.paused = false; G.guide = null;
     prefs.menuSel = sel; store.set('menu.sel', sel);
+    app.mechlab.fit.open = false;
     app.input.syncTouchUI(); app.input.exitLock();
     // The backdrop: a quiet patch of desert, with your mech standing in it.
     if (G.worldKind !== 'menu') {
@@ -105,7 +107,7 @@ export function createUi(app) {
   // The mech on show: multiplayer shows it in your arena colour.
   function showMech() {
     const key = prefs.menuSel === 'mp' ? app.R.partsKeyFor(prefs.mpColor, prefs.chassis) : prefs.chassis;
-    G.player = newMech(G, prefs.chassis, 0, 0, 0, 0, { partsKey: key });
+    G.player = newMech(G, prefs.chassis, 0, 0, 0, 0, { partsKey: key, loadout: fitOf(prefs.chassis) });
     G.mechs = [G.player];
     menuTick(0);
   }
@@ -154,28 +156,31 @@ export function createUi(app) {
     const hpSum = c => Object.values(CHASSIS[c].hp).reduce((a, v) => a + v, 0);
     const maxHp = max(...MECH_ORDER.map(hpSum)), maxSpeed = max(...MECH_ORDER.map(c => CHASSIS[c].speed));
     const bar = (label, f) => `<span>${label}</span><i><b style="width:${Math.round(f * 100)}%"></b></i>`;
-    const launchLabel = { campaign: 'LAUNCH', free: 'LAUNCH', mp: 'JOIN ARENA' }[prefs.menuSel];
+    const heavy = !fitOk(prefs.chassis), lab = app.mechlab.fit.open;
+    const launchLabel = heavy ? 'OVERWEIGHT' : { campaign: 'LAUNCH', free: 'LAUNCH', mp: 'JOIN ARENA' }[prefs.menuSel];
     showOverlay(`
       <div class="mm">
         <div class="mm-left">
           <div class="mm-title">STOMPY</div>
-          <nav class="mm-items">${MENU.map(([k, label]) => `<button class="mm-item${k === prefs.menuSel ? ' on' : ''}" data-sel="${k}">${label}</button>`).join('')}</nav>
-          <div class="mm-detail">${menuDetail(status)}</div>
-          ${launchLabel ? `<button class="mm-launch" data-a="go">${launchLabel}</button>` : ''}
+          ${lab ? `<div class="mm-detail mm-lab">${app.mechlab.html()}</div>` : `<nav class="mm-items">${MENU.map(([k, label]) => `<button class="mm-item${k === prefs.menuSel ? ' on' : ''}" data-sel="${k}">${label}</button>`).join('')}</nav>
+          <div class="mm-detail">${menuDetail(status)}</div>`}
+          ${launchLabel ? `<button class="mm-launch" data-a="go"${heavy ? ' disabled' : ''}>${launchLabel}</button>` : ''}
         </div>
         <div class="mm-right">
           <div class="mm-select">
             <div class="mm-label">SELECT MECH</div>
             <div class="mm-mech"><button data-mech="-1" aria-label="Previous mech">◀</button><span>${ch.name}</span><button data-mech="1" aria-label="Next mech">▶</button></div>
             <div class="mm-role">${info.role}</div>
-            <div class="mm-kit">${info.kit}</div>
+            <div class="mm-kit">${kitLine(prefs.chassis)}</div>
             <div class="mm-stats">${bar('SPEED', ch.speed / maxSpeed)}${bar('ARMOR', hpSum(prefs.chassis) / maxHp)}${bar('FIREPOWER', info.fire)}</div>
+            ${lab ? '' : '<button class="opt mm-fit" data-a="fit">FIT</button>'}
           </div>
         </div>
       </div>`, 'menu');
   }
 
   function go() {
+    if (!fitOk(prefs.chassis)) return;   // OVERWEIGHT: fix it in FIT first
     if (prefs.menuSel === 'campaign') { startMission(prefs.mission); launch(); }
     else if (prefs.menuSel === 'free') { startSkirmish(); launch(); }
     else if (prefs.menuSel === 'mp') app.net.join();
@@ -243,6 +248,8 @@ export function createUi(app) {
     const a = e.target.closest('[data-a]')?.dataset.a;
     if (a === 'full') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); return; }
     if (a === 'diff') { cycleDiff(1); e.target.closest('[data-a]').textContent = diffLabel(); return; }
+    if (G.state === 'menu' && app.mechlab.click(e)) return;
+    if (a === 'fit') { app.mechlab.open(true); return; }
     const dial = e.target.closest('[data-set]');
     if (dial) {
       const k = dial.dataset.set;
@@ -282,6 +289,7 @@ export function createUi(app) {
   function cycleMech(d) {
     prefs.chassis = MECH_ORDER[(MECH_ORDER.indexOf(prefs.chassis) + d + MECH_ORDER.length) % MECH_ORDER.length];
     store.set('mech.chassis', prefs.chassis);
+    app.mechlab.fit.row = 0;
     showMech(); renderMenu();
   }
   ov.addEventListener('input', e => { if (e.target.matches('.callsign')) { prefs.mpName = e.target.value.toUpperCase().slice(0, 12); store.set('mp.name', prefs.mpName); } });

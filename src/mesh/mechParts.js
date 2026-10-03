@@ -3,6 +3,11 @@ import { M, chain, mul } from '../util/math.js';
 
 // Each chassis's flat-shaded parts: hip, upper leg, lower leg, foot, torso,
 // arm. Leg lengths match GEO (l1 / l2): the IK in drawMech depends on them.
+// Where each body plan's arm barrel sits in arm space. The barrel is its own
+// part so an EMPTY arm hardpoint shows a bare arm, and each weapon can give
+// it its own proportions (BARREL in scene.js).
+export const BARREL_AT = { forward: [0, -1.15, 1.45], reverse: [0, -1.15, 1.45], quad: [0, -0.5, 1.6] };
+
 export function buildMechParts(ch) {
   if (ch.legs === 'reverse') return buildReverseParts(ch);
   if (ch.legs === 'quad') return buildQuadParts(ch);
@@ -25,9 +30,9 @@ export function buildMechParts(ch) {
     }),
     arm: part(b => {
       b.cube(chain(M.T(0, -0.6, 0.1), M.S(0.95, 1.8, 1.15)), c);
-      b.cube(chain(M.T(0, -1.15, 1.45), M.S(0.38, 0.38, 2.3)), dark);
       b.cube(chain(M.T(0, 0.25, 0), M.S(1.25, 0.8, 1.45)), acc);
     }),
+    barrel: part(b => b.cube(chain(M.T(...BARREL_AT.forward), M.S(0.38, 0.38, 2.3)), dark)),
   };
 }
 
@@ -65,9 +70,9 @@ function buildReverseParts(ch) {
     }),
     arm: part(b => {
       b.cube(chain(M.T(0, -0.6, 0.1), M.S(0.95, 1.8, 1.15)), c);
-      b.cube(chain(M.T(0, -1.15, 1.45), M.S(0.38, 0.38, 2.3)), dark);
       b.cube(chain(M.T(0, 0.25, 0), M.S(1.2, 0.75, 1.35)), dark);
     }),
+    barrel: part(b => b.cube(chain(M.T(...BARREL_AT.reverse), M.S(0.38, 0.38, 2.3)), dark)),
   };
 }
 
@@ -98,7 +103,7 @@ function buildQuadParts(ch) {
     }),
     arm: part(b => {
       b.cube(chain(M.T(0, -0.35, 0.2), M.S(0.8, 1.1, 1.6)), c);
-      b.cube(chain(M.T(0, -0.5, 1.6), M.S(0.36, 0.36, 2.4)), dark);
     }),
+    barrel: part(b => b.cube(chain(M.T(...BARREL_AT.quad), M.S(0.36, 0.36, 2.4)), dark)),
   };
 }
