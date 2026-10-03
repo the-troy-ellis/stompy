@@ -5,11 +5,11 @@ import { center, eyeOf, muzzle, rayHit, viewYaw } from './geom.js';
 import { stepMech } from './mech.js';
 import { gait } from './gait.js';
 import { think } from './ai.js';
-import { stepShots } from './combat.js';
+import { stepShots, stepDying } from './combat.js';
 import { beamTick, coolArmour, remoteBeam } from './beams.js';
 import { fusionTick, updatePulses } from './fusion.js';
 import { fireCat, missileTrigger, steerVolley } from './missiles.js';
-import { particle, stepDebris } from './effects.js';
+import { explode, particle, stepDebris } from './effects.js';
 import { stepFeel } from './feel.js';
 import { netInterp } from '../net/interp.js';
 
@@ -83,6 +83,7 @@ export function update(G, input, dt) {
   }
 
   stepShots(G, dt);
+  stepDying(G, dt);
   updatePulses(G, dt);
   for (const b of G.beams) b.life -= dt;
   G.beams = G.beams.filter(b => b.life > 0);
@@ -99,6 +100,8 @@ export function update(G, input, dt) {
   stepDebris(G, dt);
   for (const w of G.wrecks) {
     w.t += dt;
+    // Secondaries: a few more pops in the first seconds after it goes down.
+    if (w.pops > 0 && w.t > 0.4 && rng.chance(dt * 1.3)) { w.pops--; explode(G, [w.x + rng.range(-2, 2), w.y + rng.range(1, 3), w.z + rng.range(-2, 2)], false); }
     if (w.t < 30 && rng.chance(dt * 5)) particle(G, [w.x + rng.range(-2, 2), w.y + 2, w.z + rng.range(-2, 2)], [rng.range(-0.5, 0.5), rng.range(3, 5), rng.range(-0.5, 0.5)], rng.range(2, 3.5), rng.range(1, 2.2), [0.18, 0.17, 0.17], 'smoke');
   }
   for (const m of G.msgs) m.t -= dt;

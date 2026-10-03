@@ -281,6 +281,8 @@ export function createAudio(app) {
     beep() { if (!play('beep', { vol: 0.2, vary: 0 })) this.osc('square', 1200, 1190, 0.06, 0.03); },
     powerdown() { play('powerdown', { vol: 0.6, rate: 0.6, vary: 0 }); this.osc('sawtooth', 220, 30, 1.6, 0.05); },
     powerup() { play('powerup', { vol: 0.6, rate: 0.8, vary: 0 }); this.osc('sine', 60, 240, 0.8, 0.06); },
+    // The beat before a mech blows: a rising whine and nothing else.
+    whine(at) { const o = { at, ref: 60 }; this.osc('sawtooth', 320, 1500, 0.26, 0.05, o); this.osc('sine', 160, 900, 0.26, 0.06, o); },
   };
 
   let voices = [];

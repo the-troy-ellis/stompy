@@ -6,10 +6,10 @@ import { CHASSIS, HPK } from '../data/chassis.js';
 import { MP_COLORS } from '../data/colors.js';
 import { BOUND } from '../world/terrain.js';
 import { newMech, resetMatch } from '../sim/state.js';
-import { center, eyeOf } from '../sim/geom.js';
+import { eyeOf } from '../sim/geom.js';
 import { initFeet } from '../sim/gait.js';
 import { msg, particle, explode } from '../sim/effects.js';
-import { damage, destroy, shedSection } from '../sim/combat.js';
+import { beginDeath, damage, destroy, shedSection } from '../sim/combat.js';
 import { beamMult } from '../sim/beams.js';
 import { launchPulse } from '../sim/fusion.js';
 import { SEND_HZ } from '../sim/missiles.js';
@@ -193,12 +193,8 @@ export function createNet(app) {
       Object.assign(r, { x: s.x, y: s.y, z: s.z, yaw: s.yaw, twist: s.tw, pitch: s.p, alive: !!s.al });
       initFeet(G, r); r.lastYaw = r.yaw;
     } else if (!s.al && r.alive) {
-      // Its own client says it's dead: show the kill.
-      r.alive = false;
-      explode(G, center(r), true);
-      explode(G, add(center(r), [rnd(-3, 3), 2, rnd(-3, 3)]), false);
-      G.wrecks.push({ x: r.x, y: r.y, z: r.z, yaw: r.yaw, type: r.partsKey, scale: r.ch.scale, t: 0, roll: rnd(-0.6, 0.6) });
-      if (G.target === r) G.target = null;
+      // Its own client says it's dead: the same beat, blast and topple as a local kill.
+      beginDeath(G, r);
     }
   }
 

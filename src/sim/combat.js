@@ -85,14 +85,46 @@ export function shedSection(G, m, sec, p) {
 }
 const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
-export function destroy(G, m, src) {
+// The death, in beats (docs/specs/13-thunk.md): on torso zero the mech
+// freezes for BEAT seconds with only a rising whine, then the torso blows,
+// then the body topples about its feet over TOPPLE seconds, then it is a
+// wreck that pops a few more times. Gameplay (alive, scores, the match
+// ending) changes at once; only the show is staged.
+export const DEATH_BEAT = 0.25, DEATH_TOPPLE = 0.8;
+export function beginDeath(G, m) {
   const r = G.rng;
-  if (m === G.player) { endGuide(G, true); G.mDown = false; feel(G, 'death', { mech: m }); }
   m.alive = false;
-  explode(G, center(m), true);
-  explode(G, add(center(m), [r.range(-3, 3), 2, r.range(-3, 3)]), false);
-  G.wrecks.push({ x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.partsKey, scale: m.ch.scale, t: 0, roll: r.range(-0.6, 0.6) });
+  m.dying = { t: 0, exploded: false, angle: 0, fallYaw: m.yaw + (r.chance(0.5) ? 0 : Math.PI) + r.range(-0.7, 0.7), roll: r.range(-0.6, 0.6) };
+  G.fx.sfx.whine(m === G.player ? null : center(m));
   if (G.target === m) G.target = null;
+}
+export function stepDying(G, dt) {
+  for (const m of G.mechs) {
+    const d = m.dying;
+    if (!d) continue;
+    d.t += dt;
+    if (!d.exploded && d.t >= DEATH_BEAT) {
+      d.exploded = true;
+      const r = G.rng;
+      explode(G, center(m), true);
+      explode(G, add(center(m), [r.range(-3, 3), 2, r.range(-3, 3)]), false);
+      if (m === G.player) feel(G, 'death', { mech: m });
+    }
+    if (d.exploded) {
+      const u = Math.min(1, (d.t - DEATH_BEAT) / DEATH_TOPPLE);
+      d.angle = u * u * (Math.PI / 2) * 0.95;   // falls faster as it goes
+      if (u >= 1) {
+        G.wrecks.push({ x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.partsKey, scale: m.ch.scale, t: 0, roll: d.roll, pops: 2 + G.rng.int(3) });
+        G.fx.sfx.boom([m.x, m.y, m.z], false);
+        m.dying = null; m.gone = true;
+      }
+    }
+  }
+}
+
+export function destroy(G, m, src) {
+  if (m === G.player) { endGuide(G, true); G.mDown = false; }
+  beginDeath(G, m);
   if (mp(G) && m === G.player) {
     // In the arena your own client declares your death; the server scores it.
     G.fx.netSend({ t: 'died', by: src?.netId || 0 });
@@ -108,7 +140,7 @@ export function destroy(G, m, src) {
     return;
   }
   if (src === G.player) G.stats.kills++;
-  G.fx.say('Target destroyed.', true);
+  G.fx.say('Target destroyed.', true, DEATH_BEAT * 1000);   // after the bang, not before
   if (G.player.alive && !G.mechs.some(e => e.team !== 0 && e.alive)) {
     G.state = 'over'; G.endT = 3.5; G.won = true;
     G.fx.say('Mission objectives complete.', true, 1400);

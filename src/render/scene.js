@@ -12,6 +12,23 @@ const { sin, cos, atan2, min, max, abs, PI, floor } = Math;
 // up to a 20% lean of the knee pole at full squash. Pure, for the tests.
 export const legSplay = squash => clampN(squash / 0.25, 0, 1) * 0.2;
 
+// The topple of a dying mech: a rotation by its fall angle about a horizontal
+// axis through the ground under it, leaning the way it falls. Null when it
+// is not falling. Pure, for the tests.
+export function toppleOf(m) {
+  const d = m.dying;
+  if (!d || !(d.angle > 0)) return null;
+  return chain(M.T(m.x, m.y, m.z), M.RY(d.fallYaw), M.RX(d.angle), M.RZ(d.roll * d.angle), M.RY(-d.fallYaw), M.T(-m.x, -m.y, -m.z));
+}
+// Inverse of a rigid (rotation + translation) 4x4 column-major matrix.
+function inverse3(m) {
+  const r = M.id();
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) r[j * 4 + i] = m[i * 4 + j];
+  const t = [m[12], m[13], m[14]];
+  r[12] = -(r[0] * t[0] + r[4] * t[1] + r[8] * t[2]); r[13] = -(r[1] * t[0] + r[5] * t[1] + r[9] * t[2]); r[14] = -(r[2] * t[0] + r[6] * t[1] + r[10] * t[2]);
+  return r;
+}
+
 // Everything drawn in 3D: the camera per state, sky, terrain, mechs with
 // their IK legs, wrecks, shots, pulses, beams and particles.
 export function createScene(app) {
@@ -40,7 +57,9 @@ export function createScene(app) {
     // The hips drop by the sag spring (reactor down); the feet stay put and the knees take it up.
     const sag = m.sag ? m.sag.x : 0;
     // A one-legged mech leans toward the gap (m.lean, radians of roll about its heading).
-    const parts = R.mechParts[m.partsKey], B = chain(M.T(0, -sag, 0), frame(m), M.RZ(m.lean || 0)), sc = m.ch.scale;
+    // A dying mech topples rigidly about the ground under it (toppleOf), feet and all.
+    const top = toppleOf(m), place = p => (top ? M.apply(top, p) : p);
+    const B = chain(top || M.id(), M.T(0, -sag, 0), frame(m), M.RZ(m.lean || 0)), parts = R.mechParts[m.partsKey], sc = m.ch.scale;
     const fwd = [sin(m.yaw), 0, cos(m.yaw)];
     // Armour under a beam glows orange as it melts, and runs hotter in IR.
     const mf = meltFrac(m), heatWas = R.drawHeat;
@@ -59,12 +78,13 @@ export function createScene(app) {
       const out = norm([H[0] - hull[0], 0, H[2] - hull[2]]), splay = legSplay(m.squash ? m.squash.x : 0);
       let pole = g.knee === 'forward' ? fwd : g.knee === 'back' ? back : norm(add(out, [0, 0.9, 0]));
       if (splay > 0) pole = norm(add(pole, mul(out, splay)));   // knees bow out as the body squashes
-      const A = add(f.pos, [0, g.ankle * sc, 0]);
-      const K = solveKnee(H, A, pole, g.l1 * sc, g.l2 * sc);
+      const A = place(add(f.pos, [0, g.ankle * sc, 0]));
+      const polePlaced = top ? norm(sub(M.apply(top, add(hull, pole)), M.apply(top, hull))) : pole;
+      const K = solveKnee(H, A, polePlaced, g.l1 * sc, g.l2 * sc);
       const ankle = add(K, mul(norm(sub(A, K)), g.l2 * sc));   // stays attached even if out of reach
-      R.draw(parts.uleg, limb(H, K, pole, sc), legTint);
-      R.draw(parts.lleg, limb(K, ankle, pole, sc), legTint);
-      R.draw(parts.foot, chain(M.T(...ankle), M.RY(f.yaw), M.S(sc)), legTint);
+      R.draw(parts.uleg, limb(H, K, polePlaced, sc), legTint);
+      R.draw(parts.lleg, limb(K, ankle, polePlaced, sc), legTint);
+      R.draw(parts.foot, chain(top || M.id(), M.T(...(top ? M.apply(inverse3(top), ankle) : ankle)), M.RY(f.yaw), M.S(sc)), legTint);
     });
     // The thunk springs: a squash pulse on the whole body (down in y, out in x/z,
     // about the feet) and a wobble of the torso about the hips.
@@ -116,8 +136,11 @@ export function createScene(app) {
     } else {
       fov = G.zoom ? 0.42 : 1.08;
       const sh = G.shake * 0.012, wv = FEEL.view.wobble, wp = P.wob ? P.wob.p.x : 0, wr = P.wob ? P.wob.r.x : 0;
-      yaw = viewYaw(P) + rnd(-sh, sh) + wr * wv * 0.5; pitch = P.pitch + rnd(-sh, sh) - (P.alive ? 0 : 0.15) + wp * wv;
+      yaw = viewYaw(P) + rnd(-sh, sh) + wr * wv * 0.5; pitch = P.pitch + rnd(-sh, sh) - (P.alive || P.dying ? 0 : 0.15) + wp * wv;
       eye = add(G.eye, [0, -G.kick * 0.35 - (P.squash ? P.squash.x * 2 : 0) - (P.sag ? P.sag.x : 0), 0]); dir = dirOf(yaw, pitch - G.kick * 0.016);
+      // Going down: the view goes with the body.
+      const top = toppleOf(P);
+      if (top) { eye = M.apply(top, eye); const toward = cos(P.dying.fallYaw - yaw); pitch -= P.dying.angle * toward; yaw += P.dying.angle * 0.3 * sin(P.dying.fallYaw - yaw); dir = dirOf(yaw, pitch); }
     }
     G.ear = eye; G.earYaw = yaw;   // sounds are heard from the camera
     const proj = M.persp(fov, W / max(1, H), 0.5, 1800);
@@ -151,7 +174,7 @@ export function createScene(app) {
     R.draw(world, M.id());
     // In the missile camera your own mech is out there too.
     R.drawHeat = 1;
-    for (const m of G.mechs) if (m.alive && (m !== P || gd || G.state === 'menu')) drawMech(m);
+    for (const m of G.mechs) if ((m.alive || m.dying) && (m !== P || gd || G.state === 'menu')) drawMech(m);
     // Shed arms and legs, tumbling or lying where they fell.
     R.drawHeat = 0.6;
     for (const d of G.debris) {

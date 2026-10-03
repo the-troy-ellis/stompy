@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTestGame, foes } from './helpers.js';
+import { createTestGame, foes, stepFor } from './helpers.js';
 import { sectionHit, damage } from '../src/sim/combat.js';
 import { geoOf } from '../src/data/geo.js';
 
@@ -39,10 +39,12 @@ test('torso at zero destroys the mech, leaves a wreck and ends a one-enemy match
   const e = foes(G)[0];
   damage(G, e, [e.x, e.y + 5, e.z], 1000, G.player);
   assert.equal(e.alive, false);
-  assert.equal(G.wrecks.length, 1);
+  assert.ok(e.dying, 'the fall is staged');
   assert.equal(G.stats.kills, 1);
   assert.equal(G.state, 'over');
   assert.equal(G.won, true);
+  stepFor(G, 1.2);   // beat, blast, topple
+  assert.equal(G.wrecks.length, 1);
   assert.ok(G.fx.calls('sfx.boom').length >= 2);
   assert.ok(G.fx.calls('say').some(c => c.args[0] === 'Target destroyed.'));
 });
