@@ -316,7 +316,7 @@ export function createAudio(app) {
       const v = voices.find(v => /^en/i.test(v.lang) && /female|zira|samantha|victoria|karen|serena|susan|hazel|libby|aria|jenny/i.test(v.name))
         || voices.find(v => /^en/i.test(v.lang));
       if (v) u.voice = v;
-      u.rate = 1.05; u.pitch = 1.05; u.volume = 0.9;
+      u.rate = 1.05; u.pitch = 1.05; u.volume = prefs.voiceVol ?? 0.9;
       speechSynthesis.speak(u);
     } catch { /* ignore */ }
   }

@@ -46,8 +46,8 @@ export function createInput(app) {
   const onMouseMove = e => {
     if (G.state !== 'play' || G.paused || !G.player.alive) return;
     if (!locked()) return;
-    if (G.guide) { steerBy(G, e.movementX, e.movementY, 0.0028, prefs.invert); return; }
-    const sens = (G.zoom ? 0.0009 : 0.0024);
+    if (G.guide) { steerBy(G, e.movementX, e.movementY, 0.0028 * prefs.mouseSens, prefs.invert); return; }
+    const sens = (G.zoom ? 0.0009 : 0.0024) * prefs.mouseSens;
     const P = G.player;
     P.twist = clampN(P.twist - e.movementX * sens, -1.9, 1.9);
     P.pitch = clampN(P.pitch - e.movementY * sens * (prefs.invert ? -1 : 1), -0.4, 0.45);
@@ -174,17 +174,17 @@ export function createInput(app) {
     } else if (G.guide && (f.kind === 'aim' || (f.kind === 'btn' && f.name === 'missile'))) {
       // Flying missiles: drag the missile button itself (the thumb is
       // already on it) or anywhere on the right side to steer.
-      steerBy(G, e.clientX - (f.lx ?? e.clientX), e.clientY - (f.ly ?? e.clientY), f.kind === 'btn' ? 0.009 : 0.006, prefs.invert);
+      steerBy(G, e.clientX - (f.lx ?? e.clientX), e.clientY - (f.ly ?? e.clientY), (f.kind === 'btn' ? 0.009 : 0.006) * prefs.touchSens, prefs.invert);
       f.lx = e.clientX; f.ly = e.clientY;
     } else if (f.kind === 'btn' && f.name === 'fusion' && P.alive) {
       // Dragging the fusion button aims the scan (the thumb is already on it).
-      P.twist = clampN(P.twist - (e.clientX - f.lx) * 0.0055, -1.9, 1.9);
-      P.pitch = clampN(P.pitch - (e.clientY - f.ly) * 0.0055 * (prefs.invert ? -1 : 1), -0.4, 0.45);
+      P.twist = clampN(P.twist - (e.clientX - f.lx) * 0.0055 * prefs.touchSens, -1.9, 1.9);
+      P.pitch = clampN(P.pitch - (e.clientY - f.ly) * 0.0055 * prefs.touchSens * (prefs.invert ? -1 : 1), -0.4, 0.45);
       f.lx = e.clientX; f.ly = e.clientY;
     } else if (f.kind === 'btn') {
       f.lx = e.clientX; f.ly = e.clientY;
     } else if (f.kind === 'aim' && P.alive) {
-      const sens = G.zoom ? 0.0022 : 0.0055;
+      const sens = (G.zoom ? 0.0022 : 0.0055) * prefs.touchSens;
       P.twist = clampN(P.twist - (e.clientX - f.lx) * sens, -1.9, 1.9);
       P.pitch = clampN(P.pitch - (e.clientY - f.ly) * sens * (prefs.invert ? -1 : 1), -0.4, 0.45);
       f.lx = e.clientX; f.ly = e.clientY;
