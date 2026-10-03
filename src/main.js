@@ -24,6 +24,7 @@ import { createAudio } from './audio/sound.js';
 import { createInput } from './input/input.js';
 import { createUi } from './ui/screens.js';
 import { createNet } from './net/client.js';
+import { createFeelPanel } from './ui/feelPanel.js';
 
 // Settings and progress, from localStorage. Each screen writes back the key
 // it owns (store.set) when the player changes something.
@@ -79,11 +80,11 @@ function start(root) {
   app.net = createNet(app);
   app.ui = createUi(app);
   // The sim's effects sink: voice, sounds, the scan tone and arena messages.
-  G.fx = { say: app.audio.say, sfx: app.audio.sfx, fusionSound: app.audio.fusionSound, netSend: app.net.send };
+  G.fx = { say: app.audio.say, sfx: app.audio.sfx, fusionSound: app.audio.fusionSound, netSend: app.net.send, thump: app.audio.thump };
   G.hooks.debrief = app.ui.debrief;
   G.hooks.arenaDeath = () => app.net.sendState();
   // ?debug=1 exposes the state for the smoke test and for poking at in the console.
-  if (params.has('debug')) window.__stompy = { game: G, app, kill: m => destroy(G, m, G.player) };
+  if (params.has('debug')) { window.__stompy = { game: G, app, kill: m => destroy(G, m, G.player) }; createFeelPanel(app); }
 
   const quiet = () => { for (const k of Object.keys(app.audio.loops)) app.audio.loopSet(k, 0); app.audio.beamSound(false, 1); app.audio.fusionSound(false, 0); };
   let last = 0, lastAudioCheck = 0;

@@ -354,5 +354,12 @@ export function createAudio(app) {
   }
 
 
-  return { Sound, settings, loadSamples, play, loopSet, loops, sfx, say, beamSound, fusionSound, tick: audioTick };
+  // The feel table's sound columns. bass: a short sub thump (the dedicated
+  // voice and hum ducking arrive with issue #8); haptic: a buzz on touch.
+  function thump(bass, duck, haptic, at) {
+    if (bass > 0.03) sfx.osc('sine', 58, 30, 0.18 + 0.12 * min(1, bass), 0.22 * min(1.5, bass), { at, ref: 30 });
+    void duck;
+    if (haptic > 2 && G.touchUI && prefs.haptics !== false) { try { navigator.vibrate?.(min(100, Math.round(haptic))); } catch { /* unsupported */ } }
+  }
+  return { Sound, settings, loadSamples, play, loopSet, loops, sfx, say, beamSound, fusionSound, thump, tick: audioTick };
 }

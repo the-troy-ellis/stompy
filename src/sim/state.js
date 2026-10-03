@@ -7,6 +7,7 @@ import { nullFx } from './fx.js';
 import { add, mul, dirOf, TAU } from '../util/math.js';
 import { initFeet } from './gait.js';
 import { eyeOf } from './geom.js';
+import { initFeel } from './feel.js';
 
 const { sin, cos, atan2 } = Math;
 
@@ -38,6 +39,7 @@ export function newMech(G, type, team, x, z, yaw, opts = {}) {
     ai: { aware: false, strafe: rng.sign(), strafeT: rng.range(2, 5), jitter: rng.range(0.2, 0.8), wp: null },
   };
   initFeet(G, m);
+  initFeel(m);
   return m;
 }
 

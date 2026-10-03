@@ -4,6 +4,7 @@ import { buildTerrainMesh } from '../world/terrainMesh.js';
 import { frame, viewYaw } from '../sim/geom.js';
 import { solveKnee, limb } from '../sim/gait.js';
 import { meltFrac } from '../sim/beams.js';
+import { FEEL } from '../data/feel.js';
 
 const { sin, cos, atan2, min, max, abs, PI, floor } = Math;
 
@@ -56,7 +57,10 @@ export function createScene(app) {
       R.draw(parts.lleg, limb(K, ankle, pole, sc), legTint);
       R.draw(parts.foot, chain(M.T(...ankle), M.RY(f.yaw), M.S(sc)), legTint);
     });
-    const TB = chain(B, M.T(0, g.torsoY, 0), M.RY(m.twist));
+    // The thunk springs: a squash pulse on the whole body (down in y, out in x/z,
+    // about the feet) and a wobble of the torso about the hips.
+    const sq = m.squash ? m.squash.x : 0, wp = m.wob ? m.wob.p.x : 0, wr = m.wob ? m.wob.r.x : 0;
+    const TB = chain(B, M.T(0, g.torsoY, 0), M.S(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5), M.RY(m.twist), M.RX(wp), M.RZ(wr));
     R.draw(parts.torso, TB, tint);
     for (const [s, k] of [[1, 'LA'], [-1, 'RA']]) {
       if (m.hp[k] <= 0) continue;
@@ -94,9 +98,9 @@ export function createScene(app) {
       eye = add(gd.nose || gd.pos, add(mul(dir, 1.5), [0, 0.3, 0]));
     } else {
       fov = G.zoom ? 0.42 : 1.08;
-      const sh = G.shake * 0.012;
-      yaw = viewYaw(P) + rnd(-sh, sh); pitch = P.pitch + rnd(-sh, sh) - (P.alive ? 0 : 0.15);
-      eye = add(G.eye, [0, -G.kick * 0.35, 0]); dir = dirOf(yaw, pitch - G.kick * 0.016);
+      const sh = G.shake * 0.012, wv = FEEL.view.wobble, wp = P.wob ? P.wob.p.x : 0, wr = P.wob ? P.wob.r.x : 0;
+      yaw = viewYaw(P) + rnd(-sh, sh) + wr * wv * 0.5; pitch = P.pitch + rnd(-sh, sh) - (P.alive ? 0 : 0.15) + wp * wv;
+      eye = add(G.eye, [0, -G.kick * 0.35 - (P.squash ? P.squash.x * 2 : 0), 0]); dir = dirOf(yaw, pitch - G.kick * 0.016);
     }
     G.ear = eye; G.earYaw = yaw;   // sounds are heard from the camera
     const proj = M.persp(fov, W / max(1, H), 0.5, 1800);

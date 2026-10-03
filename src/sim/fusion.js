@@ -5,6 +5,7 @@ import { center, muzzle, rayHit, rayTerrain } from './geom.js';
 import { destroy } from './combat.js';
 import { explode, particle } from './effects.js';
 import { r2 } from '../net/protocol.js';
+import { feel } from './feel.js';
 
 const { sin, abs, atan2, hypot, min, max } = Math;
 
@@ -72,13 +73,11 @@ export function fusionFire(G, m, w, mz, t) {
   if (G.mode === 'mp' && m === G.player) G.fx.netSend({ t: 'fx', k: 'fu', a: mz.map(r2), id2: t.netId || 0, b: center(t).map(r2) });
   m.heat = d.overload; m.shutdown = true; w.cd = d.cd;
   m.fusion.t = 0; m.fusion.mech = null; m.fusion.on = false;
-  if (m === G.player) {
-    G.whiteFlash = 0.7; G.shake = 1.2;
-    G.fx.fusionSound(false, 0); G.fx.sfx.fusionCrack(); G.fx.sfx.powerdown();
-  }
+  feel(G, 'fusionFire', { mech: m, at: m === G.player ? null : mz });
+  if (m === G.player) { G.fx.fusionSound(false, 0); G.fx.sfx.fusionCrack(); G.fx.sfx.powerdown(); }
   const cost = m.max.T * d.feedback;
   m.hp.T -= cost;
-  if (m === G.player) { G.stats.taken += cost; G.flash = min(0.6, G.flash + 0.4); G.fx.sfx.clang(); }
+  if (m === G.player) { G.stats.taken += cost; G.fx.sfx.clang(); }
   if (m.hp.T <= 0) { m.hp.T = 0; destroy(G, m, null); return; }
   if (m === G.player) G.fx.say('Resonance discharge. Reactor overload. Torso damage.', true);
 }
