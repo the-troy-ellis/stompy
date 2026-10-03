@@ -9,6 +9,7 @@ import { stepShots, stepDying } from './combat.js';
 import { beamTick, coolArmour, remoteBeam } from './beams.js';
 import { fusionTick, updatePulses } from './fusion.js';
 import { fireCat, missileTrigger, steerVolley } from './missiles.js';
+import { meleePress, meleeTick } from './melee.js';
 import { explode, particle, stepDebris } from './effects.js';
 import { stepFeel } from './feel.js';
 import { netInterp } from '../net/interp.js';
@@ -17,7 +18,7 @@ const { sin, abs, min, max, hypot, cos } = Math;
 
 // The empty input: what the sim sees when nobody is touching anything.
 export const noInput = () => ({ thrUp: false, thrDown: false, stop: false, turn: 0, twist: 0, pitch: 0, centre: false, jets: false,
-  held: { energy: false, ballistic: false, missile: false, fusion: false }, missileTap: false });
+  held: { energy: false, ballistic: false, missile: false, fusion: false }, missileTap: false, punch: false });
 
 // One frame of the whole simulation. `input` is a snapshot (see noInput);
 // `dt` is seconds (capped by the caller). Everything the sim wants the
@@ -32,7 +33,7 @@ export function update(G, input, dt) {
     if (input.thrUp) P.throttle = min(1, P.throttle + dt * 0.9);
     if (input.thrDown) P.throttle = max(-0.35, P.throttle - dt * 0.9);
     if (input.stop) P.throttle = 0;
-    P.yaw += clampN(input.turn, -1, 1) * P.ch.turn * dt * (P.hp.LL > 0 && P.hp.RL > 0 ? 1 : 0.5);
+    P.yaw += clampN(input.turn, -1, 1) * P.ch.turn * dt * (P.hp.LL > 0 && P.hp.RL > 0 ? 1 : 0.5) * (P.melee ? 0.5 : 1);   // half rate mid-swing
     if (G.guide) { G.guide.yaw += input.twist * 1.4 * dt; G.guide.pitch = clampN(G.guide.pitch + input.pitch * 1.0 * dt, -1.3, 1.3); }
     else {
       P.twist = clampN(P.twist + input.twist * 1.6 * dt, -1.9, 1.9);
@@ -50,7 +51,9 @@ export function update(G, input, dt) {
   const t = G.target;
   G.lock = !!(t && t.alive && len(sub(center(t), G.eye)) < WEAPONS.lrm.range && dot(norm(sub(center(t), G.eye)), G.view) > cos(0.3));
 
-  const armed = P.alive && !G.paused && !G.roundOver;
+  const live = P.alive && !G.paused && !G.roundOver;
+  if (live && input.punch) meleePress(G, P);
+  const armed = live && !P.melee;   // no guns during a swing or its recovery
   P.beamOn = armed && input.held.energy && !G.guide;
   fusionTick(G, P, dt, armed && input.held.fusion && !G.guide);
   if (armed && input.held.ballistic) fireCat(G, 'ballistic');
@@ -65,7 +68,7 @@ export function update(G, input, dt) {
       continue;
     }
     if (m.team !== 0 && m.alive) think(G, m, dt);
-    if (m.alive) stepMech(G, m, dt);
+    if (m.alive) { stepMech(G, m, dt); meleeTick(G, m, dt); }
     if (m.alive && m.beamOn) beamTick(G, m, dt, m === P ? G.aim : m.ai.beamAim);
     else m.beaming = false;
     if (m !== P) m.beamOn = false;

@@ -1,0 +1,93 @@
+import { clampN, wrapA } from '../util/math.js';
+import { geoOf } from '../data/geo.js';
+import { meleeOf } from '../data/melee.js';
+import { center, viewYaw } from './geom.js';
+import { damage } from './combat.js';
+import { knock } from './knock.js';
+import { feel } from './feel.js';
+
+const { atan2, hypot, sin, cos } = Math;
+
+// Melee: a press starts a wind-up; at the hit frame the nearest mech within
+// reach and arc takes the blow and the knockback; then a recovery during
+// which the mech cannot fire and turns at half rate. Miss and it whiffs.
+
+export const canPunch = (G, m) => m.alive && !m.shutdown && !m.melee && !(m.meleeCd > 0) && !(m === G.player && G.guide);
+
+export function meleePress(G, m) {
+  if (!canPunch(G, m)) return false;
+  const def = meleeOf(m);
+  m.melee = { t: 0, phase: 'windup', hit: null };
+  m.meleeCd = def.cd;
+  return true;
+}
+
+// The mech this one's swing would land on right now, or null.
+export function meleeTarget(G, m) {
+  const def = meleeOf(m), c = center(m), facing = viewYaw(m), reach = def.reach * m.ch.scale;
+  let best = null, bestD = Infinity;
+  for (const t of G.mechs) {
+    if (t === m || !t.alive) continue;
+    const dx = t.x - m.x, dz = t.z - m.z, d = hypot(dx, dz) - geoOf(t).radius * t.ch.scale;
+    if (d > reach || d >= bestD) continue;
+    if (Math.abs(wrapA(atan2(dx, dz) - facing)) > def.arc) continue;
+    best = t; bestD = d;
+  }
+  void c;
+  return best;
+}
+
+export function meleeTick(G, m, dt) {
+  if (m.meleeCd > 0) m.meleeCd = Math.max(0, m.meleeCd - dt);
+  const st = m.melee;
+  if (!st) return;
+  const def = meleeOf(m);
+  st.t += dt;
+  if (st.phase === 'windup' && st.t >= def.windup) {
+    st.phase = 'recover';
+    const t = meleeTarget(G, m);
+    if (t) {
+      // The blow lands on the target's skin, facing the attacker, at fist height.
+      const dx = t.x - m.x, dz = t.z - m.z, hd = hypot(dx, dz) || 1, nx = dx / hd, nz = dz / hd;
+      const R = geoOf(t).radius * t.ch.scale, p = [t.x - nx * R, clampN(m.y + 5 * m.ch.scale, t.y + 1, t.y + geoOf(t).height * t.ch.scale - 1), t.z - nz * R];
+      t.lastHitMelee = true;
+      damage(G, t, p, def.dmg, m, false, true);
+      const v = knock(G, { target: t, attacker: m, base: def.knock, dir: [nx, nz] });
+      st.hit = { mech: t, p, v };
+      m.heat += def.heat;
+      const side = Math.sign(dx * cos(viewYaw(t)) - dz * sin(viewYaw(t))) || 1;
+      feel(G, 'punch', { mech: m, k: 1, at: m === G.player ? null : p });
+      feel(G, 'punched', { mech: t, k: 1, roll: -side, at: t === G.player ? null : p });
+      G.fx.sfx.punch(m === G.player ? null : p, true);
+      G.farthestShove = Math.max(G.farthestShove || 0, v);
+    } else {
+      feel(G, 'whiff', { mech: m });
+      G.fx.sfx.punch(m === G.player ? null : center(m), false);
+    }
+  }
+  if (st.phase === 'recover' && st.t >= def.windup + def.recover) m.melee = null;
+}
+
+// Landing on a mech: a stomp. Called from the landing branch with how long
+// the lander was in the air.
+export function tryStomp(G, m, airT) {
+  const def = meleeOf(m);
+  if (airT < def.stompAir) return null;
+  const gm = geoOf(m), rm = gm.radius * m.ch.scale;
+  for (const t of G.mechs) {
+    if (t === m || !t.alive) continue;
+    const gt = geoOf(t), top = t.y + gt.height * t.ch.scale, dx = t.x - m.x, dz = t.z - m.z, hd = hypot(dx, dz);
+    // Feet passing through the top of the target this frame, and over it.
+    if (hd > (rm + gt.radius * t.ch.scale) * 1.2 || m.y < top - 1.5 || m.y > top + 1.0) continue;
+    const nx = hd > 0.01 ? dx / hd : 1, nz = hd > 0.01 ? dz / hd : 0;
+    t.lastHitMelee = true;
+    damage(G, t, [t.x, top - 0.5, t.z], def.stompDmg, m, false, true);
+    knock(G, { target: t, attacker: m, base: def.stompKnock, dir: [nx, nz] });
+    m.vy = 4; m.push[0] -= nx * def.stompKnock * 0.5; m.push[1] -= nz * def.stompKnock * 0.5;
+    feel(G, 'stomp', { mech: m, k: 1, at: m === G.player ? null : [t.x, top, t.z] });
+    feel(G, 'punched', { mech: t, k: 1.2, at: t === G.player ? null : [t.x, top, t.z] });
+    G.fx.sfx.punch(m === G.player ? null : [t.x, top, t.z], true);
+    return t;
+  }
+  return null;
+}

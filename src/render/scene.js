@@ -5,12 +5,25 @@ import { frame, viewYaw } from '../sim/geom.js';
 import { solveKnee, limb } from '../sim/gait.js';
 import { meltFrac } from '../sim/beams.js';
 import { FEEL } from '../data/feel.js';
+import { meleeOf } from '../data/melee.js';
 
 const { sin, cos, atan2, min, max, abs, PI, floor } = Math;
 
 // How far the knees splay outward while the body is squashed (a landing):
 // up to a 20% lean of the knee pole at full squash. Pure, for the tests.
 export const legSplay = squash => clampN(squash / 0.25, 0, 1) * 0.2;
+
+// The swing: how far the torso rears back then lunges, and the arms cock and
+// drive, as a function of where the melee state is. Pure, for the tests.
+// Returns { lean (torso pitch, +back), arm (shoulder swing, +back), lunge (m forward) }.
+export function meleePose(m) {
+  const st = m.melee;
+  if (!st) return { lean: 0, arm: 0, lunge: 0 };
+  const def = meleeOf(m), t = st.t;
+  if (st.phase === 'windup') { const u = Math.min(1, t / def.windup); return { lean: 0.15 * u, arm: -0.9 * u, lunge: 0 }; }
+  const r = Math.min(1, (t - def.windup) / def.recover), snap = Math.exp(-r * 6);
+  return { lean: -0.2 * snap, arm: 0.6 * snap, lunge: 0.6 * snap };
+}
 
 // The topple of a dying mech: a rotation by its fall angle about a horizontal
 // axis through the ground under it, leaning the way it falls. Null when it
@@ -91,11 +104,12 @@ export function createScene(app) {
     // Armour under a beam doesn't jolt per frame; the whole mech sways slowly as it melts.
     const sway = meltFrac(m) * 0.03, swt = G.time * 2.4;
     const sq = m.squash ? m.squash.x : 0, wp = (m.wob ? m.wob.p.x : 0) + sin(swt) * sway, wr = (m.wob ? m.wob.r.x : 0) + cos(swt * 0.8) * sway * 0.7;
-    const TB = chain(B, M.T(0, g.torsoY, 0), M.S(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5), M.RY(m.twist), M.RX(wp), M.RZ(wr));
+    const pose = meleePose(m);
+    const TB = chain(B, M.T(0, g.torsoY, 0), M.S(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5), M.RY(m.twist), M.T(0, 0, pose.lunge), M.RX(wp - pose.lean), M.RZ(wr));
     R.draw(parts.torso, TB, tint);
     for (const [s, k] of [[1, 'LA'], [-1, 'RA']]) {
       if (m.hp[k] <= 0) continue;
-      R.draw(parts.arm, chain(TB, M.T(s * g.armX, g.armY, 0), M.RX(-m.pitch)), tint);
+      R.draw(parts.arm, chain(TB, M.T(s * g.armX, g.armY, 0), M.RX(-m.pitch + pose.arm)), tint);
     }
     // Muzzle flash: a hot streak out of the barrel for two frames.
     const fl = m.flash;

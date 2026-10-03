@@ -23,8 +23,9 @@ const mp = G => G.mode === 'mp';
 
 // `beam`: a slice of continuous laser damage (one frame's worth) -- it
 // isn't a "hit" for accuracy, and mustn't ring the armour every frame.
-export function damage(G, m, p, amt, src, beam = false) {
+export function damage(G, m, p, amt, src, beam = false, melee = false) {
   if (!m.alive) return;
+  if (!melee) m.lastHitMelee = false;
   if (m.remote) {
     // Another pilot: what the shooter sees counts, and the victim's own
     // client applies it. Hits are batched (a beam deals damage every
@@ -140,7 +141,7 @@ export function destroy(G, m, src) {
     return;
   }
   if (src === G.player) G.stats.kills++;
-  G.fx.say('Target destroyed.', true, DEATH_BEAT * 1000);   // after the bang, not before
+  G.fx.say(m.lastHitMelee ? 'Target punched.' : 'Target destroyed.', true, DEATH_BEAT * 1000);   // after the bang, not before
   if (G.player.alive && !G.mechs.some(e => e.team !== 0 && e.alive)) {
     G.state = 'over'; G.endT = 3.5; G.won = true;
     G.fx.say('Mission objectives complete.', true, 1400);

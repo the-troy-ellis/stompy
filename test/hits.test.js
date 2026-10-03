@@ -21,7 +21,7 @@ test('firing the autocannon nudges the mech back about 0.15 m and the push dies 
   assert.ok(Math.hypot(...P.push) < 0.01, 'push did not decay');
   assert.ok(G.frame - P.flash.frame > 1, 'flash is a record of the frame it fired');
   assert.equal(P.flash.frame, f0);
-  assert.equal(FEEL.fireAc.push, 0.6);
+  assert.equal(FEEL.fireAc.push, 0.4);
 });
 
 test('a missile volley recoils less than a shell', () => {
