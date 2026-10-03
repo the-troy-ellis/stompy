@@ -7,7 +7,7 @@ export function createFeelPanel(app) {
   const el = document.createElement('div');
   el.className = 'feel-panel';
   const rows = FEEL_EVENTS.map(ev => `<tr><th>${ev}</th>${FEEL_COLS.map(c => `<td><input type="number" step="0.05" data-ev="${ev}" data-col="${c}" value="${FEEL[ev][c]}"></td>`).join('')}</tr>`).join('');
-  const extra = ['view', 'spring'].map(g => `<tr><th>${g}</th><td colspan="${FEEL_COLS.length}">${Object.keys(FEEL[g]).map(k => `${k} <input type="number" step="0.05" data-ev="${g}" data-col="${k}" value="${FEEL[g][k]}">`).join(' ')}</td></tr>`).join('');
+  const extra = ['view', 'spring', 'knock'].map(g => `<tr><th>${g}</th><td colspan="${FEEL_COLS.length}">${Object.keys(FEEL[g]).map(k => `${k} <input type="number" step="0.05" data-ev="${g}" data-col="${k}" value="${FEEL[g][k]}">`).join(' ')}</td></tr>`).join('');
   el.innerHTML = `<div class="feel-head"><b>FEEL</b> <button data-a="toggle">hide</button> <button data-a="copy">COPY</button></div>
     <div class="feel-body"><table><tr><th></th>${FEEL_COLS.map(c => `<th>${c}</th>`).join('')}</tr>${rows}${extra}</table><textarea class="feel-out" hidden></textarea></div>`;
   el.addEventListener('input', e => {

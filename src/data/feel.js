@@ -36,12 +36,17 @@ export const FEEL = {
   death:       { kick: 1.0, shake: 1.5, flash: 0, white: 0, squash: 0, wobble: 0, bass: 1.2, duck: 1.0, dust: 0, haptic: 100, push: 0 },
   // k = (big ? 1 : 0.35) * (1 - distance / 220)
   explosion:   { kick: 0, shake: 1.0, flash: 0, white: 0, squash: 0, wobble: 0.3, bass: 0.9, duck: 0.3, dust: 0, haptic: 30, push: 0 },
+  // a missile blast's shove, k = 1 - distance / BLAST_R (the camera response is the explosion row)
+  blast:       { kick: 0, shake: 0, flash: 0, white: 0, squash: 0, wobble: 0, bass: 0, duck: 0, dust: 0, haptic: 0, push: 4 },
   // the fusion discharge: the frame shakes, the screen whites out, the feedback hurts
   fusionFire:  { kick: 0.6, shake: 1.2, flash: 0.4, white: 0.7, squash: 0.1, wobble: 0.8, bass: 1.2, duck: 1.0, dust: 0, haptic: 80, push: 0 },
   // How the view reads the springs and caps.
   view: { wobble: 0.6, shakeMax: 1.2, flashMax: 0.6 },
+  // Knockback: how far a blow jolts the aim (radians at a 10 m/s impulse) and the skid dust rate.
+  knock: { twist: 0.3, pitch: 0.1, skidDust: 12 },
   // Spring stiffness and damping ratio for the body springs.
   spring: { squashK: 160, squashZeta: 0.7, wobbleK: 90, wobbleZeta: 0.35, sagK: 45, sagZeta: 1 },
 };
-export const FEEL_EVENTS = Object.keys(FEEL).filter(k => k !== 'view' && k !== 'spring');
+const TUNING = new Set(['view', 'spring', 'knock']);   // blocks of constants, not event rows
+export const FEEL_EVENTS = Object.keys(FEEL).filter(k => !TUNING.has(k));
 export const FEEL_COLS = ['kick', 'shake', 'flash', 'white', 'squash', 'wobble', 'bass', 'duck', 'dust', 'haptic', 'push'];

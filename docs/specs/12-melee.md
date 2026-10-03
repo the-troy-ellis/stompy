@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ready |
+| Status | in progress (#10 knockback shipped; #11–#14 open) |
 | Milestone | M1 (shove, stomp, knockback, AI, arena); M2 adds PURPLE PUNCHER's real punch |
 | Size | M (split: knockback + shove + stomp; animation + feedback; AI; arena) |
 | Depends on | M0; [13-thunk.md](13-thunk.md) for the feedback table it feeds |
