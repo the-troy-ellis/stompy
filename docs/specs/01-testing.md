@@ -96,7 +96,7 @@ artifact and deploy.
 
 ### In-game diagnostics
 
-Behind `?debug=1` (and later a settings toggle, M1): a frame-time readout
+Behind `?debug=1` or the FRAME TIME setting (M1 #29): a frame-time readout
 (median and p95 over the last 2 s), draw-call count, particle count, and the
 seed. Tests and perf reports read these.
 
