@@ -93,8 +93,13 @@ function footDown(G, m, f, pace) {
   feel(G, 'step', { mech: m, k: (0.35 + 0.65 * pace) * m.ch.scale * m.ch.scale, at: m === P ? null : f.pos });
   if (m === P) G.fx.sfx.step(m, 0.4 + 0.55 * pace);
   else if (d < 350) G.fx.sfx.step(m, 0.3 + 0.45 * pace);
-  if (pace > 0.25 && d < 260 && m !== P) {
-    for (let i = 0; i < 3 * FEEL.step.dust; i++) particle(G, add(f.pos, [r.range(-1, 1), 0.3, r.range(-1, 1)]), [r.range(-2, 2), r.range(0.5, 1.5), r.range(-2, 2)], r.range(0.6, 1), r.range(0.5, 0.9) * m.ch.scale, mul(G.pal.low, 0.8), 'smoke');
+  // A heavy mech's steps are felt through the ground: within 40 m of the
+  // player, the dashboard twitches in time with its feet.
+  if (m !== P && m.ch.scale > 1.1 && d < 40) feel(G, 'nearStep', { mech: P, k: (1 - d / 40) * m.ch.scale * m.ch.scale, at: f.pos });
+  // Dust at the foot, in the ground's colour, more for a faster or heavier mech.
+  if (pace > 0.25 && d < 260) {
+    const n = Math.round(3 * FEEL.step.dust * (0.5 + 0.5 * pace) * m.ch.scale);
+    for (let i = 0; i < n; i++) particle(G, add(f.pos, [r.range(-1, 1), 0.3, r.range(-1, 1)]), [r.range(-2, 2), r.range(0.5, 1.5), r.range(-2, 2)], r.range(0.6, 1), r.range(0.5, 0.9) * m.ch.scale, mul(G.pal.low, 0.8), 'smoke');
   }
 }
 

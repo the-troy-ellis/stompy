@@ -1,10 +1,25 @@
-import { add, clampN } from '../util/math.js';
+import { add, clampN, mul } from '../util/math.js';
 import { BOUND } from '../world/terrain.js';
 import { particle } from './effects.js';
 import { gait } from './gait.js';
 import { feel, stepFeel } from './feel.js';
+import { FEEL } from '../data/feel.js';
 
 const { sin, cos, min, max } = Math;
+
+// Touchdown dust: a puff under the feet, and for a hard landing (force over
+// 0.7) a ring that races outward along the ground. (The shockwave mesh is M4.)
+function landingDust(G, m, ground, force) {
+  const r = G.rng, s = m.ch.scale, col = mul(G.pal.low, 0.85), n = Math.round(4 * FEEL.land.dust * force * s);
+  for (let i = 0; i < n; i++) particle(G, [m.x + r.range(-1.5, 1.5) * s, ground + 0.3, m.z + r.range(-1.5, 1.5) * s], [r.range(-3, 3), r.range(1, 3), r.range(-3, 3)], r.range(0.7, 1.2), r.range(0.6, 1.1) * s, col, 'smoke');
+  if (force > 0.7) {
+    const ring = Math.round(6 * FEEL.land.dust * s);
+    for (let i = 0; i < ring; i++) {
+      const a = (i / ring) * Math.PI * 2 + r.range(-0.1, 0.1), v = r.range(9, 14) * force;
+      particle(G, [m.x + sin(a) * 1.2 * s, ground + 0.2, m.z + cos(a) * 1.2 * s], [sin(a) * v, r.range(0.5, 1.5), cos(a) * v], r.range(0.5, 0.9), r.range(0.8, 1.4) * s, col, 'smoke');
+    }
+  }
+}
 
 // One mech, one frame: speed, jets, gravity, heat, shutdown, cooldowns, legs.
 export function stepMech(G, m, dt) {
@@ -32,6 +47,7 @@ export function stepMech(G, m, dt) {
       feel(G, 'land', { mech: m, k: force, at: m === G.player ? null : [m.x, m.y, m.z] });
       if (m === G.player) G.fx.sfx.land(force);
       else G.fx.sfx.step(m, force * 0.8);
+      landingDust(G, m, ground, force);
     }
     m.y = ground; m.vy = 0; m.air = false;
   } else if (m.y > ground + 1.2) m.air = true;

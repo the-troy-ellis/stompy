@@ -8,6 +8,10 @@ import { FEEL } from '../data/feel.js';
 
 const { sin, cos, atan2, min, max, abs, PI, floor } = Math;
 
+// How far the knees splay outward while the body is squashed (a landing):
+// up to a 20% lean of the knee pole at full squash. Pure, for the tests.
+export const legSplay = squash => clampN(squash / 0.25, 0, 1) * 0.2;
+
 // Everything drawn in 3D: the camera per state, sky, terrain, mechs with
 // their IK legs, wrecks, shots, pulses, beams and particles.
 export function createScene(app) {
@@ -48,8 +52,9 @@ export function createScene(app) {
       const leg = g.legs[i];
       const legTint = m.hp[leg.hx > 0 ? 'LL' : 'RL'] > 0 ? tint : mul(tint, 0.35);
       const H = M.apply(B, [leg.hx, g.hip, leg.hz]);
-      const pole = g.knee === 'forward' ? fwd : g.knee === 'back' ? back
-        : norm(add(norm([H[0] - hull[0], 0, H[2] - hull[2]]), [0, 0.9, 0]));
+      const out = norm([H[0] - hull[0], 0, H[2] - hull[2]]), splay = legSplay(m.squash ? m.squash.x : 0);
+      let pole = g.knee === 'forward' ? fwd : g.knee === 'back' ? back : norm(add(out, [0, 0.9, 0]));
+      if (splay > 0) pole = norm(add(pole, mul(out, splay)));   // knees bow out as the body squashes
       const A = add(f.pos, [0, g.ankle * sc, 0]);
       const K = solveKnee(H, A, pole, g.l1 * sc, g.l2 * sc);
       const ankle = add(K, mul(norm(sub(A, K)), g.l2 * sc));   // stays attached even if out of reach
