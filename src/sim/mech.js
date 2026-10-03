@@ -28,8 +28,11 @@ export function stepMech(G, m, dt) {
   if (m.heat > 85) maxS *= 0.65;
   const target = !m.alive || m.shutdown ? 0 : m.throttle * maxS;
   m.speed += clampN(target - m.speed, -11 * dt, 7 * dt);
-  m.x = clampN(m.x + sin(m.yaw) * m.speed * dt, -BOUND, BOUND);
-  m.z = clampN(m.z + cos(m.yaw) * m.speed * dt, -BOUND, BOUND);
+  const push = m.push || (m.push = [0, 0]);
+  m.x = clampN(m.x + (sin(m.yaw) * m.speed + push[0]) * dt, -BOUND, BOUND);
+  m.z = clampN(m.z + (cos(m.yaw) * m.speed + push[1]) * dt, -BOUND, BOUND);
+  const keep = max(0, 1 - 4 * dt);
+  push[0] *= keep; push[1] *= keep;
 
   const ground = G.ter.height(m.x, m.z);
   const jets = m.jetting && m.fuel > 0 && !m.shutdown && m.alive;

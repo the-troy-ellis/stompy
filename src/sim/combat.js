@@ -7,7 +7,7 @@ import { r2 } from '../net/protocol.js';
 import { blast, endGuide } from './missiles.js';
 import { feel } from './feel.js';
 
-const { sin, cos, max } = Math;
+const { sin, cos } = Math;
 
 export function sectionHit(m, p) {
   const dx = p[0] - m.x, dz = p[2] - m.z, ly = (p[1] - m.y) / m.ch.scale;
@@ -40,10 +40,10 @@ export function damage(G, m, p, amt, src, beam = false) {
   if (src === G.player && m !== G.player) { if (!beam) G.stats.hits++; G.stats.dealt += amt; }
   // Which side the blow came from, in torso space: the wobble leans away from it.
   const a = viewYaw(m), side = -Math.sign((p[0] - m.x) * cos(a) - (p[2] - m.z) * sin(a));
-  if (!beam || G.time - (m.lastHitFeel || -1) > 0.25) { m.lastHitFeel = G.time; feel(G, 'hit', { mech: m, k: (beam ? max(amt, 0.5) : amt) / 10, roll: side, at: m === G.player ? null : p }); }
+  if (!beam) feel(G, 'hit', { mech: m, k: amt / 10, roll: side, at: m === G.player ? null : p });   // beams don't jolt: the renderer sways a melting mech instead
   if (m === G.player) {
     G.stats.taken += amt;
-    if (!beam || G.time - (G.lastClang || 0) > 0.35) { G.lastClang = G.time; G.fx.sfx.clang(); }
+    if (!beam || G.time - (G.lastClang || 0) > 0.35) { G.lastClang = G.time; G.fx.sfx.clang(sectionHit(m, p)); }   // arms ring, legs thud, the torso is dull
     if (!G.target && src && src.alive) G.target = src;
   } else m.ai.aware = true;
   if (m.hp[sec] > 0) {
@@ -105,7 +105,8 @@ export function fire(G, m, w, aim, target) {
     if (mp(G) && m === G.player) G.fx.netSend({ t: 'fx', k: 's', p: mz.map(r2), v: mul(dir, d.speed).map(r2) });
     for (let i = 0; i < 5; i++) particle(G, add(mz, mul(dir, 1.5)), add(mul(dir, r.range(4, 12)), [r.range(-2, 2), r.range(-1, 2), r.range(-2, 2)]), 0.15, 0.6, [1, 0.8, 0.3], 'fire');
     G.fx.sfx.cannon(mz);
-    if (m === G.player) feel(G, 'fireAc', { mech: m });
+    m.flash = { frame: G.frame, p: mz, dir, big: true };   // muzzle flash, drawn for two frames
+    if (m === G.player) feel(G, 'fireAc', { mech: m, dir: [-dir[0], -dir[2]] });
   } else {
     const vid = ++G.volleySeq;
     for (let i = 0; i < d.count; i++) {
@@ -113,7 +114,8 @@ export function fire(G, m, w, aim, target) {
       G.shots.push({ kind: 'missile', p: add(mz, [r.range(-0.6, 0.6), r.range(-0.4, 0.4), r.range(-0.6, 0.6)]), v: mul(spread, d.speed * r.range(0.85, 1.1)),
         owner: m, dmg: d.dmg, life: d.range / d.speed + 1, target, smoke: 0, age: 0, vid });
     }
-    if (m === G.player) { G.lastVolley = vid; feel(G, 'fireLrm', { mech: m }); }
+    m.flash = { frame: G.frame, p: mz, dir, big: false };
+    if (m === G.player) { G.lastVolley = vid; feel(G, 'fireLrm', { mech: m, dir: [-dir[0], -dir[2]] }); }
     G.fx.sfx.missile(mz);
     if (mp(G) && m === G.player) G.fx.netSend({ t: 'fx', k: 'm', p: mz.map(r2), d: dir.map(r2), tg: target?.netId || 0, v: G.lastVolley });
   }

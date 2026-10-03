@@ -246,9 +246,13 @@ export function createAudio(app) {
       if (!buffers.crunch) this.noise(big ? 1.6 : 0.6, big ? 0.6 : 0.25, big ? 700 : 1200, 40, 'lowpass', at);
     },
     // Taking a hit: armour plate ringing.
-    clang() {
-      play('step', { vol: 0.8, rate: 1.15, vary: 0.12 }); play('plate', { vol: 0.5, rate: 0.9 });
-      if (!buffers.step) { this.osc('square', 240, 120, 0.12, 0.05); this.noise(0.15, 0.15, 4000, 800, 'highpass'); }
+    // Taking a hit: armour plate ringing. Arms ring high, legs thud, the torso is dull.
+    clang(sec = 'T') {
+      const arm = sec === 'LA' || sec === 'RA', leg = sec === 'LL' || sec === 'RL';
+      const rate = arm ? 1.4 : leg ? 0.9 : 0.75;
+      play('step', { vol: 0.8, rate: rate * 1.15, vary: 0.12 }); play('plate', { vol: arm ? 0.6 : 0.4, rate: rate * 0.9 });
+      if (leg || !arm) this.osc('sine', leg ? 70 : 55, 30, 0.2, 0.12);
+      if (!buffers.step) { this.osc('square', 240 * rate, 120 * rate, 0.12, 0.05); this.noise(0.15, 0.15, 4000, 800, 'highpass'); }
     },
     step(m, vol) {
       // A footfall is felt more than heard: a short, quiet sub-bass thump

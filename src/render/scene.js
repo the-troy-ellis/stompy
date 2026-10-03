@@ -64,12 +64,20 @@ export function createScene(app) {
     });
     // The thunk springs: a squash pulse on the whole body (down in y, out in x/z,
     // about the feet) and a wobble of the torso about the hips.
-    const sq = m.squash ? m.squash.x : 0, wp = m.wob ? m.wob.p.x : 0, wr = m.wob ? m.wob.r.x : 0;
+    // Armour under a beam doesn't jolt per frame; the whole mech sways slowly as it melts.
+    const sway = meltFrac(m) * 0.03, swt = G.time * 2.4;
+    const sq = m.squash ? m.squash.x : 0, wp = (m.wob ? m.wob.p.x : 0) + sin(swt) * sway, wr = (m.wob ? m.wob.r.x : 0) + cos(swt * 0.8) * sway * 0.7;
     const TB = chain(B, M.T(0, g.torsoY, 0), M.S(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5), M.RY(m.twist), M.RX(wp), M.RZ(wr));
     R.draw(parts.torso, TB, tint);
     for (const [s, k] of [[1, 'LA'], [-1, 'RA']]) {
       if (m.hp[k] <= 0) continue;
       R.draw(parts.arm, chain(TB, M.T(s * g.armX, g.armY, 0), M.RX(-m.pitch)), tint);
+    }
+    // Muzzle flash: a hot streak out of the barrel for two frames.
+    const fl = m.flash;
+    if (fl && G.frame - fl.frame <= 1) {
+      const d = fl.dir, yw = atan2(d[0], d[2]), pt = Math.asin(clampN(d[1], -1, 1)), L = fl.big ? 3.2 : 1.6, w = fl.big ? 0.9 : 0.5;
+      R.draw(R.meshes.beam, chain(M.T(...fl.p), M.RY(yw), M.RX(-pt), M.S(w, w, L)), [1, 0.9, 0.5], 1, 1);
     }
     R.drawHeat = heatWas;
   }
