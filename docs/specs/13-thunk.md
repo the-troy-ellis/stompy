@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#2 feel table and springs, #3 footfalls and landing, #4 hit wobble and recoil, #5 shutdown sag, #6 section loss, #7 death beat, #8 sub-bass and ducking shipped; #9 open) |
+| Status | shipped for M1 (#2–#9, plus #23 hit feedback, #24 staged destruction, #25 walking feel) |
 | Milestone | M1 (the table and the first pass); every later feature adds rows |
 | Size | M (split: feel table + footfalls + landing; hit wobble + recoil + knockback; shutdown + death; audio layer; reduced motion) |
 | Depends on | M0 |
@@ -125,6 +125,15 @@ for 0.8 s; then it is a wreck that rocks and sinks for a second and pops a
 few more times. Gameplay changes at once (dead, scored, the match ending);
 only the show waits. The player goes down the same way, eye and all. A mech
 that loses both legs sits down and keeps firing until it goes.
+
+### Walking feel (M1 #25, shipped)
+
+The ground pushes back (`src/data/walk.js`, `slopeFactor` in `mech.js`):
+the grade under the heading, sampled two metres fore and aft, scales top
+speed, a 20% climb to half and a descent up to 1.15×. A landing digs the
+feet in: it takes up to 60% of the forward speed and holds the legs at 30%
+for up to 0.35 s, scaled by the landing force, before they drive again. The
+landing squash already shows it; this makes it felt in the throttle.
 
 ### Audio layer
 
