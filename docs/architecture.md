@@ -122,18 +122,31 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
 
 ### The network protocol (as it is)
 
+`PROTOCOL` is 2 (M1: melee).
+
 Client → server: `hello {v, name, color}`, `s {state...}` (15 Hz), `fx {k, ...}`
 (`b` beam flash, `s` shell, `m` missile volley, `fu` fusion discharge, `mg`
-guided volley update, `md` detonate), `hit {to, amt, p, fu}`, `died {by}`.
+guided volley update, `md` detonate, `pu` a punch starts), `hit {to, amt, p,
+fu, kb?, me?, st?}`, `died {by, me?}`.
 
 Server → client: `welcome {id, seed, pal, limit, over, scores}`, `full
 {max}`, `join`, `leave`, `s` and `fx` stamped with `id`, `hit {from, amt, p,
-fu}`, `kill {victim, killer, scores}`, `roundover {winner, name, next,
-scores}`, `newround {seed, pal, scores}`.
+fu, kb?, me?, st?}`, `kill {victim, killer, scores, me?}`, `roundover {winner,
+name, next, scores}`, `newround {seed, pal, scores}`.
+
+Melee on the wire (`docs/specs/12-melee.md` § Arena): the shooter-scores rule
+holds. A punch or stomp on another pilot rides the batched `hit` with `me: 1`
+or `st: 1` and `kb: [vx, vz]`, the knockback impulse; the victim's client
+adds `kb` to its push, jolts its aim and plays the lurch. The server clamps
+each `kb` part to ±30 and `amt` to 40 as before. `died {me: 1}` makes the
+server's `kill` carry `me`, and the kill feed says PUNCHED OUT.
 
 The state message (`stateMessage` in `src/net/protocol.js`) carries chassis
 `ch`, pose, speed `sp`, alive/shutdown flags, per-section hp, beam state
-(`bm`, `be`, `bf`), fusion scan state (`fl`, `sc`, `sq`). (`sq` was `sp`
+(`bm`, `be`, `bf`), fusion scan state (`fl`, `sc`, `sq`), and the punch phase
+`pu` (0 none, 1 wind-up, 2 recovery), which `meleeGhost` turns into the
+swing pose on other screens; `fx {k: 'pu'}` starts the wind-up without
+waiting for the next report. (`sq` was `sp`
 before M0, which overwrote the speed; the client reads whichever it sent, so
 there was never a cross-version issue.) `hello` carries `v: PROTOCOL`; the
 server ignores it until M5a enforces it.

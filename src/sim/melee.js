@@ -5,6 +5,7 @@ import { center, viewYaw } from './geom.js';
 import { damage } from './combat.js';
 import { knock } from './knock.js';
 import { feel } from './feel.js';
+import { fxPunch } from '../net/protocol.js';
 
 const { atan2, hypot, sin, cos } = Math;
 
@@ -19,7 +20,21 @@ export function meleePress(G, m) {
   const def = meleeOf(m);
   m.melee = { t: 0, phase: 'windup', hit: null };
   m.meleeCd = def.cd;
+  if (G.mode === 'mp' && m === G.player) G.fx.netSend(fxPunch());
   return true;
+}
+
+// A remote pilot's swing: its client resolves the blow; this one only keeps
+// the pose moving between state reports. `pu` is the phase it last reported.
+export function meleeGhost(m, dt, pu) {
+  const def = meleeOf(m);
+  if (pu === 1 && !m.melee) m.melee = { t: 0, phase: 'windup', hit: null };
+  else if (pu === 2 && m.melee?.phase !== 'recover') m.melee = { t: def.windup, phase: 'recover', hit: null };
+  else if (pu === 0 && m.melee?.phase === 'recover') m.melee = null;   // a wind-up outlives a stale 0 until the next report
+  if (!m.melee) return;
+  m.melee.t += dt;
+  if (m.melee.phase === 'windup' && m.melee.t >= def.windup) m.melee.phase = 'recover';
+  if (m.melee.t >= def.windup + def.recover) m.melee = null;
 }
 
 // The mech this one's swing would land on right now, or null.
@@ -83,6 +98,7 @@ export function tryStomp(G, m, airT) {
     t.lastHitMelee = true;
     damage(G, t, [t.x, top - 0.5, t.z], def.stompDmg, m, false, true);
     knock(G, { target: t, attacker: m, base: def.stompKnock, dir: [nx, nz] });
+    if (t.remote) { const q = G.pendingHits.get(t.netId); if (q) q.st = 1; }
     m.vy = 4; m.push[0] -= nx * def.stompKnock * 0.5; m.push[1] -= nz * def.stompKnock * 0.5;
     feel(G, 'stomp', { mech: m, k: 1, at: m === G.player ? null : [t.x, top, t.z] });
     feel(G, 'punched', { mech: t, k: 1.2, at: t === G.player ? null : [t.x, top, t.z] });

@@ -9,7 +9,7 @@ import { stepShots, stepDying } from './combat.js';
 import { beamTick, coolArmour, remoteBeam } from './beams.js';
 import { fusionTick, updatePulses } from './fusion.js';
 import { fireCat, missileTrigger, steerVolley } from './missiles.js';
-import { meleePress, meleeTarget, meleeTick } from './melee.js';
+import { meleeGhost, meleePress, meleeTarget, meleeTick } from './melee.js';
 import { explode, particle, stepDebris } from './effects.js';
 import { stepFeel } from './feel.js';
 import { netInterp } from '../net/interp.js';
@@ -63,7 +63,8 @@ export function update(G, input, dt) {
 
   for (const m of G.mechs) {
     if (m.remote) {
-      if (m.alive) { netInterp(m, dt, G.clock); stepFeel(m, dt); gait(G, m, dt); }
+      if (m.alive) { netInterp(m, dt, G.clock); stepFeel(m, dt); gait(G, m, dt); meleeGhost(m, dt, m.net?.pu || 0); }
+      else m.melee = null;
       if (m.alive && m.net?.bm && m.net.be) remoteBeam(G, m, m.net.be); else m.beaming = false;
       if (m.alive && m.net?.fl) G.cbeams.push({ a: muzzle(m, m.weapons.find(w => w.def.kind === 'fusion')), b: m.net.fl, col: WEAPONS.fusion.col, w: 0.05 + 0.035 * abs(sin(G.time * 37)) });
       continue;

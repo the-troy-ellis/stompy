@@ -4,7 +4,7 @@
 import { HPK } from '../data/chassis.js';
 import { WEAPONS } from '../data/weapons.js';
 
-export const PROTOCOL = 1;
+export const PROTOCOL = 2;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died)
 export const r2 = v => Math.round(v * 100) / 100;
 const v3 = p => p.map(r2);
 
@@ -12,14 +12,16 @@ export const hello = (name, color) => ({ t: 'hello', v: PROTOCOL, name, color })
 
 // Your mech, 15 times a second: chassis, pose, speed, flags, armour, your
 // laser beam (bm/be/bf), and the fusion scan (fl: where the targeting laser
-// ends, sc: who it's on, sq: how far along, 0..1).
+// ends, sc: who it's on, sq: how far along, 0..1), and the punch phase (pu:
+// 0 none, 1 wind-up, 2 recovery) so the swing animates on every screen.
 export function stateMessage(P, bf) {
   const fu = P.fusion;
   return { t: 's', ch: P.type, x: r2(P.x), y: r2(P.y), z: r2(P.z), yaw: r2(P.yaw), tw: r2(P.twist), p: r2(P.pitch), sp: r2(P.speed),
     air: P.air ? 1 : 0, al: P.alive ? 1 : 0, sd: P.shutdown ? 1 : 0, hp: HPK.map(k => r2(P.hp[k])),
     bm: P.beaming ? 1 : 0, be: P.beaming && P.beamEnd ? v3(P.beamEnd) : 0, bf: r2(bf),
     fl: fu?.on && fu.end ? v3(fu.end) : 0, sc: fu?.mech?.netId || 0,
-    sq: fu?.mech ? r2(Math.min(1, fu.t / WEAPONS.fusion.scan)) : 0 };
+    sq: fu?.mech ? r2(Math.min(1, fu.t / WEAPONS.fusion.scan)) : 0,
+    pu: P.melee ? (P.melee.phase === 'windup' ? 1 : 2) : 0 };
 }
 
 // Weapon effects: drawn by everyone, scored by the shooter.
@@ -29,10 +31,19 @@ export const fxMissiles = (p, d, targetId, vid) => ({ t: 'fx', k: 'm', p: v3(p),
 export const fxGuide = (vid, p, d) => ({ t: 'fx', k: 'mg', v: vid, p: v3(p), d: v3(d) });
 export const fxDetonate = vid => ({ t: 'fx', k: 'md', v: vid });
 export const fxFusion = (a, targetId, b) => ({ t: 'fx', k: 'fu', a: v3(a), id2: targetId || 0, b: v3(b) });
+export const fxPunch = () => ({ t: 'fx', k: 'pu' });   // the swing starts: others see the wind-up at once
 
 // Damage to another pilot (the victim applies it); fu: a fusion kill.
-export const hit = (to, amt, p, fu = false) => (fu ? { t: 'hit', to, amt: 40, p: v3(p), fu: 1 } : { t: 'hit', to, amt: r2(amt), p: v3(p) });
-export const died = by => ({ t: 'died', by: by || 0 });
+// kb: a knockback impulse [vx, vz] the victim adds to its push (the server
+// clamps each part to +-30); me: it was a punch; st: it was a stomp.
+export function hit(to, amt, p, fu = false, { kb, me, st } = {}) {
+  const m = fu ? { t: 'hit', to, amt: 40, p: v3(p), fu: 1 } : { t: 'hit', to, amt: r2(amt), p: v3(p) };
+  if (kb && (kb[0] || kb[1])) m.kb = [r2(kb[0]), r2(kb[1])];
+  if (me) m.me = 1;
+  if (st) m.st = 1;
+  return m;
+}
+export const died = (by, me = false) => (me ? { t: 'died', by: by || 0, me: 1 } : { t: 'died', by: by || 0 });
 
 // Parse what the server sends. Unknown or malformed messages come back null.
 export function parse(text) {

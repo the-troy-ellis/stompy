@@ -6,7 +6,7 @@ import { explode, msg, particle, shedPart } from './effects.js';
 import { M } from '../util/math.js';
 import { geoOf as geo } from '../data/geo.js';
 import { torsoFrame } from './geom.js';
-import { r2 } from '../net/protocol.js';
+import { died, fxShell, fxMissiles } from '../net/protocol.js';
 import { blast, endGuide } from './missiles.js';
 import { feel } from './feel.js';
 
@@ -33,6 +33,7 @@ export function damage(G, m, p, amt, src, beam = false, melee = false) {
     if (G.roundOver) return;
     const q = G.pendingHits.get(m.netId) || { amt: 0, p };
     q.amt += amt; q.p = p;
+    if (melee) q.me = 1;
     G.pendingHits.set(m.netId, q);
     if (src === G.player) { if (!beam) G.stats.hits++; G.stats.dealt += amt; G.hitMark = 0.25; }
     return;
@@ -128,7 +129,7 @@ export function destroy(G, m, src) {
   beginDeath(G, m);
   if (mp(G) && m === G.player) {
     // In the arena your own client declares your death; the server scores it.
-    G.fx.netSend({ t: 'died', by: src?.netId || 0 });
+    G.fx.netSend(died(src?.netId, m.lastHitMelee));
     G.hooks.arenaDeath?.();
     // Real time, not game time: a slow phone shouldn't make the wait longer.
     G.respawnAt = G.clock + 5000; G.killer = src?.netId || 0;
@@ -159,7 +160,7 @@ export function fire(G, m, w, aim, target) {
   if (m === G.player) G.stats.shots += d.count || 1;   // each missile can hit, so each counts
   if (d.kind === 'shell') {
     G.shots.push({ kind: 'shell', p: mz, v: mul(dir, d.speed), owner: m, dmg: d.dmg, life: d.range / d.speed });
-    if (mp(G) && m === G.player) G.fx.netSend({ t: 'fx', k: 's', p: mz.map(r2), v: mul(dir, d.speed).map(r2) });
+    if (mp(G) && m === G.player) G.fx.netSend(fxShell(mz, mul(dir, d.speed)));
     for (let i = 0; i < 5; i++) particle(G, add(mz, mul(dir, 1.5)), add(mul(dir, r.range(4, 12)), [r.range(-2, 2), r.range(-1, 2), r.range(-2, 2)]), 0.15, 0.6, [1, 0.8, 0.3], 'fire');
     G.fx.sfx.cannon(mz);
     m.flash = { frame: G.frame, p: mz, dir, big: true };   // muzzle flash, drawn for two frames
@@ -174,7 +175,7 @@ export function fire(G, m, w, aim, target) {
     m.flash = { frame: G.frame, p: mz, dir, big: false };
     if (m === G.player) { G.lastVolley = vid; feel(G, 'fireLrm', { mech: m, dir: [-dir[0], -dir[2]] }); }
     G.fx.sfx.missile(mz);
-    if (mp(G) && m === G.player) G.fx.netSend({ t: 'fx', k: 'm', p: mz.map(r2), d: dir.map(r2), tg: target?.netId || 0, v: G.lastVolley });
+    if (mp(G) && m === G.player) G.fx.netSend(fxMissiles(mz, dir, target?.netId, G.lastVolley));
   }
   return true;
 }

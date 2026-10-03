@@ -14,9 +14,18 @@ export function knock(G, { target, attacker = null, base, dir, recoil = true }) 
   if (!target || !(base > 0) || !dir) return 0;
   const ratio = attacker ? clampN(massOf(attacker) / massOf(target), KNOCK_MIN, KNOCK_MAX) : 1;
   const v = base * ratio;
+  if (recoil && attacker && attacker.push) { attacker.push[0] -= dir[0] * v * RECOIL; attacker.push[1] -= dir[1] * v * RECOIL; }
+  if (target.remote) {
+    // Another pilot: its own client applies the shove. Ride along with the
+    // next batched hit (flushHits), creating one if nothing else hurt it.
+    if (G.roundOver) return v;
+    const q = G.pendingHits.get(target.netId) || { amt: 0, p: [target.x, target.y, target.z] };
+    q.kb = [(q.kb?.[0] || 0) + dir[0] * v, (q.kb?.[1] || 0) + dir[1] * v];
+    G.pendingHits.set(target.netId, q);
+    return v;
+  }
   if (!target.push) target.push = [0, 0];
   target.push[0] += dir[0] * v; target.push[1] += dir[1] * v;
-  if (recoil && attacker && attacker.push) { attacker.push[0] -= dir[0] * v * RECOIL; attacker.push[1] -= dir[1] * v * RECOIL; }
   // The aim jolts toward the blow and up, and the wobble springs carry it back.
   const side = Math.sign(dir[0] * Math.cos(target.yaw + target.twist) - dir[1] * Math.sin(target.yaw + target.twist)) || 1;
   const j = clampN(v / 10, 0, 1);

@@ -103,6 +103,11 @@ try {
     if (!(seen.players === 2 && seen.net && seen.speed > 1)) { failed = true; console.error('FAIL: the arena did not relay the second pilot moving'); }
     await pages[0].keyboard.down('Digit1'); await pages[0].waitForTimeout(700); await pages[0].keyboard.up('Digit1');
     await pages[1].waitForTimeout(500);
+    // ONE punches the air; TWO's copy of ONE should wind up within a state report or two.
+    await pages[0].keyboard.press('KeyE');
+    const swung = await pages[1].waitForFunction(() => { const r = window.__stompy.game.mechs.find(m => m.remote); return r?.melee ? r.melee.phase : null; }, null, { timeout: 2000 }).then(h => h.jsonValue()).catch(() => null);
+    console.log(`arena: TWO sees ONE's swing as ${swung}`);
+    if (!swung) { failed = true; console.error('FAIL: the arena did not relay the punch'); }
     await pages[0].screenshot({ path: 'test-results/smoke-arena.png' });
     await pages[1].keyboard.press('F2');
     await pages[1].waitForFunction(() => window.__stompy.game.state === 'menu', null, { timeout: 5000 });

@@ -15,7 +15,10 @@ test('every builder survives JSON and parse rejects junk', () => {
   roundTrip(P.fxDetonate(9));
   roundTrip(P.fxFusion([0, 0, 0], 2, [10, 0, 0]));
   roundTrip(P.hit(2, 3.14159, [1, 2, 3]));
+  roundTrip(P.hit(2, 8, [1, 2, 3], false, { kb: [3.456, -1], me: 1 }));
+  roundTrip(P.fxPunch());
   roundTrip(P.died(0));
+  roundTrip(P.died(3, true));
   assert.equal(P.parse('nope'), null);
   assert.equal(P.parse('42'), null);
   assert.equal(P.parse('{"x":1}'), null);
@@ -24,6 +27,26 @@ test('every builder survives JSON and parse rejects junk', () => {
 
 test('a fusion hit is always the capped 40 with the fu flag', () => {
   assert.deepEqual(P.hit(5, 999, [0, 0, 0], true), { t: 'hit', to: 5, amt: 40, p: [0, 0, 0], fu: 1 });
+});
+
+test('a hit carries knockback and the melee flags only when they are set', () => {
+  assert.deepEqual(P.hit(2, 8, [0, 0, 0], false, { kb: [3.456, -1], me: 1 }), { t: 'hit', to: 2, amt: 8, p: [0, 0, 0], kb: [3.46, -1], me: 1 });
+  assert.deepEqual(P.hit(2, 6, [0, 0, 0], false, { kb: [0, 0], st: 1 }), { t: 'hit', to: 2, amt: 6, p: [0, 0, 0], st: 1 });
+  assert.deepEqual(P.hit(2, 6, [0, 0, 0], false, { amt: 6, p: [0, 0, 0] }), { t: 'hit', to: 2, amt: 6, p: [0, 0, 0] });
+  assert.deepEqual(P.died(3, true), { t: 'died', by: 3, me: 1 });
+  assert.equal(P.PROTOCOL, 2);
+});
+
+test('the state message carries the punch phase', () => {
+  const G = createTestGame();
+  stepFor(G, 1);
+  assert.equal(P.stateMessage(G.player, 1).pu, 0);
+  stepFor(G, 1 / 60, input({ punch: true }));
+  assert.equal(P.stateMessage(G.player, 1).pu, 1);
+  stepFor(G, 0.5);
+  assert.equal(P.stateMessage(G.player, 1).pu, 2);
+  stepFor(G, 1);
+  assert.equal(P.stateMessage(G.player, 1).pu, 0);
 });
 
 test('the state message carries speed and scan progress under different keys', () => {
