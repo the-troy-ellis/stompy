@@ -57,7 +57,8 @@ export function decideFire(G, e, P, { dist, toYaw }, dt) {
   const alpha = P.hp.T < P.max.T * F.alphaTorso;
   for (const w of e.weapons) {
     if (w.def.kind === 'beam' || w.def.kind === 'fusion' || w.dead || w.cd > 0 || dist > w.def.range * 0.95) continue;
-    if (w.def.kind === 'missile' && (dist < F.lrmMin || a.lockT < F.lockFor)) continue;
+    // Homing missiles want a lock and some room; dumb-fire ones just need facing.
+    if (w.def.kind === 'missile' && w.def.homing !== false && (dist < F.lrmMin || a.lockT < F.lockFor)) continue;
     let aim = pc;
     if (w.def.kind === 'shell') { const t = dist / w.def.speed; aim = add(pc, [sin(P.yaw) * P.speed * t, 0, cos(P.yaw) * P.speed * t]); }
     const err = aimError(G, e, P, dist);

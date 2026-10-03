@@ -17,6 +17,9 @@ export const WEAPONS = {
   // energy weapons). Its hit scrambles the target's HUD for `scramble` s and
   // gives it a hard wobble (FEEL.bolt).
   ppc:    { name: n.ppc, kind: 'shell', bolt: true, dmg: 14, heat: 11, cd: 3.5, range: 600, speed: 420, scramble: 1.5, col: [0.45, 0.7, 1], tons: 7, fp: 4 },
+  // Dumb-fire spread that pops: no homing (`homing: false`), no lock or minimum
+  // range for the AI, hold-to-guide still works, and each hit shoves (`knock`, m/s).
+  srm:    { name: n.srm, kind: 'missile', homing: false, dmg: 2.6, heat: 4, cd: 3, range: 260, speed: 160, ammo: 18, count: 6, knock: 1.2, spread: 0.035, lift: 0.02, tons: 3, fp: 5.2 },   // tighter and flatter than a homing volley: it cannot correct
   lrm:    { name: n.lrm, kind: 'missile', dmg: 1.9, heat: 6,  cd: 4.5, range: 850, speed: 120, ammo: 14, count: 10, tons: 6, fp: 4.2 },
   // Hold a targeting laser on one mech for `scan` seconds -- any break and it
   // starts over -- and the reactor discharges at the target's resonant
@@ -38,6 +41,6 @@ export const WEAPONS = {
 // Three fire controls, one per kind of weapon: lasers are energy (no ammo,
 // lots of heat), the autocannon is ballistic, LRMs are missiles.
 export const CATS = ['energy', 'ballistic', 'missile', 'fusion'];
-export const CAT_OF = { laser: 'energy', mlaser: 'energy', ppc: 'energy', plaser: 'energy', ac: 'ballistic', lrm: 'missile', fusion: 'fusion' };
+export const CAT_OF = { laser: 'energy', mlaser: 'energy', ppc: 'energy', plaser: 'energy', ac: 'ballistic', lrm: 'missile', srm: 'missile', fusion: 'fusion' };
 export const CAT_LABEL = NAMES.cats;
 export const CAT_KEY = { energy: 'LMB 1', ballistic: 'RMB 2', missile: 'SPC 3', fusion: 'G 4' };

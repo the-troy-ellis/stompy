@@ -251,9 +251,9 @@ export function createNet(app) {
       G.shots.push({ kind: 'shell', type: WEAPONS[f.w] ? f.w : 'ac', p: f.p, v: f.v, owner: src, dmg: 0, life: d.range / d.speed, ghost: true });
       app.audio.sfx.cannon(f.p);
     } else if (f.k === 'm') {
-      const d = WEAPONS.lrm, target = f.tg ? mechById(f.tg) : null;
+      const d = WEAPONS[f.w]?.kind === 'missile' ? WEAPONS[f.w] : WEAPONS.lrm, target = f.tg ? mechById(f.tg) : null;
       for (let i = 0; i < d.count; i++) {
-        const spread = norm(add(f.d, [rnd(-0.08, 0.08), rnd(0, 0.12), rnd(-0.08, 0.08)]));
+        const sp = d.spread ?? 0.08, spread = norm(add(f.d, [rnd(-sp, sp), rnd(0, d.lift ?? 0.12), rnd(-sp, sp)]));
         G.shots.push({ kind: 'missile', p: add(f.p, [rnd(-0.6, 0.6), rnd(-0.4, 0.4), rnd(-0.6, 0.6)]), v: mul(spread, d.speed * rnd(0.85, 1.1)),
           owner: src, dmg: 0, life: d.range / d.speed + 1, target, smoke: 0, age: 1, ghost: true, vid: f.v, from: f.id });
       }
