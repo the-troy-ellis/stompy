@@ -2,6 +2,9 @@ import { add, clampN, wrapA } from '../util/math.js';
 import { BOUND } from '../world/terrain.js';
 import { center, viewYaw } from './geom.js';
 import { fire } from './combat.js';
+import { geoOf } from '../data/geo.js';
+import { AI_PUNCH, meleeOf } from '../data/melee.js';
+import { canPunch, meleePress, meleeTarget } from './melee.js';
 
 const { sin, cos, atan2, abs, hypot, max, PI } = Math;
 
@@ -18,7 +21,15 @@ export function think(G, e, dt) {
     e.ai.strafeT -= dt;
     if (e.ai.strafeT <= 0) { e.ai.strafe *= -1; e.ai.strafeT = r.range(3, 7); }
     const pref = e.ch.pref;
-    if (dist > pref * 1.35) moveYaw = toYaw + e.ai.strafe * 0.35;
+    // The player's reach, skin to skin: stay out of it unless they are shut
+    // down, in which case walk up and shove them. A JACKAL punching a
+    // shut-down player is correct Stompy behaviour.
+    const reachP = meleeOf(P).reach * P.ch.scale + geoOf(e).radius * e.ch.scale, tooClose = dist < reachP * AI_PUNCH.keepOut;
+    const punchable = P.alive && canPunch(G, e) && meleeTarget(G, e) === P;
+    if (P.shutdown && P.alive) { moveYaw = toYaw; thr = dist < reachP * 0.6 ? 0 : 1; }
+    else if (punchable || e.melee) { moveYaw = toYaw; thr = 0; }   // square up and decide (below); the swing holds it there
+    else if (tooClose) moveYaw = toYaw + PI - e.ai.strafe * 0.6;
+    else if (dist > pref * 1.35) moveYaw = toYaw + e.ai.strafe * 0.35;
     else if (dist < pref * 0.6) moveYaw = toYaw + PI - e.ai.strafe * 0.6;
     else { moveYaw = toYaw + e.ai.strafe * PI / 2; thr = 0.75; }
     // Steer away from the map edge.
@@ -31,6 +42,12 @@ export function think(G, e, dt) {
   e.twist += clampN(wrapA(wantTwist - e.twist), -2 * dt, 2 * dt);
   const pc = center(P);
   e.pitch = atan2(pc[1] - (e.y + 6 * e.ch.scale), dist);
+  // In reach and facing: throw the punch, by difficulty. No guns mid-swing.
+  if (P.alive && canPunch(G, e) && meleeTarget(G, e) === P) {
+    const p = AI_PUNCH.chance[G.diff] ?? AI_PUNCH.chance.normal;   // per second of opportunity, so per frame it is
+    if (P.shutdown || r.chance(1 - (1 - p) ** dt)) meleePress(G, e);
+  }
+  if (e.melee) { e.beamOn = false; return; }
   // Fire when the torso is on target, the weapon is in range, and heat allows.
   const off = abs(wrapA(toYaw - viewYaw(e)));
   e.ai.jitter -= dt;
