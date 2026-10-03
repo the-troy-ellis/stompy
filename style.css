@@ -73,14 +73,17 @@ html, body {
 .tcluster {
   position: absolute;
   right: calc(12px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom));
-  display: grid; grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(3, 52px); gap: 8px;
+  display: grid; grid-template-columns: repeat(4, 58px); grid-template-rows: repeat(3, 52px); gap: 8px;
 }
 .tfire { border-radius: 50%; font-size: 10px; letter-spacing: 0; --c: 95, 255, 95; color: rgb(var(--c)); border-color: rgba(var(--c), .7); background: rgba(var(--c), .12); }
 .tfire.on { background: rgba(var(--c), .5); color: #000; }
-.t-energy { grid-column: 2 / span 2; grid-row: 2 / span 2; font-size: 15px; --c: 92, 204, 255; }
-.t-missile { grid-column: 1; grid-row: 2; --c: 255, 120, 70; }
-.t-ballistic { grid-column: 1; grid-row: 3; --c: 255, 204, 51; }
+.t-energy { grid-column: 3 / span 2; grid-row: 2 / span 2; font-size: 15px; --c: 92, 204, 255; }
+.t-missile { grid-column: 2; grid-row: 2; --c: 255, 120, 70; }
+.t-ballistic { grid-column: 2; grid-row: 3; --c: 255, 204, 51; }
 .t-fusion { --c: 200, 128, 255; }
+/* PUNCH sits by the close-in buttons, dim until someone is in reach. */
+.t-punch { grid-column: 1; grid-row: 3; --c: 255, 160, 60; opacity: .45; }
+.t-punch.ready { opacity: 1; box-shadow: 0 0 10px rgba(var(--c), .6); }
 .tzoom {
   position: absolute; left: calc(64px + env(safe-area-inset-left)); top: calc(10px + env(safe-area-inset-top));
   width: 58px; height: 40px;

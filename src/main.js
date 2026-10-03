@@ -57,6 +57,7 @@ function start(root) {
           <button class="tbtn tfire t-missile" data-t="missile">MISSILE</button>
           <button class="tbtn tfire t-energy" data-t="energy">ENERGY</button>
           <button class="tbtn tfire t-ballistic" data-t="ballistic">BALLISTIC</button>
+          <button class="tbtn tfire t-punch" data-t="punch">PUNCH</button>
         </div>
       </div>
       <div class="mech-overlay"></div>

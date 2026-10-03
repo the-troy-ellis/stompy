@@ -22,6 +22,7 @@ export function createInput(app) {
   // A missile press is latched until the next frame sees it, so a tap
   // shorter than a frame (a slow phone, a quick thumb) still fires.
   let missileTap = false;
+  let punchTap = false;   // a press, consumed by the next snapshot
 
   // Only show fire buttons for the kinds of weapon this mech carries.
   function syncWeaponButtons() {
@@ -63,13 +64,14 @@ export function createInput(app) {
     if (!locked()) { lockPointer(); return; }
     const cat = { 0: 'energy', 2: 'ballistic', 1: 'missile' }[e.button];
     if (cat) { held[cat] = true; e.preventDefault(); if (cat === 'missile') missileTap = true; }
+    if (e.button === 3) { punchTap = true; e.preventDefault(); }   // the back button: a punch
   });
   addEventListener('mouseup', e => {
     const cat = { 0: 'energy', 2: 'ballistic', 1: 'missile' }[e.button];
     if (cat && !G.touchUI) held[cat] = false;
   });
 
-  const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX', 'KeyC', 'KeyJ', 'KeyT', 'KeyR', 'KeyF', 'KeyZ', 'KeyP', 'Space',
+  const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX', 'KeyC', 'KeyJ', 'KeyT', 'KeyR', 'KeyF', 'KeyZ', 'KeyP', 'KeyE', 'Space',
     'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyG', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
   // Keys are taken at the document: hiding the overlay drops focus to <body>,
   // and pointer lock doesn't move it back.
@@ -100,6 +102,7 @@ export function createInput(app) {
     keys[e.code] = true;
     if (KEY_FOR.missile.includes(e.code)) missileTap = true;
     if (e.code === 'KeyT') cycleTarget(G);
+    if (e.code === 'KeyE') punchTap = true;
     if (e.code === 'KeyR' && G.aimMech && G.aimMech.team !== 0) { G.target = G.aimMech; app.audio.sfx.beep(); }
     if (e.code === 'KeyF') alpha(G);
     if (e.code === 'KeyZ') G.zoom = !G.zoom;
@@ -132,6 +135,7 @@ export function createInput(app) {
     if (CATS.includes(name)) { held[name] = down; if (down && name === 'missile') missileTap = true; }
     else if (name === 'jump') keys.KeyJ = down;
     if (!down) return;
+    if (name === 'punch') punchTap = true;
     if (name === 'tgt') cycleTarget(G);
     else if (name === 'zoom') G.zoom = !G.zoom;
     else if (name === 'stop') G.player.throttle = 0;
@@ -211,9 +215,9 @@ export function createInput(app) {
       turn: (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0) + G.touchTurn,
       twist: (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0), pitch: (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0),
       centre: !!keys.KeyC, jets: !!keys.KeyJ,
-      held: Object.fromEntries(CATS.map(c => [c, isHeld(c)])), missileTap,
+      held: Object.fromEntries(CATS.map(c => [c, isHeld(c)])), missileTap, punch: punchTap,
     };
-    missileTap = false;
+    missileTap = false; punchTap = false;
     return inp;
   }
 

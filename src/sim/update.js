@@ -9,7 +9,7 @@ import { stepShots, stepDying } from './combat.js';
 import { beamTick, coolArmour, remoteBeam } from './beams.js';
 import { fusionTick, updatePulses } from './fusion.js';
 import { fireCat, missileTrigger, steerVolley } from './missiles.js';
-import { meleePress, meleeTick } from './melee.js';
+import { meleePress, meleeTarget, meleeTick } from './melee.js';
 import { explode, particle, stepDebris } from './effects.js';
 import { stepFeel } from './feel.js';
 import { netInterp } from '../net/interp.js';
@@ -53,6 +53,7 @@ export function update(G, input, dt) {
 
   const live = P.alive && !G.paused && !G.roundOver;
   if (live && input.punch) meleePress(G, P);
+  G.punchReady = live && !P.melee && !!meleeTarget(G, P);   // the HUD's fist and the PUNCH button light up
   const armed = live && !P.melee;   // no guns during a swing or its recovery
   P.beamOn = armed && input.held.energy && !G.guide;
   fusionTick(G, P, dt, armed && input.held.fusion && !G.guide);
