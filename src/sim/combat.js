@@ -10,6 +10,7 @@ import { died, fxShell, fxMissiles } from '../net/protocol.js';
 import { blast, endGuide } from './missiles.js';
 import { feel } from './feel.js';
 import { voice } from './voice.js';
+import { alertEnemy } from './ai/perception.js';
 
 const { sin, cos } = Math;
 
@@ -51,7 +52,7 @@ export function damage(G, m, p, amt, src, beam = false, melee = false) {
     G.stats.taken += amt;
     if (!beam || G.time - (G.lastClang || 0) > 0.35) { G.lastClang = G.time; G.fx.sfx.clang(sectionHit(m, p)); }   // arms ring, legs thud, the torso is dull
     if (!G.target && src && src.alive) G.target = src;
-  } else m.ai.aware = true;
+  } else if (m.team !== 0 && !m.remote) alertEnemy(G, m, G.player, src && src !== m ? [src.x, src.y, src.z] : null);   // being hit is a contact; the shooter's spot is the belief
   if (m.hp[sec] > 0) {
     if (m === G.player && sec === 'T' && m.hp.T < m.max.T * 0.3) G.fx.say('Warning. Critical damage.');
     return;

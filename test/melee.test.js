@@ -5,6 +5,7 @@ import { meleePress, meleeTarget, canPunch } from '../src/sim/melee.js';
 import { meleePose } from '../src/render/scene.js';
 import { createTestGame, stepFor, input, foes, freeze } from './helpers.js';
 import { initFeet } from '../src/sim/gait.js';
+import { VOICE } from '../src/data/voice.js';
 
 const place = (G, m, x, z, yaw = Math.PI) => { Object.assign(m, { x, z, yaw, twist: 0 }); initFeet(G, m); freeze(m); };
 const total = m => Object.values(m.hp).reduce((a, v) => a + v, 0);
@@ -92,7 +93,7 @@ test('a melee kill is announced as a punch, and the pose rears back then lunges'
   stepFor(G, 1);
   stepFor(G, 1 / 60, input({ punch: true }));
   stepFor(G, 1.5);
-  assert.ok(G.fx.calls('say').some(c => c.args[0] === 'Target punched.'));
+  assert.ok(G.fx.calls('say').some(c => VOICE.killPunch.includes(c.args[0])));
   const m = { melee: { t: 0.15, phase: 'windup' }, ch: {} };
   const w = meleePose(m); assert.ok(w.lean > 0 && w.arm < 0 && w.lunge === 0);
   m.melee = { t: DEFAULT_MELEE.windup + 0.01, phase: 'recover' };

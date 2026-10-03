@@ -5,18 +5,31 @@ import { fire } from './combat.js';
 import { geoOf } from '../data/geo.js';
 import { AI_PUNCH, meleeOf } from '../data/melee.js';
 import { canPunch, meleePress, meleeTarget } from './melee.js';
+import { perceive } from './ai/perception.js';
+import { PERCEPTION as K } from '../data/ai.js';
 
 const { sin, cos, atan2, abs, hypot, max, PI } = Math;
 
 // One enemy, one frame. State lives in e.ai.
 export function think(G, e, dt) {
-  const P = G.player, r = G.rng, dx = P.x - e.x, dz = P.z - e.z, dist = hypot(dx, dz);
+  const P = G.player, r = G.rng;
+  // Where it believes the player is: the truth with line of sight, the last fix otherwise.
+  const bp = perceive(G, e, P, dt), seen = !!e.ai.seen;
+  const tx = bp ? bp[0] : P.x, tz = bp ? bp[1] : P.z;
+  const dx = tx - e.x, dz = tz - e.z, dist = hypot(dx, dz);
   const toYaw = atan2(dx, dz);
-  if (!e.ai.aware && (dist < 600 || G.time > 25)) e.ai.aware = true;
   let moveYaw, thr = 1;
   if (!e.ai.aware) {
     if (!e.ai.wp || hypot(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z) < 30) e.ai.wp = [clampN(e.x + r.range(-250, 250), -BOUND, BOUND), clampN(e.z + r.range(-250, 250), -BOUND, BOUND)];
     moveYaw = atan2(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z); thr = 0.5;
+  } else if (e.ai.state === 'search') {
+    // Lost contact: go to where they were last seen, then poke around it.
+    const b = e.ai.belief;
+    if (!e.ai.wp || hypot(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z) < 25) {
+      const first = !e.ai.wp && hypot(b.x - e.x, b.z - e.z) > 25;
+      e.ai.wp = first ? [b.x, b.z] : [clampN(b.x + r.range(-K.searchRadius, K.searchRadius), -BOUND, BOUND), clampN(b.z + r.range(-K.searchRadius, K.searchRadius), -BOUND, BOUND)];
+    }
+    moveYaw = atan2(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z); thr = 0.7;
   } else {
     e.ai.strafeT -= dt;
     if (e.ai.strafeT <= 0) { e.ai.strafe *= -1; e.ai.strafeT = r.range(3, 7); }
@@ -24,7 +37,7 @@ export function think(G, e, dt) {
     // The player's reach, skin to skin: stay out of it unless they are shut
     // down, in which case walk up and shove them. A JACKAL punching a
     // shut-down player is correct Stompy behaviour.
-    const reachP = meleeOf(P).reach * P.ch.scale + geoOf(e).radius * e.ch.scale, tooClose = dist < reachP * AI_PUNCH.keepOut;
+    const reachP = meleeOf(P).reach * P.ch.scale + geoOf(e).radius * e.ch.scale, tooClose = seen && dist < reachP * AI_PUNCH.keepOut;
     const punchable = P.alive && canPunch(G, e) && meleeTarget(G, e) === P;
     if (P.shutdown && P.alive) { moveYaw = toYaw; thr = dist < reachP * 0.6 ? 0 : 1; }
     else if (punchable || e.melee) { moveYaw = toYaw; thr = 0; }   // square up and decide (below); the swing holds it there
@@ -40,7 +53,7 @@ export function think(G, e, dt) {
   if (!e.ai.aware) { e.twist *= 1 - dt; return; }
   const wantTwist = clampN(wrapA(toYaw - e.yaw), -1.9, 1.9);
   e.twist += clampN(wrapA(wantTwist - e.twist), -2 * dt, 2 * dt);
-  const pc = center(P);
+  const pc = seen ? center(P) : [tx, G.ter.height(tx, tz) + 4.2 * P.ch.scale, tz];
   e.pitch = atan2(pc[1] - (e.y + 6 * e.ch.scale), dist);
   // In reach and facing: throw the punch, by difficulty. No guns mid-swing.
   if (P.alive && canPunch(G, e) && meleeTarget(G, e) === P) {
@@ -54,6 +67,7 @@ export function think(G, e, dt) {
   // Lasers: hold the beam on in bursts while on target and cool enough,
   // with an aim error that drifts, so the beam wanders on and off you.
   const beam = e.weapons.find(w => w.def.kind === 'beam' && !w.dead);
+  if (!seen) return;   // no shooting at a memory
   if (beam && off < 0.3 && dist < beam.def.range * 0.95 && !e.shutdown && P.alive) {
     if (e.heat > 70) e.ai.coolT = r.range(1.5, 3);
     if ((e.ai.coolT = max(0, (e.ai.coolT || 0) - dt)) === 0) {
