@@ -27,8 +27,10 @@ export const FEEL = {
   fireLrm:     { kick: 0.3, shake: 0.3, flash: 0, white: 0, squash: 0, wobble: 0.15, bass: 0.5, duck: 0, dust: 2, haptic: 20, push: 0.2 },
   // k = damage / 10
   hit:         { kick: 0.3, shake: 0.5, flash: 0.4, white: 0, squash: 0, wobble: 0.6, bass: 0.5, duck: 0.2, dust: 0, haptic: 30, push: 0 },
-  shutdown:    { kick: 0, shake: 0, flash: 0, white: 0, squash: 0, wobble: 0, bass: 0.6, duck: 0.8, dust: 0, haptic: 0, push: 0 },
-  restart:     { kick: 0.3, shake: 0.1, flash: 0, white: 0, squash: 0.1, wobble: 0.3, bass: 0.4, duck: 0, dust: 0, haptic: 20, push: 0 },
+  // sag: how far the hips drop (metres x scale) while the reactor is down; the spring below sets the 0.6 s.
+  shutdown:    { kick: 0, shake: 0, flash: 0, white: 0, squash: 0, wobble: 0, bass: 0.6, duck: 0.8, dust: 0, haptic: 0, push: 0, sag: 0.4 },
+  // overshoot: how far past standing height the restart snaps (metres x scale) before settling.
+  restart:     { kick: 0.3, shake: 0.1, flash: 0, white: 0, squash: 0.1, wobble: 0.3, bass: 0.4, duck: 0, dust: 0, haptic: 20, push: 0, overshoot: 0.1 },
   sectionLost: { kick: 0.5, shake: 0.8, flash: 0, white: 0, squash: 0, wobble: 0.9, bass: 0.8, duck: 0.3, dust: 1, haptic: 50, push: 0 },
   // the player's own mech going down
   death:       { kick: 1.0, shake: 1.5, flash: 0, white: 0, squash: 0, wobble: 0, bass: 1.2, duck: 1.0, dust: 0, haptic: 100, push: 0 },
@@ -39,7 +41,7 @@ export const FEEL = {
   // How the view reads the springs and caps.
   view: { wobble: 0.6, shakeMax: 1.2, flashMax: 0.6 },
   // Spring stiffness and damping ratio for the body springs.
-  spring: { squashK: 160, squashZeta: 0.7, wobbleK: 90, wobbleZeta: 0.35 },
+  spring: { squashK: 160, squashZeta: 0.7, wobbleK: 90, wobbleZeta: 0.35, sagK: 45, sagZeta: 1 },
 };
 export const FEEL_EVENTS = Object.keys(FEEL).filter(k => k !== 'view' && k !== 'spring');
 export const FEEL_COLS = ['kick', 'shake', 'flash', 'white', 'squash', 'wobble', 'bass', 'duck', 'dust', 'haptic', 'push'];

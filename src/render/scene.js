@@ -37,7 +37,9 @@ export function createScene(app) {
   }
 
   function drawMech(m, VPtint) {
-    const parts = R.mechParts[m.partsKey], B = frame(m), sc = m.ch.scale;
+    // The hips drop by the sag spring (reactor down); the feet stay put and the knees take it up.
+    const sag = m.sag ? m.sag.x : 0;
+    const parts = R.mechParts[m.partsKey], B = chain(M.T(0, -sag, 0), frame(m)), sc = m.ch.scale;
     const fwd = [sin(m.yaw), 0, cos(m.yaw)];
     // Armour under a beam glows orange as it melts, and runs hotter in IR.
     const mf = meltFrac(m), heatWas = R.drawHeat;
@@ -113,7 +115,7 @@ export function createScene(app) {
       fov = G.zoom ? 0.42 : 1.08;
       const sh = G.shake * 0.012, wv = FEEL.view.wobble, wp = P.wob ? P.wob.p.x : 0, wr = P.wob ? P.wob.r.x : 0;
       yaw = viewYaw(P) + rnd(-sh, sh) + wr * wv * 0.5; pitch = P.pitch + rnd(-sh, sh) - (P.alive ? 0 : 0.15) + wp * wv;
-      eye = add(G.eye, [0, -G.kick * 0.35 - (P.squash ? P.squash.x * 2 : 0), 0]); dir = dirOf(yaw, pitch - G.kick * 0.016);
+      eye = add(G.eye, [0, -G.kick * 0.35 - (P.squash ? P.squash.x * 2 : 0) - (P.sag ? P.sag.x : 0), 0]); dir = dirOf(yaw, pitch - G.kick * 0.016);
     }
     G.ear = eye; G.earYaw = yaw;   // sounds are heard from the camera
     const proj = M.persp(fov, W / max(1, H), 0.5, 1800);
