@@ -101,11 +101,15 @@ const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 
 // then the body topples about its feet over TOPPLE seconds, then it is a
 // wreck that pops a few more times. Gameplay (alive, scores, the match
 // ending) changes at once; only the show is staged.
-export const DEATH_BEAT = 0.25, DEATH_TOPPLE = 0.8;
+// The stages of a kill: a beat of silence, the torso blows (and sheds its
+// arms and a shower of plates), the legs buckle, the body topples, the wreck
+// settles and pops. Gameplay changes at once; only the show waits.
+export const DEATH_BEAT = 0.25, DEATH_BUCKLE = 0.3, DEATH_TOPPLE = 0.8, WRECK_SETTLE = 1.0;
+const BUCKLE_DROP = 0.4;   // fraction of the hip height the hull drops as the knees fold
 export function beginDeath(G, m) {
   const r = G.rng;
   m.alive = false;
-  m.dying = { t: 0, exploded: false, angle: 0, fallYaw: m.yaw + (r.chance(0.5) ? 0 : Math.PI) + r.range(-0.7, 0.7), roll: r.range(-0.6, 0.6) };
+  m.dying = { t: 0, exploded: false, angle: 0, drop: 0, buckle: 0, fallYaw: m.yaw + (r.chance(0.5) ? 0 : Math.PI) + r.range(-0.7, 0.7), roll: r.range(-0.6, 0.6) };
   G.fx.sfx.whine(m === G.player ? null : center(m));
   if (G.target === m) G.target = null;
 }
@@ -119,13 +123,20 @@ export function stepDying(G, dt) {
       const r = G.rng;
       explode(G, center(m), true);
       explode(G, add(center(m), [r.range(-3, 3), 2, r.range(-3, 3)]), false);
+      // The blast takes the arms off and strips plates; they land with the rest of the debris.
+      const c = center(m);
+      for (const sec of ['LA', 'RA']) if (m.hp[sec] > 0) { m.hp[sec] = 0; shedSection(G, m, sec, add(c, [r.range(-1, 1), 0, r.range(-1, 1)])); }
+      for (let i = 0; i < 4; i++) shedPart(G, m, 'plate', add(c, [r.range(-1, 1), r.range(-1, 1), r.range(-1, 1)]), [r.range(-8, 8), r.range(4, 12), r.range(-8, 8)]);
       if (m === G.player) feel(G, 'death', { mech: m });
     }
     if (d.exploded) {
-      const u = Math.min(1, (d.t - DEATH_BEAT) / DEATH_TOPPLE);
-      d.angle = u * u * (Math.PI / 2) * 0.95;   // falls faster as it goes
+      // The legs buckle: the hull drops as the knees fold and the body starts to lean.
+      const b = Math.min(1, (d.t - DEATH_BEAT) / DEATH_BUCKLE);
+      d.buckle = b; d.drop = b * b * BUCKLE_DROP * geo(m).hip * m.ch.scale;
+      const u = Math.max(0, Math.min(1, (d.t - DEATH_BEAT - DEATH_BUCKLE) / DEATH_TOPPLE));
+      d.angle = b * 0.12 + u * u * (Math.PI / 2 - 0.12) * 0.95;   // a lean during the buckle, then it falls faster as it goes
       if (u >= 1) {
-        G.wrecks.push({ x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.partsKey, scale: m.ch.scale, t: 0, roll: d.roll, pops: 2 + G.rng.int(3) });
+        G.wrecks.push({ x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.partsKey, scale: m.ch.scale, t: 0, roll: d.roll, pops: 2 + G.rng.int(3), settle: 0 });
         G.fx.sfx.boom([m.x, m.y, m.z], false);
         m.dying = null; m.gone = true;
       }

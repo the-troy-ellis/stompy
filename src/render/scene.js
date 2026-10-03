@@ -68,7 +68,7 @@ export function createScene(app) {
 
   function drawMech(m, VPtint) {
     // The hips drop by the sag spring (reactor down); the feet stay put and the knees take it up.
-    const sag = m.sag ? m.sag.x : 0;
+    const sag = (m.sag ? m.sag.x : 0) + (m.dying ? m.dying.drop || 0 : 0);   // and the buckle of a dying mech
     // A one-legged mech leans toward the gap (m.lean, radians of roll about its heading).
     // A dying mech topples rigidly about the ground under it (toppleOf), feet and all.
     const top = toppleOf(m), place = p => (top ? M.apply(top, p) : p);
@@ -88,7 +88,7 @@ export function createScene(app) {
       if (m.hp[leg.hx > 0 ? 'LL' : 'RL'] <= 0) return;   // the leg came off; it's lying somewhere behind
       const legTint = tint;
       const H = M.apply(B, [leg.hx, g.hip, leg.hz]);
-      const out = norm([H[0] - hull[0], 0, H[2] - hull[2]]), splay = legSplay(m.squash ? m.squash.x : 0);
+      const out = norm([H[0] - hull[0], 0, H[2] - hull[2]]), splay = legSplay(m.squash ? m.squash.x : 0) + (m.dying ? (m.dying.buckle || 0) * 0.5 : 0);   // knees bow out as the legs give way
       let pole = g.knee === 'forward' ? fwd : g.knee === 'back' ? back : norm(add(out, [0, 0.9, 0]));
       if (splay > 0) pole = norm(add(pole, mul(out, splay)));   // knees bow out as the body squashes
       const A = place(add(f.pos, [0, g.ankle * sc, 0]));
@@ -151,7 +151,7 @@ export function createScene(app) {
       fov = G.zoom ? 0.42 : 1.08;
       const sh = G.shake * 0.012, wv = FEEL.view.wobble, wp = P.wob ? P.wob.p.x : 0, wr = P.wob ? P.wob.r.x : 0;
       yaw = viewYaw(P) + rnd(-sh, sh) + wr * wv * 0.5; pitch = P.pitch + rnd(-sh, sh) - (P.alive || P.dying ? 0 : 0.15) + wp * wv;
-      eye = add(G.eye, [0, -G.kick * 0.35 - (P.squash ? P.squash.x * 2 : 0) - (P.sag ? P.sag.x : 0), 0]); dir = dirOf(yaw, pitch - G.kick * 0.016);
+      eye = add(G.eye, [0, -G.kick * 0.35 - (P.squash ? P.squash.x * 2 : 0) - (P.sag ? P.sag.x : 0) - (P.dying ? P.dying.drop || 0 : 0), 0]); dir = dirOf(yaw, pitch - G.kick * 0.016);
       // Going down: the view goes with the body.
       const top = toppleOf(P);
       if (top) { eye = M.apply(top, eye); const toward = cos(P.dying.fallYaw - yaw); pitch -= P.dying.angle * toward; yaw += P.dying.angle * 0.3 * sin(P.dying.fallYaw - yaw); dir = dirOf(yaw, pitch); }
@@ -199,7 +199,9 @@ export function createScene(app) {
     }
     R.drawHeat = 0.45;
     for (const w of G.wrecks) {
-      const parts = R.mechParts[w.type], B = chain(M.T(w.x, w.y, w.z), M.RY(w.yaw), M.S(w.scale));
+      // A fresh wreck rocks and sinks a little before it lies still.
+      const st = w.settle ?? 1, rock = (1 - st) * 0.2 * sin(w.t * 11), sink = 0.35 * w.scale * st;
+      const parts = R.mechParts[w.type], B = chain(M.T(w.x, w.y - sink, w.z), M.RY(w.yaw), M.RX(rock), M.S(w.scale));
       const dark = [0.3, 0.28, 0.27];
       R.draw(parts.torso, chain(B, M.T(0, 1.3, -1), M.RX(-1.2), M.RZ(w.roll)), dark);
       R.draw(parts.hip, chain(B, M.T(0.5, 0.6, 1.5), M.RY(0.6)), dark);
