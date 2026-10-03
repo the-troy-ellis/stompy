@@ -35,6 +35,7 @@ export const FEEL = {
   land:        { kick: 1.0, shake: 0.6, flash: 0, white: 0, squash: 0.25, wobble: 0.4, bass: 1.0, duck: 0.3, dust: 3, haptic: 40, push: 0 },
   // k = 1 per shot (the player's own weapons)
   fireAc:      { kick: 0.5, shake: 0.2, flash: 0, white: 0, squash: 0, wobble: 0.3, bass: 0.6, duck: 0, dust: 0, haptic: 20, push: 0.4 },   // 0.4 m/s decays to a 0.16 m step back
+  fireGauss:   { kick: 1.0, shake: 0.6, flash: 0, white: 0.1, squash: 0.08, wobble: 0.5, bass: 1.0, duck: 0.3, dust: 1, haptic: 50, push: 0 },   // the push is the weapon's own recoil, on any shooter
   fireBolt:    { kick: 0.4, shake: 0.3, flash: 0, white: 0.12, squash: 0, wobble: 0.25, bass: 0.7, duck: 0.1, dust: 0, haptic: 25, push: 0.25 },
   bolt:        { kick: 0.6, shake: 0.9, flash: 0.2, white: 0.25, squash: 0, wobble: 1.4, bass: 0.9, duck: 0.3, dust: 0, haptic: 60, push: 0 },   // on the mech a bolt hits
   fireLrm:     { kick: 0.3, shake: 0.3, flash: 0, white: 0, squash: 0, wobble: 0.15, bass: 0.5, duck: 0, dust: 2, haptic: 20, push: 0.15 },

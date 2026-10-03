@@ -199,9 +199,10 @@ export function fire(G, m, w, aim, target) {
     G.shots.push({ kind: 'shell', type: w.type, p: mz, v: mul(dir, d.speed), owner: m, dmg: d.dmg, life: d.range / d.speed });
     if (mp(G) && m === G.player) G.fx.netSend(fxShell(mz, mul(dir, d.speed), w.type));
     for (let i = 0; i < 5; i++) particle(G, add(mz, mul(dir, 1.5)), add(mul(dir, r.range(4, 12)), [r.range(-2, 2), r.range(-1, 2), r.range(-2, 2)]), 0.15, 0.6, [1, 0.8, 0.3], 'fire');
-    G.fx.sfx.cannon(mz);
+    G.fx.sfx.cannon(mz, !!d.recoil);
     m.flash = { frame: G.frame, p: mz, dir, big: true };   // muzzle flash, drawn for two frames
-    if (m === G.player) feel(G, d.bolt ? 'fireBolt' : 'fireAc', { mech: m, dir: [-dir[0], -dir[2]] });
+    if (m === G.player) feel(G, d.bolt ? 'fireBolt' : d.recoil ? 'fireGauss' : 'fireAc', { mech: m, dir: [-dir[0], -dir[2]] });
+    if (d.recoil) { const h = Math.hypot(dir[0], dir[2]) || 1; m.push[0] -= dir[0] / h * d.recoil; m.push[1] -= dir[2] / h * d.recoil; }   // rocks the shooter back a step, whoever it is
   } else {
     const vid = ++G.volleySeq;
     for (let i = 0; i < d.count; i++) {

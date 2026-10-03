@@ -12,6 +12,9 @@ export const WEAPONS = {
   // (full in 2 s), and the beam stutters at `stutter` Hz.
   plaser: { name: n.plaser, kind: 'beam',    dps: 2.6, hps: 8,  range: 300, col: [1, 0.55, 0.15], w: 0.15, cd: 1, tons: 3, fp: 2.6, meltRate: 1.5, stutter: 12 },
   // The autocannon is the opposite: big individual hits, little heat, ammo.
+  // The sniper's gun: a bright tracer, a heavy `recoil` that rocks the shooter
+  // back a step (m/s on its push), and a `knock` on the target worth a shove.
+  gauss:  { name: n.gauss, kind: 'shell', dmg: 20, heat: 1, cd: 3.2, range: 800, speed: 700, ammo: 12, knock: 6, recoil: 1.6, tracer: [0.85, 0.95, 1], tons: 12, fp: 6.3 },
   ac:     { name: n.ac, kind: 'shell',  dmg: 11,  heat: 2,  cd: 1.1, range: 650, speed: 340, ammo: 30, tons: 8, fp: 10 },
   // A slow blue bolt: a shell with `bolt` set (drawn as a bolt, fired with the
   // energy weapons). Its hit scrambles the target's HUD for `scramble` s and
@@ -41,6 +44,6 @@ export const WEAPONS = {
 // Three fire controls, one per kind of weapon: lasers are energy (no ammo,
 // lots of heat), the autocannon is ballistic, LRMs are missiles.
 export const CATS = ['energy', 'ballistic', 'missile', 'fusion'];
-export const CAT_OF = { laser: 'energy', mlaser: 'energy', ppc: 'energy', plaser: 'energy', ac: 'ballistic', lrm: 'missile', srm: 'missile', fusion: 'fusion' };
+export const CAT_OF = { laser: 'energy', mlaser: 'energy', ppc: 'energy', plaser: 'energy', ac: 'ballistic', gauss: 'ballistic', lrm: 'missile', srm: 'missile', fusion: 'fusion' };
 export const CAT_LABEL = NAMES.cats;
 export const CAT_KEY = { energy: 'LMB 1', ballistic: 'RMB 2', missile: 'SPC 3', fusion: 'G 4' };

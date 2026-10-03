@@ -38,7 +38,7 @@ try {
   // Freeze time just after the shot so the round is in the air for the picture.
   const beam = await page.evaluate(async k => (await import('/src/data/weapons.js')).WEAPONS[k].kind === 'beam', key);
   await page.keyboard.down(cat);
-  await page.waitForTimeout(beam ? 1500 : 60);   // a beam is held until the armour glows
+  await page.waitForTimeout(beam ? 1500 : +(process.env.SHOOT_WAIT || 60));   // a beam is held until the armour glows; SHOOT_WAIT catches a fast shell mid-flight
   await page.evaluate(() => window.__stompy.app.ui.pause(true));
   await page.evaluate(() => { document.querySelector('.mech-overlay').hidden = true; });
   await page.screenshot({ path: `test-results/shot-${key}-fire.png` });
