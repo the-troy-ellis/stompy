@@ -1,15 +1,15 @@
-import { add, clampN, wrapA } from '../util/math.js';
+import { clampN, wrapA } from '../util/math.js';
 import { BOUND } from '../world/terrain.js';
-import { center, viewYaw } from './geom.js';
-import { fire } from './combat.js';
+import { center } from './geom.js';
 import { geoOf } from '../data/geo.js';
 import { AI_PUNCH, meleeOf } from '../data/melee.js';
 import { canPunch, meleePress, meleeTarget } from './melee.js';
 import { perceive } from './ai/perception.js';
 import { defaultPlan, steer, strafeTick } from './ai/behaviours.js';
+import { decideFire } from './ai/fire.js';
 import { PERCEPTION as K } from '../data/ai.js';
 
-const { sin, cos, atan2, abs, hypot, max, PI } = Math;
+const { atan2, hypot, PI } = Math;
 
 // One enemy, one frame. State lives in e.ai.
 export function think(G, e, dt) {
@@ -63,28 +63,6 @@ export function think(G, e, dt) {
     if (P.shutdown || r.chance(1 - (1 - p) ** dt)) meleePress(G, e);
   }
   if (e.melee) { e.beamOn = false; return; }
-  // Fire when the torso is on target, the weapon is in range, and heat allows.
-  const off = abs(wrapA(toYaw - viewYaw(e)));
-  e.ai.jitter -= dt;
-  // Lasers: hold the beam on in bursts while on target and cool enough,
-  // with an aim error that drifts, so the beam wanders on and off you.
-  const beam = e.weapons.find(w => w.def.kind === 'beam' && !w.dead);
-  if (!seen) return;   // no shooting at a memory
-  if (beam && off < 0.3 && dist < beam.def.range * 0.95 && !e.shutdown && P.alive) {
-    if (e.heat > 70) e.ai.coolT = r.range(1.5, 3);
-    if ((e.ai.coolT = max(0, (e.ai.coolT || 0) - dt)) === 0) {
-      const err = dist * e.ch.acc0 * (1 + abs(P.speed) / 14) * (P.air ? 1.6 : 1), k = G.time * 0.9 + e.ai.strafeT;
-      e.ai.beamAim = add(pc, [sin(k * 1.3) * err, sin(k * 1.7) * err * 0.5, cos(k * 1.1) * err]);
-      e.beamOn = true;
-    }
-  }
-  if (off > 0.25 || e.heat > 72 || e.shutdown || e.ai.jitter > 0 || !P.alive) return;
-  for (const w of e.weapons) {
-    if (w.def.kind === 'beam' || w.def.kind === 'fusion' || w.dead || w.cd > 0 || dist > w.def.range * 0.95) continue;
-    let aim = pc;
-    if (w.def.kind === 'shell') { const t = dist / w.def.speed; aim = add(pc, [sin(P.yaw) * P.speed * t, 0, cos(P.yaw) * P.speed * t]); }
-    const err = dist * e.ch.acc0 * (1 + abs(P.speed) / 14) * (P.air ? 1.6 : 1);
-    aim = add(aim, [r.range(-err, err), r.range(-err, err) * 0.6, r.range(-err, err)]);
-    if (fire(G, e, w, aim, P)) { e.ai.jitter = r.range(0.15, 0.6); break; }
-  }
+  if (!seen) { e.ai.lockT = 0; return; }   // no shooting at a memory
+  decideFire(G, e, P, { dist, toYaw }, dt);
 }

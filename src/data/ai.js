@@ -2,9 +2,18 @@
 // skill, never stats; `G.diff` picks the row (#21 adds the setting; NORMAL
 // until then).
 export const DIFF = {
-  easy: { sight: 400 },
-  normal: { sight: 600 },
-  hard: { sight: 800 },
+  easy: { sight: 400, heatCap: 60, aimErr: 1.4, sections: false },
+  normal: { sight: 600, heatCap: 72, aimErr: 1.0, sections: false },
+  hard: { sight: 800, heatCap: 85, aimErr: 0.7, sections: true },
+};
+
+export const FIRE = {
+  coolBelow: 15,      // heat under the cap before it opens up again after overheating
+  alphaTorso: 0.25,   // target torso fraction under which everything that is ready fires at once
+  lockFace: 0.3,      // rad: facing this well, for lockFor seconds, is a missile lock
+  lockFor: 1,
+  lrmMin: 120,        // m: missiles never closer than this
+  armOffset: 1.9,     // m x scale: the aim offset toward a damaged arm (section targeting)
 };
 export const diffOf = G => DIFF[G.diff] || DIFF.normal;
 

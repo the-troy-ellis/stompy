@@ -4,7 +4,7 @@ import { NAMES } from './names.js';
 // `legs` names a body plan in geo.js; `pref` is the AI's preferred range and
 // `acc0` its aim error per metre.
 export const CHASSIS = {
-  kestrel: { name: NAMES.chassis.kestrel, legs: 'reverse', speed: 15, turn: 1.05, sink: 10, scale: 1, pref: 300,
+  kestrel: { name: NAMES.chassis.kestrel, legs: 'reverse', speed: 15, turn: 1.05, sink: 10, scale: 1, pref: 300, acc0: 0.03,   // acc0 so a KESTREL enemy aims at all (NaN otherwise)
     hp: { T: 72, LA: 32, RA: 32, LL: 42, RL: 42 }, col: [0.55, 0.58, 0.62], acc: [0.85, 0.6, 0.15],
     weapons: [['laser', 'LA'], ['laser', 'RA'], ['ac', 'T'], ['lrm', 'T'], ['fusion', 'T']] },
   jackal: { name: NAMES.chassis.jackal, legs: 'forward', speed: 19, turn: 1.6, sink: 9, scale: 0.85, pref: 140, acc0: 0.035,

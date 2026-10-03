@@ -31,6 +31,7 @@ export function rayCyl(o, d, m) {
 }
 // Terrain is ray-marched in 4 m steps, then bisected.
 export function rayTerrain(G, o, d, maxT) {
+  if (!(maxT > 0) || !Number.isFinite(o[0] + o[1] + o[2] + d[0] + d[1] + d[2])) return null;   // a NaN here would march forever
   const ter = G.ter, step = 4;
   let prev = 0;
   for (let t = min(step, maxT); ; t = min(t + step, maxT)) {
