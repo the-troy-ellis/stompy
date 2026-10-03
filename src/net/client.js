@@ -9,7 +9,7 @@ import { newMech, resetMatch } from '../sim/state.js';
 import { eyeOf } from '../sim/geom.js';
 import { initFeet } from '../sim/gait.js';
 import { msg, particle, explode } from '../sim/effects.js';
-import { beginDeath, damage, destroy, shedSection } from '../sim/combat.js';
+import { beginDeath, damage, destroy, scramble, shedSection } from '../sim/combat.js';
 import { knock } from '../sim/knock.js';
 import { feel } from '../sim/feel.js';
 import { voice } from '../sim/voice.js';
@@ -123,6 +123,7 @@ export function createNet(app) {
           const melee = !!(m.me || m.st);
           if (melee) G.player.lastHitMelee = m.st ? 'stomp' : 'punch';
           damage(G, G.player, m.p, m.amt, mechById(m.from) || null, false, melee);
+          if (m.zap && G.player.alive) scramble(G, G.player, WEAPONS.ppc.scramble, m.p);
           // A shove or a stomp: the push, the aim jolt and the lurch happen here, on the victim's screen.
           if (Array.isArray(m.kb) && G.player.alive && G.player.spawnT <= 0 && !G.roundOver) {
             const kb = [clamp30(m.kb[0]), clamp30(m.kb[1])], v = hypot(kb[0], kb[1]);
@@ -246,7 +247,8 @@ export function createNet(app) {
       for (let i = 0; i < 4; i++) particle(G, f.b, [rnd(-4, 4), rnd(1, 6), rnd(-4, 4)], 0.25, 0.35, d.col, 'fire');
       app.audio.sfx.laser(f.a, d === WEAPONS.mlaser);
     } else if (f.k === 's') {
-      G.shots.push({ kind: 'shell', p: f.p, v: f.v, owner: src, dmg: 0, life: WEAPONS.ac.range / WEAPONS.ac.speed, ghost: true });
+      const d = WEAPONS[f.w]?.kind === 'shell' ? WEAPONS[f.w] : WEAPONS.ac;
+      G.shots.push({ kind: 'shell', type: WEAPONS[f.w] ? f.w : 'ac', p: f.p, v: f.v, owner: src, dmg: 0, life: d.range / d.speed, ghost: true });
       app.audio.sfx.cannon(f.p);
     } else if (f.k === 'm') {
       const d = WEAPONS.lrm, target = f.tg ? mechById(f.tg) : null;

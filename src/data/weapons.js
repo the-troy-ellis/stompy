@@ -10,6 +10,10 @@ export const WEAPONS = {
   mlaser: { name: n.mlaser, kind: 'beam',    dps: 2.0, hps: 6,  range: 360, col: [0.3, 1, 0.35], w: 0.16, cd: 1, tons: 2, fp: 2 },
   // The autocannon is the opposite: big individual hits, little heat, ammo.
   ac:     { name: n.ac, kind: 'shell',  dmg: 11,  heat: 2,  cd: 1.1, range: 650, speed: 340, ammo: 30, tons: 8, fp: 10 },
+  // A slow blue bolt: a shell with `bolt` set (drawn as a bolt, fired with the
+  // energy weapons). Its hit scrambles the target's HUD for `scramble` s and
+  // gives it a hard wobble (FEEL.bolt).
+  ppc:    { name: n.ppc, kind: 'shell', bolt: true, dmg: 14, heat: 11, cd: 3.5, range: 600, speed: 420, scramble: 1.5, col: [0.45, 0.7, 1], tons: 7, fp: 4 },
   lrm:    { name: n.lrm, kind: 'missile', dmg: 1.9, heat: 6,  cd: 4.5, range: 850, speed: 120, ammo: 14, count: 10, tons: 6, fp: 4.2 },
   // Hold a targeting laser on one mech for `scan` seconds -- any break and it
   // starts over -- and the reactor discharges at the target's resonant
@@ -31,6 +35,6 @@ export const WEAPONS = {
 // Three fire controls, one per kind of weapon: lasers are energy (no ammo,
 // lots of heat), the autocannon is ballistic, LRMs are missiles.
 export const CATS = ['energy', 'ballistic', 'missile', 'fusion'];
-export const CAT_OF = { laser: 'energy', mlaser: 'energy', ac: 'ballistic', lrm: 'missile', fusion: 'fusion' };
+export const CAT_OF = { laser: 'energy', mlaser: 'energy', ppc: 'energy', ac: 'ballistic', lrm: 'missile', fusion: 'fusion' };
 export const CAT_LABEL = NAMES.cats;
 export const CAT_KEY = { energy: 'LMB 1', ballistic: 'RMB 2', missile: 'SPC 3', fusion: 'G 4' };

@@ -122,7 +122,7 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
 
 ### The network protocol (as it is)
 
-`PROTOCOL` is 3 (2: M1 melee; 3: M2 mechlab loadouts).
+`PROTOCOL` is 4 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell effect so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim).
 
 Client → server: `hello {v, name, color}`, `s {state...}` (15 Hz), `fx {k, ...}`
 (`b` beam flash, `s` shell, `m` missile volley, `fu` fusion discharge, `mg`

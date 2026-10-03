@@ -310,8 +310,8 @@ export function createHud(app) {
       ctx.stroke(); ctx.lineWidth = 1;
     }
 
-    // Target brackets.
-    const t = G.target;
+    // Target brackets (gone while a bolt has the HUD scrambled).
+    const scr = P.scramble > 0, t = scr ? null : G.target;
     if (t && t.alive) {
       const a = project([t.x, t.y + 8.2 * t.ch.scale, t.z]), b = project([t.x, t.y, t.z]);
       if (a && b) {
@@ -381,11 +381,17 @@ export function createHud(app) {
       const dx = m.x - P.x, dz = m.z - P.z, d = hypot(dx, dz);
       if (d > RANGE) continue;
       const ang = atan2(dx, dz) - vy;
-      const px = rx - sin(ang) * (d / RANGE) * rr, py = ry - cos(ang) * (d / RANGE) * rr;
+      if (scr && random() < 0.4) continue;   // scrambled: blips drop out...
+      const jit = scr ? rr * 0.15 : 0;      // ...and jump about
+      const px = rx - sin(ang) * (d / RANGE) * rr + (random() - 0.5) * jit, py = ry - cos(ang) * (d / RANGE) * rr + (random() - 0.5) * jit;
       ctx.fillStyle = m === t ? AMBER : m.remote ? app.net.pilotCss(m.netId) : RED;
       ctx.fillRect(px - 2, py - 2, m === t ? 5 : 4, m === t ? 5 : 4);
     }
     ctx.fillStyle = GREEN; ctx.fillRect(rx - 1, ry - 1, 3, 3);
+    if (scr) {   // static across the radar
+      ctx.fillStyle = 'rgba(140,200,255,0.35)';
+      for (let i = 0; i < 14; i++) ctx.fillRect(rx - rr + random() * rr * 2, ry - rr + random() * rr * 2, random() * rr * 0.6, 1);
+    }
     ctx.fillStyle = DIM; ctx.textAlign = 'center'; ctx.fillText(`${RANGE}m`, rx, ry + rr + 9 > app.scene.view.H ? ry + rr - 8 : ry + rr + 8);
 
     // Left: own damage, heat, jump jets.

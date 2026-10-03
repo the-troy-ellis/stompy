@@ -92,6 +92,10 @@
    "cat": "ballistic",
    "tons": 8
   },
+  "ppc": {
+   "cat": "energy",
+   "tons": 7
+  },
   "lrm": {
    "cat": "missile",
    "tons": 6
