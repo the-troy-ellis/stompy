@@ -2,13 +2,14 @@ import { add, mul, norm, sub } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { SECT_NAME } from '../data/chassis.js';
 import { center, muzzle, rayHit, viewYaw } from './geom.js';
-import { explode, msg, particle, shedPart } from './effects.js';
+import { explode, hitSparks, msg, particle, shedPart } from './effects.js';
 import { M } from '../util/math.js';
 import { geoOf as geo } from '../data/geo.js';
 import { torsoFrame } from './geom.js';
 import { died, fxShell, fxMissiles } from '../net/protocol.js';
 import { blast, endGuide } from './missiles.js';
 import { feel } from './feel.js';
+import { HIT_BY_SECTION, HIT_STOP } from '../data/feel.js';
 import { voice } from './voice.js';
 import { alertEnemy } from './ai/perception.js';
 
@@ -33,21 +34,23 @@ export function damage(G, m, p, amt, src, beam = false, melee = false) {
     // client applies it. Hits are batched (a beam deals damage every
     // frame) and flushed a few times a second -- see flushHits.
     if (G.roundOver) return;
+    if (!beam) hitSparks(G, m, p, sectionHit(m, p), amt);   // the shooter sees the sparks; the damage is the victim's to apply
     const q = G.pendingHits.get(m.netId) || { amt: 0, p };
     q.amt += amt; q.p = p;
     if (melee) q.me = 1;
     G.pendingHits.set(m.netId, q);
-    if (src === G.player) { if (!beam) G.stats.hits++; G.stats.dealt += amt; G.hitMark = 0.25; }
+    if (src === G.player) { if (!beam) { G.stats.hits++; G.hitStop = HIT_STOP; } G.stats.dealt += amt; G.hitMark = 0.25; }
     return;
   }
   if (m === G.player && mp(G) && (m.spawnT > 0 || G.roundOver)) return;
   let sec = sectionHit(m, p);
   if (m.hp[sec] <= 0) sec = 'T';
   m.hp[sec] -= amt;
-  if (src === G.player && m !== G.player) { if (!beam) G.stats.hits++; G.stats.dealt += amt; }
+  if (!beam) hitSparks(G, m, p, sec, amt);
+  if (src === G.player && m !== G.player) { if (!beam) { G.stats.hits++; G.hitStop = HIT_STOP; } G.stats.dealt += amt; }
   // Which side the blow came from, in torso space: the wobble leans away from it.
   const a = viewYaw(m), side = -Math.sign((p[0] - m.x) * cos(a) - (p[2] - m.z) * sin(a));
-  if (!beam) feel(G, 'hit', { mech: m, k: amt / 10, roll: side, at: m === G.player ? null : p });   // beams don't jolt: the renderer sways a melting mech instead
+  if (!beam) feel(G, 'hit', { mech: m, k: amt / 10 * (HIT_BY_SECTION[sec] || 1), roll: side, at: m === G.player ? null : p });   // beams don't jolt: the renderer sways a melting mech instead
   if (m === G.player) {
     G.stats.taken += amt;
     if (!beam || G.time - (G.lastClang || 0) > 0.35) { G.lastClang = G.time; G.fx.sfx.clang(sectionHit(m, p)); }   // arms ring, legs thud, the torso is dull

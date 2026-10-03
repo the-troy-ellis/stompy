@@ -15,6 +15,7 @@ export function buildMechParts(ch) {
     uleg: part(b => { b.cube(chain(M.T(0, -1.3, 0), M.S(0.95, 2.8, 1.25)), c, 0.85, 0.9); b.cube(chain(M.T(0, -2.6, 0.25), M.S(1.05, 0.75, 1)), dark); }),
     lleg: part(b => { b.cube(chain(M.T(0, -1.25, -0.1), M.S(0.8, 2.5, 1.05)), c); b.cube(chain(M.T(0, -1.1, -0.65), M.S(0.3, 1.8, 0.3)), dark); }),
     foot: part(b => b.cube(chain(M.T(0, -0.2, 0.35), M.S(1.25, 0.4, 2.3)), dark, 0.8, 0.8)),
+    plate: part(b => b.cube(M.S(0.9, 0.12, 0.7), c)),   // a knocked-loose armour plate (hit feedback)
     torso: part(b => {
       b.cube(chain(M.T(0, 1.3, 0), M.S(3.4, 2.6, 2.6)), c, 0.85, 0.8);
       b.cube(chain(M.T(0, 2.15, 1.3), M.S(1.6, 0.9, 1)), glass, 0.75, 0.6);
@@ -43,6 +44,7 @@ function buildReverseParts(ch) {
     // l2 = 2.9: a slimmer shin with a hydraulic ram.
     lleg: part(b => { b.cube(chain(M.T(0, -1.45, 0), M.S(0.7, 2.9, 0.9)), c, 1.2, 1.15); b.cube(chain(M.T(0, -1.3, 0.55), M.S(0.28, 2.2, 0.28)), dark); }),
     // Three toes forward and a spur behind.
+    plate: part(b => b.cube(M.S(0.9, 0.12, 0.7), c)),   // a knocked-loose armour plate (hit feedback)
     foot: part(b => {
       b.cube(chain(M.T(0, -0.15, 0), M.S(0.8, 0.5, 0.8)), dark);
       b.cube(chain(M.T(0, -0.32, 1.0), M.S(0.38, 0.34, 1.7)), dark, 0.7, 0.8);
@@ -85,6 +87,7 @@ function buildQuadParts(ch) {
     uleg: part(b => { b.cube(chain(M.T(0, -1.2, 0), M.S(0.8, 2.4, 0.9)), c); b.cube(chain(M.T(0, -2.4, 0), M.S(0.95, 0.75, 0.95)), dark); }),
     lleg: part(b => { b.cube(chain(M.T(0, -1.45, 0), M.S(0.55, 2.9, 0.6)), c, 1.45, 1.4); b.cube(chain(M.T(0, -0.2, 0), M.S(0.85, 0.5, 0.85)), dark); }),
     foot: part(b => b.cube(chain(M.T(0, -0.17, 0), M.S(1.15, 0.35, 1.15)), dark, 0.75, 0.75)),
+    plate: part(b => b.cube(M.S(0.9, 0.12, 0.7), c)),   // a knocked-loose armour plate (hit feedback)
     // The turret: cockpit at the front, an LRM box on top.
     torso: part(b => {
       b.cube(chain(M.T(0, 0.7, 0), M.S(2.7, 1.4, 2.5)), c, 0.85, 0.85);

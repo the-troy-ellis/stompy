@@ -14,14 +14,15 @@ test('a destroyed arm falls off as one piece that lands, lies still, and is gone
   Object.assign(e, { x: 0, z: 80, yaw: 0, twist: 0 }); freeze(e);   // facing +z: +x is its left
   damage(G, e, armPoint(e, 1), e.hp.LA, G.player);               // exactly the arm, no overflow into the torso
   assert.equal(e.hp.LA, 0);
-  assert.equal(G.debris.length, 1);
-  assert.equal(G.debris[0].part, 'arm');
+  const limbs = G.debris.filter(d => d.part !== 'plate');   // the hit itself knocks plates loose too
+  assert.equal(limbs.length, 1);
+  assert.equal(limbs[0].part, 'arm');
   stepFor(G, 3);
-  const d = G.debris[0];
+  const d = limbs[0];
   assert.ok(d.landed, 'still in the air');
   assert.ok(Math.abs(d.p[1] - 0.4 * e.ch.scale) < 1e-6, `rests at ${d.p[1]}`);
   stepFor(G, DEBRIS_LIFE);
-  assert.equal(G.debris.length, 0);
+  assert.equal(G.debris.filter(d => d.part !== 'plate').length, 0);
 });
 
 test('a lost leg sheds thigh, shin and foot, the mech limps with a dip and a lean, and keeps walking', () => {
@@ -32,7 +33,7 @@ test('a lost leg sheds thigh, shin and foot, the mech limps with a dip and a lea
   for (let i = 0; i < 120; i++) { stepFor(G, 1 / 60, input({ thrUp: true })); two = Math.min(two, P.bob); }
   damage(G, P, [P.x + 1, P.y + 1, P.z], P.hp.LL, null);
   assert.equal(P.hp.LL, 0);
-  assert.deepEqual(G.debris.map(d => d.part), ['uleg', 'lleg', 'foot']);
+  assert.deepEqual(G.debris.filter(d => d.part !== 'plate').map(d => d.part), ['uleg', 'lleg', 'foot']);
   let one = 0, lean = 0;
   for (let i = 0; i < 240; i++) { stepFor(G, 1 / 60, input({ thrUp: true })); one = Math.min(one, P.bob); lean = P.lean; }
   assert.ok(one < two - 0.1, `no limp dip (${one} vs ${two})`);

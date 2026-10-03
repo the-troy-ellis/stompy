@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createTestGame, foes, stepFor } from './helpers.js';
 import { sectionHit, damage } from '../src/sim/combat.js';
 import { geoOf } from '../src/data/geo.js';
+import { VOICE } from '../src/data/voice.js';
 
 test('sectionHit routes by height and lateral offset in torso space', () => {
   const G = createTestGame();
@@ -46,7 +47,7 @@ test('torso at zero destroys the mech, leaves a wreck and ends a one-enemy match
   stepFor(G, 1.2);   // beat, blast, topple
   assert.equal(G.wrecks.length, 1);
   assert.ok(G.fx.calls('sfx.boom').length >= 2);
-  assert.ok(G.fx.calls('say').some(c => c.args[0] === 'Target destroyed.'));
+  assert.ok(G.fx.calls('say').some(c => VOICE.kill.includes(c.args[0])));
 });
 
 test('the player taking damage records stats, flashes, and auto-targets the attacker', () => {

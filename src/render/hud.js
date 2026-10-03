@@ -178,7 +178,7 @@ export function createHud(app) {
 
   // ?debug=1: frame time over the last 2 s, draw calls, particles, the seed.
   const frames = [];
-  let lastFrameAt = 0;
+  let lastFrameAt = 0, stopAt = null;
   function drawDebug() {
     const now = performance.now();
     if (lastFrameAt) frames.push(now - lastFrameAt);
@@ -242,7 +242,9 @@ export function createHud(app) {
     if (G.whiteFlash > 0) { ctx.fillStyle = `rgba(235,215,255,${G.whiteFlash * 0.85})`; ctx.fillRect(0, 0, app.scene.view.W, app.scene.view.H); }
 
     // Crosshair.
-    const ch = project(G.aim) || [app.scene.view.W / 2, app.scene.view.H / 2];
+    let ch = project(G.aim) || [app.scene.view.W / 2, app.scene.view.H / 2];
+    // Hit-stop: the crosshair holds where it was for a beat when your shot lands.
+    if (G.hitStop > 0) { if (!stopAt) stopAt = ch; ch = stopAt; } else stopAt = null;
     ctx.strokeStyle = G.aimMech ? RED : GREEN;
     ctx.beginPath();
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(ch[0] + dx * 5, ch[1] + dy * 5); ctx.lineTo(ch[0] + dx * 14, ch[1] + dy * 14); }

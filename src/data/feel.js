@@ -15,6 +15,11 @@
 //   haptic  navigator.vibrate milliseconds on touch
 //   push    horizontal impulse on the mech in m/s along the event's direction (recoil, knockback); it decays over about a second (mech.js PUSH_DECAY)
 // Rows are plain mutable objects so the ?debug=1 FEEL panel can tune them live.
+// How hard a hit on each section lands, as a factor on the hit row: legs
+// thunk up through the frame, arms are out on the side.
+export const HIT_BY_SECTION = { T: 1, LA: 0.7, RA: 0.7, LL: 1.2, RL: 1.2 };
+export const HIT_STOP = 0.08;   // s the crosshair holds still after a hit lands
+
 export const FEEL = {
   // k = 0.35 + 0.65 * pace, scaled by the chassis (scale^2) in footDown
   step:        { kick: 1.0, shake: 0.12, flash: 0, white: 0, squash: 0.03, wobble: 0, bass: 0.4, duck: 0, dust: 1, haptic: 10, push: 0 },

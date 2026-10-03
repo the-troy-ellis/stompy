@@ -119,6 +119,7 @@ export function update(G, input, dt) {
   G.kick = max(0, G.kick - dt * 5);
   G.whiteFlash = max(0, (G.whiteFlash || 0) - dt * 1.6);
   G.hitMark = max(0, (G.hitMark || 0) - dt);
+  G.hitStop = max(0, (G.hitStop || 0) - dt);
   G.twistRate = abs(P.twist - G.lastTwist) / max(dt, 1e-3);
   G.lastTwist = P.twist;
 
