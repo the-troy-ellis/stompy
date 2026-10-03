@@ -29,7 +29,7 @@ export default [
   {
     // The smoke test's page.evaluate callbacks run in the browser.
     files: ['test/smoke/**/*.mjs'],
-    languageOptions: { globals: { window: 'readonly', document: 'readonly' } },
+    languageOptions: { globals: { window: 'readonly', document: 'readonly', localStorage: 'readonly' } },
   },
   {
     files: ['test/**/*.js', 'test/**/*.mjs', 'scripts/**/*.mjs', 'eslint.config.js'],

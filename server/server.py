@@ -27,6 +27,8 @@ import sys
 import time
 from urllib.parse import urlsplit
 
+from data import check_loadout
+
 GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 MAX_PLAYERS = 8
 SCORE_LIMIT = int(os.environ.get("STOMPY_SCORE_LIMIT", 10))   # kills to win a round
@@ -200,6 +202,17 @@ def handle_message(c, msg):
     if t in ("s", "fx"):
         # Movement and weapon effects: stamp the sender and pass them on.
         msg["id"] = c.id
+        if t == "s" and "lo" in msg:
+            # A mechlab loadout rides the state message now and then. One that
+            # is malformed or over its tonnage goes out as stock, and the
+            # sender is told so its HUD can say LOADOUT REJECTED.
+            lo, rejected = check_loadout(msg.get("ch"), msg["lo"])
+            if lo is None:
+                del msg["lo"]
+            else:
+                msg["lo"] = lo
+            if rejected:
+                send(c, {"t": "note", "k": "lo"})
         broadcast(msg, skip=c)
     elif t == "hit":
         target = players.get(int(num(msg.get("to"), 0, 99)))
