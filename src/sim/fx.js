@@ -4,7 +4,7 @@
 //
 // @typedef {object} Fx
 // @property {(text: string, force?: boolean) => void} say        cockpit voice
-// @property {object} sfx                                           one-shot sounds: laser(at, small), cannon(at, heavy), missile(at), boom(at, big), clang(), step(m, vol), land(force), fusionCrack(), fusion(at), beep(), powerdown(), powerup()
+// @property {object} sfx                                           one-shot sounds: laser(at, small), cannon(at, size), missile(at), boom(at, big), clang(), step(m, vol), land(force), fusionCrack(), fusion(at), beep(), powerdown(), powerup()
 // @property {(on: boolean, p: number) => void} fusionSound        scan whine
 // @property {(obj: object) => void} netSend                        arena message (ignored outside the arena)
 // @property {(bass: number, duck: number, haptic: number, at?: number[]) => void} thump   the feel table's sound and haptic columns

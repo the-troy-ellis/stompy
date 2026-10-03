@@ -249,7 +249,7 @@ export function createNet(app) {
     } else if (f.k === 's') {
       const d = WEAPONS[f.w]?.kind === 'shell' ? WEAPONS[f.w] : WEAPONS.ac;
       G.shots.push({ kind: 'shell', type: WEAPONS[f.w] ? f.w : 'ac', p: f.p, v: f.v, owner: src, dmg: 0, life: d.range / d.speed, ghost: true });
-      app.audio.sfx.cannon(f.p, !!d.recoil);
+      app.audio.sfx.cannon(f.p, d.sound);
     } else if (f.k === 'm') {
       const d = WEAPONS[f.w]?.kind === 'missile' ? WEAPONS[f.w] : WEAPONS.lrm, target = f.tg ? mechById(f.tg) : null;
       for (let i = 0; i < d.count; i++) {

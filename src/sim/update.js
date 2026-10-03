@@ -6,7 +6,7 @@ import { stepMech } from './mech.js';
 import { gait } from './gait.js';
 import { think } from './ai.js';
 import { groupPass } from './ai/group.js';
-import { stepShots, stepDying, WRECK_SETTLE } from './combat.js';
+import { stepBursts, stepShots, stepDying, WRECK_SETTLE } from './combat.js';
 import { beamTick, coolArmour, remoteBeam } from './beams.js';
 import { fusionTick, updatePulses } from './fusion.js';
 import { fireCat, missileTrigger, steerVolley } from './missiles.js';
@@ -91,6 +91,7 @@ export function update(G, input, dt) {
     }
   }
 
+  stepBursts(G, dt);
   stepShots(G, dt);
   stepDying(G, dt);
   updatePulses(G, dt);
