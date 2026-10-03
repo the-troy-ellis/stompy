@@ -11,6 +11,7 @@ import { newMech, startMatch } from '../sim/state.js';
 import { initFeet } from '../sim/gait.js';
 import { endGuide } from '../sim/missiles.js';
 import { DIFF, DIFF_ORDER } from '../data/ai.js';
+import { SETTINGS, SETTING_KEYS, stepSetting } from '../data/settings.js';
 
 const { sin, max, random, floor } = Math;
 
@@ -73,7 +74,8 @@ export function createUi(app) {
   const diffLabel = () => `DIFFICULTY: ${DIFF[prefs.diff].label}`;
   const cycleDiff = d => { prefs.diff = DIFF_ORDER[(DIFF_ORDER.indexOf(prefs.diff) + d + DIFF_ORDER.length) % DIFF_ORDER.length]; store.set('diff', prefs.diff); };
   const options = () => `<div class="opts">${Object.keys(OPTS).map(k => `<button class="opt" data-opt="${k}">${optLabel(k)}</button>`).join('')}
-    <button class="opt" data-a="diff">${diffLabel()}</button>
+    <button class="opt" data-a="diff">${diffLabel()}</button></div>
+    <div class="opts dials">${SETTING_KEYS.map(k => `<div class="mm-pick"><span>${SETTINGS[k].label}</span><button data-set="${k}" data-d="-1">◀</button><b>${SETTINGS[k].fmt(prefs[k])}</b><button data-set="${k}" data-d="1">▶</button></div>`).join('')}
     <button class="opt" data-a="full">FULL SCREEN</button></div>`;
 
   function showOverlay(html, cls = '') { ov.innerHTML = html; ov.className = 'mech-overlay' + (cls ? ' ' + cls : ''); ov.hidden = false; }
@@ -240,6 +242,13 @@ export function createUi(app) {
     const a = e.target.closest('[data-a]')?.dataset.a;
     if (a === 'full') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); return; }
     if (a === 'diff') { cycleDiff(1); e.target.closest('[data-a]').textContent = diffLabel(); return; }
+    const dial = e.target.closest('[data-set]');
+    if (dial) {
+      const k = dial.dataset.set;
+      prefs[k] = stepSetting(k, prefs[k], +dial.dataset.d); store.set(SETTINGS[k].key, prefs[k]);
+      dial.parentElement.querySelector('b').textContent = SETTINGS[k].fmt(prefs[k]);
+      return;
+    }
     if (e.target.closest('a')) return;
     const sw = e.target.closest('[data-col]');
     if (sw) { prefs.mpColor = +sw.dataset.col; store.set('mp.color', prefs.mpColor); ov.querySelectorAll('.swatch').forEach(b => b.classList.toggle('on', b === sw)); if (G.state === 'menu') showMech(); return; }

@@ -113,6 +113,9 @@ html, body {
 .mech-overlay .go:hover, .mech-overlay .opt:hover { background: #052; }
 
 .mech-overlay .opts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.mech-overlay .opts.dials { gap: 0 18px; margin-top: 4px; }
+.mech-overlay .opts.dials .mm-pick { margin: 2px 0; }
+.mech-overlay .opts.dials b { min-width: 6ch; }
 .mech-overlay .opt {
   font: 11px "Lucida Console", monospace; background: #010a01; color: #7f7;
   border: 1px solid #2a7a2a; padding: 4px 10px; cursor: pointer;

@@ -29,6 +29,10 @@ try {
     await page.close();
   };
   await run('desktop', URL_, async page => {
+    await page.click('[data-sel="settings"]');
+    await page.click('[data-set="fov"][data-d="1"]');
+    const fov = await page.evaluate(() => window.__stompy.app.prefs.fov);
+    if (fov !== 67) { failed = true; console.error(`FAIL: the FOV dial read ${fov}, not 67`); }
     await page.click('[data-sel="free"]');
     await page.click('[data-fp="diff"][data-d="1"]');   // NORMAL -> HARD
     await page.click('[data-a="go"]');

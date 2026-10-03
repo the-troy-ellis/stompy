@@ -148,7 +148,7 @@ export function createScene(app) {
       fov = 0.95; yaw = gd.yaw; pitch = gd.pitch; dir = gd.dir;
       eye = add(gd.nose || gd.pos, add(mul(dir, 1.5), [0, 0.3, 0]));
     } else {
-      fov = G.zoom ? 0.42 : 1.08;
+      fov = G.zoom ? 0.42 : (app.prefs?.fov || 62) * Math.PI / 180;   // the FOV setting; 62 degrees is the old 1.08 rad
       const sh = G.shake * 0.012, wv = FEEL.view.wobble, wp = P.wob ? P.wob.p.x : 0, wr = P.wob ? P.wob.r.x : 0;
       yaw = viewYaw(P) + rnd(-sh, sh) + wr * wv * 0.5; pitch = P.pitch + rnd(-sh, sh) - (P.alive || P.dying ? 0 : 0.15) + wp * wv;
       // Running hot: the view swims, a slow breath in the field of view and a sway, until the reactor trips.
