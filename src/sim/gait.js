@@ -37,7 +37,7 @@ function swingTarget(G, m, i, u, D, dir) {
 }
 
 export function gait(G, m, dt) {
-  const s = m.ch.scale, pace = min(1, abs(m.speed) / m.ch.speed), crouch = -0.35 * s * pace;
+  const s = m.ch.scale, pace = min(1, abs(m.speed) / (m.maxSpeed ?? m.ch.speed)), crouch = -0.35 * s * pace;
   const g0 = geoOf(m), legOk = i => m.hp[g0.legs[i].hx > 0 ? 'LL' : 'RL'] > 0;
   // No legs left: the hull sits on the ground, the torso still turns and fires.
   if (m.hp.LL <= 0 && m.hp.RL <= 0) {

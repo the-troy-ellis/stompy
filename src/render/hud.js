@@ -443,7 +443,7 @@ export function createHud(app) {
     const thx = L.throttle.x, top = L.throttle.y, bh = L.throttle.h;
     ctx.fillStyle = '#031203'; ctx.fillRect(thx, top, 12, bh);
     const zero = top + bh * (1 / 1.35);
-    const spF = P.speed / (P.ch.speed * 1.35);
+    const spF = P.speed / ((P.maxSpeed ?? P.ch.speed) * 1.35);
     ctx.fillStyle = GREEN;
     if (P.speed >= 0) ctx.fillRect(thx, zero - bh * spF, 12, bh * spF); else ctx.fillRect(thx, zero, 12, -bh * spF);
     ctx.strokeStyle = DIM; ctx.strokeRect(thx + 0.5, top + 0.5, 11, bh - 1);

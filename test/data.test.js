@@ -11,7 +11,7 @@ test('every chassis weapon and mount exists', () => {
   for (const [k, ch] of Object.entries(CHASSIS)) {
     assert.ok(GEO[ch.legs], `${k} legs`);
     assert.equal(ch.name, NAMES.chassis[k]);
-    for (const [w, mount] of ch.weapons) { assert.ok(WEAPONS[w], `${k} ${w}`); assert.ok(HPK.includes(mount)); assert.ok(CATS.includes(CAT_OF[w])); }
+    for (const h of ch.hardpoints) { assert.ok(WEAPONS[h.stock], `${k} ${h.stock}`); assert.ok(HPK.includes(h.loc)); assert.equal(CAT_OF[h.stock], h.cat, `${k} ${h.id}`); assert.ok(CATS.includes(h.cat)); }
     for (const s of HPK) assert.ok(ch.hp[s] > 0);
   }
   for (const k of MECH_ORDER) { assert.ok(CHASSIS[k]); assert.ok(MECH_INFO[k]); }

@@ -85,25 +85,25 @@ Shipped in #1 (all rows below), except branch protection, which the owner sets o
 
 | # | Title | Labels | Size | Spec |
 |---|---|---|---|---|
-| | M2: hardpoints, tonnage and systems data; loadout validate/apply/stats | sim, content | M | 02 §Data |
-| | M2: FIT screen (mechlab UI) with live mech preview | ui, platform:touch | M | 02 §Player experience |
-| | M2: loadout in the arena state message; server-side validation with parity fixture | net, server | S | 02 §Arena |
-| | M2: weapon THUNDERCLAP (bolt kind, HUD scramble, wobble) | sim, hud, content | S | 06 §Weapons |
-| | M2: weapon PEPPER LASER (meltRate) | sim, content | S | 06 |
-| | M2: weapon FIRECRACKERS (dumb-fire volley, small knockback) | sim, content | S | 06 |
-| | M2: weapon BIG BONKER (tracer, recoil, knockback) | sim, render, content | S | 06 |
-| | M2: weapon PEASHOOTER (bursts, tracers, shell cap) | sim, render, content | S | 06 |
-| | M2: weapon TOASTER (target heat, cone particles) | sim, render, content | S | 06 |
-| | M2: GEO per-chassis overrides and torso/arm styles in mech parts | render, sim | S | 06 §Body plan mechanics |
-| | M2: chassis PURPLE PUNCHER (plan, fists, mesh, brawler profile, real punch, menu) | content, render, ai, sim | L | 06 §PURPLE PUNCHER, 12 |
-| | M2: chassis PIPSQUEAK | content, render, ai | M | 06 §PIPSQUEAK |
-| | M2: chassis BEANPOLE | content, render, ai | M | 06 §BEANPOLE |
-| | M2: unlock-aware mech selector with LOCKED state and new role lines | ui | S | 06 §Menu |
-| | M2: KNUCKLES system slot for PURPLE PUNCHER | sim, ui | S | 02 §Data |
-| | M2: Free Play pickers for chassis mix and difficulty | ui | S | roadmap §M2 |
-| | M2: sfx recipes for the six new weapons from existing clips | audio | S | 06 |
-| | M2: balance pass on all twelve weapons and six chassis (with notes) | content, needs-owner | M | 06 |
-| | M2: naming round for light1, sniper1 and the six new weapons (one issue per thing, opened by the PR that makes it visible) | content, needs-owner | S | workflow §Naming things |
+| #62 | M2: hardpoints, tonnage and systems data; loadout validate/apply/stats | sim, content | M | 02 §Data |
+| #63 | M2: FIT screen (mechlab UI) with live mech preview | ui, platform:touch | M | 02 §Player experience |
+| #64 | M2: loadout in the arena state message; server-side validation with parity fixture | net, server | S | 02 §Arena |
+| #65 | M2: weapon THUNDERCLAP (bolt kind, HUD scramble, wobble) | sim, hud, content | S | 06 §Weapons |
+| #66 | M2: weapon PEPPER LASER (meltRate) | sim, content | S | 06 |
+| #67 | M2: weapon FIRECRACKERS (dumb-fire volley, small knockback) | sim, content | S | 06 |
+| #68 | M2: weapon BIG BONKER (tracer, recoil, knockback) | sim, render, content | S | 06 |
+| #69 | M2: weapon PEASHOOTER (bursts, tracers, shell cap) | sim, render, content | S | 06 |
+| #70 | M2: weapon TOASTER (target heat, cone particles) | sim, render, content | S | 06 |
+| #71 | M2: GEO per-chassis overrides and torso/arm styles in mech parts | render, sim | S | 06 §Body plan mechanics |
+| #72 | M2: chassis PURPLE PUNCHER (plan, fists, mesh, brawler profile, real punch, menu) | content, render, ai, sim | L | 06 §PURPLE PUNCHER, 12 |
+| #73 | M2: chassis PIPSQUEAK | content, render, ai | M | 06 §PIPSQUEAK |
+| #74 | M2: chassis BEANPOLE | content, render, ai | M | 06 §BEANPOLE |
+| #75 | M2: unlock-aware mech selector with LOCKED state and new role lines | ui | S | 06 §Menu |
+| #76 | M2: KNUCKLES system slot for PURPLE PUNCHER | sim, ui | S | 02 §Data |
+| #77 | M2: Free Play picker for chassis mix (difficulty shipped in #21) | ui | S | roadmap §M2 |
+| #78 | M2: sfx recipes for the six new weapons from existing clips | audio | S | 06 |
+| #79 | M2: balance pass on all twelve weapons and six chassis (with notes) | content, needs-owner | M | 06 |
+| (per PR) | M2: naming round for light1, sniper1 and the six new weapons (one issue per thing, opened by the PR that makes it visible) | content, needs-owner | S | workflow §Naming things |
 
 ## M3 — Campaign
 

@@ -7,6 +7,7 @@ import { FEEL } from '../data/feel.js';
 import { WALK } from '../data/walk.js';
 import { tryStomp } from './melee.js';
 import { voice } from './voice.js';
+import { JETS_CLIMB, JETS_FUEL } from '../data/systems.js';
 
 const { sin, cos, min, max } = Math;
 
@@ -38,7 +39,7 @@ function landingDust(G, m, ground, force) {
 // One mech, one frame: speed, jets, gravity, heat, shutdown, cooldowns, legs.
 export function stepMech(G, m, dt) {
   const r = G.rng, legs = (m.hp.LL > 0 ? 0.5 : 0) + (m.hp.RL > 0 ? 0.5 : 0);
-  let maxS = m.ch.speed * (legs >= 1 ? 1 : legs > 0 ? 0.45 : 0);   // no legs: sat down, a turret
+  let maxS = (m.maxSpeed ?? m.ch.speed) * (legs >= 1 ? 1 : legs > 0 ? 0.45 : 0);   // no legs: sat down, a turret
   if (m.heat > 85) maxS *= 0.65;
   // The ground: a grade under the heading slows the climb and hurries the descent,
   // and a landing holds the legs for a moment while the feet dig in.
@@ -59,10 +60,11 @@ export function stepMech(G, m, dt) {
   }
 
   const ground = G.ter.height(m.x, m.z);
-  const jets = m.jetting && m.fuel > 0 && !m.shutdown && m.alive;
+  // Jets by the JUMP JETS level: none at 0, stock at 1, more fuel and climb at 2.
+  const jl = m.jets ?? 1, jets = jl > 0 && m.jetting && m.fuel > 0 && !m.shutdown && m.alive;
   if (jets) {
-    m.vy = min(m.vy + 30 * dt, 12);
-    m.fuel = max(0, m.fuel - dt * 0.32);
+    m.vy = min(m.vy + 30 * JETS_CLIMB[jl] * dt, 12 * JETS_CLIMB[jl]);
+    m.fuel = max(0, m.fuel - dt * 0.32 / JETS_FUEL[jl]);
     m.heat += 10 * dt;
     if (r.chance(0.6)) particle(G, add([m.x, m.y + 1.5, m.z], [r.range(-1, 1), 0, r.range(-1, 1)]), [r.range(-1, 1), -8, r.range(-1, 1)], 0.35, 0.7, [1, 0.6, 0.2], 'fire');
   } else m.fuel = min(1, m.fuel + dt * 0.12);
@@ -93,7 +95,7 @@ export function stepMech(G, m, dt) {
 
 // Heat, shutdown, cooldowns, springs and legs: the second half of a step.
 function finishStep(G, m, dt) {
-  m.heat = max(0, m.heat - (m.shutdown ? 20 : m.ch.sink) * dt);
+  m.heat = max(0, m.heat - (m.shutdown ? 20 : m.sink ?? m.ch.sink) * dt);
   if (!m.shutdown && m.heat >= 100) {
     m.shutdown = true;
     feel(G, 'shutdown', { mech: m, at: m === G.player ? null : [m.x, m.y, m.z] });

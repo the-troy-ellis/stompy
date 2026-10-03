@@ -12,7 +12,7 @@ M0 Foundations ──► M1 Feel & AI ──► M2 Content & Mechlab ──► M
                          └──► M5a LAN polish ──► M5b Co-op ──► M5c Internet
 ```
 
-Current milestone: **M1** (M0 shipped on `m0/foundations`; merge it, then set branch protection on `main` to require CI).
+Current milestone: **M2** (M0 and M1 shipped; M2 issues are #62–#79).
 
 ## M0 — Foundations
 
