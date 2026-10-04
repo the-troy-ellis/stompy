@@ -65,11 +65,13 @@ try {
     if (fov !== 67) { failed = true; console.error(`FAIL: the FOV dial read ${fov}, not 67`); }
     await page.click('[data-sel="free"]');
     await page.click('[data-fp="diff"][data-d="1"]');   // NORMAL -> HARD
+    for (let i = 0; i < 2; i++) await page.click('[data-fp="mix"][data-d="1"]');   // MIXED -> LIGHT -> HEAVY
     await page.click('[data-a="go"]');
     await page.waitForFunction(() => window.__stompy?.game?.state === 'play', null, { timeout: 10000 });
-    const diff = await page.evaluate(() => [window.__stompy.app.prefs.diff, window.__stompy.game.diff]);
-    console.log(`desktop: difficulty ${diff[0]} / game ${diff[1]}`);
+    const diff = await page.evaluate(() => [window.__stompy.app.prefs.diff, window.__stompy.game.diff, [...new Set(window.__stompy.game.mechs.filter(m => m.team).map(m => m.type))].join(',')]);
+    console.log(`desktop: difficulty ${diff[0]} / game ${diff[1]}; HEAVY mix on a fresh save: ${diff[2]}`);
     if (!(diff[0] === 'hard' && diff[1] === 'hard')) { failed = true; console.error('FAIL: the difficulty picker did not reach the game'); }
+    if (diff[2] !== 'warden') { failed = true; console.error(`FAIL: HEAVY on a fresh save should be all WARDENs (${diff[2]})`); }
     const x0 = await page.evaluate(() => [window.__stompy.game.player.x, window.__stompy.game.player.z, window.__stompy.game.frame]);
     await page.keyboard.down('KeyW');
     await page.waitForTimeout(2500);

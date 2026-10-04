@@ -5,7 +5,7 @@ import { CATS, CAT_OF } from '../data/weapons.js';
 import { CHASSIS, MECH_ORDER, MECH_INFO, isUnlocked } from '../data/chassis.js';
 import { NAMES } from '../data/names.js';
 import { PALS } from '../data/palettes.js';
-import { missionDef, FP_MAPS } from '../data/missions.js';
+import { missionDef, FP_MAPS, FP_MIXES, pickFoes } from '../data/missions.js';
 import { MP_COLORS } from '../data/colors.js';
 import { makeTerrain } from '../world/terrain.js';
 import { newMech, startMatch } from '../sim/state.js';
@@ -32,7 +32,7 @@ export function createUi(app) {
   // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
   function startSkirmish() {
     const pk = FP_MAPS[prefs.fpMap] === 'random' ? ['dusk', 'ice', 'volcanic'][floor(random() * 3)] : FP_MAPS[prefs.fpMap];
-    const foes = Array.from({ length: prefs.fpFoes }, () => (random() < 0.35 ? 'warden' : 'jackal'));
+    const foes = pickFoes(FP_MIXES[prefs.fpMix] || FP_MIXES[0], prefs.fpFoes, random, k => isUnlocked(k, cleared()));
     G.diff = prefs.diff;
     startMatch(G, { name: 'Free Play', pal: pk, foes, intel: '' }, 1 + floor(random() * 1e5), false, prefs.chassis, { loadout: fitOf(prefs.chassis) });
     G.kind = 'free';
@@ -142,6 +142,7 @@ export function createUi(app) {
       return `<p>One battle, your rules.</p>
         <div class="mm-pick"><span>MAP</span><button data-fp="map" data-d="-1">◀</button><b>${mapName}</b><button data-fp="map" data-d="1">▶</button></div>
         <div class="mm-pick"><span>HOSTILES</span><button data-fp="foes" data-d="-1">◀</button><b>${prefs.fpFoes}</b><button data-fp="foes" data-d="1">▶</button></div>
+        <div class="mm-pick"><span>MIX</span><button data-fp="mix" data-d="-1">◀</button><b>${(FP_MIXES[prefs.fpMix] || FP_MIXES[0]).label}</b><button data-fp="mix" data-d="1">▶</button></div>
         <div class="mm-pick"><span>DIFFICULTY</span><button data-fp="diff" data-d="-1">◀</button><b>${DIFF[prefs.diff].label}</b><button data-fp="diff" data-d="1">▶</button></div>`;
     }
     if (prefs.menuSel === 'mp') {
@@ -278,6 +279,7 @@ export function createUi(app) {
         const d = +fp.dataset.d;
         if (fp.dataset.fp === 'map') prefs.fpMap = (prefs.fpMap + d + FP_MAPS.length) % FP_MAPS.length;
         else if (fp.dataset.fp === 'diff') cycleDiff(d);
+        else if (fp.dataset.fp === 'mix') { prefs.fpMix = (prefs.fpMix + d + FP_MIXES.length) % FP_MIXES.length; store.set('fp.mix', prefs.fpMix); }
         else prefs.fpFoes = clampN(prefs.fpFoes + d, 1, 8);
         store.set('fp.map', prefs.fpMap); store.set('fp.foes', prefs.fpFoes);
         renderMenu(); return;
