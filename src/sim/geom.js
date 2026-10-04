@@ -16,7 +16,7 @@ export function leadPoint(from, t, speed) {
 }
 export function muzzle(m, w) {
   const tf = torsoFrame(m), g = geoOf(m);
-  if (w.mount === 'T') return M.apply(tf, w.type === 'lrm' ? [w.side % 2 ? -1.25 : 1.25, g.rackY, 0.6] : [-0.9, g.acY, 1.6]);
+  if (w.mount === 'T') return M.apply(tf, w.def.kind === 'missile' ? [w.side % 2 ? -1.25 : 1.25, g.rackY, 0.6] : [-0.9, g.acY, 1.6]);
   return M.apply(tf, [(w.mount === 'LA' ? 1 : -1) * g.armX, g.armY - 1.2, 2.4]);
 }
 export const eyeOf = m => M.apply(torsoFrame(m), geoOf(m).eye);

@@ -39,7 +39,7 @@ export function validate(chassis, loadout) {
     hp[h.id] = w === null ? null : WEAPONS[w] && CAT_OF[w] === h.cat ? w : h.stock;
   }
   const sys = {};
-  for (const k of SYSTEM_KEYS) sys[k] = clampInt(inSys[k], 0, SYSTEMS[k].max, ch.systems[k]);
+  for (const k of SYSTEM_KEYS) sys[k] = clampInt(inSys[k], 0, sysMax(ch, k), ch.systems[k]);
   const out = { hp, sys }, tons = tonsOf(ch, out);
   return { loadout: out, tons, ok: tons <= ch.tons };
 }
@@ -97,8 +97,10 @@ export function cycleWeapon(chassis, loadout, id, d) {
   const c = choicesFor(h), i = c.indexOf(loadout.hp[id] ?? null);
   return { hp: { ...loadout.hp, [id]: c[(i + d + c.length) % c.length] }, sys: { ...loadout.sys } };
 }
-export function cycleSystem(loadout, key, d) {
-  const n = SYSTEMS[key].max + 1;
+// A system's top level on this chassis: the system's own, or lower where the chassis caps it.
+export const sysMax = (chassis, key) => Math.min(SYSTEMS[key].max, chassisOf(chassis).sysMax?.[key] ?? Infinity);
+export function cycleSystem(loadout, key, d, chassis) {
+  const n = (chassis ? sysMax(chassis, key) : SYSTEMS[key].max) + 1;
   return { hp: { ...loadout.hp }, sys: { ...loadout.sys, [key]: ((loadout.sys[key] || 0) + d + n) % n } };
 }
 
@@ -107,7 +109,7 @@ export function cycleSystem(loadout, key, d) {
 // and a test on each side keeps the two in step.
 export function loadoutFixture() {
   const chassis = Object.fromEntries(Object.entries(CHASSIS).map(([k, c]) => [k, {
-    tons: c.tons, frame: c.frame, systems: c.systems, hardpoints: c.hardpoints.map(({ id, cat, stock }) => ({ id, cat, stock })) }]));
+    tons: c.tons, frame: c.frame, systems: c.systems, max: Object.fromEntries(SYSTEM_KEYS.map(s => [s, sysMax(c, s)])), hardpoints: c.hardpoints.map(({ id, cat, stock }) => ({ id, cat, stock })) }]));
   const weapons = Object.fromEntries(Object.entries(WEAPONS).map(([k, w]) => [k, { cat: CAT_OF[k], tons: w.tons ?? 0 }]));
   const systems = Object.fromEntries(SYSTEM_KEYS.map(k => [k, { max: SYSTEMS[k].max, tons: SYSTEMS[k].tons }]));
   const inputs = [
@@ -117,6 +119,8 @@ export function loadoutFixture() {
     ['jackal', { hp: { la: 'mlaser', ra: 'mlaser' }, sys: { sinks: 3, armour: 0, jets: 0 } }],
     ['warden', { hp: { t1: null, ra: 'ac', la: 'mlaser' }, sys: { sinks: 1, armour: 1, jets: 1 } }],
     ['warden', { hp: [], sys: [] }],
+    ['puncher', { hp: { t1: 'gauss', t2: 'lrm' }, sys: { sinks: 2, armour: 1, jets: 2 } }],
+    ['puncher', { hp: { t1: 'mg', t2: null }, sys: { sinks: 3, armour: 2, jets: 1 } }],
   ];
   const cases = inputs.map(([ch, input]) => ({ ch, input, want: validate(ch, input) }));
   return { chassis, weapons, systems, cases };

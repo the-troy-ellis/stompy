@@ -1,6 +1,7 @@
 import { add, wrapA } from '../../util/math.js';
 import { center, viewYaw } from '../geom.js';
 import { fire } from '../combat.js';
+import { planFor } from './profiles.js';
 import { diffOf, FIRE as F } from '../../data/ai.js';
 
 const { sin, cos, abs, max } = Math;
@@ -54,7 +55,8 @@ export function decideFire(G, e, P, { dist, toYaw }, dt) {
   }
   if (!may || off > 0.25 || a.jitter > 0) return;
   // Alpha: the target's torso is nearly gone, so everything that is ready goes now.
-  const alpha = P.hp.T < P.max.T * F.alphaTorso;
+  const plan = e.ai.plan || (e.ai.plan = planFor(e));   // think() normally builds it first
+  const alpha = P.hp.T < P.max.T * (plan.alphaTorso ?? F.alphaTorso);
   for (const w of e.weapons) {
     if (w.def.kind === 'beam' || w.def.kind === 'fusion' || w.dead || w.cd > 0 || dist > w.def.range * 0.95) continue;
     // Homing missiles want a lock and some room; dumb-fire ones just need facing.

@@ -52,7 +52,8 @@ def validate_loadout(chassis, loadout):
             continue
         w = in_hp.get(h["id"])
         hp[h["id"]] = w if isinstance(w, str) and w in WEAPONS and WEAPONS[w]["cat"] == h["cat"] else h["stock"]
-    sys_ = {k: _level(in_sys.get(k), s["max"], ch["systems"][k]) for k, s in SYSTEMS.items()}
+    top = ch.get("max", {})   # a chassis may cap a system lower (PURPLE PUNCHER: jets 1)
+    sys_ = {k: _level(in_sys.get(k), top.get(k, s["max"]), ch["systems"][k]) for k, s in SYSTEMS.items()}
     out = {"hp": hp, "sys": sys_}
     tons = tons_of(chassis, out)
     return out, tons, tons <= ch["tons"]

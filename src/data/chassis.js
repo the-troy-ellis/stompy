@@ -1,4 +1,5 @@
 import { NAMES } from './names.js';
+import { FIST_MELEE } from './melee.js';
 
 // Hit points per section: T(orso), L/R A(rm), L/R L(eg). Losing the torso kills.
 // `legs` names a body plan in geo.js; `pref` is the AI's preferred range,
@@ -9,6 +10,10 @@ import { NAMES } from './names.js';
 // loadout uses about 85% of the budget), `hardpoints` the slots in HUD order,
 // each locked to a fire category, and `systems` the stock levels. The fusion
 // cannon is not a hardpoint: every chassis carries it, after the rest.
+// `sysMax` caps a system below its usual top level for this chassis.
+// M2 adds (docs/specs/06-chassis-and-weapons.md): `geo` overrides the body
+// plan (geoFor), `style` picks the torso and arms (mesh/mechParts.js), and
+// `melee` gives a chassis fists (data/melee.js).
 export const CHASSIS = {
   kestrel: { name: NAMES.chassis.kestrel, legs: 'reverse', speed: 15, turn: 1.05, sink: 10, scale: 1, pref: 300, acc0: 0.03, ai: { profile: 'baseline' },
     hp: { T: 72, LA: 32, RA: 32, LL: 42, RL: 42 }, col: [0.55, 0.58, 0.62], acc: [0.85, 0.6, 0.15],
@@ -24,10 +29,17 @@ export const CHASSIS = {
     tons: 60, frame: 30.5, systems: { sinks: 0, armour: 0, jets: 1 },
     hardpoints: [{ id: 't1', loc: 'T', cat: 'missile', stock: 'lrm' }, { id: 'ra', loc: 'RA', cat: 'ballistic', stock: 'ac' },
       { id: 'la', loc: 'LA', cat: 'energy', stock: 'laser' }] },
+  // The one with fists. Slow enough to kite, ruinous if it reaches you.
+  puncher: { name: NAMES.chassis.puncher, legs: 'forward', style: 'puncher', speed: 9, turn: 0.6, sink: 12, scale: 1.3, pref: 20, acc0: 0.03, ai: { profile: 'brawler' },
+    hp: { T: 110, LA: 50, RA: 50, LL: 60, RL: 60 }, col: [0.45, 0.22, 0.6], acc: [0.95, 0.75, 0.2],
+    geo: { hip: 5.0, l1: 2.6, l2: 2.6, stride: [3.0, 3.4], girth: 1.35, radius: 3.0, armX: 2.95, armY: 1.55, eye: [0, 1.8, 1.75], acY: 0.9, rackY: 2.55 },
+    melee: FIST_MELEE,
+    tons: 80, frame: 57, systems: { sinks: 0, armour: 0, jets: 0 }, sysMax: { jets: 1 },
+    hardpoints: [{ id: 't1', loc: 'T', cat: 'ballistic', stock: 'ac' }, { id: 't2', loc: 'T', cat: 'missile', stock: 'srm' }] },
 };
 
 // The selectable mechs, in selector order, with what the menu says about them.
-export const MECH_ORDER = ['kestrel', 'jackal', 'warden'];
+export const MECH_ORDER = ['kestrel', 'jackal', 'warden', 'puncher'];   // #75 makes this unlock-aware
 export const MECH_INFO = NAMES.roles;
 
 export const HPK = ['T', 'LA', 'RA', 'LL', 'RL'];

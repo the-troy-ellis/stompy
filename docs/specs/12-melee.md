@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | shipped for M1 (#10 knockback, #11 shove and stomp, #12 PUNCH input, #13 arena, #14 AI); PURPLE PUNCHER's real punch is M2 |
+| Status | shipped for M1 (#10 knockback, #11 shove and stomp, #12 PUNCH input, #13 arena, #14 AI); PURPLE PUNCHER's real punch shipped in M2 (#72) |
 | Milestone | M1 (shove, stomp, knockback, AI, arena); M2 adds PURPLE PUNCHER's real punch |
 | Size | M (split: knockback + shove + stomp; animation + feedback; AI; arena) |
 | Depends on | M0; [13-thunk.md](13-thunk.md) for the feedback table it feeds |

@@ -12,6 +12,7 @@ const BEFORE = {
   kestrel: [['laser', 'LA'], ['laser', 'RA'], ['ac', 'T'], ['lrm', 'T'], ['fusion', 'T']],
   jackal: [['mlaser', 'LA'], ['mlaser', 'RA'], ['fusion', 'T']],
   warden: [['lrm', 'T'], ['ac', 'RA'], ['laser', 'LA'], ['fusion', 'T']],
+  puncher: [['ac', 'T'], ['srm', 'T'], ['fusion', 'T']],   // M2: arms carry fists, not guns
 };
 
 test('the stock loadout is exactly what each chassis always carried, and uses about 85% of its budget', () => {
