@@ -23,7 +23,7 @@ export const beamMult = m => (m.beamMech ? meltMult(m.beamMech.melt || 0) : 1);
 export function beamTick(G, m, dt, aim) {
   const lasers = m.weapons.filter(w => w.def.kind === 'beam' && !w.dead), r = G.rng;
   if (!lasers.length || m.shutdown || !m.alive) { m.beaming = false; m.beamMech = null; return; }
-  if (!m.beaming) G.fx.sfx.laser(m === G.player ? null : muzzle(m, lasers[0]), lasers[0].def.tons < 5);   // the small zap for the light ones
+  if (!m.beaming) beamSound(G, m, lasers, m === G.player ? null : muzzle(m, lasers[0]));
   m.beaming = true;
   m.beamEnd = aim;
   m.beamMech = null;
@@ -32,7 +32,7 @@ export function beamTick(G, m, dt, aim) {
     const hit = rayHit(G, mz, dir, w.def.range, m);
     const end = hit ? hit.point : add(mz, mul(dir, w.def.range));
     const t = hit?.mech, mult = t ? meltMult(t.melt || 0) : 1;
-    drawBeam(G, mz, end, w.def, mult);
+    if (w.def.cone) flameCone(G, mz, end, w.def); else drawBeam(G, mz, end, w.def, mult);
     m.heat += w.def.hps * dt;
     if (m === G.player) G.stats.shots += dt * 4;   // accuracy counts beam time in quarter-seconds
     if (!hit) continue;
@@ -40,6 +40,7 @@ export function beamTick(G, m, dt, aim) {
     if (t) {
       m.beamMech = t;
       damage(G, t, end, w.def.dps * mult * dt, m, true);
+      if (w.def.targetHeat) toast(G, t, w.def.targetHeat * dt);
       // Melt rises once per frame however many beams are on it, at the fastest rate among them.
       const rate = w.def.meltRate || 1;
       if (t.meltFrame !== G.frame) { t.meltFrame = G.frame; t.meltRate = rate; t.melt = min(MELT_T, (t.melt || 0) + dt * rate); }
@@ -47,6 +48,28 @@ export function beamTick(G, m, dt, aim) {
       t.meltAt = G.time;
       if (m === G.player) G.stats.hits += dt * 4;
     }
+  }
+}
+// Heat poured into a target (TOASTER). Another pilot's heat is theirs to
+// apply: it rides the batched hit as hh.
+export function toast(G, t, amt) {
+  if (!t.remote) { t.heat += amt; return; }
+  const q = G.pendingHits.get(t.netId);
+  if (q) q.hh = (q.hh || 0) + amt;
+}
+// The start-of-fire sound: a roar for a flamer, the small zap for the light
+// lasers, the big one otherwise.
+function beamSound(G, m, lasers, at) {
+  if (lasers.some(w => w.def.cone)) G.fx.sfx.flame(at);
+  if (lasers.some(w => !w.def.cone)) { const l = lasers.find(w => !w.def.cone); G.fx.sfx.laser(at, l.def.tons < 5); }
+}
+// A flamer draws no line: a cone of fire puffs from the muzzle that spread
+// and reach the end in about a fifth of a second.
+export function flameCone(G, a, b, def) {
+  const r = G.rng, d = sub(b, a), life = 0.22;
+  for (let i = 0; i < 3; i++) {
+    const v = add(mul(d, r.range(0.75, 1.05) / life), [r.range(-9, 9), r.range(-3, 7), r.range(-9, 9)]);
+    particle(G, add(a, mul(d, r.range(0, 0.15))), v, life, r.range(0.45, 0.8), mix3(def.col, [1, 0.9, 0.4], r.next()), 'flame');
   }
 }
 // Armour cools whenever no beam touched it this frame.
@@ -65,8 +88,12 @@ export function drawBeam(G, a, b, def, mult) {
 export function remoteBeam(G, m, end) {
   const lasers = m.weapons.filter(w => w.def.kind === 'beam' && m.hp[w.mount] > 0), r = G.rng;
   if (!lasers.length) return;
-  if (!m.beaming) G.fx.sfx.laser(muzzle(m, lasers[0]), false);
+  if (!m.beaming) beamSound(G, m, lasers, muzzle(m, lasers[0]));
   m.beaming = true;
-  for (const w of lasers) drawBeam(G, muzzle(m, w), end, w.def, m.net.bf || 1);   // bf: how melted their target is
+  for (const w of lasers) {
+    const mz = muzzle(m, w);
+    if (w.def.cone) flameCone(G, mz, add(mz, mul(norm(sub(end, mz)), Math.min(w.def.range, Math.hypot(...sub(end, mz))))), w.def);
+    else drawBeam(G, mz, end, w.def, m.net.bf || 1);   // bf: how melted their target is
+  }
   if (r.chance(0.4)) particle(G, end, [r.range(-3, 3), r.range(1, 5), r.range(-3, 3)], 0.25, 0.4, lasers[0].def.col, 'fire');
 }

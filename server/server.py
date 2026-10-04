@@ -232,6 +232,9 @@ def handle_message(c, msg):
                 out["st"] = 1
             if msg.get("zap"):
                 out["zap"] = 1   # a bolt: the victim's HUD scrambles
+            hh = num(msg.get("hh"), 0, 20)
+            if hh > 0:
+                out["hh"] = hh   # heat poured in (TOASTER), clamped
             send(target, out)
     elif t == "died":
         c.deaths += 1

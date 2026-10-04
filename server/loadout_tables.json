@@ -92,6 +92,10 @@
    "cat": "energy",
    "tons": 3
   },
+  "flamer": {
+   "cat": "energy",
+   "tons": 1.5
+  },
   "gauss": {
    "cat": "ballistic",
    "tons": 12

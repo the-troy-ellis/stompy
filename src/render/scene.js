@@ -277,9 +277,10 @@ export function createScene(app) {
       const f = p.life / p.max;
       let size = p.size, tint = p.col, emis = 1;
       if (p.kind === 'fire') { size *= 0.4 + f * 0.8; tint = mix3([0.4, 0.1, 0.05], p.col, f); }
+      else if (p.kind === 'flame') { size *= 0.5 + (1 - f) * 3; tint = mix3([0.55, 0.12, 0.04], p.col, f); }   // a flamer's puff swells and reddens as it goes
       else if (p.kind === 'smoke') { size *= 1.6 - f * 0.8; tint = mix3(G.pal.hor, p.col, f); emis = 0.6; }
       else emis = 0;
-      R.draw(R.meshes.cube, chain(M.T(...p.p), M.RY(p.spin), M.RX(p.spin * 0.7), M.S(size)), tint, emis, p.kind === 'fire' ? f : p.kind === 'smoke' ? 0.15 : 0.3);
+      R.draw(R.meshes.cube, chain(M.T(...p.p), M.RY(p.spin), M.RX(p.spin * 0.7), M.S(size)), tint, emis, p.kind === 'fire' || p.kind === 'flame' ? f : p.kind === 'smoke' ? 0.15 : 0.3);
     }
     [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.disableVertexAttribArray(a));
 

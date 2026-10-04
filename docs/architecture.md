@@ -122,16 +122,16 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
 
 ### The network protocol (as it is)
 
-`PROTOCOL` is 4 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim).
+`PROTOCOL` is 5 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server).
 
 Client → server: `hello {v, name, color}`, `s {state...}` (15 Hz), `fx {k, ...}`
 (`b` beam flash, `s` shell, `m` missile volley, `fu` fusion discharge, `mg`
 guided volley update, `md` detonate, `pu` a punch starts), `hit {to, amt, p,
-fu, kb?, me?, st?}`, `died {by, me?}`.
+fu, kb?, me?, st?, zap?, hh?}`, `died {by, me?}`.
 
 Server → client: `welcome {id, seed, pal, limit, over, scores}`, `full
 {max}`, `join`, `leave`, `note {k}` (`k: 'lo'`: your loadout was rejected), `s` and `fx` stamped with `id`, `hit {from, amt, p,
-fu, kb?, me?, st?}`, `kill {victim, killer, scores, me?}`, `roundover {winner,
+fu, kb?, me?, st?, zap?, hh?}`, `kill {victim, killer, scores, me?}`, `roundover {winner,
 name, next, scores}`, `newround {seed, pal, scores}`.
 
 Melee on the wire (`docs/specs/12-melee.md` § Arena): the shooter-scores rule
