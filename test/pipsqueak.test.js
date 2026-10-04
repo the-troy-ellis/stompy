@@ -19,7 +19,7 @@ test('PIPSQUEAK (light1): the spec numbers, boosted jets stock, a placeholder na
   assert.equal(ch.legs, 'reverse');
   assert.equal(ch.scale, 0.8); assert.equal(ch.speed, 22); assert.equal(ch.turn, 1.9); assert.equal(ch.sink, 8);
   assert.deepEqual(ch.hp, { T: 28, LA: 12, RA: 12, LL: 16, RL: 16 });
-  assert.deepEqual(stockLoadout('light1'), { hp: { la: 'srm', ra: 'mlaser', t1: 'mg' }, sys: { sinks: 0, armour: 0, jets: 2 } });
+  assert.deepEqual(stockLoadout('light1'), { hp: { la: 'srm', ra: 'mlaser', t1: 'mg' }, sys: { sinks: 0, armour: 0, jets: 2, knuckles: 0 } });
   assert.ok(validate('light1', stockLoadout('light1')).ok);
   const g = geoFor(ch);
   assert.equal(g.l1, 2.4); assert.equal(g.l2, 2.9); assert.equal(g.swing, 0.46);

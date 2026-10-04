@@ -4,7 +4,7 @@
 import { HPK } from '../data/chassis.js';
 import { WEAPONS } from '../data/weapons.js';
 
-export const PROTOCOL = 5;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit. 5: hh (heat) on hit
+export const PROTOCOL = 6;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit. 5: hh (heat) on hit. 6: knuckles in lo.sys
 export const r2 = v => Math.round(v * 100) / 100;
 const v3 = p => p.map(r2);
 
