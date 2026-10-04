@@ -8,6 +8,11 @@
     "armour": 0,
     "jets": 1
    },
+   "max": {
+    "sinks": 3,
+    "armour": 2,
+    "jets": 2
+   },
    "hardpoints": [
     {
      "id": "la",
@@ -39,6 +44,11 @@
     "armour": 0,
     "jets": 1
    },
+   "max": {
+    "sinks": 3,
+    "armour": 2,
+    "jets": 2
+   },
    "hardpoints": [
     {
      "id": "la",
@@ -60,6 +70,11 @@
     "armour": 0,
     "jets": 1
    },
+   "max": {
+    "sinks": 3,
+    "armour": 2,
+    "jets": 2
+   },
    "hardpoints": [
     {
      "id": "t1",
@@ -75,6 +90,32 @@
      "id": "la",
      "cat": "energy",
      "stock": "laser"
+    }
+   ]
+  },
+  "puncher": {
+   "tons": 80,
+   "frame": 57,
+   "systems": {
+    "sinks": 0,
+    "armour": 0,
+    "jets": 0
+   },
+   "max": {
+    "sinks": 3,
+    "armour": 2,
+    "jets": 1
+   },
+   "hardpoints": [
+    {
+     "id": "t1",
+     "cat": "ballistic",
+     "stock": "ac"
+    },
+    {
+     "id": "t2",
+     "cat": "missile",
+     "stock": "srm"
     }
    ]
   }
@@ -356,6 +397,64 @@
      }
     },
     "tons": 51,
+    "ok": true
+   }
+  },
+  {
+   "ch": "puncher",
+   "input": {
+    "hp": {
+     "t1": "gauss",
+     "t2": "lrm"
+    },
+    "sys": {
+     "sinks": 2,
+     "armour": 1,
+     "jets": 2
+    }
+   },
+   "want": {
+    "loadout": {
+     "hp": {
+      "t1": "gauss",
+      "t2": "lrm"
+     },
+     "sys": {
+      "sinks": 2,
+      "armour": 1,
+      "jets": 1
+     }
+    },
+    "tons": 80.5,
+    "ok": false
+   }
+  },
+  {
+   "ch": "puncher",
+   "input": {
+    "hp": {
+     "t1": "mg",
+     "t2": null
+    },
+    "sys": {
+     "sinks": 3,
+     "armour": 2,
+     "jets": 1
+    }
+   },
+   "want": {
+    "loadout": {
+     "hp": {
+      "t1": "mg",
+      "t2": null
+     },
+     "sys": {
+      "sinks": 3,
+      "armour": 2,
+      "jets": 1
+     }
+    },
+    "tons": 66.5,
     "ok": true
    }
   }

@@ -73,7 +73,7 @@ of it. Draft numbers (`06-chassis-and-weapons.md` finalises):
 | JACKAL | 25 | 21 |
 | KESTREL | 45 | 38 |
 | WARDEN | 60 | 51 |
-| PURPLE PUNCHER | 80 | 62 |
+| PURPLE PUNCHER | 80 | 68 (shipped at the 85% rule; the 62 draft would be 78%) |
 
 A **loadout** is `{ hp: { la: 'laser', ra: 'mlaser', t1: null, t2: 'lrm' },
 sys: { sinks: 1, armour: 0, jets: 1 } }`. `src/sim/loadout.js` exports:

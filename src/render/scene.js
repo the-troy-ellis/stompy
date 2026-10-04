@@ -21,6 +21,23 @@ export const legSplay = squash => clampN(squash / 0.25, 0, 1) * 0.2;
 // The swing: how far the torso rears back then lunges, and the arms cock and
 // drive, as a function of where the melee state is. Pure, for the tests.
 // Returns { lean (torso pitch, +back), arm (shoulder swing, +back), lunge (m forward) }.
+// A fisted chassis's arms (PURPLE PUNCHER), as shoulder angles: at rest
+// the fists hang a little forward in a guard; the wind-up cocks the punching
+// arm back and tucks the other up; the hit swings the punching fist out level
+// and it eases back over the recovery. Negative swings forward. `twist`
+// turns the torso away from the punch, then into it. Pure, for the tests.
+export const FIST_REST = -0.35;
+export function fistPose(m) {
+  const st = m.melee, rest = { LA: FIST_REST, RA: FIST_REST, twist: 0 };
+  if (!st || !st.arm) return rest;
+  const def = meleeOf(m), t = st.t, side = st.arm === 'LA' ? 1 : -1, other = st.arm === 'LA' ? 'RA' : 'LA';
+  if (st.phase === 'windup') {
+    const u = Math.min(1, t / def.windup);
+    return { [st.arm]: FIST_REST + 0.95 * u, [other]: FIST_REST - 0.4 * u, twist: -0.1 * side * u };
+  }
+  const r = Math.min(1, (t - def.windup) / def.recover), snap = Math.exp(-r * 5);
+  return { [st.arm]: FIST_REST - 1.15 * snap, [other]: FIST_REST - 0.4 * snap, twist: 0.12 * side * snap };
+}
 export function meleePose(m) {
   const st = m.melee;
   if (!st) return { lean: 0, arm: 0, lunge: 0 };
@@ -110,12 +127,15 @@ export function createScene(app) {
     const sway = meltFrac(m) * 0.03, swt = G.time * 2.4;
     const sq = m.squash ? m.squash.x : 0, wp = (m.wob ? m.wob.p.x : 0) + sin(swt) * sway, wr = (m.wob ? m.wob.r.x : 0) + cos(swt * 0.8) * sway * 0.7;
     const pose = meleePose(m);
-    const TB = chain(B, M.T(0, g.torsoY, 0), M.S(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5), M.RY(m.twist), M.T(0, 0, pose.lunge), M.RX(wp - pose.lean), M.RZ(wr));
+    const fists = parts.fist && meleeOf(m).fists ? fistPose(m) : null;   // with both arms gone it shoves like anyone else
+    const TB = chain(B, M.T(0, g.torsoY, 0), M.S(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5), M.RY(m.twist + (fists ? fists.twist : 0)), M.T(0, 0, pose.lunge), M.RX(wp - pose.lean), M.RZ(wr));
     R.draw(parts.torso, TB, tint);
     for (const [s, k] of [[1, 'LA'], [-1, 'RA']]) {
       if (m.hp[k] <= 0) continue;
-      const AM = chain(TB, M.T(s * g.armX, g.armY, 0), M.RX(-m.pitch + pose.arm));
+      // Fists follow the aim only a little; guns follow it all the way.
+      const AM = chain(TB, M.T(s * g.armX, g.armY, 0), M.RX(fists ? -m.pitch * 0.3 + fists[k] : -m.pitch + pose.arm));
       R.draw(parts.arm, AM, tint);
+      if (parts.fist) R.draw(parts.fist, AM, tint);
       // The arm's gun, shaped by what is fitted there; nothing for an EMPTY hardpoint.
       const w = m.weapons.find(x => x.mount === k && x.def.kind !== 'fusion');
       if (w && parts.barrel) {

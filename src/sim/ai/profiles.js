@@ -14,7 +14,8 @@ export const PROFILES = {
   // BEANPOLE (M2): finds high ground with a view, then keeps its long range.
   sniper: e => ({ drive: [ridge, useCover, keepRange(e.ch.pref)], shape: [avoidAllies, avoidEdge] }),
   // PURPLE PUNCHER (M2): walks in and punches. Never retreats, never hides.
-  brawler: () => ({ drive: [brawler], shape: [avoidAllies, avoidEdge], brawler: true }),
+  // It fires everything at once once the target's torso is under 40%.
+  brawler: () => ({ drive: [brawler], shape: [avoidAllies, avoidEdge], brawler: true, alphaTorso: 0.4 }),
 };
 
 export const planFor = e => (PROFILES[e.ch.ai?.profile] || defaultPlan)(e);

@@ -1,6 +1,6 @@
 import { clampN, wrapA } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
-import { meleeOf } from '../data/melee.js';
+import { meleeOf, punchArm } from '../data/melee.js';
 import { center, viewYaw } from './geom.js';
 import { damage } from './combat.js';
 import { knock } from './knock.js';
@@ -19,6 +19,7 @@ export function meleePress(G, m) {
   if (!canPunch(G, m)) return false;
   const def = meleeOf(m);
   m.melee = { t: 0, phase: 'windup', hit: null };
+  if (def.fists) m.melee.arm = m.lastArm = punchArm(m);   // left, right, left: whichever fist is still on
   m.meleeCd = def.cd;
   if (G.mode === 'mp' && m === G.player) G.fx.netSend(fxPunch());
   return true;
@@ -28,7 +29,7 @@ export function meleePress(G, m) {
 // the pose moving between state reports. `pu` is the phase it last reported.
 export function meleeGhost(m, dt, pu) {
   const def = meleeOf(m);
-  if (pu === 1 && !m.melee) m.melee = { t: 0, phase: 'windup', hit: null };
+  if (pu === 1 && !m.melee) { m.melee = { t: 0, phase: 'windup', hit: null }; if (def.fists) m.melee.arm = m.lastArm = punchArm(m); }
   else if (pu === 2 && m.melee?.phase !== 'recover') m.melee = { t: def.windup, phase: 'recover', hit: null };
   else if (pu === 0 && m.melee?.phase === 'recover') m.melee = null;   // a wind-up outlives a stale 0 until the next report
   if (!m.melee) return;

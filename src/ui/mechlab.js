@@ -31,7 +31,7 @@ export function createMechlab(app) {
 
   function change(row, d) {
     const k = prefs.chassis, lo = fitOf(k);
-    const next = row.kind === 'hp' ? cycleWeapon(k, lo, row.id, d) : cycleSystem(lo, row.id, d);
+    const next = row.kind === 'hp' ? cycleWeapon(k, lo, row.id, d) : cycleSystem(lo, row.id, d, k);
     store.set(key(k), next);
     app.ui.showMech();
     app.ui.renderMenu();
