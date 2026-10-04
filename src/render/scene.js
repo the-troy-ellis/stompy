@@ -10,7 +10,7 @@ import { BARREL_AT, styleOf } from '../mesh/mechParts.js';
 import { WEAPONS } from '../data/weapons.js';
 
 // An arm gun's proportions by weapon: [thickness, length] against the stock barrel.
-const BARREL = { laser: [1, 1], mlaser: [0.8, 0.7], ac: [1.45, 1.1], gauss: [0.8, 1.9], mg: [0.6, 0.75], lrm: [1.7, 0.55] };
+const BARREL = { laser: [1, 1], mlaser: [0.8, 0.7], ac: [1.45, 1.1], gauss: [0.8, 1.9], mg: [0.6, 0.75], lrm: [1.7, 0.55], srm: [2.4, 0.55] };   // srm: an arm-mounted box
 
 const { sin, cos, atan2, min, max, abs, PI, floor } = Math;
 

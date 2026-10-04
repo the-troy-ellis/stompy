@@ -36,10 +36,18 @@ export const CHASSIS = {
     melee: FIST_MELEE,
     tons: 80, frame: 57, systems: { sinks: 0, armour: 0, jets: 0 }, sysMax: { jets: 1 },
     hardpoints: [{ id: 't1', loc: 'T', cat: 'ballistic', stock: 'ac' }, { id: 't2', loc: 'T', cat: 'missile', stock: 'srm' }] },
+  // A light reverse-joint skirmisher: long shins, boosted jets stock, and
+  // light enough to be shoved a very long way.
+  light1: { name: NAMES.chassis.light1, legs: 'reverse', style: 'light1', speed: 22, turn: 1.9, sink: 8, scale: 0.8, pref: 170, acc0: 0.035, ai: { profile: 'skirmish' },
+    hp: { T: 28, LA: 12, RA: 12, LL: 16, RL: 16 }, col: [0.26, 0.58, 0.56], acc: [0.95, 0.45, 0.18],
+    geo: { hip: 4.5, l1: 2.4, l2: 2.9, stride: [4.2, 5.2], swing: 0.46, radius: 2.2, height: 7.6, armX: 1.45, armY: 1.6, eye: [0, 1.55, 1.1], acY: 0.8, rackY: 2.2 },
+    tons: 25, frame: 12.5, systems: { sinks: 0, armour: 0, jets: 2 },
+    hardpoints: [{ id: 'la', loc: 'LA', cat: 'missile', stock: 'srm' }, { id: 'ra', loc: 'RA', cat: 'energy', stock: 'mlaser' },
+      { id: 't1', loc: 'T', cat: 'ballistic', stock: 'mg' }] },
 };
 
 // The selectable mechs, in selector order, with what the menu says about them.
-export const MECH_ORDER = ['kestrel', 'jackal', 'warden', 'puncher'];   // #75 makes this unlock-aware
+export const MECH_ORDER = ['kestrel', 'jackal', 'warden', 'puncher', 'light1'];   // #75 makes this unlock-aware
 export const MECH_INFO = NAMES.roles;
 
 export const HPK = ['T', 'LA', 'RA', 'LL', 'RL'];

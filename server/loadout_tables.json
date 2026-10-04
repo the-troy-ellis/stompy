@@ -118,6 +118,37 @@
      "stock": "srm"
     }
    ]
+  },
+  "light1": {
+   "tons": 25,
+   "frame": 12.5,
+   "systems": {
+    "sinks": 0,
+    "armour": 0,
+    "jets": 2
+   },
+   "max": {
+    "sinks": 3,
+    "armour": 2,
+    "jets": 2
+   },
+   "hardpoints": [
+    {
+     "id": "la",
+     "cat": "missile",
+     "stock": "srm"
+    },
+    {
+     "id": "ra",
+     "cat": "energy",
+     "stock": "mlaser"
+    },
+    {
+     "id": "t1",
+     "cat": "ballistic",
+     "stock": "mg"
+    }
+   ]
   }
  },
  "weapons": {

@@ -24,6 +24,7 @@ export const BEHAVIOUR = {
   coverDists: [40, 80, 120], coverEvery: 2, coverArrive: 8, coverMaxWait: 12, coverRetry: 20,
   ridgeAbove: 15, ridgeRadii: [80, 120, 160, 200, 240, 300], ridgeEvery: 4, ridgeArrive: 10,
   harassBand: [140, 200], jumpWithin: 60, jumpFor: 1.2, jumpCooldown: 6,
+  stompOver: 3,       // m: a diving skirmisher this close over its target cuts the jets and drops
   lineRange: 150,     // m: holdLine matches the slowest ally this close
   allyGap: 6,         // m of clearance avoidAllies steers for
 };
