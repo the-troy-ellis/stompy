@@ -38,6 +38,13 @@ export function fistPose(m) {
   const r = Math.min(1, (t - def.windup) / def.recover), snap = Math.exp(-r * 5);
   return { [st.arm]: FIST_REST - 1.15 * snap, [other]: FIST_REST - 0.4 * snap, twist: 0.12 * side * snap };
 }
+// The menu mech's vertical band in NDC (+1 is the top of the screen): from
+// just under the top edge down to just above the mech selector panel, which
+// sits lower on a tall screen than on a phone held sideways.
+export function menuBand(H, panelTop = null) {
+  const floor = clampN(panelTop != null ? panelTop / H : (H < 500 ? 0.42 : 0.65), 0.35, 0.92);
+  return { top: 1 - 2 * 0.07, bottom: 1 - 2 * (floor - 0.03) };
+}
 export function meleePose(m) {
   const st = m.melee;
   if (!st) return { lean: 0, arm: 0, lunge: 0 };
@@ -168,12 +175,18 @@ export function createScene(app) {
       // stands in the right-hand part of the screen beside the menu panel.
       // Pulled back a touch more on short screens, and framed so the mech
       // stands above the mech selector in the bottom-right corner.
-      const sc = P.ch.scale, R = (15 * sc + 4) * (H < 500 ? 1.45 : 1.2), aspect = W / max(1, H);
-      fov = 0.75;
-      const c = [P.x, P.y + 4 * sc, P.z];
-      eye = [c[0], c[1] + 1.6, c[2] + R];
-      const off = aspect > 1 ? 0.4 * R * Math.tan(fov / 2) * aspect : 0;
-      dir = norm(sub([c[0] - off, c[1] - (H < 500 ? 2.6 : 1.6), c[2]], eye));
+      // The mech stands in the band between the top of the screen and the
+      // top of the selector panel (menuBand), sized to fill it, whatever
+      // the chassis's height and the screen's shape.
+      const sel = document.querySelector('.mm-right .mm-select'), panelTop = sel ? sel.getBoundingClientRect().top - wrap.getBoundingClientRect().top : null;
+      const aspect = W / max(1, H), band = menuBand(H, panelTop), tf = Math.tan((fov = 0.75) / 2);
+      const h = geoOf(P).height * P.ch.scale * 1.15, mid = (band.top + band.bottom) / 2, half = (band.top - band.bottom) / 2;
+      const wide = geoOf(P).radius * P.ch.scale * 1.6;   // half-width, legs splayed: the quadruped is wider than it is tall
+      const R = max((h / 2) / (half * tf), aspect > 1 ? wide / (0.42 * tf * aspect) : 0);
+      const c = [P.x, P.y + h / 2 / 1.15, P.z];
+      eye = [c[0], c[1], c[2] + R];
+      const off = aspect > 1 ? 0.4 * R * tf * aspect : 0, down = Math.atan(mid * tf);
+      dir = norm(sub([c[0] - off, c[1] - Math.tan(down) * R, c[2]], eye));
       yaw = atan2(dir[0], dir[2]); pitch = Math.asin(clampN(dir[1], -1, 1));
     } else if (gd) {
       // Riding just behind the volley, looking where it's going.

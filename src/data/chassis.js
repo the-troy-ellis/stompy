@@ -11,6 +11,7 @@ import { FIST_MELEE } from './melee.js';
 // each locked to a fire category, and `systems` the stock levels. The fusion
 // cannon is not a hardpoint: every chassis carries it, after the rest.
 // `sysMax` caps a system below its usual top level for this chassis.
+// `unlock`: how many campaign missions must be cleared before it can launch.
 // M2 adds (docs/specs/06-chassis-and-weapons.md): `geo` overrides the body
 // plan (geoFor), `style` picks the torso and arms (mesh/mechParts.js), and
 // `melee` gives a chassis fists (data/melee.js).
@@ -33,7 +34,7 @@ export const CHASSIS = {
   puncher: { name: NAMES.chassis.puncher, legs: 'forward', style: 'puncher', speed: 9, turn: 0.6, sink: 12, scale: 1.3, pref: 20, acc0: 0.03, ai: { profile: 'brawler' },
     hp: { T: 110, LA: 50, RA: 50, LL: 60, RL: 60 }, col: [0.45, 0.22, 0.6], acc: [0.95, 0.75, 0.2],
     geo: { hip: 5.0, l1: 2.6, l2: 2.6, stride: [3.0, 3.4], girth: 1.35, radius: 3.0, armX: 2.95, armY: 1.55, eye: [0, 1.8, 1.75], acY: 0.9, rackY: 2.55 },
-    melee: FIST_MELEE,
+    melee: FIST_MELEE, unlock: 11, lockedInColour: true,
     tons: 80, frame: 57, systems: { sinks: 0, armour: 0, jets: 0 }, sysMax: { jets: 1 },
     hardpoints: [{ id: 't1', loc: 'T', cat: 'ballistic', stock: 'ac' }, { id: 't2', loc: 'T', cat: 'missile', stock: 'srm' }] },
   // A light reverse-joint skirmisher: long shins, boosted jets stock, and
@@ -41,7 +42,7 @@ export const CHASSIS = {
   light1: { name: NAMES.chassis.light1, legs: 'reverse', style: 'light1', speed: 22, turn: 1.9, sink: 8, scale: 0.8, pref: 170, acc0: 0.035, ai: { profile: 'skirmish' },
     hp: { T: 28, LA: 12, RA: 12, LL: 16, RL: 16 }, col: [0.26, 0.58, 0.56], acc: [0.95, 0.45, 0.18],
     geo: { hip: 4.5, l1: 2.4, l2: 2.9, stride: [4.2, 5.2], swing: 0.46, radius: 2.2, height: 7.6, armX: 1.45, armY: 1.6, eye: [0, 1.55, 1.1], acY: 0.8, rackY: 2.2 },
-    tons: 25, frame: 12.5, systems: { sinks: 0, armour: 0, jets: 2 },
+    tons: 25, frame: 12.5, systems: { sinks: 0, armour: 0, jets: 2 }, unlock: 6,
     hardpoints: [{ id: 'la', loc: 'LA', cat: 'missile', stock: 'srm' }, { id: 'ra', loc: 'RA', cat: 'energy', stock: 'mlaser' },
       { id: 't1', loc: 'T', cat: 'ballistic', stock: 'mg' }] },
   // A medium sniper on stilts: tall legs, a narrow stance, a long gun arm.
@@ -49,14 +50,23 @@ export const CHASSIS = {
     hp: { T: 60, LA: 26, RA: 26, LL: 36, RL: 36 }, col: [0.72, 0.7, 0.62], acc: [0.2, 0.45, 0.75],
     geo: { hip: 5.4, l1: 3.0, l2: 2.8, radius: 2.2, armX: 1.9, armY: 1.9, eye: [0, 2.0, 1.4], acY: 1.3, rackY: 2.6,
       legs: [{ hx: 0.7, hz: 0, fx: 0.8, fz: 0, ph: 0 }, { hx: -0.7, hz: 0, fx: -0.8, fz: 0, ph: 0.5 }] },
-    tons: 50, frame: 21.5, systems: { sinks: 0, armour: 0, jets: 0 }, sysMax: { jets: 1 },
+    tons: 50, frame: 21.5, systems: { sinks: 0, armour: 0, jets: 0 }, sysMax: { jets: 1 }, unlock: 8,
     hardpoints: [{ id: 'ra', loc: 'RA', cat: 'ballistic', stock: 'gauss' }, { id: 'la', loc: 'LA', cat: 'energy', stock: 'ppc' },
       { id: 't1', loc: 'T', cat: 'energy', stock: 'mlaser' }] },
 };
 
-// The selectable mechs, in selector order, with what the menu says about them.
-export const MECH_ORDER = ['kestrel', 'jackal', 'warden', 'puncher', 'light1', 'sniper1'];   // #75 makes this unlock-aware
-export const MECH_INFO = NAMES.roles;
+// The selectable mechs, in selector order. Locked ones are in the list too:
+// the selector shows them as silhouettes, and they cannot launch.
+export const MECH_ORDER = ['kestrel', 'jackal', 'warden', 'light1', 'sniper1', 'puncher'];
+export const isUnlocked = (key, cleared) => (CHASSIS[key]?.unlock || 0) <= cleared;
+// A locked chassis on show: a near-black silhouette, except the one that
+// stays purple (on purpose: it is the game's set piece).
+const SILHOUETTE = [0.07, 0.07, 0.08];
+export function lockedLook(ch) {
+  if (ch.lockedInColour) { const c = ch.col.map(v => v * 0.7); return { col: c, acc: c }; }
+  return { col: SILHOUETTE, acc: SILHOUETTE };
+}   // #75 makes this unlock-aware
+export const MECH_INFO = NAMES.roles;   // what the menu says about each one
 
 export const HPK = ['T', 'LA', 'RA', 'LL', 'RL'];
 export const SECT_NAME = NAMES.sections;

@@ -212,6 +212,7 @@ html, body {
 .mm-mech span { font: 900 26px "Arial Black", Impact, sans-serif; letter-spacing: 3px; color: #fff; }
 .mm-mech button { font-size: 26px; }
 .mm-role { color: #fc3; font-size: 11px; letter-spacing: 1px; }
+.mm-role.locked { color: #8a8f86; }
 .mm-kit { color: #7f7; font-size: 11px; margin: 2px 0 8px; }
 .mm-stats { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: center; font-size: 10px; color: #2a9a2a; text-align: left; }
 .mm-stats i { display: block; height: 6px; background: #031203; border: 1px solid #1a4a1a; }

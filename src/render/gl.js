@@ -1,7 +1,7 @@
 import { M } from '../util/math.js';
 import { Builder } from '../mesh/builder.js';
 import { buildMechParts } from '../mesh/mechParts.js';
-import { CHASSIS } from '../data/chassis.js';
+import { CHASSIS, lockedLook } from '../data/chassis.js';
 import { MP_COLORS } from '../data/colors.js';
 
 // The WebGL side: context, the two shaders, mesh upload, the per-draw call,
@@ -83,6 +83,12 @@ export function createRenderer(cv) {
   }
 
   // A mesh set per chassis + multiplayer colour, built the first time it's needed.
+  // A locked chassis's silhouette (lockedLook), built the first time it's shown.
+  function partsKeyLocked(type) {
+    const key = `${type}:locked`;
+    if (!mechParts[key]) mechParts[key] = Object.fromEntries(Object.entries(buildMechParts({ ...CHASSIS[type], ...lockedLook(CHASSIS[type]) })).map(([n, b]) => [n, upload(b)]));
+    return key;
+  }
   function partsKeyFor(color, type = 'kestrel') {
     if (!CHASSIS[type]) type = 'kestrel';
     const key = `${type}:${color}`;
@@ -113,5 +119,5 @@ export function createRenderer(cv) {
   };
 
 
-  return Object.assign(R, { gl, prog, skyProg, U, A, SU, skyBuf, upload, meshes, mechParts, partsKeyFor, draw });
+  return Object.assign(R, { gl, prog, skyProg, U, A, SU, skyBuf, upload, meshes, mechParts, partsKeyFor, partsKeyLocked, draw });
 }
