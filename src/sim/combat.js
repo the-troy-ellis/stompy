@@ -225,7 +225,7 @@ function round(G, m, w, mz, dir) {
   G.shots.push({ kind: 'shell', type: w.type, p: mz, v: mul(dir, d.speed), owner: m, dmg: d.dmg, life: d.range / d.speed });
   if (mp(G) && m === G.player) G.fx.netSend(fxShell(mz, mul(dir, d.speed), w.type));
   for (let i = 0; i < (d.burst ? 2 : 5); i++) particle(G, add(mz, mul(dir, 1.5)), add(mul(dir, r.range(4, 12)), [r.range(-2, 2), r.range(-1, 2), r.range(-2, 2)]), 0.15, 0.6, [1, 0.8, 0.3], 'fire');
-  G.fx.sfx.cannon(mz, d.sound);
+  G.fx.sfx[d.sfx || 'cannon'](mz);
   m.flash = { frame: G.frame, p: mz, dir, big: !d.burst };   // muzzle flash, drawn for two frames
   // The recoil's rock (wobble, squash) shows on whoever fires it; the rest only on the player.
   if (m === G.player || d.recoil) feel(G, d.bolt ? 'fireBolt' : d.recoil ? 'fireGauss' : d.burst ? 'fireMg' : 'fireAc', { mech: m, dir: [-dir[0], -dir[2]], at: m === G.player ? null : mz });

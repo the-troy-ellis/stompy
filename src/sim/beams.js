@@ -57,11 +57,12 @@ export function toast(G, t, amt) {
   const q = G.pendingHits.get(t.netId);
   if (q) q.hh = (q.hh || 0) + amt;
 }
-// The start-of-fire sound: a roar for a flamer, the small zap for the light
-// lasers, the big one otherwise.
+// The start-of-fire sound: each recipe among the beams once (TOASTER's
+// roar), and one laser zap for the rest, small for the light ones.
 function beamSound(G, m, lasers, at) {
-  if (lasers.some(w => w.def.cone)) G.fx.sfx.flame(at);
-  if (lasers.some(w => !w.def.cone)) { const l = lasers.find(w => !w.def.cone); G.fx.sfx.laser(at, l.def.tons < 5); }
+  for (const k of new Set(lasers.map(w => w.def.sfx).filter(Boolean))) G.fx.sfx[k](at);
+  const l = lasers.find(w => !w.def.sfx);
+  if (l) G.fx.sfx.laser(at, l.def.tons < 5);
 }
 // A flamer draws no line: a cone of fire puffs from the muzzle that spread
 // and reach the end in about a fifth of a second.

@@ -1,6 +1,8 @@
 import { NAMES } from './names.js';
 
 const n = NAMES.weapons;
+// `sfx` names a weapon's own sound recipe (audio/sound.js); without one, shells
+// use the cannon and beams the laser zap.
 export const WEAPONS = {
   // Lasers are continuous beams: damage per second (dps) climbs the longer
   // a beam stays on one mech -- its armour melts (see MELT_T / MELT_MAX) -- and heat per second
@@ -13,19 +15,19 @@ export const WEAPONS = {
   plaser: { name: n.plaser, kind: 'beam',    dps: 2.6, hps: 8,  range: 300, col: [1, 0.55, 0.15], w: 0.15, cd: 1, tons: 3, fp: 2.6, meltRate: 1.5, stutter: 12 },
   // Forces shutdowns at knife range: a `cone` of fire instead of a line, and
   // `targetHeat` (per second) poured into whatever it is on.
-  flamer: { name: n.flamer, kind: 'beam',    dps: 0.8, hps: 3,  range: 90,  col: [1, 0.5, 0.12], w: 0.1, cd: 1, tons: 1.5, fp: 0.8, targetHeat: 6, cone: true },
+  flamer: { name: n.flamer, kind: 'beam',    dps: 0.8, hps: 3,  range: 90,  col: [1, 0.5, 0.12], w: 0.1, cd: 1, tons: 1.5, fp: 0.8, targetHeat: 6, cone: true, sfx: 'toaster' },
   // The autocannon is the opposite: big individual hits, little heat, ammo.
   // The sniper's gun: a bright tracer, a heavy `recoil` that rocks the shooter
   // back a step (m/s on its push), and a `knock` on the target worth a shove.
-  gauss:  { name: n.gauss, kind: 'shell', dmg: 20, heat: 1, cd: 3.2, range: 800, speed: 700, ammo: 12, knock: 6, recoil: 1.6, tracer: [0.85, 0.95, 1], sound: 'heavy', tons: 12, fp: 6.3 },
+  gauss:  { name: n.gauss, kind: 'shell', dmg: 20, heat: 1, cd: 3.2, range: 800, speed: 700, ammo: 12, knock: 6, recoil: 1.6, tracer: [0.85, 0.95, 1], sfx: 'bonker', tons: 12, fp: 6.3 },
   // Strips a melted section fast: each trigger pull is a `burst` of n rounds,
   // dt apart (ammo and heat are per burst, damage per round), with a little jitter.
-  mg:     { name: n.mg, kind: 'shell', dmg: 0.8, heat: 0.2, cd: 0.5, range: 220, speed: 520, ammo: 60, burst: { n: 6, dt: 0.05 }, jitter: 0.012, tracer: [1, 0.85, 0.45], tw: 0.18, tl: 3.5, sound: 'light', tons: 1, fp: 9.6 },
+  mg:     { name: n.mg, kind: 'shell', dmg: 0.8, heat: 0.2, cd: 0.5, range: 220, speed: 520, ammo: 60, burst: { n: 6, dt: 0.05 }, jitter: 0.012, tracer: [1, 0.85, 0.45], tw: 0.18, tl: 3.5, sfx: 'peashooter', tons: 1, fp: 9.6 },
   ac:     { name: n.ac, kind: 'shell',  dmg: 11,  heat: 2,  cd: 1.1, range: 650, speed: 340, ammo: 30, tons: 8, fp: 10 },
   // A slow blue bolt: a shell with `bolt` set (drawn as a bolt, fired with the
   // energy weapons). Its hit scrambles the target's HUD for `scramble` s and
   // gives it a hard wobble (FEEL.bolt).
-  ppc:    { name: n.ppc, kind: 'shell', bolt: true, dmg: 14, heat: 11, cd: 3.5, range: 600, speed: 420, scramble: 1.5, col: [0.45, 0.7, 1], tons: 7, fp: 4 },
+  ppc:    { name: n.ppc, kind: 'shell', bolt: true, dmg: 14, heat: 11, cd: 3.5, range: 600, speed: 420, scramble: 1.5, col: [0.45, 0.7, 1], tons: 7, fp: 4, sfx: 'thunderclap' },
   // Dumb-fire spread that pops: no homing (`homing: false`), no lock or minimum
   // range for the AI, hold-to-guide still works, and each hit shoves (`knock`, m/s).
   srm:    { name: n.srm, kind: 'missile', homing: false, dmg: 2.6, heat: 4, cd: 3, range: 260, speed: 160, ammo: 18, count: 6, knock: 1.2, spread: 0.035, lift: 0.02, tons: 3, fp: 5.2 },   // tighter and flatter than a homing volley: it cannot correct
