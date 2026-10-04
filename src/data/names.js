@@ -7,13 +7,14 @@ export const NAMES = {
   weapons: { laser: 'LG LASER', mlaser: 'MED LASER', ac: 'AUTOCANNON', lrm: 'LRM-10', fusion: 'FUSION CANNON', ppc: 'THUNDERCLAP', plaser: 'PEPPER LASER', srm: 'FIRECRACKERS', gauss: 'BIG BONKER', mg: 'PEASHOOTER', flamer: 'TOASTER' },
   // What the menu says about each selectable mech.
   roles: {
-    kestrel: { role: 'REVERSE-JOINT · MEDIUM ALL-ROUNDER', kit: '2x LG LASER · AUTOCANNON · LRM-10 · FUSION', fire: 0.75 },
-    jackal: { role: 'FORWARD-JOINT · LIGHT, FAST', kit: '2x MED LASER · FUSION', fire: 0.35 },
-    warden: { role: 'QUADRUPED · HEAVY FIRE SUPPORT', kit: 'LG LASER · AUTOCANNON · LRM-10 · FUSION', fire: 0.85 },
+    kestrel: { role: 'REVERSE-JOINT · DOES A BIT OF EVERYTHING', kit: '2x LG LASER · AUTOCANNON · LRM-10 · FUSION', fire: 0.75 },
+    jackal: { role: 'FORWARD-JOINT · FAST, FLIMSY', kit: '2x MED LASER · FUSION', fire: 0.35 },
+    warden: { role: 'QUADRUPED · SLOW, STUBBORN', kit: 'LG LASER · AUTOCANNON · LRM-10 · FUSION', fire: 0.85 },
     puncher: { role: 'ASSAULT · IT PUNCHES', kit: 'AUTOCANNON · FIRECRACKERS · FUSION · FISTS', fire: 0.45 },
     light1: { role: 'REVERSE-JOINT · SMALL, RUDE', kit: 'FIRECRACKERS · MED LASER · PEASHOOTER · FUSION', fire: 0.4 },
     sniper1: { role: 'FORWARD-JOINT · LONG GUN, LONG LEGS', kit: 'BIG BONKER · THUNDERCLAP · MED LASER · FUSION', fire: 0.7 },
   },
+  locked: n => `LOCKED · CLEAR MISSION ${n}`,
   cats: { energy: 'ENERGY', ballistic: 'BALLISTIC', missile: 'MISSILE', fusion: 'FUSION' },
   sections: { T: 'Torso', LA: 'Left arm', RA: 'Right arm', LL: 'Left leg', RL: 'Right leg' },
 };

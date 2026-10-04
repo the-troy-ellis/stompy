@@ -51,6 +51,13 @@ try {
     const stock = await page.evaluate(() => [document.querySelector('.mm-launch')?.disabled, window.__stompy.game.player.weapons.map(w => w.type).join(',')]);
     if (stock[0] || stock[1] !== 'laser,laser,ac,lrm,fusion') { failed = true; console.error(`FAIL: RESET did not restore stock (${stock})`); }
     await page.click('[data-lab="back"]');
+    // The selector: PIPSQUEAK is fourth and locked on a fresh save; LAUNCH says so and does nothing.
+    for (let i = 0; i < 3; i++) await page.click('[data-mech="1"]');
+    const lock = await page.evaluate(() => [document.querySelector('.mm-launch')?.disabled, document.querySelector('.mm-launch')?.textContent, document.querySelector('.mm-role')?.textContent, !!document.querySelector('.mm-fit')]);
+    console.log(`desktop: ${lock[2]}; launch ${lock[1]} disabled=${lock[0]}`);
+    if (!lock[0] || lock[1] !== 'LOCKED' || !/^LOCKED/.test(lock[2]) || lock[3]) { failed = true; console.error(`FAIL: a locked chassis could launch or fit (${lock})`); }
+    await page.screenshot({ path: 'test-results/smoke-locked.png' });
+    for (let i = 0; i < 3; i++) await page.click('[data-mech="-1"]');
     await page.click('[data-sel="settings"]');
     await page.click('[data-opt="frameTime"]');   // the readout on, through the setting rather than ?debug
     await page.click('[data-set="fov"][data-d="1"]');

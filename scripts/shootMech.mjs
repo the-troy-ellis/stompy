@@ -14,9 +14,11 @@ const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || 
 const out = name => `test-results/mech-${key}-${name}.png`;
 try {
   // The menu, with this chassis selected, at desktop and phone-sideways size.
-  for (const [name, vp] of [['menu', { width: 1024, height: 640 }], ['menu-phone', { width: 740, height: 360 }]]) {
+  // SHOOT_LOCKED=1: as a new player sees it, before the campaign unlocks it.
+  const lockedRun = !!process.env.SHOOT_LOCKED, sfx = lockedRun ? '-locked' : '';
+  for (const [name, vp] of [['menu' + sfx, { width: 1024, height: 640 }], ['menu-phone' + sfx, { width: 740, height: 360 }]]) {
     const page = await browser.newPage({ viewport: vp });
-    await page.goto(`http://localhost:${PORT}/?debug=1`);
+    await page.goto(`http://localhost:${PORT}/?debug=1${lockedRun ? '' : '&unlock'}`);
     await page.evaluate(k => localStorage.setItem('stompy.mech.chassis', JSON.stringify(k)), key);
     await page.reload();
     await page.waitForSelector('.mm-title');
@@ -26,9 +28,10 @@ try {
     await page.screenshot({ path: out(name) });
     await page.close();
   }
+  if (!lockedRun) {
   // In the field, from a KESTREL's cockpit.
   const page = await browser.newPage({ viewport: { width: 1024, height: 640 } });
-  await page.goto(`http://localhost:${PORT}/?debug=1`);
+  await page.goto(`http://localhost:${PORT}/?debug=1&unlock`);
   await page.waitForSelector('.mm-title');
   await page.evaluate(() => localStorage.setItem('stompy.mech.chassis', JSON.stringify('kestrel')));
   await page.reload();
@@ -78,6 +81,7 @@ try {
     await page.waitForTimeout(160);
     await page.evaluate(() => { window.__stompy.app.ui.pause(true); document.querySelector('.mech-overlay').hidden = true; });
     await page.screenshot({ path: out('punch') });
+  }
   }
   console.log(`wrote test-results/mech-${key}-*.png`);
 } finally { await browser.close(); server.kill(); }

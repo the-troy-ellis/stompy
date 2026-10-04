@@ -2,7 +2,8 @@ import { $, esc } from '../util/dom.js';
 import { store } from '../util/store.js';
 import { clampN } from '../util/math.js';
 import { CATS, CAT_OF } from '../data/weapons.js';
-import { CHASSIS, MECH_ORDER, MECH_INFO } from '../data/chassis.js';
+import { CHASSIS, MECH_ORDER, MECH_INFO, isUnlocked } from '../data/chassis.js';
+import { NAMES } from '../data/names.js';
 import { PALS } from '../data/palettes.js';
 import { missionDef, FP_MAPS } from '../data/missions.js';
 import { MP_COLORS } from '../data/colors.js';
@@ -108,8 +109,12 @@ export function createUi(app) {
     renderMenu(status);
   }
   // The mech on show: multiplayer shows it in your arena colour.
+  // Missions cleared, ever: a restarted campaign keeps what it unlocked. ?unlock opens everything (for testing).
+  const unlockAll = new URLSearchParams(location.search).has('unlock');
+  const cleared = () => max(store.get('mech.mission', 0), store.get('mech.best', 0));
+  const locked = k => !unlockAll && !isUnlocked(k, cleared());
   function showMech() {
-    const key = prefs.menuSel === 'mp' ? app.R.partsKeyFor(prefs.mpColor, prefs.chassis) : prefs.chassis;
+    const key = locked(prefs.chassis) ? app.R.partsKeyLocked(prefs.chassis) : prefs.menuSel === 'mp' ? app.R.partsKeyFor(prefs.mpColor, prefs.chassis) : prefs.chassis;
     G.player = newMech(G, prefs.chassis, 0, 0, 0, 0, { partsKey: key, loadout: fitOf(prefs.chassis) });
     G.mechs = [G.player];
     menuTick(0);
@@ -159,30 +164,31 @@ export function createUi(app) {
     const hpSum = c => Object.values(CHASSIS[c].hp).reduce((a, v) => a + v, 0);
     const maxHp = max(...MECH_ORDER.map(hpSum)), maxSpeed = max(...MECH_ORDER.map(c => CHASSIS[c].speed));
     const bar = (label, f) => `<span>${label}</span><i><b style="width:${Math.round(f * 100)}%"></b></i>`;
-    const heavy = !fitOk(prefs.chassis), lab = app.mechlab.fit.open;
-    const launchLabel = heavy ? 'OVERWEIGHT' : { campaign: 'LAUNCH', free: 'LAUNCH', mp: 'JOIN ARENA' }[prefs.menuSel];
+    const shut = locked(prefs.chassis), heavy = !shut && !fitOk(prefs.chassis), lab = app.mechlab.fit.open && !shut;
+    const launchLabel = shut ? 'LOCKED' : heavy ? 'OVERWEIGHT' : { campaign: 'LAUNCH', free: 'LAUNCH', mp: 'JOIN ARENA' }[prefs.menuSel];
     showOverlay(`
       <div class="mm">
         <div class="mm-left">
           <div class="mm-title">STOMPY</div>
           ${lab ? `<div class="mm-detail mm-lab">${app.mechlab.html()}</div>` : `<nav class="mm-items">${MENU.map(([k, label]) => `<button class="mm-item${k === prefs.menuSel ? ' on' : ''}" data-sel="${k}">${label}</button>`).join('')}</nav>
           <div class="mm-detail">${menuDetail(status)}</div>`}
-          ${launchLabel ? `<button class="mm-launch" data-a="go"${heavy ? ' disabled' : ''}>${launchLabel}</button>` : ''}
+          ${launchLabel ? `<button class="mm-launch" data-a="go"${heavy || shut ? ' disabled' : ''}>${launchLabel}</button>` : ''}
         </div>
         <div class="mm-right">
           <div class="mm-select">
             <div class="mm-label">SELECT MECH</div>
             <div class="mm-mech"><button data-mech="-1" aria-label="Previous mech">◀</button><span>${ch.name}</span><button data-mech="1" aria-label="Next mech">▶</button></div>
-            <div class="mm-role">${info.role}</div>
+            <div class="mm-role${shut ? ' locked' : ''}">${shut ? NAMES.locked(ch.unlock) : info.role}</div>
             <div class="mm-kit">${kitLine(prefs.chassis)}</div>
             <div class="mm-stats">${bar('SPEED', ch.speed / maxSpeed)}${bar('ARMOR', hpSum(prefs.chassis) / maxHp)}${bar('FIREPOWER', info.fire)}</div>
-            ${lab ? '' : '<button class="opt mm-fit" data-a="fit">FIT</button>'}
+            ${lab || shut ? '' : '<button class="opt mm-fit" data-a="fit">FIT</button>'}
           </div>
         </div>
       </div>`, 'menu');
   }
 
   function go() {
+    if (locked(prefs.chassis)) return;   // LOCKED: clear more missions
     if (!fitOk(prefs.chassis)) return;   // OVERWEIGHT: fix it in FIT first
     if (prefs.menuSel === 'campaign') { startMission(prefs.mission); launch(); }
     else if (prefs.menuSel === 'free') { startSkirmish(); launch(); }
@@ -212,7 +218,7 @@ export function createUi(app) {
     const s = G.stats, acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
     const tm = `${floor(G.time / 60)}:${String(floor(G.time % 60)).padStart(2, '0')}`;
     const camp = G.kind === 'campaign';
-    if (G.won && camp) store.set('mech.mission', max(store.get('mech.mission', 0), prefs.mission + 1));
+    if (G.won && camp) { store.set('mech.mission', max(store.get('mech.mission', 0), prefs.mission + 1)); store.set('mech.best', max(store.get('mech.best', 0), prefs.mission + 1)); }
     showOverlay(`
       <h1 style="color:${G.won ? '#5f5' : '#f44'}">${G.won ? 'MISSION COMPLETE' : 'MECH DESTROYED'}</h1>
       <div class="panel">
@@ -252,7 +258,7 @@ export function createUi(app) {
     if (a === 'full') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); return; }
     if (a === 'diff') { cycleDiff(1); e.target.closest('[data-a]').textContent = diffLabel(); return; }
     if (G.state === 'menu' && app.mechlab.click(e)) return;
-    if (a === 'fit') { app.mechlab.open(true); return; }
+    if (a === 'fit') { if (!locked(prefs.chassis)) app.mechlab.open(true); return; }
     const dial = e.target.closest('[data-set]');
     if (dial) {
       const k = dial.dataset.set;
@@ -293,6 +299,7 @@ export function createUi(app) {
     prefs.chassis = MECH_ORDER[(MECH_ORDER.indexOf(prefs.chassis) + d + MECH_ORDER.length) % MECH_ORDER.length];
     store.set('mech.chassis', prefs.chassis);
     app.mechlab.fit.row = 0;
+    if (locked(prefs.chassis)) app.mechlab.fit.open = false;   // nothing to fit on a silhouette
     showMech(); renderMenu();
   }
   ov.addEventListener('input', e => { if (e.target.matches('.callsign')) { prefs.mpName = e.target.value.toUpperCase().slice(0, 12); store.set('mp.name', prefs.mpName); } });
