@@ -34,7 +34,7 @@ test('the stock loadout is exactly what each chassis always carried, and uses ab
 test('validate drops unknown hardpoints, resets wrong or unknown weapons to stock, keeps EMPTY, clamps levels, and flags overweight', () => {
   const v = validate('kestrel', { hp: { la: 'mlaser', ra: 'ac', t1: 'nope', t2: null, zz: 'laser' }, sys: { sinks: 9, armour: -1, jets: 1.5 } });
   assert.deepEqual(v.loadout.hp, { la: 'mlaser', ra: 'laser', t1: 'ac', t2: null });
-  assert.deepEqual(v.loadout.sys, { sinks: 3, armour: 0, jets: 1 });
+  assert.deepEqual(v.loadout.sys, { sinks: 3, armour: 0, jets: 1, knuckles: 0 });
   assert.equal(v.ok, true);
   assert.deepEqual(validate('jackal', null).loadout, stockLoadout('jackal'), 'junk is stock');
   assert.deepEqual(validate('jackal', 'x').loadout, stockLoadout('jackal'));

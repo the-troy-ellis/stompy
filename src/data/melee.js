@@ -15,7 +15,8 @@ export const FIST_MELEE = {
 export const meleeOf = m => {
   const f = m.ch.melee;
   if (!f) return DEFAULT_MELEE;
-  return f.fists && m.hp && m.hp.LA <= 0 && m.hp.RA <= 0 ? DEFAULT_MELEE : f;
+  if (f.fists && m.hp && m.hp.LA <= 0 && m.hp.RA <= 0) return DEFAULT_MELEE;
+  return m.fistMelee || f;   // KNUCKLES fitted (loadout.js builds it)
 };
 // Which fist throws this punch: they take turns, skipping a lost arm.
 export function punchArm(m) {

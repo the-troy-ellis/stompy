@@ -1,9 +1,9 @@
 import { CHASSIS, HPK } from '../data/chassis.js';
 import { WEAPONS, CAT_OF } from '../data/weapons.js';
-import { SYSTEMS, SYSTEM_KEYS, SINK_PER_LEVEL, ARMOUR_HP, ARMOUR_SPEED } from '../data/systems.js';
+import { SYSTEMS, SYSTEM_KEYS, SINK_PER_LEVEL, ARMOUR_HP, ARMOUR_SPEED, KNUCKLES_MULT } from '../data/systems.js';
 
 // Mechlab-lite (docs/specs/02-mechlab.md § Data). A loadout is
-// { hp: { <hardpoint id>: <weapon key> | null }, sys: { sinks, armour, jets } }.
+// { hp: { <hardpoint id>: <weapon key> | null }, sys: { sinks, armour, jets, knuckles } }.
 // Chassis identity is the hardpoint map; the loadout only picks which weapon
 // of the hardpoint's category sits in it, and the system levels.
 
@@ -12,7 +12,7 @@ const clampInt = (v, lo, hi, def) => (Number.isInteger(v) ? Math.min(hi, Math.ma
 
 export function stockLoadout(chassis) {
   const ch = chassisOf(chassis);
-  return { hp: Object.fromEntries(ch.hardpoints.map(h => [h.id, h.stock])), sys: { ...ch.systems } };
+  return { hp: Object.fromEntries(ch.hardpoints.map(h => [h.id, h.stock])), sys: Object.fromEntries(SYSTEM_KEYS.map(k => [k, ch.systems[k] ?? 0])) };
 }
 
 // The weapons that may sit in a hardpoint: every weapon of its category, and EMPTY (null).
@@ -39,7 +39,7 @@ export function validate(chassis, loadout) {
     hp[h.id] = w === null ? null : WEAPONS[w] && CAT_OF[w] === h.cat ? w : h.stock;
   }
   const sys = {};
-  for (const k of SYSTEM_KEYS) sys[k] = clampInt(inSys[k], 0, sysMax(ch, k), ch.systems[k]);
+  for (const k of SYSTEM_KEYS) sys[k] = clampInt(inSys[k], 0, sysMax(ch, k), ch.systems[k] ?? 0);
   const out = { hp, sys }, tons = tonsOf(ch, out);
   return { loadout: out, tons, ok: tons <= ch.tons };
 }
@@ -60,6 +60,7 @@ export function derived(chassis, loadout) {
     maxSpeed: ch.speed * (1 - ARMOUR_SPEED * s.armour),
     hp: Object.fromEntries(HPK.map(k => [k, Math.round(ch.hp[k] * hpScale)])),
     jets: s.jets,
+    knuckles: s.knuckles || 0,
   };
 }
 
@@ -85,6 +86,8 @@ export function applyLoadout(G, m, loadout) {
   m.loadout = lo;
   m.weapons = weaponList(ch, lo).map(([w, mount], i) => ({ type: w, def: WEAPONS[w], mount, cd: rng.next() * 0.5, ammo: WEAPONS[w].ammo || null, dead: false, side: i }));
   m.sink = d.sink; m.maxSpeed = d.maxSpeed; m.jets = d.jets;
+  // KNUCKLES: the fists' block with dmg and knock up (meleeOf reads it).
+  m.fistMelee = d.knuckles && ch.melee?.fists ? { ...ch.melee, dmg: ch.melee.dmg * KNUCKLES_MULT, knock: ch.melee.knock * KNUCKLES_MULT } : null;
   m.hp = { ...d.hp }; m.max = { ...d.hp };
   return m;
 }
@@ -98,7 +101,13 @@ export function cycleWeapon(chassis, loadout, id, d) {
   return { hp: { ...loadout.hp, [id]: c[(i + d + c.length) % c.length] }, sys: { ...loadout.sys } };
 }
 // A system's top level on this chassis: the system's own, or lower where the chassis caps it.
-export const sysMax = (chassis, key) => Math.min(SYSTEMS[key].max, chassisOf(chassis).sysMax?.[key] ?? Infinity);
+export const sysMax = (chassis, key) => {
+  const ch = chassisOf(chassis), s = SYSTEMS[key];
+  if (s.needs === 'fists' && !ch.melee?.fists) return 0;   // no fists, no slot
+  return Math.min(s.max, ch.sysMax?.[key] ?? Infinity);
+};
+// The system slots this chassis has (the FIT screen's rows).
+export const systemsFor = chassis => SYSTEM_KEYS.filter(k => sysMax(chassis, k) > 0);
 export function cycleSystem(loadout, key, d, chassis) {
   const n = (chassis ? sysMax(chassis, key) : SYSTEMS[key].max) + 1;
   return { hp: { ...loadout.hp }, sys: { ...loadout.sys, [key]: ((loadout.sys[key] || 0) + d + n) % n } };
@@ -121,6 +130,8 @@ export function loadoutFixture() {
     ['warden', { hp: [], sys: [] }],
     ['puncher', { hp: { t1: 'gauss', t2: 'lrm' }, sys: { sinks: 2, armour: 1, jets: 2 } }],
     ['puncher', { hp: { t1: 'mg', t2: null }, sys: { sinks: 3, armour: 2, jets: 1 } }],
+    ['puncher', { hp: { t1: 'ac', t2: 'srm' }, sys: { sinks: 0, armour: 0, jets: 0, knuckles: 1 } }],
+    ['kestrel', { hp: { la: 'laser' }, sys: { sinks: 0, armour: 0, jets: 1, knuckles: 1 } }],
   ];
   const cases = inputs.map(([ch, input]) => ({ ch, input, want: validate(ch, input) }));
   return { chassis, weapons, systems, cases };

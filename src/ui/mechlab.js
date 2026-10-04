@@ -2,8 +2,8 @@ import { store } from '../util/store.js';
 import { esc } from '../util/dom.js';
 import { CHASSIS, SECT_NAME } from '../data/chassis.js';
 import { WEAPONS, CAT_LABEL } from '../data/weapons.js';
-import { SYSTEMS, SYSTEM_KEYS } from '../data/systems.js';
-import { cycleSystem, cycleWeapon, stats, stockLoadout, validate } from '../sim/loadout.js';
+import { SYSTEMS } from '../data/systems.js';
+import { cycleSystem, cycleWeapon, stats, stockLoadout, systemsFor, validate } from '../sim/loadout.js';
 
 // The FIT screen (docs/specs/02-mechlab.md § Player experience): the
 // hardpoints and system slots of the chassis on show, each a row you tap (or
@@ -27,7 +27,7 @@ export function kitLine(k) {
 export function createMechlab(app) {
   const prefs = app.prefs;
   const fit = { open: false, row: 0 };
-  const rows = () => [...CHASSIS[prefs.chassis].hardpoints.map(h => ({ kind: 'hp', id: h.id })), ...SYSTEM_KEYS.map(k => ({ kind: 'sys', id: k }))];
+  const rows = () => [...CHASSIS[prefs.chassis].hardpoints.map(h => ({ kind: 'hp', id: h.id })), ...systemsFor(prefs.chassis).map(k => ({ kind: 'sys', id: k }))];
 
   function change(row, d) {
     const k = prefs.chassis, lo = fitOf(k);
@@ -46,7 +46,7 @@ export function createMechlab(app) {
       <span>${label}</span><button ${attrs} data-d="-1" aria-label="Previous">◀</button><b ${attrs} data-d="1">${value}</b><button ${attrs} data-d="1" aria-label="Next">▶</button></div>`;
     const hpRows = ch.hardpoints.map((h, i) => row(i, `${SECT_NAME[h.loc].toUpperCase()} · ${CAT_LABEL[h.cat]}`,
       lo.hp[h.id] ? WEAPONS[lo.hp[h.id]].name : 'EMPTY', `data-lab="hp" data-id="${h.id}"`));
-    const sysRows = SYSTEM_KEYS.map((s, j) => row(ch.hardpoints.length + j, SYSTEMS[s].label, SYSTEMS[s].show(lo.sys[s]), `data-lab="sys" data-id="${s}"`));
+    const sysRows = systemsFor(prefs.chassis).map((s, j) => row(ch.hardpoints.length + j, SYSTEMS[s].label, SYSTEMS[s].show(lo.sys[s]), `data-lab="sys" data-id="${s}"`));
     const f = v.tons / ch.tons, col = v.ok ? (f >= 1 ? 'amber' : '') : 'red';
     return `<div class="mm-label">FIT · ${esc(ch.name)}</div>
       <div class="lab">${hpRows.join('')}<div class="lab-gap"></div>${sysRows.join('')}</div>

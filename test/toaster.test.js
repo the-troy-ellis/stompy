@@ -57,7 +57,7 @@ test('long enough on it forces a shutdown', () => {
   assert.ok(e.shutdown, `heat ${e.heat.toFixed(1)}`);
 });
 
-test('on another pilot the heat rides the hit as hh (PROTOCOL 5)', () => {
+test('on another pilot the heat rides the hit as hh (PROTOCOL 5 on)', () => {
   const { G, e } = setup();
   G.mode = 'mp';
   Object.assign(e, { remote: true, netId: 7 });
@@ -66,7 +66,7 @@ test('on another pilot the heat rides the hit as hh (PROTOCOL 5)', () => {
   const hh = G.pendingHits.get(7)?.hh;
   assert.ok(Math.abs(hh - D.targetHeat * 0.5) < 0.3, `hh ${hh}`);
   assert.equal(e.heat, heat0, 'the remote copy does not heat here');
-  assert.equal(P.PROTOCOL, 5);
+  assert.ok(P.PROTOCOL >= 5);
   assert.equal(P.hit(7, 1, [0, 0, 0], false, { hh: 2.345 }).hh, 2.35);
   assert.equal(P.hit(7, 1, [0, 0, 0], false, {}).hh, undefined);
 });

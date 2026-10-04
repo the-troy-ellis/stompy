@@ -52,7 +52,7 @@ class Helpers(unittest.TestCase):
         stock = data.stock_loadout("kestrel")
         lo, rejected = data.check_loadout("kestrel", stock)
         self.assertEqual((lo, rejected), (stock, False))
-        custom = {"hp": {"la": "mlaser", "ra": "laser", "t1": None, "t2": "lrm"}, "sys": {"sinks": 2, "armour": 0, "jets": 1}}
+        custom = {"hp": {"la": "mlaser", "ra": "laser", "t1": None, "t2": "lrm"}, "sys": {"sinks": 2, "armour": 0, "jets": 1, "knuckles": 0}}
         self.assertEqual(data.check_loadout("kestrel", custom), (custom, False))
         self.assertEqual(data.check_loadout("kestrel", {"hp": {"la": "ac"}, "sys": stock["sys"]}), (stock, True))   # wrong category
         heavy = {"hp": {"la": "laser", "ra": "laser"}, "sys": {"sinks": 3, "armour": 2, "jets": 2}}
@@ -167,7 +167,7 @@ class Session(unittest.IsolatedAsyncioTestCase):
         a, _ = await self.join("A")
         b, _ = await self.join("B")
         await a.recv()
-        good = {"hp": {"la": "mlaser", "ra": "laser", "t1": "ac", "t2": "lrm"}, "sys": {"sinks": 1, "armour": 0, "jets": 1}}
+        good = {"hp": {"la": "mlaser", "ra": "laser", "t1": "ac", "t2": "lrm"}, "sys": {"sinks": 1, "armour": 0, "jets": 1, "knuckles": 0}}
         await a.send({"t": "s", "ch": "kestrel", "x": 0, "lo": good})
         self.assertEqual((await b.recv())["lo"], good)
         await a.send({"t": "s", "ch": "jackal", "x": 0, "lo": {"hp": {"la": "laser", "ra": "laser"}, "sys": {"sinks": 3, "armour": 2, "jets": 2}}})

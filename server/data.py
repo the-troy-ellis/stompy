@@ -24,7 +24,7 @@ def _level(v, top, default):
 
 def stock_loadout(chassis):
     ch = CHASSIS[chassis]
-    return {"hp": {h["id"]: h["stock"] for h in ch["hardpoints"]}, "sys": dict(ch["systems"])}
+    return {"hp": {h["id"]: h["stock"] for h in ch["hardpoints"]}, "sys": {k: ch["systems"].get(k, 0) for k in SYSTEMS}}
 
 
 def tons_of(chassis, loadout):
@@ -53,7 +53,7 @@ def validate_loadout(chassis, loadout):
         w = in_hp.get(h["id"])
         hp[h["id"]] = w if isinstance(w, str) and w in WEAPONS and WEAPONS[w]["cat"] == h["cat"] else h["stock"]
     top = ch.get("max", {})   # a chassis may cap a system lower (PURPLE PUNCHER: jets 1)
-    sys_ = {k: _level(in_sys.get(k), top.get(k, s["max"]), ch["systems"][k]) for k, s in SYSTEMS.items()}
+    sys_ = {k: _level(in_sys.get(k), top.get(k, s["max"]), ch["systems"].get(k, 0)) for k, s in SYSTEMS.items()}
     out = {"hp": hp, "sys": sys_}
     tons = tons_of(chassis, out)
     return out, tons, tons <= ch["tons"]
