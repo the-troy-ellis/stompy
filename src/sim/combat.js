@@ -227,7 +227,8 @@ function round(G, m, w, mz, dir) {
   for (let i = 0; i < (d.burst ? 2 : 5); i++) particle(G, add(mz, mul(dir, 1.5)), add(mul(dir, r.range(4, 12)), [r.range(-2, 2), r.range(-1, 2), r.range(-2, 2)]), 0.15, 0.6, [1, 0.8, 0.3], 'fire');
   G.fx.sfx.cannon(mz, d.sound);
   m.flash = { frame: G.frame, p: mz, dir, big: !d.burst };   // muzzle flash, drawn for two frames
-  if (m === G.player) feel(G, d.bolt ? 'fireBolt' : d.recoil ? 'fireGauss' : d.burst ? 'fireMg' : 'fireAc', { mech: m, dir: [-dir[0], -dir[2]] });
+  // The recoil's rock (wobble, squash) shows on whoever fires it; the rest only on the player.
+  if (m === G.player || d.recoil) feel(G, d.bolt ? 'fireBolt' : d.recoil ? 'fireGauss' : d.burst ? 'fireMg' : 'fireAc', { mech: m, dir: [-dir[0], -dir[2]], at: m === G.player ? null : mz });
   if (d.recoil) { const h = Math.hypot(dir[0], dir[2]) || 1; m.push[0] -= dir[0] / h * d.recoil; m.push[1] -= dir[2] / h * d.recoil; }   // rocks the shooter back a step, whoever it is
 }
 

@@ -44,10 +44,18 @@ export const CHASSIS = {
     tons: 25, frame: 12.5, systems: { sinks: 0, armour: 0, jets: 2 },
     hardpoints: [{ id: 'la', loc: 'LA', cat: 'missile', stock: 'srm' }, { id: 'ra', loc: 'RA', cat: 'energy', stock: 'mlaser' },
       { id: 't1', loc: 'T', cat: 'ballistic', stock: 'mg' }] },
+  // A medium sniper on stilts: tall legs, a narrow stance, a long gun arm.
+  sniper1: { name: NAMES.chassis.sniper1, legs: 'forward', style: 'sniper1', speed: 13, turn: 0.9, sink: 11, scale: 1, pref: 450, acc0: 0.02, ai: { profile: 'sniper' },
+    hp: { T: 60, LA: 26, RA: 26, LL: 36, RL: 36 }, col: [0.72, 0.7, 0.62], acc: [0.2, 0.45, 0.75],
+    geo: { hip: 5.4, l1: 3.0, l2: 2.8, radius: 2.2, armX: 1.9, armY: 1.9, eye: [0, 2.0, 1.4], acY: 1.3, rackY: 2.6,
+      legs: [{ hx: 0.7, hz: 0, fx: 0.8, fz: 0, ph: 0 }, { hx: -0.7, hz: 0, fx: -0.8, fz: 0, ph: 0.5 }] },
+    tons: 50, frame: 21.5, systems: { sinks: 0, armour: 0, jets: 0 }, sysMax: { jets: 1 },
+    hardpoints: [{ id: 'ra', loc: 'RA', cat: 'ballistic', stock: 'gauss' }, { id: 'la', loc: 'LA', cat: 'energy', stock: 'ppc' },
+      { id: 't1', loc: 'T', cat: 'energy', stock: 'mlaser' }] },
 };
 
 // The selectable mechs, in selector order, with what the menu says about them.
-export const MECH_ORDER = ['kestrel', 'jackal', 'warden', 'puncher', 'light1'];   // #75 makes this unlock-aware
+export const MECH_ORDER = ['kestrel', 'jackal', 'warden', 'puncher', 'light1', 'sniper1'];   // #75 makes this unlock-aware
 export const MECH_INFO = NAMES.roles;
 
 export const HPK = ['T', 'LA', 'RA', 'LL', 'RL'];

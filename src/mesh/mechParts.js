@@ -11,7 +11,7 @@ import { geoFor } from '../data/geo.js';
 // Where each style's arm barrel sits in arm space. The barrel is its own part
 // so an EMPTY arm hardpoint shows a bare arm, and each weapon can give it its
 // own proportions (BARREL in scene.js).
-export const BARREL_AT = { forward: [0, -1.15, 1.45], reverse: [0, -1.15, 1.45], quad: [0, -0.5, 1.6], puncher: [0, -1.15, 1.45], light1: [0, -0.85, 1.1] };
+export const BARREL_AT = { forward: [0, -1.15, 1.45], reverse: [0, -1.15, 1.45], quad: [0, -0.5, 1.6], puncher: [0, -1.15, 1.45], light1: [0, -0.85, 1.1], sniper1: [0, -1.0, 1.5] };
 export const styleOf = ch => ch.style || ch.legs;
 
 const part = f => { const b = new Builder(); f(b); return b; };
@@ -162,6 +162,28 @@ const BODY = {
         b.cube(chain(M.T(0, 0.2, 0), M.S(0.9, 0.6, 1.0)), dark);
       }),
       barrel: part(b => b.cube(chain(M.T(...BARREL_AT.light1), M.S(0.3, 0.3, 1.6)), dark)),
+    };
+  },
+  // BEANPOLE (sniper1, placeholder name): a slim torso with a visor, a tall
+  // sensor mast with a dish, a MED LASER stub on the front, and slim arms
+  // (the right one's BIG BONKER barrel is long, by BARREL).
+  sniper1(ch) {
+    const { c, dark, acc, glass } = palette(ch);
+    return {
+      torso: part(b => {
+        b.cube(chain(M.T(0, 1.25, 0), M.S(2.6, 2.3, 2.3)), c, 0.85, 0.85);
+        b.cube(chain(M.T(0, 1.95, 1.17), M.S(1.4, 0.45, 0.1)), glass);
+        b.cube(chain(M.T(0.7, 3.4, -0.5), M.S(0.18, 2.3, 0.18)), dark);    // the mast...
+        b.cube(chain(M.T(0.7, 4.6, -0.5), M.S(0.7, 0.22, 0.7)), acc);      // ...its cap...
+        b.cube(chain(M.T(0.7, 4.0, -0.3), M.S(0.55, 0.55, 0.1)), acc);     // ...and a dish
+        b.cube(chain(M.T(0, 1.0, -1.3), M.S(1.8, 1.4, 0.5)), dark);
+        b.cube(chain(M.T(-0.9, 1.3, 1.3), M.S(0.25, 0.25, 0.7)), dark);
+      }),
+      arm: part(b => {
+        b.cube(chain(M.T(0, -0.55, 0.1), M.S(0.8, 1.6, 1.0)), c);
+        b.cube(chain(M.T(0, 0.25, 0), M.S(1.05, 0.7, 1.25)), acc);
+      }),
+      barrel: part(b => b.cube(chain(M.T(...BARREL_AT.sniper1), M.S(0.34, 0.34, 2.4)), dark)),
     };
   },
   // The quadruped's turret: cockpit at the front, an LRM box on top.
