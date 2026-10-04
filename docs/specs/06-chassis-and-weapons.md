@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#65 THUNDERCLAP, #66 PEPPER LASER, #67 FIRECRACKERS, #68 BIG BONKER, #69 PEASHOOTER, #70 TOASTER shipped; names and numbers are proposals; PURPLE PUNCHER is confirmed) |
+| Status | in progress (#65 THUNDERCLAP, #66 PEPPER LASER, #67 FIRECRACKERS, #68 BIG BONKER, #69 PEASHOOTER, #70 TOASTER, #71 body-plan overrides and styles shipped; names and numbers are proposals; PURPLE PUNCHER is confirmed) |
 | Milestone | M2 |
 | Size | L (each chassis is an M issue; each weapon an S issue) |
 | Depends on | M0; AI profiles from [05-ai.md](05-ai.md); melee from [12-melee.md](12-melee.md) for PURPLE PUNCHER |
@@ -118,7 +118,7 @@ that is the wrong colour, then the footfalls.
 ### Body plan mechanics
 
 `GEO` gains per-chassis overrides: a chassis may name `legs: 'forward'` and a
-`geo: { hip, l1, l2, stride, swing }` partial that `geoOf(m)` merges. The
+`geo: { hip, l1, l2, stride, swing }` partial that `geoFor(ch)` (and so `geoOf(m)`) merges; moving `hip` moves `legTop`, `torsoY` and `height` with it. The
 mesh builders already size legs from `l1`/`l2`; torso and arm builders take a
 `style` string per chassis for the distinct silhouettes (`buildTorso(ch)`
 with a switch; `buildFist` for PURPLE PUNCHER). Keep each chassis's parts

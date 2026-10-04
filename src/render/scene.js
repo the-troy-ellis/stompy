@@ -6,7 +6,7 @@ import { solveKnee, limb } from '../sim/gait.js';
 import { meltFrac } from '../sim/beams.js';
 import { FEEL, HEAT, hotFrac } from '../data/feel.js';
 import { meleeOf } from '../data/melee.js';
-import { BARREL_AT } from '../mesh/mechParts.js';
+import { BARREL_AT, styleOf } from '../mesh/mechParts.js';
 import { WEAPONS } from '../data/weapons.js';
 
 // An arm gun's proportions by weapon: [thickness, length] against the stock barrel.
@@ -119,7 +119,7 @@ export function createScene(app) {
       // The arm's gun, shaped by what is fitted there; nothing for an EMPTY hardpoint.
       const w = m.weapons.find(x => x.mount === k && x.def.kind !== 'fusion');
       if (w && parts.barrel) {
-        const [bw, bl] = BARREL[w.type] || [1, 1], at = BARREL_AT[m.ch.legs] || BARREL_AT.forward;
+        const [bw, bl] = BARREL[w.type] || [1, 1], at = BARREL_AT[styleOf(m.ch)] || BARREL_AT[m.ch.legs] || BARREL_AT.forward;
         R.draw(parts.barrel, chain(AM, M.T(...at), M.S(bw, bw, bl), M.T(-at[0], -at[1], -at[2])), tint);
       }
     }

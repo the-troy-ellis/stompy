@@ -17,7 +17,7 @@ relay and its tests.
 | `src/sim/` | ~900 | **The simulation.** `state.js` (`createGame`, `newMech`, `startMatch`, `resetMatch`), `update.js` (`update(game, input, dt)`), `geom.js`, `effects.js`, `combat.js`, `mech.js`, `gait.js`, `beams.js`, `fusion.js`, `missiles.js`, `ai.js` with `ai/perception.js` (line of sight, belief, shout, search) and `ai/behaviours.js` (keepRange, harass, useCover, ridge, brawler, holdLine, avoidEdge, avoidAllies; `steer` runs a plan) and `ai/fire.js` (heat cap, lock, alpha, section targeting) and `ai/profiles.js` (a plan per chassis) and `ai/group.js` (shared fixes, the flanker), `melee.js`, `knock.js`, `feel.js`, `voice.js`, `loadout.js` (mechlab: stock, validate, apply, stats), `rng.js`, `fx.js`. No DOM, GL, audio or input imports (lint enforces it). |
 | `src/data/` | ~200 | Weapons, chassis, body plans (`geo.js`), palettes, missions, arena colours, and `names.js` (every display name, keyed). |
 | `src/world/` | ~110 | `terrain.js` (heights, `height(x, z)`, `BOUND`, a `flat` option for tests), `terrainMesh.js`. |
-| `src/mesh/` | ~140 | `builder.js` (flat-shaded triangle soup), `mechParts.js` (the three chassis' parts). |
+| `src/mesh/` | ~140 | `builder.js` (flat-shaded triangle soup), `mechParts.js` (each chassis's parts: legs by leg type, sized from its body plan; torso, arm and barrel by `style`). |
 | `src/render/` | ~730 | `gl.js` (`createRenderer`: context, shaders, `upload`, `draw`, mesh sets), `scene.js` (`createScene`: camera, sky, world, mechs with IK, effects), `hud.js` (`createHud`: the 2D instruments, the missile camera feed, the `?debug=1` readout). |
 | `src/audio/` | ~360 | `sound.js` (`createAudio`: unlock dance, samples over synthesis, spatialisation, loops, `sfx.*`, the voice `say`, the beam and scan tones, `tick`). |
 | `src/input/` | ~220 | `input.js` (`createInput`: keyboard, mouse with pointer lock, touch stick/aim/buttons, one per-frame `snapshot()`). |
@@ -84,8 +84,8 @@ homing, blast), `fusion`. Fire controls are by **category** (`CATS`,
 design.
 
 **Chassis** (`CHASSIS`, line 169) hold speed, turn rate, heat sink rate,
-scale, AI preferred range and accuracy, per-section HP, colours, and a fixed
-`weapons: [[type, mount], ...]` list. `legs` names a body plan in `GEO`.
+scale, AI preferred range and accuracy, per-section HP, colours, and the
+mechlab block (`tons`, `frame`, `hardpoints`, `systems`; see the loadout section). `legs` names a body plan in `GEO`; an optional `geo` partial overrides any of it (`geoFor(ch)`, which `geoOf(m)` calls), and an optional `style` picks the torso and arms (default: the leg type).
 
 **Missions** (`MISSIONS`, line 198) are `{ name, pal, foes[], intel }`;
 `missionDef(n)` returns hand-authored ones for n < 4 and procedural contracts
@@ -188,7 +188,7 @@ src/
   data/
     weapons.js     WEAPONS, CATS, CAT_OF, CAT_LABEL, CAT_KEY
     chassis.js     CHASSIS, MECH_ORDER, MECH_INFO, hardpoints (M2)
-    geo.js         GEO body plans
+    geo.js         GEO body plans, geoFor (per-chassis overrides)
     palettes.js    PALS and weather/time variants (M4)
     missions.js    MISSIONS, missionDef, objective definitions (M3)
     colors.js      MP_COLORS
@@ -199,7 +199,7 @@ src/
     props.js       buildings, rocks, structures as entities (M3/M4)
   mesh/
     builder.js     Builder
-    mechParts.js   buildMechParts / Reverse / Quad
+    mechParts.js   buildMechParts: LEGS by leg type, BODY by style
   sim/
     state.js       createGame(): the G object and factories (newMech)
     mech.js        stepMech, heat, shutdown
