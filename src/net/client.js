@@ -246,11 +246,11 @@ export function createNet(app) {
       const d = WEAPONS[f.w] || WEAPONS.laser;
       G.beams.push({ a: f.a, b: f.b, col: d.col, w: d.w, life: 0.14, max: 0.14 });
       for (let i = 0; i < 4; i++) particle(G, f.b, [rnd(-4, 4), rnd(1, 6), rnd(-4, 4)], 0.25, 0.35, d.col, 'fire');
-      app.audio.sfx.laser(f.a, d === WEAPONS.mlaser);
+      if (d.sfx) app.audio.sfx[d.sfx](f.a); else app.audio.sfx.laser(f.a, d.tons < 5);
     } else if (f.k === 's') {
       const d = WEAPONS[f.w]?.kind === 'shell' ? WEAPONS[f.w] : WEAPONS.ac;
       G.shots.push({ kind: 'shell', type: WEAPONS[f.w] ? f.w : 'ac', p: f.p, v: f.v, owner: src, dmg: 0, life: d.range / d.speed, ghost: true });
-      app.audio.sfx.cannon(f.p, d.sound);
+      app.audio.sfx[d.sfx || 'cannon'](f.p);
     } else if (f.k === 'm') {
       const d = WEAPONS[f.w]?.kind === 'missile' ? WEAPONS[f.w] : WEAPONS.lrm, target = f.tg ? mechById(f.tg) : null;
       for (let i = 0; i < d.count; i++) {

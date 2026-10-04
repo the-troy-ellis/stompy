@@ -233,27 +233,49 @@ export function createAudio(app) {
       if (play(small ? 'mlaser' : 'laser', { ...at, vol: small ? 0.35 : 0.5, rate: small ? 1 : 0.85 })) return;
       this.osc('sawtooth', 1900, 180, 0.28, 0.05, at); this.osc('sine', 900, 120, 0.3, 0.05, at);
     },
-    // The autocannon is a thunk first and a bang second. Heavy (BIG BONKER)
-    // is the same thunk an octave down, carrying twice as far, with a crack on
-    // top; light (PEASHOOTER) is one tick of a rattle, per round.
-    cannon(p, size) {
-      const heavy = size === 'heavy';
-      if (size === 'light') {
-        if (!play('crunch', { at: p, ref: 30, vol: 0.2, rate: 2.6, vary: 0.2 })) this.noise(0.05, 0.12, 2500, 900, 'bandpass', { at: p, ref: 30 });
-        return;
-      }
-      const at = { at: p, ref: heavy ? 80 : 40 };
-      play('punch', { ...at, vol: heavy ? 1.1 : 0.9, rate: heavy ? 0.5 : 0.7 });
+    // The autocannon is a thunk first and a bang second.
+    cannon(p) {
+      const at = { at: p, ref: 40 };
+      play('punch', { ...at, vol: 0.9, rate: 0.7 });
       play('crunch', { ...at, vol: 0.45, rate: 1.25 });
-      if (heavy) play('plate', { ...at, vol: 0.5, rate: 1.6 });
-      this.osc('sine', heavy ? 70 : 110, heavy ? 24 : 32, heavy ? 0.5 : 0.32, heavy ? 0.45 : 0.3, at);
+      this.osc('sine', 110, 32, 0.32, 0.3, at);
       if (!buffers.punch) this.noise(0.35, 0.3, 900, 80, 'lowpass', at);
     },
-    // TOASTER lighting up: a breathy roar.
-    flame(p) {
+    // M2's weapons each have a recipe (a weapon row's `sfx` names it), made
+    // from the clips above plus synthesis; no new assets.
+    // THUNDERCLAP: a zap that drops away under a crack of thunder.
+    // Clips: crunch (slowed), boom_low (sped up). Synth: a falling saw, a bandpassed noise crack.
+    thunderclap(p) {
+      const at = { at: p, ref: 60 };
+      this.osc('sawtooth', 1400, 90, 0.4, 0.22, at);
+      this.noise(0.14, 0.4, 4200, 900, 'bandpass', at);
+      play('crunch', { ...at, vol: 0.8, rate: 0.6 });
+      play('boom_low', { ...at, vol: 0.5, rate: 1.6, delay: 0.03 });
+      this.osc('sine', 55, 30, 0.6, 0.35, at);
+    },
+    // BIG BONKER: the cannon's thunk an octave down, carrying twice as far,
+    // with a ringing crack on top. Clips: punch (half speed), crunch, plate (sped up). Synth: a low sine drop, a triangle ring.
+    bonker(p) {
+      const at = { at: p, ref: 80 };
+      play('punch', { ...at, vol: 1.1, rate: 0.5 });
+      play('crunch', { ...at, vol: 0.45, rate: 1.25 });
+      play('plate', { ...at, vol: 0.5, rate: 1.6 });
+      this.osc('sine', 70, 24, 0.5, 0.45, at);
+      this.osc('triangle', 920, 860, 0.35, 0.06, at);
+      if (!buffers.punch) this.noise(0.45, 0.35, 700, 60, 'lowpass', at);
+    },
+    // PEASHOOTER: one tick of the rattle, per round. Clips: crunch and step, both sped right up. Synth fallback: a short noise tick.
+    peashooter(p) {
+      const at = { at: p, ref: 30 };
+      if (!play('crunch', { ...at, vol: 0.2, rate: 2.6, vary: 0.2 })) this.noise(0.05, 0.12, 2500, 900, 'bandpass', at);
+      play('step', { ...at, vol: 0.12, rate: 2.8, vary: 0.15 });
+    },
+    // TOASTER lighting up: a breathy roar with a pilot-light pop. Clips: missile (slowed). Synth: lowpassed noise, a little square pop.
+    toaster(p) {
       const at = { at: p, ref: 30 };
       play('missile', { ...at, vol: 0.3, rate: 0.55, vary: 0.1 });
       this.noise(0.5, 0.25, 900, 250, 'lowpass', at);
+      this.osc('square', 180, 90, 0.06, 0.05, at);
     },
     missile(p) { if (!play('missile', { at: p, ref: 30, vol: 0.35, rate: 1.25, vary: 0.15 })) this.noise(0.7, 0.12, 3000, 400, 'bandpass', { at: p, ref: 30 }); },
     boom(p, big) {
