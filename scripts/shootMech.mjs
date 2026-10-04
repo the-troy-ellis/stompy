@@ -41,7 +41,7 @@ try {
     const { newMech } = await import('/src/sim/state.js');
     const G = window.__stompy.game, P = G.player;
     for (const m of G.mechs) if (m.team) m.alive = false, m.gone = true;
-    const e = newMech(G, k, 1, P.x, P.z + 25, P.yaw + Math.PI);
+    const e = newMech(G, k, 0, P.x, P.z + 25, P.yaw + Math.PI);   // friendly: no AI wandering off out of shot
     e.ai.aware = false; e.weapons = e.weapons.filter(w => w.def.kind === 'fusion');   // it stands there and lets you look
     G.mechs.push(e); window.__subject = e;
   }, key);

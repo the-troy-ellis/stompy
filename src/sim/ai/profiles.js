@@ -1,4 +1,4 @@
-import { keepRange, harass, harassStomp, cover, useCover, coverWhenHot, ridge, brawler, holdLine, avoidEdge, avoidAllies, defaultPlan } from './behaviours.js';
+import { keepRange, harass, harassStomp, cover, useCover, coverWhenHot, ridgeRelocate, brawler, holdLine, avoidEdge, avoidAllies, defaultPlan } from './behaviours.js';
 
 // Per-chassis fighting styles (docs/specs/05-ai.md § Profiles): a plan of
 // drivers and shapers from the behaviour library. CHASSIS[key].ai.profile
@@ -13,8 +13,9 @@ export const PROFILES = {
   line: e => ({ drive: [keepRange(e.ch.pref)], shape: [holdLine, avoidAllies, avoidEdge] }),
   // PIPSQUEAK (M2): harasses, dives in to stomp, and breaks off at half torso.
   skirmish: () => ({ drive: [cover({ torso: 0.5 }), harassStomp], shape: [avoidAllies, avoidEdge] }),
-  // BEANPOLE (M2): finds high ground with a view, then keeps its long range.
-  sniper: e => ({ drive: [ridge, useCover, keepRange(e.ch.pref)], shape: [avoidAllies, avoidEdge] }),
+  // BEANPOLE (M2): finds high ground with a view, moves on after three shots,
+  // keeps its long range, and never squares up to punch anything.
+  sniper: e => ({ drive: [ridgeRelocate, useCover, keepRange(e.ch.pref)], shape: [avoidAllies, avoidEdge], noMelee: true }),
   // PURPLE PUNCHER (M2): walks in and punches. Never retreats, never hides.
   // It fires everything at once once the target's torso is under 40%.
   brawler: () => ({ drive: [brawler], shape: [avoidAllies, avoidEdge], brawler: true, alphaTorso: 0.4 }),

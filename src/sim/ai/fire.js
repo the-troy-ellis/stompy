@@ -65,6 +65,8 @@ export function decideFire(G, e, P, { dist, toYaw }, dt) {
     if (w.def.kind === 'shell') { const t = dist / w.def.speed; aim = add(pc, [sin(P.yaw) * P.speed * t, 0, cos(P.yaw) * P.speed * t]); }
     const err = aimError(G, e, P, dist);
     aim = add(aim, [r.range(-err, err), r.range(-err, err) * 0.6, r.range(-err, err)]);
-    if (fire(G, e, w, aim, P) && !alpha) { a.jitter = r.range(0.15, 0.6); break; }
+    if (!fire(G, e, w, aim, P)) continue;
+    a.shots = (a.shots || 0) + 1;   // the sniper counts them to know when to move
+    if (!alpha) { a.jitter = r.range(0.15, 0.6); break; }
   }
 }

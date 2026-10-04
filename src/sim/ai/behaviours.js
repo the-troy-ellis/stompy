@@ -55,6 +55,7 @@ export const harass = (G, e, ctx, dt, { stomp = false } = {}) => {
   return keepRange((B.harassBand[0] + B.harassBand[1]) / 2, [B.harassBand[0] / ((B.harassBand[0] + B.harassBand[1]) / 2), B.harassBand[1] / ((B.harassBand[0] + B.harassBand[1]) / 2)])(G, e, ctx);
 };
 
+export const ridgeRelocate = (G, e, ctx, dt) => ridge(G, e, ctx, dt, { relocate: B.relocateAfter });
 export const harassStomp = (G, e, ctx, dt) => harass(G, e, ctx, dt, { stomp: true });
 
 // Hot or hurt: find the nearest spot nearby from which the target cannot be
@@ -93,24 +94,30 @@ export const coverWhenHot = cover({ hurt: false });
 
 // Snipers: a spot well above the target with line of sight, re-sampled on a
 // slow timer from a ring around the target. No opinion once it is there.
-export function findRidge(G, e, target) {
+export function findRidge(G, e, target, avoid = null) {
   const tc = center(target), base = G.ter.height(target.x, target.z);
   let best = null;
   for (const r of B.ridgeRadii) for (let k = 0; k < 16; k++) {
     const a = k * PI / 8, x = inMap(target.x + sin(a) * r), z = inMap(target.z + cos(a) * r);
     const h = G.ter.height(x, z);
     if (h < base + B.ridgeAbove) continue;
+    if (avoid && hypot(x - avoid.x, z - avoid.z) < B.relocateAway) continue;   // somewhere it has not just been shooting from
     if (blocked(G, eyeAt(G, e, x, z), tc)) continue;
     const d = hypot(x - e.x, z - e.z);
     if (!best || d < best.d) best = { x, z, d };
   }
   return best;
 }
-export const ridge = (G, e, ctx) => {
+// With `relocate`, after that many shots it picks a different ridge, away
+// from where it fired them (BEANPOLE: three).
+export const ridge = (G, e, ctx, dt, { relocate = 0 } = {}) => {
   const a = e.ai;
+  if (relocate && (a.shots || 0) - (a.shotsAt || 0) >= relocate) {
+    a.shotsAt = a.shots; a.moveOff = { x: e.x, z: e.z }; a.ridgeLookT = 0;
+  }
   if (!(a.ridgeLookT > G.time)) {
     a.ridgeLookT = G.time + B.ridgeEvery;
-    const r = findRidge(G, e, ctx.P);
+    const r = findRidge(G, e, ctx.P, relocate ? a.moveOff : null);
     a.ridge = r ? { x: r.x, z: r.z } : null;
   }
   if (!a.ridge) return null;

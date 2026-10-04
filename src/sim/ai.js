@@ -40,7 +40,7 @@ export function think(G, e, dt) {
     // shut-down player is correct Stompy behaviour.
     const reachP = meleeOf(P).reach * P.ch.scale + geoOf(e).radius * e.ch.scale, tooClose = seen && dist < reachP * AI_PUNCH.keepOut;
     const reachE = meleeOf(e).reach * e.ch.scale + geoOf(P).radius * P.ch.scale;
-    const punchable = P.alive && canPunch(G, e) && meleeTarget(G, e) === P;
+    const punchable = !plan.noMelee && P.alive && canPunch(G, e) && meleeTarget(G, e) === P;
     let jets = false;
     if (P.shutdown && P.alive) { moveYaw = toYaw; thr = dist < reachP * 0.6 ? 0 : 1; }
     else if (punchable || e.melee) { moveYaw = toYaw; thr = 0; }   // square up and decide (below); the swing holds it there
@@ -59,7 +59,7 @@ export function think(G, e, dt) {
   const pc = seen ? center(P) : [tx, G.ter.height(tx, tz) + 4.2 * P.ch.scale, tz];
   e.pitch = atan2(pc[1] - (e.y + 6 * e.ch.scale), dist);
   // In reach and facing: throw the punch, by difficulty. No guns mid-swing.
-  if (P.alive && canPunch(G, e) && meleeTarget(G, e) === P) {
+  if (!plan.noMelee && P.alive && canPunch(G, e) && meleeTarget(G, e) === P) {
     const p = AI_PUNCH.chance[G.diff] ?? AI_PUNCH.chance.normal;   // per second of opportunity, so per frame it is
     if (P.shutdown || r.chance(1 - (1 - p) ** dt)) meleePress(G, e);
   }

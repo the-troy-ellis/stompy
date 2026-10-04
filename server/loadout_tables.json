@@ -149,6 +149,37 @@
      "stock": "mg"
     }
    ]
+  },
+  "sniper1": {
+   "tons": 50,
+   "frame": 21.5,
+   "systems": {
+    "sinks": 0,
+    "armour": 0,
+    "jets": 0
+   },
+   "max": {
+    "sinks": 3,
+    "armour": 2,
+    "jets": 1
+   },
+   "hardpoints": [
+    {
+     "id": "ra",
+     "cat": "ballistic",
+     "stock": "gauss"
+    },
+    {
+     "id": "la",
+     "cat": "energy",
+     "stock": "ppc"
+    },
+    {
+     "id": "t1",
+     "cat": "energy",
+     "stock": "mlaser"
+    }
+   ]
   }
  },
  "weapons": {
