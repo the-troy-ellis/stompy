@@ -1,4 +1,4 @@
-// Body plans, by leg type. Lengths are model units (x chassis scale), and
+// Body plans, by leg type (a chassis may override any of it: geoFor). Lengths are model units (x chassis scale), and
 // buildMechParts builds each type's leg meshes to match l1 / l2. Per leg:
 // hip (hx, hz), rest foot (fx, fz) and its phase in the gait cycle; `swing`
 // is the share of the cycle a foot spends in the air. +x is the mech's
@@ -17,4 +17,17 @@ export const GEO = {
     legs: [{ hx: 1.4, hz: 1.6, fx: 2.9, fz: 2.3, ph: 0 }, { hx: -1.4, hz: -1.6, fx: -2.9, fz: -2.2, ph: 0 },
            { hx: -1.4, hz: 1.6, fx: -2.9, fz: 2.3, ph: 0.5 }, { hx: 1.4, hz: -1.6, fx: 2.9, fz: -2.2, ph: 0.5 }] },
 };
-export const geoOf = m => GEO[m.ch.legs] || GEO.forward;
+// A chassis's body plan: its leg type's, with the chassis's own `geo`
+// partial (any of the fields above) merged over it. Raising or lowering the
+// hip moves everything stacked on it (legTop, torsoY, height) with it unless
+// the partial sets those too. Built once per chassis object.
+const plans = new WeakMap();
+export function geoFor(ch) {
+  let g = plans.get(ch);
+  if (g) return g;
+  const base = GEO[ch.legs] || GEO.forward, o = ch.geo || {}, dh = (o.hip ?? base.hip) - base.hip;
+  g = { ...base, legTop: base.legTop + dh, torsoY: base.torsoY + dh, height: base.height + dh, ...o };
+  plans.set(ch, g);
+  return g;
+}
+export const geoOf = m => geoFor(m.ch);
