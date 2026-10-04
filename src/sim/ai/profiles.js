@@ -1,4 +1,4 @@
-import { keepRange, harass, useCover, coverWhenHot, ridge, brawler, holdLine, avoidEdge, avoidAllies, defaultPlan } from './behaviours.js';
+import { keepRange, harass, harassStomp, cover, useCover, coverWhenHot, ridge, brawler, holdLine, avoidEdge, avoidAllies, defaultPlan } from './behaviours.js';
 
 // Per-chassis fighting styles (docs/specs/05-ai.md § Profiles): a plan of
 // drivers and shapers from the behaviour library. CHASSIS[key].ai.profile
@@ -11,6 +11,8 @@ export const PROFILES = {
   harass: () => ({ drive: [coverWhenHot, harass], shape: [avoidAllies, avoidEdge] }),
   // WARDEN: advances with the group at the slowest member's pace and holds its range.
   line: e => ({ drive: [keepRange(e.ch.pref)], shape: [holdLine, avoidAllies, avoidEdge] }),
+  // PIPSQUEAK (M2): harasses, dives in to stomp, and breaks off at half torso.
+  skirmish: () => ({ drive: [cover({ torso: 0.5 }), harassStomp], shape: [avoidAllies, avoidEdge] }),
   // BEANPOLE (M2): finds high ground with a view, then keeps its long range.
   sniper: e => ({ drive: [ridge, useCover, keepRange(e.ch.pref)], shape: [avoidAllies, avoidEdge] }),
   // PURPLE PUNCHER (M2): walks in and punches. Never retreats, never hides.

@@ -21,7 +21,15 @@ export function restFoot(G, m, i, ahead = 0) {
 }
 export function initFeet(G, m) {
   m.feet = geoOf(m).legs.map((_, i) => ({ pos: restFoot(G, m, i), from: null, lifted: false, yaw: m.yaw }));
-  m.bob = 0; m.cyc = 0.45;   // between swings: every foot planted
+  m.bob = 0; m.cyc = restCyc(geoOf(m));   // between swings: every foot planted
+}
+// A point in the gait cycle where no leg is mid-swing: 0.45 for the stock
+// plans, or the middle of the first gap for a plan whose swings are longer.
+export function restCyc(g) {
+  const free = c => g.legs.every(l => (((c - l.ph) % 1) + 1) % 1 >= g.swing);
+  if (free(0.45)) return 0.45;
+  for (let c = 0; c < 1; c += 0.005) if (free(c) && free(c + 0.01)) return c + 0.005;
+  return 0.45;
 }
 
 // One gait clock per mech, advanced by distance travelled (and turning),
@@ -56,7 +64,7 @@ export function gait(G, m, dt) {
     m.bob = 0; m.wasAir = true;
     return;
   }
-  if (m.wasAir) { m.wasAir = false; m.cyc = 0.45; m.feet.forEach((f, i) => { f.pos = restFoot(G, m, i); f.yaw = m.yaw; }); }
+  if (m.wasAir) { m.wasAir = false; m.cyc = restCyc(geoOf(m)); m.feet.forEach((f, i) => { f.pos = restFoot(G, m, i); f.yaw = m.yaw; }); }
 
   // Cycle length in distance: longer strides when faster, but a planted
   // foot never gets more than (1 - swing) / 2 * D from its hip (leg reach).

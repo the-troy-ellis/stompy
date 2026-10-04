@@ -16,10 +16,12 @@ try {
   // The menu, with this chassis selected, at desktop and phone-sideways size.
   for (const [name, vp] of [['menu', { width: 1024, height: 640 }], ['menu-phone', { width: 740, height: 360 }]]) {
     const page = await browser.newPage({ viewport: vp });
-    await page.goto(`http://localhost:${PORT}/`);
+    await page.goto(`http://localhost:${PORT}/?debug=1`);
     await page.evaluate(k => localStorage.setItem('stompy.mech.chassis', JSON.stringify(k)), key);
     await page.reload();
     await page.waitForSelector('.mm-title');
+    await page.addStyleTag({ content: '.feel-panel, .perf { display: none !important; }' });
+    await page.evaluate(() => { const G = window.__stompy.game; G.menuDrag = true; G.showYaw = 0.55; });   // hold it three-quarters on
     await page.waitForTimeout(1200);
     await page.screenshot({ path: out(name) });
     await page.close();

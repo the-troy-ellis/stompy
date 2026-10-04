@@ -36,12 +36,14 @@ export const keepRange = (pref, band = [0.6, 1.35]) => (G, e, ctx) => {
 };
 
 // Light mechs: orbit close, flip the strafe when hit, and when the player is
-// near enough, jump straight over them and land behind.
-export const harass = (G, e, ctx, dt) => {
+// near enough, jump straight over them and land behind. With `stomp` the
+// jump becomes a dive: over the target it cuts the jets and drops on it.
+export const harass = (G, e, ctx, dt, { stomp = false } = {}) => {
   const a = e.ai, { dist, toYaw, seen } = ctx;
   if (a.hitAt != null && a.hitAt !== a.flippedAt) { a.flippedAt = a.hitAt; a.strafe *= -1; a.strafeT = G.rng.range(3, 7); }
   if (a.jump) {
-    if (G.time < a.jump.until) return { moveYaw: a.jump.yaw, thr: 1, jets: true };
+    if (stomp && e.air && dist < B.stompOver) { a.jump.until = 0; return { moveYaw: toYaw, thr: 0, jets: false }; }   // right on top: drop
+    if (G.time < a.jump.until) return { moveYaw: stomp ? toYaw : a.jump.yaw, thr: 1, jets: true };
     if (e.air) return { moveYaw: a.jump.yaw, thr: 1, jets: false };   // carry through the landing
     a.jump = null; a.jumpCd = G.time + B.jumpCooldown;
   }
@@ -52,6 +54,8 @@ export const harass = (G, e, ctx, dt) => {
   void dt;
   return keepRange((B.harassBand[0] + B.harassBand[1]) / 2, [B.harassBand[0] / ((B.harassBand[0] + B.harassBand[1]) / 2), B.harassBand[1] / ((B.harassBand[0] + B.harassBand[1]) / 2)])(G, e, ctx);
 };
+
+export const harassStomp = (G, e, ctx, dt) => harass(G, e, ctx, dt, { stomp: true });
 
 // Hot or hurt: find the nearest spot nearby from which the target cannot be
 // seen, walk there and wait until cool. Sample 8 bearings x 3 distances.
@@ -66,9 +70,10 @@ export function findCover(G, e, target) {
   }
   return best;
 }
-// `hurt: false` makes a profile that only hides from its own heat (the JACKAL).
-export const cover = ({ hurt: byTorso = true } = {}) => (G, e, ctx) => {
-  const a = e.ai, hot = e.heat > B.coverHeat, hurt = byTorso && e.hp.T < e.max.T * B.coverTorso;
+// `hurt: false` makes a profile that only hides from its own heat (the JACKAL);
+// `torso` sets how hurt is hurt (PIPSQUEAK breaks off at half).
+export const cover = ({ hurt: byTorso = true, torso = B.coverTorso } = {}) => (G, e, ctx) => {
+  const a = e.ai, hot = e.heat > B.coverHeat, hurt = byTorso && e.hp.T < e.max.T * torso;
   if (!a.cover) {
     if (!(hot || (hurt && !(a.coverCd > G.time)))) return null;
     if (a.coverLookT > G.time) return null;

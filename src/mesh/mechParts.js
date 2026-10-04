@@ -11,7 +11,7 @@ import { geoFor } from '../data/geo.js';
 // Where each style's arm barrel sits in arm space. The barrel is its own part
 // so an EMPTY arm hardpoint shows a bare arm, and each weapon can give it its
 // own proportions (BARREL in scene.js).
-export const BARREL_AT = { forward: [0, -1.15, 1.45], reverse: [0, -1.15, 1.45], quad: [0, -0.5, 1.6], puncher: [0, -1.15, 1.45] };
+export const BARREL_AT = { forward: [0, -1.15, 1.45], reverse: [0, -1.15, 1.45], quad: [0, -0.5, 1.6], puncher: [0, -1.15, 1.45], light1: [0, -0.85, 1.1] };
 export const styleOf = ch => ch.style || ch.legs;
 
 const part = f => { const b = new Builder(); f(b); return b; };
@@ -142,6 +142,26 @@ const BODY = {
         for (let i = 0; i < 4; i++) b.cube(chain(M.T((i - 1.5) * 0.4, -2.55, 0.35), M.S(0.34, 0.22, 1.5)), mul(acc, 0.75));
         b.cube(chain(M.T(0.95, -1.6, 0.75), M.S(0.35, 0.8, 0.6)), mul(acc, 0.85));   // a thumb
       }),
+    };
+  },
+  // PIPSQUEAK (light1, placeholder name): a narrow torso with a single eye
+  // slit, a little fin, a PEASHOOTER stub low on the front, and small arms
+  // (the left one's gun is the FIRECRACKERS box, shaped by BARREL).
+  light1(ch) {
+    const { c, dark, acc, glass } = palette(ch);
+    return {
+      torso: part(b => {
+        b.cube(chain(M.T(0, 1.1, 0), M.S(2.2, 2.0, 2.0)), c, 0.85, 0.8);
+        b.cube(chain(M.T(0, 1.55, 1.02), M.S(1.3, 0.18, 0.06)), glass);   // the one eye
+        b.cube(chain(M.T(0, 2.3, -0.25), M.S(0.28, 0.6, 1.3)), acc, 0.6, 0.7);
+        b.cube(chain(M.T(0, 0.9, -1.15), M.S(1.4, 1.2, 0.4)), dark);
+        b.cube(chain(M.T(-0.7, 0.8, 1.2), M.S(0.22, 0.22, 0.9)), dark);
+      }),
+      arm: part(b => {
+        b.cube(chain(M.T(0, -0.45, 0.05), M.S(0.7, 1.2, 0.85)), c);
+        b.cube(chain(M.T(0, 0.2, 0), M.S(0.9, 0.6, 1.0)), dark);
+      }),
+      barrel: part(b => b.cube(chain(M.T(...BARREL_AT.light1), M.S(0.3, 0.3, 1.6)), dark)),
     };
   },
   // The quadruped's turret: cockpit at the front, an LRM box on top.
