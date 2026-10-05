@@ -58,6 +58,14 @@ instant kick on every step made the view jump, and quick-stepping mechs
 turned it into a judder; a bob lets a fast cadence blend into a sway. The
 instant `kick` stays for one-off impacts (landings, hits, punches).
 
+The 2D layers don't move as one. The cockpit (frame, dashboard and the
+instruments on it) and the projected HUD (crosshair, compass, objective
+lines and markers, target box, status lines) each chase the camera drop
+through their own spring (`FEEL.view.cockpit*` and `hud*`: gain, stiffness,
+damping). The cockpit is stiff and a little loose, so it jolts and rattles
+like something bolted on; the HUD is soft, so it floats behind and settles.
+On touch there is no dashboard, and the instruments float with the HUD.
+
 ### The spring
 
 `src/util/spring.js`: `spring(state, target, dt, { k, c })` with critically
