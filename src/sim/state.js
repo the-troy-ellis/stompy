@@ -66,7 +66,10 @@ export function resetMatch(G, { def, seed, pal, terrainOpts }) {
 export const foeType = f => (typeof f === 'string' ? f : f.type);
 export function startMatch(G, def, seed, gentle, chassis, { partsKey, terrainOpts, loadout } = {}) {
   resetMatch(G, { def, seed, terrainOpts });
-  G.player = newMech(G, chassis, 0, 0, 0, 0, { partsKey, loadout });
+  // `start: [bearing°, dist, face°]` moves the player off the map's centre
+  // (mission 11's long run); every other position stays measured from the centre.
+  const st = def.start ? polar(def.start) : { x: 0, z: 0 }, face = def.start?.[2] ? -def.start[2] * Math.PI / 180 : 0;
+  G.player = newMech(G, chassis, 0, st.x, st.z, face, { partsKey, loadout });
   G.mechs.push(G.player);
   G.eye = eyeOf(G.player); G.view = dirOf(0, 0); G.aim = add(G.eye, mul(G.view, 100));
   const rng = G.rng;

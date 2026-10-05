@@ -11,6 +11,7 @@ import { NAMES } from './names.js';
 //   waves       { at } on the clock or { when: { obj, done } } on progress, with foes and from
 //   flat        [[bearing°, dist, radius]] extra pads
 //   prefer      'convoy': the enemies go for the trucks
+//   start       [bearing°, dist, face°]: the player starts there, not at the centre
 //   weather, time  for M4's atmosphere (docs/specs/07-atmosphere.md); the
 //               plain palette until it lands
 // Bearings: 0 is straight ahead at the start, 90 to the right.
@@ -19,6 +20,8 @@ const TRUCK = { kind: 'vehicle', mesh: 'truck', tags: ['convoy'], label: 'TRUCK'
 const ROUTE = [[200, 120], [100, 200], [40, 520], [15, 850], [350, 1040]];   // ~1.6 km down the valley
 const TANK = { kind: 'structure', mesh: 'tank', height: 7, radius: 5, tags: ['tank'], label: 'TANK', pad: 11 };
 const PAD = { kind: 'nav', mesh: 'pad', radius: 14, pad: 16 };
+const LAUNCHER = { kind: 'turret', mesh: 'launcher', height: 6, radius: 4, tags: ['battery'], label: 'LAUNCHER', pad: 10 };
+const PROP_TANK = { kind: 'structure', mesh: 'tank', height: 7, radius: 5, hp: Infinity, pad: 11 };   // the refinery's: scenery
 const ICE_ROUTE = [[160, 110], [120, 260], [70, 520], [30, 800], [10, 1030]];   // ~1.4 km across the glacier
 
 export const MISSIONS = [
@@ -74,6 +77,42 @@ export const MISSIONS = [
     objectives: [{ type: 'escort', convoy: 'convoy', to: 'exit', minAlive: 2, label: 'CONVOY' }],
     waves: [{ at: 40, foes: ['jackal', 'jackal'], from: 270 }, { at: 120, foes: ['jackal', 'jackal'], from: 90 }],
     intel: 'Three trucks cross the ice at night. Their lights are on. Get them across.' },
+  // Act III: the volcanic plain. Structures that shoot back at 9, PURPLE
+  // PUNCHER walks in at 10 (#108 gives it the entrance) and unlocks after 11.
+  { key: 'm09', pal: 'volcanic', seed: 111,
+    foes: [{ type: 'warden', at: [5, 720] }, { type: 'warden', at: [335, 780], aware: false }, { type: 'jackal', at: [30, 480] }, { type: 'jackal', at: [320, 520], aware: false }],
+    entities: [
+      { ...LAUNCHER, id: 'launcher1', at: [350, 590] }, { ...LAUNCHER, id: 'launcher2', at: [5, 640] }, { ...LAUNCHER, id: 'launcher3', at: [20, 570] },
+      { ...PROP_TANK, id: 'refinery1', at: [0, 700] }, { ...PROP_TANK, id: 'refinery2', at: [12, 720] },
+    ],
+    objectives: [{ type: 'destroy', targets: ['battery'], label: 'LAUNCHER' }, { type: 'eliminate' }],
+    intel: 'Three launchers sit by the refinery. They shoot back. Knock them over.' },
+  { key: 'm10', pal: 'volcanic', seed: 124, weather: 'dust',
+    foes: [],
+    entities: [{ ...TANK, id: 'store1', at: [0, 70], tags: ['store'] }, { ...TANK, id: 'store2', at: [120, 75], tags: ['store'] }, { ...TANK, id: 'store3', at: [240, 70], tags: ['store'] }],
+    objectives: [
+      { type: 'survive', seconds: 180, waves: [
+        { at: 0, foes: ['jackal', 'jackal'], from: 0 },
+        { at: 40, foes: ['jackal', 'light1'], from: 120 },
+        { at: 80, foes: ['warden', 'jackal', 'jackal'], from: 240 },
+        { at: 120, foes: ['puncher'], from: 0, dist: 600 },   // from the ridge
+        { at: 150, foes: ['light1', 'light1'], from: 180 },
+      ] },
+      { type: 'protect', targets: ['store'], minAlive: 2, label: 'TANK', secondary: true },
+    ],
+    intel: 'Hold the refinery for three minutes. Keep the tanks in one piece.' },
+  { key: 'm11', pal: 'volcanic', seed: 137, start: [225, 1100, 45],   // corner to corner: ~2.2 km
+    foes: [
+      { type: 'jackal', at: [225, 620], aware: false }, { type: 'jackal', at: [180, 90], aware: false }, { type: 'jackal', at: [45, 560], aware: false },
+      { type: 'puncher', at: [80, 220], aware: false }, { type: 'sniper1', at: [110, 520], aware: false }, { type: 'sniper1', at: [350, 420], aware: false },
+    ],
+    entities: [{ ...PAD, id: 'lz', at: [45, 1100] }],
+    objectives: [{ type: 'extract', at: 'lz', within: 240 }, { type: 'eliminate', secondary: true }],
+    intel: 'The canyon is long. The clock is short. Run to the end.' },
+  { key: 'm12', pal: 'volcanic', seed: 150, time: 'night',   // lightning with M4's weather
+    foes: [{ type: 'puncher', at: [355, 650] }, { type: 'puncher', at: [30, 720] }, { type: 'warden', at: [330, 600] }, { type: 'warden', at: [20, 560] }, { type: 'light1', at: [300, 440] }, { type: 'light1', at: [60, 420] }],
+    objectives: [{ type: 'eliminate' }],
+    intel: 'Everyone is here. Big ones, little ones, purple ones. Stomp them all.' },
 ].map(m => ({ ...m, name: NAMES.missions[m.key] }));
 // Every hostile a mission brings: placed, in its waves, and on a SURVIVE's clock.
 export const missionFoes = d => [...d.foes, ...(d.waves || []).flatMap(w => w.foes), ...(d.objectives || []).flatMap(o => (o.waves || []).flatMap(w => w.foes))];

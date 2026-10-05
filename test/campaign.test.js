@@ -206,3 +206,90 @@ test('m08: three trucks cross about 1.4 km of ice; two home wins, two lost loses
   assert.equal(L.won, false);
   assert.equal(L.state, 'over');
 });
+
+// Act III: the volcanic plain.
+test('Act III is m09-m12 on the volcanic plain, everything on the map; twelve missions, then contracts', () => {
+  assert.equal(MISSIONS.length, 12);
+  assert.deepEqual(MISSIONS.slice(8).map(m => m.key), ['m09', 'm10', 'm11', 'm12']);
+  for (let n = 8; n < 12; n++) {
+    const def = missionDef(n), G = play(n);
+    assert.equal(def.name, NAMES.missions[def.key]);
+    assert.equal(def.pal, 'volcanic');
+    for (const t of [...G.mechs, ...G.entities]) assert.ok(Math.abs(t.x) <= BOUND && Math.abs(t.z) <= BOUND, `${def.key}: ${t.id || t.type} off the map`);
+    assert.equal(G.state, 'play');
+  }
+  assert.equal(missionDef(12).name, 'Contract 13');
+});
+
+test('spec 04: every objective type at least twice, four missions per biome, three or more at night or in weather', () => {
+  const uses = {};
+  for (const m of MISSIONS) for (const o of m.objectives || [{ type: 'eliminate' }]) uses[o.type] = (uses[o.type] || 0) + 1;
+  for (const t of ['eliminate', 'destroy', 'survive', 'escort', 'extract']) assert.ok(uses[t] >= 2, `${t}: ${uses[t] || 0}`);
+  for (const pal of ['dusk', 'ice', 'volcanic']) assert.equal(MISSIONS.filter(m => m.pal === pal).length, 4, pal);
+  assert.ok(MISSIONS.filter(m => m.weather || m.time).length >= 3);
+});
+
+test('m09: three launchers that shoot back, then the mechs; both count', () => {
+  const G = play(8);
+  const battery = G.entities.filter(e => e.tags.includes('battery'));
+  assert.equal(battery.length, 3);
+  assert.ok(battery.every(e => e.kind === 'turret' && e.targetable));
+  assert.ok(G.entities.filter(e => e.id.startsWith('refinery')).every(e => !e.targetable), 'the refinery is scenery');
+  assert.deepEqual(types(G), ['jackal', 'jackal', 'warden', 'warden']);
+  for (const e of battery) destroyEntity(G, e, G.player);
+  stepFor(G, 0.2);
+  assert.notEqual(G.state, 'over', 'the mechs are not optional');
+  killAll(G);
+  stepFor(G, 0.5);
+  assert.equal(G.won, true);
+});
+
+test('m10: hold three minutes; PURPLE PUNCHER walks in at 2:00; keeping two tanks is optional', () => {
+  const G = play(9);
+  keepAlive(G);
+  const park = () => { for (const m of hostiles(G)) freeze(m); return input(); };
+  stepFor(G, 119, park, 1 / 20);
+  assert.ok(!types(G).includes('puncher'));
+  stepFor(G, 2, park, 1 / 20);
+  assert.ok(types(G).includes('puncher'), 'at two minutes');
+  const stores = G.entities.filter(e => e.tags.includes('store'));
+  destroyEntity(G, stores[0], null); destroyEntity(G, stores[1], null);
+  stepFor(G, 0.2);
+  assert.equal(G.objectives[1].state, 'failed');
+  assert.notEqual(G.state, 'over', 'a secondary never fails the mission');
+  stepFor(G, 60, park, 1 / 20);
+  assert.equal(G.won, true);
+
+  const K = play(9);
+  keepAlive(K);
+  stepFor(K, 181, () => { for (const m of hostiles(K)) freeze(m); return input(); }, 1 / 20);
+  assert.equal(K.won, true);
+  assert.equal(K.objectives[1].state, 'done', 'all three standing at the end');
+});
+
+test('m11: starts in one corner, runs ~2.2 km to the pad in the other within four minutes', () => {
+  const G = play(10), P = G.player, lz = G.entities.find(e => e.id === 'lz');
+  const run = Math.hypot(lz.x - P.x, lz.z - P.z);
+  assert.ok(run > 2100 && run < 2300, `${run} m`);
+  assert.ok(Math.abs(G.ter.height(P.x + 20, P.z) - G.ter.height(P.x, P.z)) < 0.5, 'flat ground under the moved start');
+  const fwd = [Math.sin(P.yaw), Math.cos(P.yaw)], to = [(lz.x - P.x) / run, (lz.z - P.z) / run];
+  assert.ok(fwd[0] * to[0] + fwd[1] * to[1] > 0.99, 'facing the far end');
+  assert.ok(types(G).includes('puncher'));
+  for (const m of hostiles(G)) freeze(m);
+  P.x = lz.x; P.z = lz.z;
+  stepFor(G, 0.2);
+  assert.equal(G.won, true, 'ELIMINATE was optional');
+
+  const L = play(10);
+  keepAlive(L);
+  stepFor(L, 241, () => { for (const m of hostiles(L)) freeze(m); return input(); }, 1 / 20);
+  assert.equal(L.won, false);
+});
+
+test('m12: everyone, two PURPLE PUNCHERs among them; ELIMINATE wins it', () => {
+  const G = play(11);
+  assert.deepEqual(types(G), ['light1', 'light1', 'puncher', 'puncher', 'warden', 'warden']);
+  killAll(G);
+  stepFor(G, 0.5);
+  assert.equal(G.won, true);
+});

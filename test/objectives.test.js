@@ -7,6 +7,9 @@ import { damage } from '../src/sim/combat.js';
 import { destroyEntity } from '../src/sim/entities.js';
 import { polar, flatZones } from '../src/sim/objectives.js';
 import { makeTerrain } from '../src/world/terrain.js';
+import { objectivePoint } from '../src/sim/objectives.js';
+import { objectiveLine } from '../src/render/hud.js';
+import { objectiveRows } from '../src/ui/debrief.js';
 
 const { hypot } = Math;
 // A match from a hand-written mission definition (flat ground unless asked).
@@ -84,4 +87,48 @@ test('the player dying loses it, whatever the objectives say; the arena has none
   for (const e of M.entities) destroyEntity(M, e, null);
   stepFor(M, DT);
   assert.equal(M.state, 'play', 'objectives do not run in the arena');
+});
+
+const STORES = {
+  entities: [0, 120, 240].map((b, i) => ({ kind: 'structure', id: `store${i}`, at: [b, 80], tags: ['store'], hp: 30, label: 'TANK' })),
+};
+
+test('PROTECT: held while enough stand, failed below minAlive, done when the mission is won', () => {
+  const G = mission({ ...STORES, objectives: [{ type: 'eliminate' }, { type: 'protect', targets: ['store'], minAlive: 2, label: 'TANK', secondary: true }] });
+  stepFor(G, 0.1);
+  const o = G.objectives[1];
+  assert.equal(o.state, 'active');
+  assert.equal(objectiveLine(o), 'PROTECT TANK 3/3');
+  assert.ok(objectivePoint(G, o), 'the marker points at a tank to guard');
+  destroyEntity(G, G.entities[0], null);
+  stepFor(G, 0.1);
+  assert.equal(o.state, 'active', 'two is enough');
+  assert.equal(objectiveLine(o), 'PROTECT TANK 2/3');
+  for (const m of foes(G)) m.alive = false;
+  stepFor(G, 0.1);
+  assert.equal(G.won, true);
+  assert.equal(o.state, 'done');
+  assert.deepEqual(objectiveRows(G)[1], { text: 'PROTECT TANK 2/3', ok: true, secondary: true });
+
+  const F = mission({ ...STORES, objectives: [{ type: 'eliminate' }, { type: 'protect', targets: ['store'], minAlive: 2, label: 'TANK', secondary: true }] });
+  destroyEntity(F, F.entities[0], null); destroyEntity(F, F.entities[1], null);
+  stepFor(F, 0.1);
+  assert.equal(F.objectives[1].state, 'failed');
+  assert.notEqual(F.state, 'over', 'a secondary never ends it');
+});
+
+test('PROTECT as a main objective: losing what it guards loses the mission; it never wins one alone', () => {
+  const G = mission({ ...STORES, objectives: [{ type: 'eliminate' }, { type: 'protect', targets: ['store'], label: 'TANK' }] });
+  destroyEntity(G, G.entities[2], null);
+  stepFor(G, 0.1);
+  assert.equal(G.state, 'over');
+  assert.equal(G.won, false, 'minAlive defaults to all of them');
+});
+
+test('a mission start moves the player and faces them; bearings stay from the centre', () => {
+  const G = mission({ start: [90, 500, 270] });
+  const P = G.player;
+  assert.ok(Math.abs(P.x + 500) < 1e-6 && Math.abs(P.z) < 1e-6, 'east of the centre');
+  assert.ok(Math.abs(Math.sin(P.yaw) - 1) < 1e-6, 'facing west, back toward the centre');
+  assert.ok(flatZones({ start: [90, 500] }).some(([x, z, r]) => Math.abs(x + 500) < 1e-6 && Math.abs(z) < 1e-6 && r >= 60), 'flat ground under it');
 });

@@ -46,7 +46,13 @@ Mission definitions gain `objectives: [...]`, each one of:
 { type: 'survive', seconds: 150, waves: [{ at: 0, foes: [...] }, { at: 60, foes: [...] }] }
 { type: 'escort', convoy: 'c1', to: 'nav_exit', minAlive: 2, label: 'CONVOY' }
 { type: 'extract', at: 'nav_lz', within: 180 }          // seconds, optional
+{ type: 'protect', targets: ['store'], minAlive: 2, label: 'TANK' }   // keep them standing
 ```
+
+PROTECT (added for mission 10's storage tanks) fails the moment fewer than
+`minAlive` (default: all) of its targets stand, and otherwise holds until the
+mission is won, when it is done. It goes alongside another objective, usually
+as a secondary; it never wins a mission on its own.
 
 Plus a `fail` rule per mission (default: player dead). `secondary: true` on
 an objective makes it optional (counts in debrief, never fails the mission).
@@ -109,6 +115,11 @@ which puts it somewhere, points it, wakes it or leaves it asleep, and can
 give it another chassis's fighting style (mission 1's JACKAL that walks in
 close enough to shove uses `profile: 'brawler'`). A mission's `seed` fixes
 its terrain.
+
+`start: [bearing, dist, face]` moves the player's start off the centre and
+points them (mission 11 runs corner to corner); the moved start gets the
+start's flat ground, and every other position is still measured from the
+centre.
 
 ### Arena and co-op
 
