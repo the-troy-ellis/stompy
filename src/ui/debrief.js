@@ -29,3 +29,15 @@ export function debriefTitle(G) {
   if (G.won) return 'MISSION COMPLETE';
   return G.player?.alive ? 'MISSION FAILED' : 'MECH DESTROYED';
 }
+
+// "MISSION 2: TOWER TROUBLE", or just "MISSION 2" while it has no name of its own.
+export function missionTitle(n, name) {
+  const up = (name || '').toUpperCase();
+  return !up || up === `MISSION ${n}` ? `MISSION ${n}` : `MISSION ${n}: ${up}`;
+}
+// The voice's version at launch: "Mission 2. Tower Trouble." or "Mission 2."
+export function missionSpoken(n, name) {
+  const t = missionTitle(n, name).split(': ');
+  const cap = w => w.charAt(0) + w.slice(1).toLowerCase();
+  return t.map(w => `${w.split(' ').map(cap).join(' ')}.`).join(' ');
+}

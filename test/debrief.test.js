@@ -4,7 +4,7 @@ import { createGame, startMatch } from '../src/sim/state.js';
 import { recordFx } from '../src/sim/fx.js';
 import { stepFor, foes, freeze, createTestGame } from './helpers.js';
 import { destroyEntity } from '../src/sim/entities.js';
-import { objectiveRows, debriefTitle } from '../src/ui/debrief.js';
+import { objectiveRows, debriefTitle, missionTitle, missionSpoken } from '../src/ui/debrief.js';
 
 function mission(def) {
   const G = createGame({ fx: recordFx(), seed: 4 });
@@ -45,4 +45,11 @@ test('losing the mech still reads MECH DESTROYED; plain missions list no rows', 
   assert.deepEqual(objectiveRows(G), []);
   G.player.alive = false; G.won = false;
   assert.equal(debriefTitle(G), 'MECH DESTROYED');
+});
+
+test('a mission still on its placeholder name is not announced twice', () => {
+  assert.equal(missionTitle(2, 'MISSION 2'), 'MISSION 2');
+  assert.equal(missionTitle(2, 'Tower Trouble'), 'MISSION 2: TOWER TROUBLE');
+  assert.equal(missionSpoken(2, 'MISSION 2'), 'Mission 2.');
+  assert.equal(missionSpoken(2, 'Tower Trouble'), 'Mission 2. Tower Trouble.');
 });

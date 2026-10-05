@@ -22,8 +22,8 @@ Rules that are easy to miss:
 - Names are the owner's, picked after seeing the thing. Use stable keys in
   code, put display names only in `src/data/names.js`, ship placeholders,
   and end any PR that makes a new mech, weapon or mission visible with a
-  NAMING section (screenshots plus candidates). PURPLE PUNCHER is the only
-  confirmed name. See `docs/workflow.md`.
+  NAMING section (screenshots plus candidates). Confirmed so far: PURPLE
+  PUNCHER and Act I's missions. See `docs/workflow.md`.
 - Balance numbers change only in issues about balance.
 - Any change to a network message bumps `PROTOCOL` and updates
   `docs/architecture.md`.

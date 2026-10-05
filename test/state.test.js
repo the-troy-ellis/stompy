@@ -4,8 +4,9 @@ import { createGame, startMatch, newMech } from '../src/sim/state.js';
 import { missionDef } from '../src/data/missions.js';
 import { nullFx } from '../src/sim/fx.js';
 
-test('mission 0 places two JACKALs on the 520-760 m ring, one of them unaware; the same seed places them identically', () => {
-  const build = () => { const G = createGame({ fx: nullFx }); startMatch(G, missionDef(0), 7, true, 'kestrel'); return G; };
+test('foes given as keys go on the 520-760 m ring, the first unaware when gentle; the same seed places them identically', () => {
+  const def = { name: 'Ring', pal: 'dusk', foes: ['jackal', 'jackal'], intel: '' };
+  const build = () => { const G = createGame({ fx: nullFx }); startMatch(G, def, 7, true, 'kestrel'); return G; };
   const a = build(), b = build();
   const foes = a.mechs.filter(m => m.team !== 0);
   assert.equal(foes.length, 2);
@@ -14,6 +15,20 @@ test('mission 0 places two JACKALs on the 520-760 m ring, one of them unaware; t
   assert.deepEqual(a.mechs.map(m => [m.x, m.z, m.yaw]), b.mechs.map(m => [m.x, m.z, m.yaw]));
   assert.equal(a.state, 'play');
   assert.deepEqual(a.stats, { shots: 0, hits: 0, dealt: 0, taken: 0, kills: 0 });
+});
+
+test('a foe spec places, points, wakes and restyles: mission 1 has a sleeper and a JACKAL that walks in', () => {
+  const G = createGame({ fx: nullFx });
+  startMatch(G, { name: 'Spec', pal: 'dusk', intel: '', foes: [{ type: 'warden', at: [90, 300], face: 270, aware: true }] }, 3, false, 'kestrel');
+  const w = G.mechs.find(m => m.team !== 0);
+  assert.ok(Math.abs(w.x + 300) < 1e-6 && Math.abs(w.z) < 1e-6, 'bearing 90 is to the right: -x');
+  assert.ok(Math.abs(Math.sin(w.yaw) - 1) < 1e-6, 'facing bearing 270 points it back at the start (+x)');
+  assert.equal(w.ai.aware, true);
+  const M = createGame({ fx: nullFx });
+  startMatch(M, missionDef(0), missionDef(0).seed, true, 'kestrel');
+  const [sleeper, brawler] = M.mechs.filter(m => m.team !== 0);
+  assert.equal(sleeper.ai.aware, false);
+  assert.ok(brawler.ai.plan?.brawler, 'the second one closes to punching range');
 });
 
 test('newMech copies hit points and arms the chassis weapon list', () => {
