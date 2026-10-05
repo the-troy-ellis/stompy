@@ -15,7 +15,7 @@ Read in this order the first time:
 | [issues.md](issues.md) | The backlog, written as ready-to-file GitHub issues with labels and milestones. |
 | [specs/](specs/) | One spec per feature. Each has the design, the code it touches, acceptance criteria and tests. |
 
-If you read one spec before any other, read [specs/13-thunk.md](specs/13-thunk.md): it is what the game is supposed to feel like.
+If you read one spec before any other, read [specs/13-thunk.md](specs/13-thunk.md): it is what the game is supposed to feel like. [specs/14-look-and-performance.md](specs/14-look-and-performance.md) is what it is supposed to look like, and how that stays fast.
 
 ## How to use this plan
 

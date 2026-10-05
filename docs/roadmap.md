@@ -116,6 +116,10 @@ Goal: twelve hand-authored missions with objectives, then contracts.
   curve, chassis unlocks, and a final mission against the assault chassis.
 - Contracts after mission twelve pick an objective type too.
 - Debrief shows objective results; campaign screen shows a twelve-slot strip.
+- After the strip (#106) and before Acts II–III: the look-and-performance
+  groundwork from [specs/14-look-and-performance.md](specs/14-look-and-performance.md)
+  (perf harness, instanced effects with a shape per kind, particle pool,
+  allocation diet, the 240-line pixelated look by default, dither fades).
 
 Exit: campaign playable end to end on desktop and phone in about two hours,
 every objective type used at least twice, no text longer than two sentences.
@@ -136,6 +140,9 @@ once M0 is in.
 - Explosions: shockwave ring, more debris, scorch quads on terrain, persistent
   burning wrecks with a smoke column, delayed secondary pops.
 - Particle system rework: one instanced draw, a hard cap, LOD by distance.
+  The look and the performance plan behind it (instanced effects, a
+  particle pool, one draw per mech, a PIXELS setting, culling, a perf
+  harness) are in [specs/14-look-and-performance.md](specs/14-look-and-performance.md).
 - Ambient audio bed per biome and weather.
 
 Exit: a night dust-storm mission on the volcanic plain holds the frame budget
