@@ -15,6 +15,7 @@ import { explode, particle, stepDebris } from './effects.js';
 import { stepFeel } from './feel.js';
 import { netInterp } from '../net/interp.js';
 import { pushOutOfEntities, stepEntities } from './entities.js';
+import { tickObjectives } from './objectives.js';
 
 const { sin, abs, min, max, hypot, cos } = Math;
 
@@ -92,6 +93,7 @@ export function update(G, input, dt) {
     }
   }
   stepEntities(G, dt);
+  tickObjectives(G);
   pushOutOfEntities(G, m => geoOf(m).radius * m.ch.scale);
 
   stepBursts(G, dt);

@@ -14,5 +14,6 @@ export const VOICE = {
   shutdown: ['Reactor shutdown.', 'Reactor shutdown. Please hold.'],
   online: ['Reactor online.', 'Reactor online. Carry on.'],
   complete: ['Mission complete.', 'Mission complete. Good stomping.'],
+  failed: ['Mission failed.'],   // an objective failed (the player's own death has its own lines)
 };
 export const DRY_GAP = 60;

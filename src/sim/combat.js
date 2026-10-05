@@ -181,10 +181,7 @@ export function destroy(G, m, src) {
   }
   if (src === G.player) G.stats.kills++;
   voice(G, m.lastHitMelee === 'stomp' ? 'killStomp' : m.lastHitMelee ? 'killPunch' : 'kill', {}, true, DEATH_BEAT * 1000);   // after the bang, not before
-  if (G.player.alive && !G.mechs.some(e => e.team !== 0 && e.alive)) {
-    G.state = 'over'; G.endT = 3.5; G.won = true;
-    voice(G, 'complete', {}, true, 1400);
-  }
+  // Whether that won the mission is the objectives' call (objectives.js).
 }
 
 export function fire(G, m, w, aim, target) {
