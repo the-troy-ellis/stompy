@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#109 Act I: `m01`-`m04` shipped on placeholder names; the mission list is still a proposal for the owner to edit) |
+| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; Acts II and III are still a proposal for the owner to edit) |
 | Milestone | M3 |
 | Size | L (each mission is an S issue once the framework exists) |
 | Depends on | [03-objectives.md](03-objectives.md), [05-ai.md](05-ai.md), [06-chassis-and-weapons.md](06-chassis-and-weapons.md), [12-melee.md](12-melee.md), [07-atmosphere.md](07-atmosphere.md) for night/weather variants (missions degrade gracefully to plain palettes if M4 is late) |
@@ -36,10 +36,10 @@ available.` once (`New chassis available. It is purple.` for the last).
 
 | # | Name | Objective | Foes | Notes |
 |---|---|---|---|---|
-| 1 | First Stomp | ELIMINATE | 2 JACKAL | Today's mission 1. Also the silent tutorial (M6 prompts). One enemy starts unaware. The shove is taught here by a JACKAL that gets too close. |
-| 2 | Tower Trouble | DESTROY 3 relay towers; ELIMINATE secondary | 2 JACKAL, 1 JACKAL wave at the 2nd tower | Teaches structures and that noise brings company. Towers can be punched down. |
-| 3 | Trucks Don't Fight Back | ESCORT 4 trucks 1.6 km, min 2 alive | 3 JACKAL from the flanks in two waves | Teaches escort. Trucks take the valley road the terrain flattens. |
-| 4 | Big Boy | ELIMINATE | 1 WARDEN, 2 JACKAL | Dusk → night during the mission (M4 time ramp). WARDEN unlock. |
+| 1 | LIL SNOOZERS | ELIMINATE | 2 JACKAL | Today's mission 1. Also the silent tutorial (M6 prompts). One enemy starts unaware. The shove is taught here by a JACKAL that gets too close. |
+| 2 | TOWER TOPPLER | DESTROY 3 relay towers; ELIMINATE secondary | 2 JACKAL, 1 JACKAL wave at the 2nd tower | Teaches structures and that noise brings company. Towers can be punched down. |
+| 3 | HELPLESS LIL BUDDIES | ESCORT 4 trucks 1.6 km, min 2 alive | 3 JACKAL from the flanks in two waves | Teaches escort. Trucks take the valley road the terrain flattens. |
+| 4 | FOUR LEGS BAD | ELIMINATE | 1 WARDEN, 2 JACKAL | Dusk → night during the mission (M4 time ramp). WARDEN unlock. |
 
 ### Act II — The glacier
 

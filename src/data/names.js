@@ -14,8 +14,8 @@ export const NAMES = {
     light1: { role: 'REVERSE-JOINT · SMALL, RUDE', kit: 'FIRECRACKERS · MED LASER · PEASHOOTER · FUSION', fire: 0.4 },
     sniper1: { role: 'FORWARD-JOINT · LONG GUN, LONG LEGS', kit: 'BIG BONKER · THUNDERCLAP · MED LASER · FUSION', fire: 0.7 },
   },
-  // Campaign missions by key: placeholders until the owner picks (docs/workflow.md § Naming).   // unnamed
-  missions: { m01: 'MISSION 1', m02: 'MISSION 2', m03: 'MISSION 3', m04: 'MISSION 4' },
+  // Campaign missions by key. Act I's are the owner's, picked after seeing them (docs/workflow.md § Naming).
+  missions: { m01: 'LIL SNOOZERS', m02: 'TOWER TOPPLER', m03: 'HELPLESS LIL BUDDIES', m04: 'FOUR LEGS BAD' },
   locked: n => `LOCKED · CLEAR MISSION ${n}`,
   cats: { energy: 'ENERGY', ballistic: 'BALLISTIC', missile: 'MISSILE', fusion: 'FUSION' },
   sections: { T: 'Torso', LA: 'Left arm', RA: 'Right arm', LL: 'Left leg', RL: 'Right leg' },

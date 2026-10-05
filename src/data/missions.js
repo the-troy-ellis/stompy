@@ -21,13 +21,13 @@ export const MISSIONS = [
   { key: 'm01', pal: 'dusk', seed: 7,
     foes: [{ type: 'jackal', at: [20, 600], aware: false }, { type: 'jackal', at: [335, 460], profile: 'brawler' }],
     objectives: [{ type: 'eliminate' }],
-    intel: 'Two scouts are loitering on the Redwater road, and one of them is asleep.' },
+    intel: 'Two scouts are napping on the Redwater road, and it would be rude not to wake them.' },
   { key: 'm02', pal: 'dusk', seed: 20,
     foes: [{ type: 'jackal', at: [345, 700] }, { type: 'jackal', at: [30, 480], aware: false }],
     entities: [{ ...RELAY, id: 'relay1', at: [10, 380] }, { ...RELAY, id: 'relay2', at: [310, 620] }, { ...RELAY, id: 'relay3', at: [55, 820] }],
     objectives: [{ type: 'destroy', targets: ['relay'], label: 'RELAY' }, { type: 'eliminate', secondary: true }],
     waves: [{ when: { obj: 0, done: 2 }, foes: ['jackal'], from: 0, dist: 450 }],
-    intel: 'Three relay towers are telling everyone where you are, so knock them over.' },
+    intel: 'Three relay towers are telling everyone where you are, and they all bend at the bottom.' },
   { key: 'm03', pal: 'dusk', seed: 33, prefer: 'convoy',
     foes: [],
     entities: [
@@ -36,11 +36,11 @@ export const MISSIONS = [
     ],
     objectives: [{ type: 'escort', convoy: 'convoy', to: 'exit', minAlive: 2, label: 'CONVOY' }],
     waves: [{ at: 30, foes: ['jackal', 'jackal'], from: 90 }, { at: 105, foes: ['jackal'], from: 270 }],
-    intel: 'Four trucks need to reach the far end of the valley. Two of them, at least.' },
+    intel: 'Four little trucks need walking down the valley; bring back at least two.' },
   { key: 'm04', pal: 'dusk', seed: 46,   // dusk into night once M4's time ramp exists
     foes: [{ type: 'warden', at: [0, 720] }, { type: 'jackal', at: [330, 600] }, { type: 'jackal', at: [30, 640] }],
     objectives: [{ type: 'eliminate' }],
-    intel: 'Something heavy is walking around Redwater, and it is not one of ours.' },
+    intel: 'Something with four legs is stomping around Redwater, which is two too many.' },
 ].map(m => ({ ...m, name: NAMES.missions[m.key] }));
 export function missionDef(n) {
   if (n < MISSIONS.length) return MISSIONS[n];
