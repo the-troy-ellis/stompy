@@ -1,6 +1,6 @@
 import { M } from '../util/math.js';
 import { buildProps } from '../mesh/props.js';
-import { buildEffectShapes, EFFECT_SHAPES } from '../mesh/effects.js';
+import { buildEffectShapes, EFFECT_SHAPES, DITHER_SHAPES } from '../mesh/effects.js';
 import { Builder } from '../mesh/builder.js';
 import { buildMechParts } from '../mesh/mechParts.js';
 import { CHASSIS, lockedLook } from '../data/chassis.js';
@@ -54,12 +54,15 @@ export function createRenderer(cv, { antialias = true } = {}) {
   // Effects, instanced (spec 14 P1): one draw per shape. Per vertex the shape's
   // position and normal; per instance its position and size (iPS), spin and
   // tumble (iRot, the same RY-then-RX order the matrices used), colour, glow and
-  // IR heat (iFx). Lit, fogged and IR-shaded exactly like the main shader.
+  // IR heat and dither (iFx). Lit, fogged and IR-shaded exactly like the main shader.
+  // Smoke and dust dither out (§ The look 3): the DITHER build skips pixels by
+  // an ordered 4x4 threshold (Bayer) on the screen's pixel grid, which at the
+  // chunky resolution is a coarse checkerboard. Drawn last; never blended.
   const ext = gl.getExtension('ANGLE_instanced_arrays');
-  const instProg = ext && compile(`
-    attribute vec3 aPos, aNrm; attribute vec4 iPS; attribute vec2 iRot; attribute vec3 iCol; attribute vec2 iFx;
+  const instVS = `
+    attribute vec3 aPos, aNrm; attribute vec4 iPS; attribute vec2 iRot; attribute vec3 iCol; attribute vec3 iFx;
     uniform mat4 uVP; uniform vec3 uLight, uCam; uniform vec2 uFog;
-    varying vec3 vCol; varying float vFog, vHeat;
+    varying vec3 vCol; varying float vFog, vHeat, vDither;
     vec3 turn(vec3 v) {
       float c = cos(iRot.y), s = sin(iRot.y);
       v = vec3(v.x, c * v.y - s * v.z, s * v.y + c * v.z);
@@ -71,19 +74,26 @@ export function createRenderer(cv, { antialias = true } = {}) {
       gl_Position = uVP * vec4(wp, 1.0);
       float d = max(dot(normalize(turn(aNrm)), uLight), 0.0);
       vCol = mix(iCol * (0.36 + 0.78 * d), iCol, iFx.x);
-      vHeat = iFx.y;
+      vHeat = iFx.y; vDither = iFx.z;
       vFog = clamp((length(wp - uCam) - uFog.x) / (uFog.y - uFog.x), 0.0, 1.0);
-    }`, `
+    }`;
+  const instFS = `
     precision mediump float;
-    uniform vec3 uFogCol; uniform float uIR; varying vec3 vCol; varying float vFog, vHeat;
+    uniform vec3 uFogCol; uniform float uIR; varying vec3 vCol; varying float vFog, vHeat, vDither;
+    float bayer2(vec2 a) { return mod(2.0 * a.x + 3.0 * a.y, 4.0); }
+    float bayer4(vec2 p) { vec2 q = mod(floor(p), 4.0); return (4.0 * bayer2(mod(q, 2.0)) + bayer2(floor(q / 2.0)) + 0.5) / 16.0; }
     void main() {
+    #ifdef DITHER
+      if (vDither >= bayer4(gl_FragCoord.xy)) discard;
+    #endif
       vec3 c = mix(vCol, uFogCol, vFog);
       if (uIR > 0.5) {
         float l = dot(vCol, vec3(0.3, 0.59, 0.11));
         c = vec3(mix(mix(0.1 + l * 0.3, 0.97, vHeat), 0.06, vFog * 0.9));
       }
       gl_FragColor = vec4(c, 1.0);
-    }`);
+    }`;
+  const instProg = ext && compile(instVS, instFS), ditherProg = ext && compile(instVS, '#define DITHER\n' + instFS);
   const skyProg = compile(`
     attribute vec2 aP; void main() { gl_Position = vec4(aP, 0.999, 1.0); }`, `
     precision mediump float;
@@ -158,27 +168,34 @@ export function createRenderer(cv, { antialias = true } = {}) {
 
 
   // Instanced effects: FX_FLOATS per instance (x y z size, spin tumble, r g b,
-  // glow heat, pad). The scene fills R.fx[shape].data and .n each frame and
+  // glow heat dither). The scene fills R.fx[shape].data and .n each frame and
   // calls drawEffects once; R.frame holds that frame's shared uniforms.
   const FX_FLOATS = 12, FX_CAP = 4096, fx = {};
-  let instBuf = null, IU = null, IA = null;
+  let instBuf = null;
+  const instLocs = p => {
+    const L2 = n => gl.getUniformLocation(p, n), A2 = n => gl.getAttribLocation(p, n);
+    return { p, U: { VP: L2('uVP'), light: L2('uLight'), cam: L2('uCam'), fog: L2('uFog'), fogCol: L2('uFogCol'), ir: L2('uIR') },
+      A: { pos: A2('aPos'), nrm: A2('aNrm'), ps: A2('iPS'), rot: A2('iRot'), col: A2('iCol'), fx: A2('iFx') } };
+  };
+  // Two passes: the solid shapes, then the dithering ones (mesh/effects.js).
+  const passes = [];
   if (instProg) {
     for (const k of EFFECT_SHAPES) fx[k] = { data: new Float32Array(FX_CAP * FX_FLOATS), n: 0 };
     instBuf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
     gl.bufferData(gl.ARRAY_BUFFER, FX_CAP * FX_FLOATS * 4, gl.DYNAMIC_DRAW);
-    const L2 = n => gl.getUniformLocation(instProg, n), A2 = n => gl.getAttribLocation(instProg, n);
-    IU = { VP: L2('uVP'), light: L2('uLight'), cam: L2('uCam'), fog: L2('uFog'), fogCol: L2('uFogCol'), ir: L2('uIR') };
-    IA = { pos: A2('aPos'), nrm: A2('aNrm'), ps: A2('iPS'), rot: A2('iRot'), col: A2('iCol'), fx: A2('iFx') };
+    passes.push({ ...instLocs(instProg), shapes: EFFECT_SHAPES.filter(k => !DITHER_SHAPES.includes(k)) },
+      { ...instLocs(ditherProg), shapes: DITHER_SHAPES });
   }
-  const drawEffects = () => {
+  const drawPass = ({ p, U: IU, A: IA, shapes }) => {
+    if (!shapes.some(k => fx[k].n)) return;
     const f = R.frame, inst = [IA.ps, IA.rot, IA.col, IA.fx];
-    gl.useProgram(instProg);
+    gl.useProgram(p);
     gl.uniformMatrix4fv(IU.VP, false, f.VP); gl.uniform3fv(IU.light, f.light); gl.uniform3fv(IU.cam, f.cam);
     gl.uniform2f(IU.fog, f.fog[0], f.fog[1]); gl.uniform3fv(IU.fogCol, f.fogCol); gl.uniform1f(IU.ir, f.ir);
     for (const a of [IA.pos, IA.nrm, ...inst]) gl.enableVertexAttribArray(a);
     for (const a of inst) ext.vertexAttribDivisorANGLE(a, 1);
-    for (const k of EFFECT_SHAPES) {
+    for (const k of shapes) {
       const g = fx[k], mesh = meshes.fx[k];
       if (!g.n) continue;
       gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
@@ -189,13 +206,16 @@ export function createRenderer(cv, { antialias = true } = {}) {
       gl.vertexAttribPointer(IA.ps, 4, gl.FLOAT, false, FX_FLOATS * 4, 0);
       gl.vertexAttribPointer(IA.rot, 2, gl.FLOAT, false, FX_FLOATS * 4, 16);
       gl.vertexAttribPointer(IA.col, 3, gl.FLOAT, false, FX_FLOATS * 4, 24);
-      gl.vertexAttribPointer(IA.fx, 2, gl.FLOAT, false, FX_FLOATS * 4, 36);
+      gl.vertexAttribPointer(IA.fx, 3, gl.FLOAT, false, FX_FLOATS * 4, 36);
       ext.drawArraysInstancedANGLE(gl.TRIANGLES, 0, mesh.count, g.n);
       R.draws++;
       g.n = 0;
     }
     for (const a of inst) ext.vertexAttribDivisorANGLE(a, 0);
     for (const a of [IA.pos, IA.nrm, ...inst]) gl.disableVertexAttribArray(a);
+  };
+  const drawEffects = () => {
+    for (const pass of passes) drawPass(pass);
     gl.useProgram(prog);
     R.curMesh = null;
   };

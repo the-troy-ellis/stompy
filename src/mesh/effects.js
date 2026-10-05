@@ -11,6 +11,14 @@ export const EFFECT_SHAPES = ['cube', 'tetra', 'chunk', 'sliver', 'octa', 'flat'
 export const shapeOf = kind => SHAPE_OF[kind] || 'cube';
 // The same, by the particle pool's kind number (sim/particles.js KINDS).
 export const SHAPE_BY_KIND = KINDS.map(shapeOf);
+// Soft things dither out over the last third of their life (§ The look 3):
+// an ordered 4x4 pattern of skipped pixels, never blending. Their shapes are
+// drawn by the dithering shader, after the solid ones, since a shader that can
+// skip pixels can turn off a phone GPU's early depth test.
+export const DITHER_KINDS = ['smoke', 'dust'];
+export const DITHER_SHAPES = [...new Set(DITHER_KINDS.map(shapeOf))];
+const DITHERS = KINDS.map(k => DITHER_KINDS.includes(k));
+export const DITHER_FROM = 1 / 3;   // of its life left
 
 const W = [1, 1, 1], O = [0, 0, 0];
 const solid = (b, verts, faces) => { for (const [a, c, d] of faces) b.tri(verts[a], verts[c], verts[d], W, O); };
@@ -32,10 +40,12 @@ export function buildEffectShapes() {
 }
 
 // How particle i of the pool P looks this frame, written into the Float32Array
-// `out` as [size, r, g, b, glow, heat] (glow 1 ignores the light; heat is for
-// IR). A typed array, not an object, so drawing thousands allocates nothing:
-// numbers stored on an object's fields can be boxed one by one. Fire shrinks and reddens, a flamer's puff swells and reddens, smoke
-// grows and fades into the horizon colour `hor`; the rest are plain and unlit.
+// `out` as [size, r, g, b, glow, heat, dither] (glow 1 ignores the light; heat
+// is for IR; dither is the share of its pixels skipped, 0 to 1). A typed
+// array, not an object, so drawing thousands allocates nothing: numbers stored
+// on an object's fields can be boxed one by one. Fire shrinks and reddens, a
+// flamer's puff swells and reddens, smoke grows and fades into the horizon
+// colour `hor`; the rest are plain and unlit. Smoke and dust dither out.
 export function effectLook(P, i, hor, out) {
   const f = P.life[i] / P.max[i], kind = KINDS[P.kind[i]], c = P.col, c0 = c[i * 3], c1 = c[i * 3 + 1], c2 = c[i * 3 + 2];
   let size = P.size[i], emis = 1, heat = 0.3, r = c0, g = c1, b = c2;
@@ -44,5 +54,6 @@ export function effectLook(P, i, hor, out) {
   else if (kind === 'smoke') { size *= 1.6 - f * 0.8; r = hor[0] + (c0 - hor[0]) * f; g = hor[1] + (c1 - hor[1]) * f; b = hor[2] + (c2 - hor[2]) * f; emis = 0.6; heat = 0.15; }
   else emis = 0;
   out[0] = size; out[1] = r; out[2] = g; out[3] = b; out[4] = emis; out[5] = heat;
+  out[6] = DITHERS[P.kind[i]] && f < DITHER_FROM ? 1 - f / DITHER_FROM : 0;
   return out;
 }
