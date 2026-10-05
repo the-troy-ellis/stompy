@@ -1,19 +1,47 @@
 import { PALS } from './palettes.js';
+import { NAMES } from './names.js';
 
-// A mission: { name, pal, foes, intel }, and from M3 optionally
-// `objectives` (default ELIMINATE), `entities` placed `at: [bearing°, dist]`
-// from the start, and `flat: [[bearing°, dist, radius]]` pads
-// (docs/specs/03-objectives.md; sim/objectives.js reads them).
+// A mission: { key, pal, seed, foes, intel }; its display name comes from
+// NAMES.missions[key]. From M3 also (docs/specs/03-objectives.md; the sim
+// reads them in state.js and objectives.js):
+//   foes        chassis keys, or { type, at: [bearing°, dist], face, aware, profile }
+//   objectives  default ELIMINATE; see sim/objectives.js
+//   entities    structures, vehicles, turrets and nav points placed `at: [bearing°, dist]`
+//               from the start, vehicles with a `path` of the same; `pad: r` flattens under one
+//   waves       { at } on the clock or { when: { obj, done } } on progress, with foes and from
+//   flat        [[bearing°, dist, radius]] extra pads
+//   prefer      'convoy': the enemies go for the trucks
+// Bearings: 0 is straight ahead at the start, 90 to the right.
+const RELAY = { kind: 'structure', mesh: 'relay', height: 18, radius: 3, tags: ['relay'], label: 'RELAY', pad: 9 };
+const TRUCK = { kind: 'vehicle', mesh: 'truck', tags: ['convoy'], label: 'TRUCK', speed: 7 };
+const ROUTE = [[200, 120], [100, 200], [40, 520], [15, 850], [350, 1040]];   // ~1.6 km down the valley
+
 export const MISSIONS = [
-  { name: 'Proving Grounds', pal: 'dusk', foes: ['jackal', 'jackal'],
-    intel: 'Two JACKAL scouts have been shadowing the convoy route out of Redwater. Fast, lightly armoured, armed with medium lasers. Run them down.' },
-  { name: 'Ridge Patrol', pal: 'ice', foes: ['jackal', 'jackal', 'jackal'],
-    intel: 'A scout lance is sweeping the glacier ridges. Visibility is poor. Use the radar and let them come to you.' },
-  { name: 'Iron Rain', pal: 'volcanic', foes: ['warden', 'jackal', 'jackal'],
-    intel: 'A WARDEN fire-support mech is shelling the refinery with long-range missiles, screened by two scouts. Close the distance: LRMs are weak up close.' },
-  { name: 'Hammerfall', pal: 'dusk', foes: ['warden', 'warden', 'jackal', 'jackal'],
-    intel: 'The Combine has committed heavies. Two WARDENs and their escorts. Watch your heat.' },
-];
+  // Act I: Redwater, dusk desert.
+  { key: 'm01', pal: 'dusk', seed: 7,
+    foes: [{ type: 'jackal', at: [20, 600], aware: false }, { type: 'jackal', at: [335, 460], profile: 'brawler' }],
+    objectives: [{ type: 'eliminate' }],
+    intel: 'Two scouts are loitering on the Redwater road, and one of them is asleep.' },
+  { key: 'm02', pal: 'dusk', seed: 20,
+    foes: [{ type: 'jackal', at: [345, 700] }, { type: 'jackal', at: [30, 480], aware: false }],
+    entities: [{ ...RELAY, id: 'relay1', at: [10, 380] }, { ...RELAY, id: 'relay2', at: [310, 620] }, { ...RELAY, id: 'relay3', at: [55, 820] }],
+    objectives: [{ type: 'destroy', targets: ['relay'], label: 'RELAY' }, { type: 'eliminate', secondary: true }],
+    waves: [{ when: { obj: 0, done: 2 }, foes: ['jackal'], from: 0, dist: 450 }],
+    intel: 'Three relay towers are telling everyone where you are, so knock them over.' },
+  { key: 'm03', pal: 'dusk', seed: 33, prefer: 'convoy',
+    foes: [],
+    entities: [
+      ...[[200, 120], [207, 135], [213, 151], [218, 169]].map((at, i) => ({ ...TRUCK, id: `truck${i + 1}`, at, path: ROUTE })),
+      { kind: 'nav', id: 'exit', at: ROUTE[ROUTE.length - 1], mesh: 'pad', radius: 14, pad: 16 },
+    ],
+    objectives: [{ type: 'escort', convoy: 'convoy', to: 'exit', minAlive: 2, label: 'CONVOY' }],
+    waves: [{ at: 30, foes: ['jackal', 'jackal'], from: 90 }, { at: 105, foes: ['jackal'], from: 270 }],
+    intel: 'Four trucks need to reach the far end of the valley. Two of them, at least.' },
+  { key: 'm04', pal: 'dusk', seed: 46,   // dusk into night once M4's time ramp exists
+    foes: [{ type: 'warden', at: [0, 720] }, { type: 'jackal', at: [330, 600] }, { type: 'jackal', at: [30, 640] }],
+    objectives: [{ type: 'eliminate' }],
+    intel: 'Something heavy is walking around Redwater, and it is not one of ours.' },
+].map(m => ({ ...m, name: NAMES.missions[m.key] }));
 export function missionDef(n) {
   if (n < MISSIONS.length) return MISSIONS[n];
   const pals = Object.keys(PALS), k = 3 + Math.floor(n / 2), heavies = Math.floor(n / 3);

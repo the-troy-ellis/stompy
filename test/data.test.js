@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { foeType } from '../src/sim/state.js';
 import assert from 'node:assert/strict';
 import { WEAPONS, CATS, CAT_OF } from '../src/data/weapons.js';
 import { CHASSIS, MECH_ORDER, MECH_INFO, HPK } from '../src/data/chassis.js';
@@ -21,8 +22,9 @@ test('missions reference real palettes and chassis, and contracts continue', () 
   for (let n = 0; n < MISSIONS.length + 6; n++) {
     const d = missionDef(n);
     assert.ok(PALS[d.pal], `${d.name} palette`);
-    assert.ok(d.foes.length > 0);
-    for (const f of d.foes) assert.ok(CHASSIS[f]);
+    const all = [...d.foes, ...(d.waves || []).flatMap(w => w.foes)];   // m03's come in waves
+    assert.ok(all.length > 0);
+    for (const f of all) assert.ok(CHASSIS[foeType(f)], `${d.name}: ${foeType(f)}`);
   }
   assert.ok(missionDef(20).foes.length > missionDef(4).foes.length);
 });

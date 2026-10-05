@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#97 entities, #99 framework with ELIMINATE and DESTROY, #100 SURVIVE and waves, #102 EXTRACT and `after`, #101 ESCORT, #103 HUD line, markers and voice, #98 prop meshes, #104 debrief rows shipped) |
+| Status | in progress (#97 entities, #99 framework with ELIMINATE and DESTROY, #100 SURVIVE and waves, #102 EXTRACT and `after`, #101 ESCORT, #103 HUD line, markers and voice, #98 prop meshes, #104 debrief rows, #105 turrets shipped) |
 | Milestone | M3 |
 | Size | L (split: framework + eliminate/structures; survive + waves; convoy; extraction) |
 | Depends on | M0; M1's AI for waves and escorts |
@@ -90,12 +90,25 @@ using the same ring maths as `startMatch`, awake, with `ai.aware = true`. A
 voice line precedes each by 3 s. Wave sizes scale with difficulty (M1's
 setting) by ±1 mech, never by HP.
 
+Besides a SURVIVE's own waves, a mission can list `waves` of its own:
+`{ at: 30, foes, from }` on the mission clock, or `{ when: { obj: 0, done: 2 },
+foes, from }` once objective 0's count reaches 2 (it arrives 3 s after the
+trigger, so the call still comes first). ELIMINATE is not done while a wave
+is on its way.
+
 ### Placement in mission data
 
 Positions are given as polar `[bearing°, distance]` from the start, so a
 mission file reads like a sketch. The terrain's flat start zone stays; a
 mission may add `flat: [[bearing, dist, radius]]` zones that `makeTerrain`
 flattens for structures and the extraction pad.
+
+Foes can be placed the same way: a foe is a chassis key (on the start ring,
+as before) or `{ type, at: [bearing, dist], face: bearing, aware, profile }`,
+which puts it somewhere, points it, wakes it or leaves it asleep, and can
+give it another chassis's fighting style (mission 1's JACKAL that walks in
+close enough to shove uses `profile: 'brawler'`). A mission's `seed` fixes
+its terrain.
 
 ### Arena and co-op
 

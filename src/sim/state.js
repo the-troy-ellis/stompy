@@ -8,6 +8,8 @@ import { initFeet } from './gait.js';
 import { eyeOf } from './geom.js';
 import { initFeel } from './feel.js';
 import { flatZones, initObjectives } from './objectives.js';
+import { polar } from './placement.js';
+import { PROFILES } from './ai/profiles.js';
 import { applyLoadout, stockLoadout } from './loadout.js';
 
 const { sin, cos, atan2 } = Math;
@@ -50,7 +52,7 @@ export function resetMatch(G, { def, seed, pal, terrainOpts }) {
   G.pal = PALS[pal || def.pal] || PALS.dusk;
   G.ter = makeTerrain(seed, { ...terrainOpts, zones: flatZones(def) });
   G.worldKind = 'match';
-  G.mechs = []; G.entities = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts = []; G.debris = []; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear();
+  G.mechs = []; G.entities = []; G.waves = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts = []; G.debris = []; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear();
   G.target = null; G.aimMech = null; G.flash = 0; G.shake = 0; G.kick = 0; G.whiteFlash = 0; G.zoom = false; G.endT = 0; G.time = 0; G.frame = 0;
   G.guide = null; G.mDown = false; G.won = false; G.roundOver = false; G.hitMark = 0; G.voice = null;
   G.stats = { shots: 0, hits: 0, dealt: 0, taken: 0, kills: 0 };
@@ -58,17 +60,25 @@ export function resetMatch(G, { def, seed, pal, terrainOpts }) {
 }
 
 // A single-player match: the player at the origin, the foes on a ring.
+// A foe is a chassis key, or { type, at: [bearing°, dist], face: bearing°,
+// aware, profile } to place it, point it, wake it (or not) and give it a
+// fighting style other than its chassis's (ai/profiles.js).
+export const foeType = f => (typeof f === 'string' ? f : f.type);
 export function startMatch(G, def, seed, gentle, chassis, { partsKey, terrainOpts, loadout } = {}) {
   resetMatch(G, { def, seed, terrainOpts });
   G.player = newMech(G, chassis, 0, 0, 0, 0, { partsKey, loadout });
   G.mechs.push(G.player);
   G.eye = eyeOf(G.player); G.view = dirOf(0, 0); G.aim = add(G.eye, mul(G.view, 100));
   const rng = G.rng;
-  def.foes.forEach((t, i) => {
-    const a = (i / def.foes.length) * TAU + rng.range(-0.4, 0.4) + Math.PI * 0.6, d = rng.range(520, 760);
-    const x = Math.max(-BOUND, Math.min(BOUND, sin(a) * d)), z = Math.max(-BOUND, Math.min(BOUND, cos(a) * d));
-    const e = newMech(G, t, 1, x, z, atan2(-x, -z) + rng.range(-1, 1));
-    e.ai.aware = i === 0 && gentle ? false : rng.chance(0.3);
+  def.foes.forEach((f, i) => {
+    const s = typeof f === 'string' ? { type: f } : f;
+    let x, z;
+    if (s.at) ({ x, z } = polar(s.at));
+    else { const a = (i / def.foes.length) * TAU + rng.range(-0.4, 0.4) + Math.PI * 0.6, d = rng.range(520, 760); x = sin(a) * d; z = cos(a) * d; }
+    x = Math.max(-BOUND, Math.min(BOUND, x)); z = Math.max(-BOUND, Math.min(BOUND, z));
+    const e = newMech(G, s.type, 1, x, z, s.face != null ? -s.face * Math.PI / 180 : atan2(-x, -z) + rng.range(-1, 1));
+    e.ai.aware = s.aware ?? (i === 0 && gentle ? false : rng.chance(0.3));
+    if (s.profile) { e.ai.plan = PROFILES[s.profile](e); e.ai.profile = s.profile; }
     G.mechs.push(e);
   });
   initObjectives(G, def);

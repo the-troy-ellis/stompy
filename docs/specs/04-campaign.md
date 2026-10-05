@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (mission list is a proposal for the owner to edit) |
+| Status | in progress (#109 Act I: `m01`-`m04` shipped on placeholder names; the mission list is still a proposal for the owner to edit) |
 | Milestone | M3 |
 | Size | L (each mission is an S issue once the framework exists) |
 | Depends on | [03-objectives.md](03-objectives.md), [05-ai.md](05-ai.md), [06-chassis-and-weapons.md](06-chassis-and-weapons.md), [12-melee.md](12-melee.md), [07-atmosphere.md](07-atmosphere.md) for night/weather variants (missions degrade gracefully to plain palettes if M4 is late) |
