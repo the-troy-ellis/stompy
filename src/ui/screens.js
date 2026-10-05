@@ -5,7 +5,7 @@ import { CATS, CAT_OF } from '../data/weapons.js';
 import { CHASSIS, MECH_ORDER, MECH_INFO } from '../data/chassis.js';
 import { NAMES } from '../data/names.js';
 import { PALS } from '../data/palettes.js';
-import { missionDef, FP_MAPS, FP_MIXES, pickFoes } from '../data/missions.js';
+import { missionDef, missionFoes, FP_MAPS, FP_MIXES, pickFoes } from '../data/missions.js';
 import { MP_COLORS } from '../data/colors.js';
 import { makeTerrain } from '../world/terrain.js';
 import { newMech, startMatch, foeType } from '../sim/state.js';
@@ -138,7 +138,7 @@ export function createUi(app) {
   function menuDetail(status) {
     if (prefs.menuSel === 'campaign') {
       const d = missionDef(prefs.mission), p = PALS[d.pal];
-      const all = [...d.foes, ...(d.waves || []).flatMap(w => w.foes)];   // waves are hostiles too
+      const all = missionFoes(d);   // waves are hostiles too
       const counts = all.reduce((a, f) => ((a[foeType(f)] = (a[foeType(f)] || 0) + 1), a), {});
       // The strip: twelve squares, done (tap to replay), the next one, the rest locked.
       const strip = stripSquares(camp).map((st, i) => `<button class="sq ${st}${i === prefs.mission ? ' sel' : ''}" data-mis="${i}" ${st === 'locked' ? 'disabled' : ''}>${i + 1}</button>`).join('');

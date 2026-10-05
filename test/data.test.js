@@ -5,7 +5,7 @@ import { WEAPONS, CATS, CAT_OF } from '../src/data/weapons.js';
 import { CHASSIS, MECH_ORDER, MECH_INFO, HPK } from '../src/data/chassis.js';
 import { GEO } from '../src/data/geo.js';
 import { PALS } from '../src/data/palettes.js';
-import { MISSIONS, missionDef } from '../src/data/missions.js';
+import { MISSIONS, missionDef, missionFoes } from '../src/data/missions.js';
 import { NAMES } from '../src/data/names.js';
 
 test('every chassis weapon and mount exists', () => {
@@ -22,9 +22,9 @@ test('missions reference real palettes and chassis, and contracts continue', () 
   for (let n = 0; n < MISSIONS.length + 6; n++) {
     const d = missionDef(n);
     assert.ok(PALS[d.pal], `${d.name} palette`);
-    const all = [...d.foes, ...(d.waves || []).flatMap(w => w.foes)];   // m03's come in waves
+    const all = missionFoes(d);   // m03's come in waves, m05's on a SURVIVE clock
     assert.ok(all.length > 0);
     for (const f of all) assert.ok(CHASSIS[foeType(f)], `${d.name}: ${foeType(f)}`);
   }
-  assert.ok(missionDef(20).foes.length > missionDef(4).foes.length);
+  assert.ok(missionDef(20).foes.length > missionDef(MISSIONS.length).foes.length);
 });

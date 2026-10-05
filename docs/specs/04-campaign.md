@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; #106 strip, replay, unlocks and REALLY? shipped; Acts II and III are still a proposal for the owner to edit) |
+| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; #106 strip, replay, unlocks and REALLY? shipped; #110 Act II: `m05`-`m08` shipped with placeholder names; Act III is still a proposal for the owner to edit) |
 | Milestone | M3 |
 | Size | L (each mission is an S issue once the framework exists) |
 | Depends on | [03-objectives.md](03-objectives.md), [05-ai.md](05-ai.md), [06-chassis-and-weapons.md](06-chassis-and-weapons.md), [12-melee.md](12-melee.md), [07-atmosphere.md](07-atmosphere.md) for night/weather variants (missions degrade gracefully to plain palettes if M4 is late) |
@@ -49,6 +49,16 @@ available.` once (`New chassis available. It is purple.` for the last).
 | 6 | Pop the Tanks | DESTROY 2 tanks; EXTRACT within 3:00 after | 1 WARDEN, 2 PIPSQUEAK, 1 JACKAL | PIPSQUEAK unlock. |
 | 7 | Beanpoles | ELIMINATE | 2 BEANPOLE, 2 JACKAL | Snow. BIG BONKER from the far slope; the terrain has a ridge to use. Getting close enough to shove a BEANPOLE is its own reward. |
 | 8 | Headlights | ESCORT 3 trucks across the glacier; SURVIVE until they clear | 2 WARDEN, 2 BEANPOLE, waves of JACKAL | Night with headlights. BEANPOLE unlock. |
+
+As shipped (#110): the names above are working titles; until the owner picks,
+the game shows `MISSION 5` to `MISSION 8`. Fog (5), snow (7) and night (8) are
+`weather` and `time` fields that M4's atmosphere reads; until then they play
+in the plain glacier palette, and 5's halved radar comes with the fog's radar
+factor. 5's waves are 2 JACKAL at once, 2 JACKAL + 1 PIPSQUEAK at 0:50 and
+the WARDEN at 1:40. In 8 the WARDENs walk straight at the convoy and the
+BEANPOLEs wait on the slope by the route; the JACKALs come at 0:40 and 2:00.
+The ridges in 5 and 7 are whatever the seed makes: the terrain generator has
+no authored ridges.
 
 ### Act III — The plain (volcanic)
 
