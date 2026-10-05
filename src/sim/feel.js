@@ -18,6 +18,21 @@ export function stepFeel(m, dt) {
   stepSpring(m.sag, dt, m.shutdown ? FEEL.shutdown.sag * m.ch.scale : 0);
 }
 
+// The camera's eased drop (the `bob` column), in the same units as G.kick.
+// Impulses go into G.bobIn and G.bob follows it: two critically damped
+// springs in series, so the view starts from rest, dips and comes back
+// without ringing. stepBob runs them once a frame.
+const tune = s => { const S = FEEL.spring; s.k = S.bobK; s.c = 2 * Math.sqrt(S.bobK) * S.bobZeta; return s; };   // live from the FEEL panel
+function bobIn(G) {
+  if (!G.bob) { G.bob = makeSpring(); G.bobIn = makeSpring(); }
+  return tune(G.bobIn);
+}
+export function stepBob(G, dt) {
+  if (!G.bob) return;
+  stepSpring(tune(G.bobIn), dt);
+  stepSpring(tune(G.bob), dt, G.bobIn.x);
+}
+
 // One event, one row of the table. `k` is the intensity the event supplies
 // (pace, landing force, damage / 10, blast falloff); `mech` is who it
 // happened to (its body springs react); `roll` leans the wobble sideways
@@ -32,6 +47,7 @@ export function feel(G, event, { mech = null, k = 1, roll = 0, dir = null, at = 
   const rm = mine && G.reducedMotion ? V.reducedScale : 1;
   if (mine) {
     if (row.kick) G.kick = max(G.kick, row.kick * k * rm);
+    if (row.bob) kickSpring(bobIn(G), row.bob * k * rm);
     if (row.shake) G.shake = min(V.shakeMax, G.shake + row.shake * k * rm);
     if (row.flash) G.flash = min(V.flashMax, G.flash + row.flash * k);
     if (row.white) G.whiteFlash = max(G.whiteFlash || 0, row.white * k);

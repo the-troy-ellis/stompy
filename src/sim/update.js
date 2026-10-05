@@ -12,7 +12,7 @@ import { fusionTick, updatePulses } from './fusion.js';
 import { fireCat, missileTrigger, steerVolley } from './missiles.js';
 import { meleeGhost, meleePress, meleeTarget, meleeTick } from './melee.js';
 import { explode, particle, stepDebris } from './effects.js';
-import { stepFeel } from './feel.js';
+import { stepFeel, stepBob } from './feel.js';
 import { netInterp } from '../net/interp.js';
 import { pushOutOfEntities, stepEntities } from './entities.js';
 import { tickObjectives } from './objectives.js';
@@ -125,6 +125,7 @@ export function update(G, input, dt) {
   G.flash = max(0, G.flash - dt * (G.reducedMotion ? 2.4 : 1.2));   // reduced motion: shorter flashes
   G.shake = max(0, G.shake - dt * 2.2);
   G.kick = max(0, G.kick - dt * 5);
+  stepBob(G, dt);
   G.whiteFlash = max(0, (G.whiteFlash || 0) - dt * (G.reducedMotion ? 3.2 : 1.6));
   G.hitMark = max(0, (G.hitMark || 0) - dt);
   G.hitStop = max(0, (G.hitStop || 0) - dt);

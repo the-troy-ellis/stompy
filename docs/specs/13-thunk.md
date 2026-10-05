@@ -29,7 +29,7 @@ Groups and initial values (tune in play):
 
 | Event | kick | shake | squash | wobble | bass | duck | dust | haptic |
 |---|---|---|---|---|---|---|---|---|
-| step (× scale²) | 0.25 | 0 | 0.03 | 0 | 0.4 | 0 | 1 | 10 ms |
+| step (× scale²) | 0 (bob 28) | 0.03 | 0.03 | 0 | 0.4 | 0 | 1 | 10 ms |
 | land (× force) | 1.0 | 0.6 | 0.25 | 0.4 | 1.0 | 0.3 | 3 | 40 ms |
 | fire ac | 0.5 | 0.2 | 0 | 0.3 (torso recoil) | 0.6 | 0 | 0 | 20 ms |
 | fire gauss (M2) | 0.9 | 0.4 | 0.05 | 0.6 | 1.0 | 0.4 | 1 | 40 ms |
@@ -50,6 +50,13 @@ up, via spring), **wobble** = torso/view angular spring amplitude, **bass** =
 sub-bass layer gain, **duck** = hum ducking amount, **dust** = particle
 burst count multiplier, **haptic** = `navigator.vibrate` ms on touch
 (ignored where unsupported; a setting turns it off).
+
+A **bob** column carries the same eye drop through two critically damped
+springs in series (`FEEL.spring.bobK`): it eases in from rest, dips and
+comes back without ringing. Footsteps use it instead of `kick`, because an
+instant kick on every step made the view jump, and quick-stepping mechs
+turned it into a judder; a bob lets a fast cadence blend into a sway. The
+instant `kick` stays for one-off impacts (landings, hits, punches).
 
 ### The spring
 
@@ -155,7 +162,7 @@ there.
 
 ### Reduced motion
 
-Setting (M1 settings issue) REDUCED MOTION: multiplies `kick`, `shake`,
+Setting (M1 settings issue) REDUCED MOTION: multiplies `kick`, `bob`, `shake`,
 `wobble` (view only; the mech still wobbles) and `squash` by 0.3 and sets
 `haptic` to 0. Flashes shorten. The sim is untouched.
 

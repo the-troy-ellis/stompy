@@ -3,7 +3,9 @@
 // shake amount; it calls feel(G, event, { mech, k }) and the row decides.
 //
 // Columns, each multiplied by the event's intensity k:
-//   kick    dashboard / eye drop (G.kick, max with the current value)
+//   kick    dashboard / eye drop (G.kick, max with the current value): an instant jolt
+//   bob     the same drop through two springs in series (an impulse on G.bobIn, which G.bob follows):
+//           eases in, dips and comes back, so a steady rhythm like footsteps reads as a bob, not a jolt
 //   shake   camera jitter (G.shake, added, capped at view.shakeMax)
 //   flash   red damage flash (G.flash, added, capped at view.flashMax)
 //   white   white-out (G.whiteFlash, max)
@@ -28,7 +30,7 @@ export const hotFrac = heat => Math.min(1, Math.max(0, (heat - HEAT.from) / (HEA
 
 export const FEEL = {
   // k = 0.35 + 0.65 * pace, scaled by the chassis (scale^2) in footDown
-  step:        { kick: 1.0, shake: 0.12, flash: 0, white: 0, squash: 0.03, wobble: 0, bass: 0.4, duck: 0, dust: 1, haptic: 10, push: 0 },
+  step:        { kick: 0, bob: 28, shake: 0.03, flash: 0, white: 0, squash: 0.03, wobble: 0, bass: 0.4, duck: 0, dust: 1, haptic: 10, push: 0 },   // a bob, not a kick: quick steps blend instead of snapping
   // Another mech's footfall felt through the ground: k = (1 - d / 40) * scale^2, heavies only
   nearStep:    { kick: 0.15, shake: 0.12, flash: 0, white: 0, squash: 0, wobble: 0.05, bass: 0.3, duck: 0, dust: 0, haptic: 8, push: 0 },
   // k = landing force 0.25..1
@@ -65,8 +67,10 @@ export const FEEL = {
   // Knockback: how far a blow jolts the aim (radians at a 10 m/s impulse) and the skid dust rate.
   knock: { twist: 0.3, pitch: 0.1, skidDust: 12 },
   // Spring stiffness and damping ratio for the body springs.
-  spring: { squashK: 160, squashZeta: 0.7, wobbleK: 90, wobbleZeta: 0.35, sagK: 45, sagZeta: 1 },
+  spring: { squashK: 160, squashZeta: 0.7, wobbleK: 90, wobbleZeta: 0.35, sagK: 45, sagZeta: 1, bobK: 200, bobZeta: 1 },
 };
 const TUNING = new Set(['view', 'spring', 'knock']);   // blocks of constants, not event rows
 export const FEEL_EVENTS = Object.keys(FEEL).filter(k => !TUNING.has(k));
-export const FEEL_COLS = ['kick', 'shake', 'flash', 'white', 'squash', 'wobble', 'bass', 'duck', 'dust', 'haptic', 'push'];
+export const FEEL_COLS = ['kick', 'bob', 'shake', 'flash', 'white', 'squash', 'wobble', 'bass', 'duck', 'dust', 'haptic', 'push'];
+// Rows leave out columns they don't use; fill them so every row has every column.
+for (const ev of FEEL_EVENTS) for (const c of FEEL_COLS) FEEL[ev][c] ??= 0;
