@@ -9,6 +9,18 @@ export const DIFF = {
 };
 export const DIFF_ORDER = ['easy', 'normal', 'hard'];
 
+// Static launchers (sim/turrets.js): they see as far as the difficulty's
+// `sight` (never past the weapon's range), wait its `react` before the first
+// volley, then fire every `cd` seconds while the head is on target.
+// Placeholder numbers: the balance pass (#79) owns them.
+export const TURRET = {
+  weapon: 'lrm',
+  cd: 9,          // s between volleys
+  turn: 1.2,      // rad/s the head slews
+  aimTol: 0.15,   // rad: fires once the head points this close
+  muzzle: 0.8,    // share of its height the volley leaves from
+};
+
 export const FIRE = {
   coolBelow: 15,      // heat under the cap before it opens up again after overheating
   alphaTorso: 0.25,   // target torso fraction under which everything that is ready fires at once

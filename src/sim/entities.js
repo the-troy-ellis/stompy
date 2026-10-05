@@ -5,9 +5,10 @@ import { feel } from './feel.js';
 const { hypot, atan2, sin, cos, min, PI } = Math;
 
 // World entities (docs/specs/03-objectives.md § Entities): structures,
-// vehicles and nav points, in G.entities. Each is
+// vehicles, turrets and nav points, in G.entities. Each is
 // { kind, id, tags, team, x, y, z, yaw, hp, max, radius, height, mesh, col, alive }
-// plus, for a vehicle, a waypoint `path` [[x, z], ...] and a `speed`.
+// plus, for a vehicle, a waypoint `path` [[x, z], ...] and a `speed`; for a
+// turret, a `weapon` (turrets.js; a turret is a structure that shoots).
 // Structures and vehicles are vertical cylinders for hits and footprints,
 // like mechs; a nav point has no body, only a `trigger` radius.
 // `hp: Infinity` makes a decorative structure (it sparks, never falls).
@@ -18,14 +19,14 @@ export const FALL_TIME = 1.2;    // s: a punched-down structure's topple
 // the same way they do on a mech: a name and a scale that puts the centre at
 // half height.
 export function addEntity(G, spec) {
-  const kind = spec.kind || 'structure', height = spec.height ?? (kind === 'vehicle' ? 3 : kind === 'nav' ? 0 : 10);
+  const kind = spec.kind || 'structure', height = spec.height ?? (kind === 'vehicle' ? 3 : kind === 'nav' ? 0 : kind === 'turret' ? 6 : 10);
   const e = {
     kind, id: spec.id || `${kind}${G.entities.length}`, tags: spec.tags || [], team: spec.team ?? (kind === 'vehicle' ? 0 : 1),
     x: spec.x, z: spec.z, y: G.ter.height(spec.x, spec.z), yaw: spec.yaw || 0,
     hp: spec.hp ?? (kind === 'nav' ? Infinity : 40), radius: spec.radius ?? (kind === 'vehicle' ? 2.2 : 3), height,
-    mesh: spec.mesh || null, col: spec.col || [0.5, 0.5, 0.48], alive: true, speed: 0,
-    path: spec.path || null, wp: 0, cruise: spec.speed || 0, trigger: spec.trigger ?? 40,
-    ch: { scale: Math.max(0.3, height / 8.2), name: spec.label || (kind === 'vehicle' ? 'TRUCK' : 'STRUCTURE') },
+    mesh: spec.mesh || (kind === 'turret' ? 'launcher' : null), col: spec.col || [0.5, 0.5, 0.48], alive: true, speed: 0,
+    weapon: spec.weapon || null, path: spec.path || null, wp: 0, cruise: spec.speed || 0, trigger: spec.trigger ?? 40,
+    ch: { scale: Math.max(0.3, height / 8.2), name: spec.label || (kind === 'vehicle' ? 'TRUCK' : kind === 'turret' ? 'LAUNCHER' : 'STRUCTURE') },
   };
   e.max = e.hp;
   e.targetable = kind !== 'nav' && e.team !== 0 && Number.isFinite(e.hp);

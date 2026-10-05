@@ -185,7 +185,7 @@ export function destroy(G, m, src) {
 }
 
 export function fire(G, m, w, aim, target) {
-  const d = w.def, r = G.rng;
+  const d = w.def;
   if (d.kind === 'beam' || d.kind === 'fusion') return false;   // continuous: see beamTick / fusionTick
   if (!m.alive || m.shutdown || w.dead || w.cd > 0 || (d.ammo && w.ammo <= 0)) return false;
   const mz = muzzle(m, w);
@@ -197,19 +197,26 @@ export function fire(G, m, w, aim, target) {
     round(G, m, w, mz, dir);
     if (d.burst) w.burst = { left: d.burst.n - 1, t: d.burst.dt, aim: [...aim] };   // the rest follow in stepBursts
   } else {
-    const vid = ++G.volleySeq;
-    for (let i = 0; i < d.count; i++) {
-      const sp = d.spread ?? 0.08, lift = d.lift ?? 0.12;   // homing volleys fan out and climb; they find their way down
-      const spread = norm(add(dir, [r.range(-sp, sp), r.range(0, lift), r.range(-sp, sp)]));
-      G.shots.push({ kind: 'missile', type: w.type, p: add(mz, [r.range(-0.6, 0.6), r.range(-0.4, 0.4), r.range(-0.6, 0.6)]), v: mul(spread, d.speed * r.range(0.85, 1.1)),
-        owner: m, dmg: d.dmg, life: d.range / d.speed + 1, target: d.homing === false ? null : target, smoke: 0, age: 0, vid });
-    }
+    const vid = volley(G, m, w.type, mz, dir, target);
     m.flash = { frame: G.frame, p: mz, dir, big: false };
     if (m === G.player) { G.lastVolley = vid; feel(G, 'fireLrm', { mech: m, dir: [-dir[0], -dir[2]] }); }
     G.fx.sfx.missile(mz);
     if (mp(G) && m === G.player) G.fx.netSend(fxMissiles(mz, dir, d.homing === false ? 0 : target?.netId, G.lastVolley, w.type));
   }
   return true;
+}
+
+// A missile volley of weapon `type` from `mz` along `dir`, homing on `target`
+// unless the weapon doesn't. The owner is a mech or a turret (turrets.js).
+export function volley(G, owner, type, mz, dir, target) {
+  const d = WEAPONS[type], r = G.rng, vid = ++G.volleySeq;
+  for (let i = 0; i < d.count; i++) {
+    const sp = d.spread ?? 0.08, lift = d.lift ?? 0.12;   // homing volleys fan out and climb; they find their way down
+    const spread = norm(add(dir, [r.range(-sp, sp), r.range(0, lift), r.range(-sp, sp)]));
+    G.shots.push({ kind: 'missile', type, p: add(mz, [r.range(-0.6, 0.6), r.range(-0.4, 0.4), r.range(-0.6, 0.6)]), v: mul(spread, d.speed * r.range(0.85, 1.1)),
+      owner, dmg: d.dmg, life: d.range / d.speed + 1, target: d.homing === false ? null : target, smoke: 0, age: 0, vid });
+  }
+  return vid;
 }
 
 // Live shots are capped: past this, the oldest unguided one is dropped silently.

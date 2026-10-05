@@ -40,7 +40,7 @@ export const compassLabel = d => ({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[d] || 
 // a star on the flanker), and what it is up to right now.
 export function aiLabel(e) {
   const a = e.ai || {}, g = a.group;
-  let s = `${(a.state || 'patrol').toUpperCase()} ${e.ch?.ai?.profile || 'baseline'}`;
+  let s = `${(a.state || 'patrol').toUpperCase()} ${a.profile || e.ch?.ai?.profile || 'baseline'}`;
   if (g && g.size > 1) s += ` G${g.id}${g.flank ? '*' : ''}`;
   if (a.cover) s += ' COVER';
   if (a.ridge) s += ' RIDGE';

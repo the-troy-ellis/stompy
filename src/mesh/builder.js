@@ -21,4 +21,17 @@ export class Builder {
     for (const [a, b, c, d] of [[0, 2, 6, 4], [1, 3, 7, 5], [0, 1, 5, 4], [2, 3, 7, 6], [0, 1, 3, 2], [4, 5, 7, 6]])
       this.quad(C[a], C[b], C[c], C[d], col, ctr);
   }
+  // A unit cylinder (radius 0.5, -0.5..0.5) of n sides through matrix m;
+  // `top` scales the top cap's radius (0 makes a cone).
+  cyl(m, col, n = 8, top = 1) {
+    const ring = (y, r) => Array.from({ length: n }, (_, i) => { const a = (i / n) * Math.PI * 2; return M.apply(m, [Math.sin(a) * 0.5 * r, y, Math.cos(a) * 0.5 * r]); });
+    const lo = ring(-0.5, 1), hi = ring(0.5, top), ctr = M.apply(m, [0, 0, 0]);
+    const cLo = M.apply(m, [0, -0.5, 0]), cHi = M.apply(m, [0, 0.5, 0]);
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      if (top > 0) this.quad(lo[i], lo[j], hi[j], hi[i], col, ctr); else this.tri(lo[i], lo[j], hi[0], col, ctr);
+      this.tri(cLo, lo[i], lo[j], col, ctr);
+      if (top > 0) this.tri(cHi, hi[i], hi[j], col, ctr);
+    }
+  }
 }
