@@ -14,7 +14,7 @@ const ch = CHASSIS.light1;
 
 test('PIPSQUEAK (light1): the spec numbers, boosted jets stock, a placeholder name, selectable', () => {
   assert.equal(NAMES.chassis.light1, 'PIPSQUEAK');
-  assert.equal(NAMES.roles.light1.role, 'REVERSE-JOINT · SMALL, RUDE');
+  assert.equal(NAMES.roles.light1.role, 'IT IS SMALL. IT IS RUDE.');
   assert.ok(MECH_ORDER.includes('light1'));
   assert.equal(ch.legs, 'reverse');
   assert.equal(ch.scale, 0.8); assert.equal(ch.speed, 22); assert.equal(ch.turn, 1.9); assert.equal(ch.sink, 8);

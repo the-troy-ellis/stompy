@@ -28,9 +28,9 @@ test('a locked chassis is a dark silhouette, except PURPLE PUNCHER, which stays 
 
 test('the menu says LOCKED and which mission opens it; the old three have their new role lines', () => {
   assert.equal(NAMES.locked(6), 'LOCKED · CLEAR MISSION 6');
-  assert.equal(NAMES.roles.kestrel.role, 'REVERSE-JOINT · DOES A BIT OF EVERYTHING');
-  assert.equal(NAMES.roles.jackal.role, 'FORWARD-JOINT · FAST, FLIMSY');
-  assert.equal(NAMES.roles.warden.role, 'QUADRUPED · SLOW, STUBBORN');
+  assert.equal(NAMES.roles.kestrel.role, 'IT DOES A LITTLE OF EVERYTHING.');
+  assert.equal(NAMES.roles.jackal.role, 'IT RUNS FAST. IT BREAKS FAST.');
+  assert.equal(NAMES.roles.warden.role, 'FOUR LEGS. SLOW. DOES NOT STOP.');
   for (const k of MECH_ORDER) assert.ok(NAMES.roles[k]?.role, `${k} has a role line`);
 });
 

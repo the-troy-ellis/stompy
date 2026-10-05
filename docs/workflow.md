@@ -50,7 +50,7 @@ Steps for a reviewer, on desktop and on a phone.
 - [ ] Frame budget checked where the change touches render/update
 - [ ] Spec status updated; README/docs updated if behaviour changed
 - [ ] NAMING section included if this PR makes a new mech, weapon, mission or verdict visible (see Naming things)
-- [ ] New text passes the tone guide (one sentence, dry voice, no outside references); warnings stay flat
+- [ ] New text passes the tone guide (board-book descriptions, dry voice, no outside references; `test/tone.test.js`); warnings stay flat
 
 ## Screenshots / recordings
 Required for anything visual or HUD.

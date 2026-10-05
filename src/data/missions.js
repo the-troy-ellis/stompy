@@ -21,13 +21,13 @@ export const MISSIONS = [
   { key: 'm01', pal: 'dusk', seed: 7,
     foes: [{ type: 'jackal', at: [20, 600], aware: false }, { type: 'jackal', at: [335, 460], profile: 'brawler' }],
     objectives: [{ type: 'eliminate' }],
-    intel: 'Two scouts are napping on the Redwater road, and it would be rude not to wake them.' },
+    intel: 'Two scouts sleep by the road. Wake them up. Knock them down.' },
   { key: 'm02', pal: 'dusk', seed: 20,
     foes: [{ type: 'jackal', at: [345, 700] }, { type: 'jackal', at: [30, 480], aware: false }],
     entities: [{ ...RELAY, id: 'relay1', at: [10, 380] }, { ...RELAY, id: 'relay2', at: [310, 620] }, { ...RELAY, id: 'relay3', at: [55, 820] }],
     objectives: [{ type: 'destroy', targets: ['relay'], label: 'RELAY' }, { type: 'eliminate', secondary: true }],
     waves: [{ when: { obj: 0, done: 2 }, foes: ['jackal'], from: 0, dist: 450 }],
-    intel: 'Three relay towers are telling everyone where you are, and they all bend at the bottom.' },
+    intel: 'Three tall towers talk and talk. Knock them down. Someone will come.' },
   { key: 'm03', pal: 'dusk', seed: 33, prefer: 'convoy',
     foes: [],
     entities: [
@@ -36,18 +36,21 @@ export const MISSIONS = [
     ],
     objectives: [{ type: 'escort', convoy: 'convoy', to: 'exit', minAlive: 2, label: 'CONVOY' }],
     waves: [{ at: 30, foes: ['jackal', 'jackal'], from: 90 }, { at: 105, foes: ['jackal'], from: 270 }],
-    intel: 'Four little trucks need walking down the valley; bring back at least two.' },
+    intel: 'Four little trucks drive down the valley. JACKALs come to catch them. Keep two trucks safe.' },
   { key: 'm04', pal: 'dusk', seed: 46,   // dusk into night once M4's time ramp exists
     foes: [{ type: 'warden', at: [0, 720] }, { type: 'jackal', at: [330, 600] }, { type: 'jackal', at: [30, 640] }],
     objectives: [{ type: 'eliminate' }],
-    intel: 'Something with four legs is stomping around Redwater, which is two too many.' },
+    intel: 'One big mech walks on four legs. Two little mechs walk with it. Stomp all three.' },
 ].map(m => ({ ...m, name: NAMES.missions[m.key] }));
+// Board-book numbers (docs/vision.md § Tone guide): words, not digits.
+const WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen', 'Twenty'];
+const count = n => WORDS[n] || 'Lots of';
 export function missionDef(n) {
   if (n < MISSIONS.length) return MISSIONS[n];
   const pals = Object.keys(PALS), k = 3 + Math.floor(n / 2), heavies = Math.floor(n / 3);
   return { name: `Contract ${n + 1}`, pal: pals[n % pals.length],
     foes: Array.from({ length: k }, (_, i) => (i < heavies ? 'warden' : 'jackal')),
-    intel: `Open contract. ${k} hostiles reported, ${heavies} of them heavy. Pay is by the kill.` };
+    intel: `${count(k)} mechs are out there. ${heavies ? `${count(heavies)} of them ${heavies > 1 ? 'are' : 'is'} big.` : 'None of them are big.'} Go and stomp them.` };
 }
 // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
 export const FP_MAPS = ['random', 'dusk', 'ice', 'volcanic'];

@@ -53,7 +53,7 @@ If one of them blocks you, raise it in the issue, do not route around it.
 - **Tone:** minimal text, not solemn. Mission names, a one-line brief, HUD
   markers. No named characters, no dialogue, no lore dumps. The humour lives
   in silly hardware names (PURPLE PUNCHER, BIG BONKER), a deadpan cockpit
-  voice, wry one-sentence briefs, and cartoon-weight physics. Think a 90s
+  voice, board-book briefs (short, plain, action-first), and cartoon-weight physics. Think a 90s
   shareware demo made by people who were having fun. The tone guide in
   [vision.md](vision.md) has the rules and a starter pool of voice lines.
 - **Tech:** raw WebGL, hand-built flat-shaded meshes, no engine, no

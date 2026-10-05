@@ -31,7 +31,7 @@ function punchAt(foe, setup = () => {}) {
 test('PURPLE PUNCHER: the confirmed name, its numbers from the spec, fists not arm guns, selectable', () => {
   const ch = CHASSIS.puncher;
   assert.equal(NAMES.chassis.puncher, 'PURPLE PUNCHER');
-  assert.equal(NAMES.roles.puncher.role, 'ASSAULT · IT PUNCHES');
+  assert.equal(NAMES.roles.puncher.role, 'IT PUNCHES.');
   assert.ok(MECH_ORDER.includes('puncher'));
   assert.equal(ch.scale, 1.3); assert.equal(ch.speed, 9); assert.equal(ch.turn, 0.6); assert.equal(ch.sink, 12);
   assert.deepEqual(ch.hp, { T: 110, LA: 50, RA: 50, LL: 60, RL: 60 });
