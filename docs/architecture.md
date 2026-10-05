@@ -14,7 +14,7 @@ relay and its tests.
 | Path | Lines | Role |
 |---|---|---|
 | `src/main.js` | ~120 | Bootstrap: builds the page, creates everything below, wires them through one `app` object, runs the frame loop. |
-| `src/sim/` | ~900 | **The simulation.** `state.js` (`createGame`, `newMech`, `startMatch`, `resetMatch`), `update.js` (`update(game, input, dt)`), `geom.js`, `effects.js`, `combat.js`, `mech.js`, `gait.js`, `beams.js`, `fusion.js`, `missiles.js`, `ai.js` with `ai/perception.js` (line of sight, belief, shout, search) and `ai/behaviours.js` (keepRange, harass, useCover, ridge, brawler, holdLine, avoidEdge, avoidAllies; `steer` runs a plan) and `ai/fire.js` (heat cap, lock, alpha, section targeting) and `ai/profiles.js` (a plan per chassis) and `ai/group.js` (shared fixes, the flanker), `melee.js`, `knock.js`, `feel.js`, `voice.js`, `loadout.js` (mechlab: stock, validate, apply, stats), `rng.js`, `fx.js`. No DOM, GL, audio or input imports (lint enforces it). |
+| `src/sim/` | ~900 | **The simulation.** `state.js` (`createGame`, `newMech`, `startMatch`, `resetMatch`), `update.js` (`update(game, input, dt)`), `geom.js`, `effects.js`, `combat.js`, `mech.js`, `gait.js`, `beams.js`, `fusion.js`, `missiles.js`, `ai.js` with `ai/perception.js` (line of sight, belief, shout, search) and `ai/behaviours.js` (keepRange, harass, useCover, ridge, brawler, holdLine, avoidEdge, avoidAllies; `steer` runs a plan) and `ai/fire.js` (heat cap, lock, alpha, section targeting) and `ai/profiles.js` (a plan per chassis) and `ai/group.js` (shared fixes, the flanker), `melee.js`, `knock.js`, `feel.js`, `voice.js`, `loadout.js` (mechlab: stock, validate, apply, stats), `entities.js` (M3: structures, vehicles and nav points in `G.entities`: `addEntity`, `stepEntities`, `damageEntity`, `destroyEntity`, footprints), `rng.js`, `fx.js`. No DOM, GL, audio or input imports (lint enforces it). |
 | `src/data/` | ~200 | Weapons, chassis, body plans (`geo.js`), palettes, missions, arena colours, and `names.js` (every display name, keyed). |
 | `src/world/` | ~110 | `terrain.js` (heights, `height(x, z)`, `BOUND`, a `flat` option for tests), `terrainMesh.js`. |
 | `src/mesh/` | ~140 | `builder.js` (flat-shaded triangle soup), `mechParts.js` (each chassis's parts: legs by leg type, sized from its body plan; torso, arm and barrel by `style`). |
@@ -102,7 +102,10 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
   test that samples both.
 - **Mechs are vertical cylinders** for hits (`rayCyl`) with radius and height
   from `GEO`. Section routing (`sectionHit`) is by height and lateral offset
-  in torso space.
+  in torso space. Structures and vehicles are cylinders too (`radius`,
+  `height` on the entity): `rayHit` returns `{ mech }` or `{ ent }`, blasts and
+  punches reach them, and their footprints push mechs out. An entity has one
+  `hp` pool; `hp: Infinity` is decorative.
 - **Melt belongs to the target.** Laser damage ramps on the *target's* `melt`,
   shared by every beam on it. Do not move it to the shooter.
 - **Heat 100 shuts the reactor down, 45 restarts it.** Shutdown halts movement

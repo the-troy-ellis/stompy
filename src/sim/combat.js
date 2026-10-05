@@ -14,6 +14,7 @@ import { voice } from './voice.js';
 import { alertEnemy } from './ai/perception.js';
 import { WEAPONS } from '../data/weapons.js';
 import { knock } from './knock.js';
+import { damageEntity } from './entities.js';
 
 const { sin, cos } = Math;
 
@@ -274,7 +275,8 @@ export function stepShots(G, dt) {
     if (hit) {
       s.life = -1;
       if (hit.mech && !s.ghost) { damage(G, hit.mech, hit.point, s.dmg, s.owner); onShotHit(G, s, hit.mech, hit.point); }   // ghosts are other pilots' shots: theirs to score
-      if (s.kind === 'missile' && !s.ghost) blast(G, hit.point, s.dmg, s.owner, hit.mech);
+      if (hit.ent && !s.ghost) damageEntity(G, hit.ent, s.dmg, s.owner, hit.point);
+      if (s.kind === 'missile' && !s.ghost) blast(G, hit.point, s.dmg, s.owner, hit.mech || hit.ent);
       explode(G, hit.point, false);
     } else s.p = add(s.p, mul(s.v, dt));
     if (s.life <= 0 && s.kind === 'missile' && !hit) { if (!s.ghost) blast(G, s.p, s.dmg, s.owner, null); explode(G, s.p, false); }

@@ -14,6 +14,7 @@ import { meleeGhost, meleePress, meleeTarget, meleeTick } from './melee.js';
 import { explode, particle, stepDebris } from './effects.js';
 import { stepFeel } from './feel.js';
 import { netInterp } from '../net/interp.js';
+import { pushOutOfEntities, stepEntities } from './entities.js';
 
 const { sin, abs, min, max, hypot, cos } = Math;
 
@@ -48,7 +49,7 @@ export function update(G, input, dt) {
   G.view = dirOf(viewYaw(P), P.pitch);
   const aimHit = rayHit(G, G.eye, G.view, 1100, P);
   G.aim = aimHit ? aimHit.point : add(G.eye, mul(G.view, 1100));
-  G.aimMech = aimHit?.mech || null;
+  G.aimMech = aimHit?.mech || (aimHit?.ent?.targetable ? aimHit.ent : null);   // R targets it; a structure counts
   const t = G.target;
   G.lock = !!(t && t.alive && len(sub(center(t), G.eye)) < WEAPONS.lrm.range && dot(norm(sub(center(t), G.eye)), G.view) > cos(0.3));
 
@@ -90,6 +91,8 @@ export function update(G, input, dt) {
       a.x -= (dx / d) * gap * fa; a.z -= (dz / d) * gap * fa; b.x += (dx / d) * gap * fb; b.z += (dz / d) * gap * fb;
     }
   }
+  stepEntities(G, dt);
+  pushOutOfEntities(G, m => geoOf(m).radius * m.ch.scale);
 
   stepBursts(G, dt);
   stepShots(G, dt);

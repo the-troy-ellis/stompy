@@ -5,6 +5,7 @@ import { damage, fire } from './combat.js';
 import { explode } from './effects.js';
 import { r2 } from '../net/protocol.js';
 import { knock } from './knock.js';
+import { damageEntity, solid } from './entities.js';
 import { FEEL } from '../data/feel.js';
 
 const { atan2, hypot, max } = Math;
@@ -90,6 +91,13 @@ export function blast(G, p, dmg, owner, direct) {
     // The blast shoves too: away from it, falling off with distance, by the masses involved.
     if (m.alive) knock(G, { target: m, attacker: owner, base: FEEL.blast.push * (1 - d / BLAST_R), dir: [-nx, -nz], recoil: false });   // the firer is far away
   }
+  // Structures and vehicles in the radius take the same falloff (the one hit directly took the full shot already).
+  for (const e of G.entities) {
+    if (!solid(e) || e === direct) continue;
+    const hd = hypot(p[0] - e.x, p[2] - e.z), top = e.y + e.height;
+    const dy = p[1] < e.y ? e.y - p[1] : p[1] > top ? p[1] - top : 0, d = hypot(Math.max(0, hd - e.radius), dy);
+    if (d < BLAST_R) damageEntity(G, e, dmg * 0.8 * (1 - d / BLAST_R), owner, [e.x, clampN(p[1], e.y + 0.5, top - 0.5), e.z]);
+  }
 }
 
 // Fire every weapon of one kind that's ready; held, each refires as it recharges.
@@ -104,7 +112,7 @@ export function alpha(G) {
   for (const w of P.weapons) fire(G, P, w, G.aim, G.lock ? G.target : null);   // beams skip themselves
 }
 export function cycleTarget(G) {
-  const foes = G.mechs.filter(m => m.alive && m.team !== 0)
+  const foes = [...G.mechs.filter(m => m.alive && m.team !== 0), ...G.entities.filter(e => e.alive && e.targetable)]
     .sort((a, b) => hypot(a.x - G.player.x, a.z - G.player.z) - hypot(b.x - G.player.x, b.z - G.player.z));
   if (!foes.length) return;
   const i = foes.indexOf(G.target);
