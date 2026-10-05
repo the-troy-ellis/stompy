@@ -1,5 +1,8 @@
 import { addEntity } from './entities.js';
 import { voice } from './voice.js';
+import { polar } from './placement.js';
+import { spawnWave, waveFoes, WAVE_WARN } from './waves.js';
+export { polar, flatZones } from './placement.js';
 
 // Mission objectives (docs/specs/03-objectives.md § State machine). A mission
 // lists `objectives`; without any it is ELIMINATE, as missions always were.
@@ -8,14 +11,9 @@ import { voice } from './voice.js';
 // combat.js). `secondary: true` counts in the debrief and never fails it.
 //   { type: 'eliminate' }                                  every team-1 mech
 //   { type: 'destroy', targets: ['relay'], label: 'RELAY' } entities with those tags
-// SURVIVE, ESCORT and EXTRACT arrive in #100-#102.
-
-// A mission places things by polar [bearing°, distance] from the start, so a
-// mission file reads like a sketch: bearing 0 is straight ahead (north on the
-// compass), 90 to the right (east).
-export const polar = ([bearing, dist]) => { const b = bearing * Math.PI / 180; return { x: -Math.sin(b) * dist, z: Math.cos(b) * dist }; };
-// A mission's extra flat pads, for makeTerrain's `zones`.
-export const flatZones = def => (def.flat || []).map(([b, d, r]) => { const p = polar([b, d]); return [p.x, p.z, r]; });
+//   { type: 'survive', seconds: 150, waves: [{ at: 0, foes: [...], from }] }
+//                                                          hold out; waves arrive on the clock
+// ESCORT and EXTRACT arrive in #101-#102.
 
 const TYPES = {
   eliminate: {
@@ -31,6 +29,20 @@ const TYPES = {
     tick(G, o) {
       o.total = o.targets.length; o.done = o.targets.filter(e => !e.alive).length;
       if (o.total && o.done === o.total) return 'done';
+    },
+  },
+  // The clock runs from the mission start; each wave is called in WAVE_WARN
+  // seconds before it arrives (waves at the very start just arrive).
+  survive: {
+    init: (G, d) => ({ start: G.time, waves: (d.waves || []).map(w => ({ ...w, warned: w.at < WAVE_WARN, spawned: false })) }),
+    tick(G, o) {
+      const t = G.time - o.start;
+      for (const w of o.waves) {
+        if (!w.warned && t >= w.at - WAVE_WARN) { w.warned = true; voice(G, 'inbound'); }
+        if (!w.spawned && t >= w.at) { w.spawned = true; spawnWave(G, waveFoes(G, w.foes), w); }
+      }
+      o.left = Math.max(0, o.def.seconds - t);
+      if (o.left === 0) return 'done';
     },
   },
 };
