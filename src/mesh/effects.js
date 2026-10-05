@@ -1,0 +1,44 @@
+import { Builder } from './builder.js';
+import { M } from '../util/math.js';
+
+// Effect shapes (docs/specs/14-look-and-performance.md § The look 2): every
+// effect is a small solid, one shape per kind, drawn instanced (one draw per
+// shape) and coloured per instance, so the shapes are built white. Unit size:
+// about 1 across, centred on the origin. ≤ 16 triangles each.
+export const SHAPE_OF = { smoke: 'cube', dust: 'flat', fire: 'tetra', flame: 'tetra', debris: 'chunk', spark: 'sliver', rain: 'sliver', snow: 'octa' };
+export const EFFECT_SHAPES = ['cube', 'tetra', 'chunk', 'sliver', 'octa', 'flat'];
+export const shapeOf = kind => SHAPE_OF[kind] || 'cube';
+
+const W = [1, 1, 1], O = [0, 0, 0];
+const solid = (b, verts, faces) => { for (const [a, c, d] of faces) b.tri(verts[a], verts[c], verts[d], W, O); };
+const BUILD = {
+  cube: b => b.cube(M.id(), W),
+  chunk: b => b.cube(M.id(), W, 0.55, 0.7),        // a tapered lump of armour
+  sliver: b => b.cube(M.S(0.16, 1, 0.16), W),      // thin: sparks, rain
+  flat: b => b.cube(M.S(1, 0.35, 1), W),           // dust that streams sideways
+  // Fire: a tetrahedron is far less solid than a cube the same width, so it is
+  // drawn ~1.4x wider to keep a fireball's weight.
+  tetra: b => solid(b, [[0, 0.87, 0], [0.76, -0.43, 0.43], [-0.76, -0.43, 0.43], [0, -0.43, -0.87]], [[0, 1, 2], [0, 2, 3], [0, 3, 1], [1, 3, 2]]),
+  octa: b => {
+    const v = [[0.5, 0, 0], [-0.5, 0, 0], [0, 0.5, 0], [0, -0.5, 0], [0, 0, 0.5], [0, 0, -0.5]];
+    solid(b, v, [[2, 0, 4], [2, 4, 1], [2, 1, 5], [2, 5, 0], [3, 4, 0], [3, 1, 4], [3, 5, 1], [3, 0, 5]]);
+  },
+};
+export function buildEffectShapes() {
+  return Object.fromEntries(EFFECT_SHAPES.map(k => { const b = new Builder(); BUILD[k](b); return [k, b]; }));
+}
+
+// How a particle looks this frame: size, colour, glow (1 ignores the light)
+// and IR heat, written into `out` so drawing thousands allocates nothing.
+// Fire shrinks and reddens, a flamer's puff swells and reddens, smoke grows
+// and fades into the horizon colour `hor`; the rest are plain and unlit-free.
+export function effectLook(p, hor, out) {
+  const f = p.life / p.max, c = p.col;
+  let size = p.size, emis = 1, heat = 0.3, r = c[0], g = c[1], b = c[2];
+  if (p.kind === 'fire') { size *= 0.4 + f * 0.8; r = 0.4 + (c[0] - 0.4) * f; g = 0.1 + (c[1] - 0.1) * f; b = 0.05 + (c[2] - 0.05) * f; heat = f; }
+  else if (p.kind === 'flame') { size *= 0.5 + (1 - f) * 3; r = 0.55 + (c[0] - 0.55) * f; g = 0.12 + (c[1] - 0.12) * f; b = 0.04 + (c[2] - 0.04) * f; heat = f; }
+  else if (p.kind === 'smoke') { size *= 1.6 - f * 0.8; r = hor[0] + (c[0] - hor[0]) * f; g = hor[1] + (c[1] - hor[1]) * f; b = hor[2] + (c[2] - hor[2]) * f; emis = 0.6; heat = 0.15; }
+  else emis = 0;
+  out.size = size; out.r = r; out.g = g; out.b = b; out.emis = emis; out.heat = heat;
+  return out;
+}

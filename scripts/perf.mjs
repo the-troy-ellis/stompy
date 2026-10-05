@@ -14,16 +14,18 @@ import { chromium } from 'playwright-core';
 import { spawn, execSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 
-// Baseline on main when this landed (meanDraws/peakDraws/tris/allocKB):
+// Baseline when P0 landed (meanDraws/peakDraws/tris/allocKB):
 //   menu 13/13/21.6k/38 · free-start 37/37/21.8k/160 · fight 231/325/26.1k/682
 //   fight-deaths 470/529/28.5k/1315 · wrecks 464/515/28.2k/1286
-// Budgets are that plus ~15%. Lower them as P1-P4 land.
+// After P1 (#132, instanced effects): fight 94/112/23.6k/394 ·
+//   fight-deaths 106/112/23.6k/545 · wrecks 91/97/23.2k/499
+// Budgets are the latest numbers plus ~15%. Lower them as P2-P4 land.
 export const BUDGETS = {
   menu:           { meanDraws: 15, peakDraws: 15, tris: 25000, allocKB: 45 },
   'free-start':   { meanDraws: 43, peakDraws: 43, tris: 25000, allocKB: 190 },
-  fight:          { meanDraws: 265, peakDraws: 375, tris: 30000, allocKB: 785 },
-  'fight-deaths': { meanDraws: 540, peakDraws: 610, tris: 33000, allocKB: 1510 },
-  wrecks:         { meanDraws: 535, peakDraws: 595, tris: 33000, allocKB: 1480 },
+  fight:          { meanDraws: 110, peakDraws: 130, tris: 28000, allocKB: 455 },
+  'fight-deaths': { meanDraws: 122, peakDraws: 130, tris: 28000, allocKB: 620 },
+  wrecks:         { meanDraws: 105, peakDraws: 112, tris: 27500, allocKB: 575 },
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;

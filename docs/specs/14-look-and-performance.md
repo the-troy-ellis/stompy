@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (P0 #131 perf harness shipped; the owner's decisions are recorded below) |
+| Status | in progress (P0 #131 perf harness, P1 #132 instanced effects shipped; the owner's decisions are recorded below) |
 | Milestone | between M3's #106 and Acts II–III (#110, #111); the rest of M4 builds on it |
 | Size | L (split: perf harness; instanced effects + particle pool; allocation diet; one-draw mechs; render scale; culling) |
 | Depends on | [07-atmosphere.md](07-atmosphere.md) (weather and explosions are the big new loads); [13-thunk.md](13-thunk.md) (effects are feedback) |
@@ -82,6 +82,12 @@ to the draw, and adds what this table lacked: **about 1.3 MB of garbage per
 frame** in the fight-with-deaths scene (680 KB in a plain fight, 160 KB with
 nobody shooting), which is roughly 80 MB a second for the phone's garbage
 collector at 60 fps. P2 and P3 aim straight at that number.
+
+After P1 (instanced effects): the fight-with-deaths scene is 106 draws on
+average (112 at peak, from 470 / 529) and about 545 KB of garbage a frame
+(from 1,315), because effects no longer build matrices per particle. What
+remains is mostly mechs (P4) and the particle objects themselves (P2). The
+particle cap stays at 420 until the pool (P2) replaces the objects.
 
 The simulation itself is cheap: `update()` takes 0.3 ms per frame with 6
 enemies, 0.5 ms with 12 and 0.8 ms with 20, on a desktop CPU in Node. A 2021
