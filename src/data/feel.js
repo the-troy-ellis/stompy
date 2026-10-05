@@ -63,7 +63,10 @@ export const FEEL = {
   // the fusion discharge: the frame shakes, the screen whites out, the feedback hurts
   fusionFire:  { kick: 0.6, shake: 1.2, flash: 0.4, white: 0.7, squash: 0.1, wobble: 0.8, bass: 1.2, duck: 1.0, dust: 0, haptic: 80, push: 0 },
   // How the view reads the springs and caps.
-  view: { wobble: 0.6, shakeMax: 1.2, flashMax: 0.6, reducedScale: 0.3 },   // reducedScale: REDUCED MOTION's multiplier on the camera columns
+  view: { wobble: 0.6, shakeMax: 1.2, flashMax: 0.6, reducedScale: 0.3,
+    // The 2D layers' sway after the camera drop (hud.js stepSway): px per unit of drop, spring stiffness and damping.
+    // The cockpit is bolted on (stiff, a little loose: it rattles); the HUD is projected (soft: it floats and settles).
+    cockpitGain: 4, cockpitK: 900, cockpitZeta: 0.45, hudGain: 2.5, hudK: 45, hudZeta: 0.9 },   // reducedScale: REDUCED MOTION's multiplier on the camera columns
   // Knockback: how far a blow jolts the aim (radians at a 10 m/s impulse) and the skid dust rate.
   knock: { twist: 0.3, pitch: 0.1, skidDust: 12 },
   // Spring stiffness and damping ratio for the body springs.

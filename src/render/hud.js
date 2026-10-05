@@ -4,7 +4,8 @@ import { MP_COLORS } from '../data/colors.js';
 import { center, leadPoint, viewYaw } from '../sim/geom.js';
 import { objectivePoint } from '../sim/objectives.js';
 import { MELT_MAX, beamMult } from '../sim/beams.js';
-import { HEAT, hotFrac } from '../data/feel.js';
+import { HEAT, hotFrac, FEEL } from '../data/feel.js';
+import { makeSpring, stepSpring } from '../util/spring.js';
 
 const { sin, cos, atan2, min, max, PI, random, hypot, floor } = Math;
 
@@ -33,6 +34,21 @@ export function markerEdge(W, top, bottom, m, rel) {
   const dx = -Math.sin(a), dy = -Math.cos(a), hx = cx - m, hy = (bottom - top) / 2;
   const k = Math.min(Math.abs(dx) > 1e-6 ? hx / Math.abs(dx) : Infinity, Math.abs(dy) > 1e-6 ? hy / Math.abs(dy) : Infinity);
   return { x: cx + dx * k, y: cy + dy * k, a: Math.atan2(dx, -dy) };
+}
+// The cockpit's and the HUD's vertical sway, in pixels, each a spring chasing
+// the camera's drop (G.kick plus the footstep bob) with its own stiffness,
+// damping and gain from FEEL.view: the cockpit stiff and a little loose so it
+// rattles, the HUD soft so it floats behind and settles.
+export const makeSway = () => ({ cockpit: makeSpring(), hud: makeSpring() });
+export function stepSway(s, drop, dt, V = FEEL.view) {
+  const out = {};
+  for (const n of ['cockpit', 'hud']) {
+    const sp = s[n], k = V[`${n}K`], z = V[`${n}Zeta`];
+    sp.k = k; sp.c = 2 * Math.sqrt(k) * z;
+    if (dt > 0) stepSpring(sp, dt, drop);
+    out[n] = sp.x * V[`${n}Gain`];
+  }
+  return out;
 }
 export const compassLabel = d => ({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[d] || String(d / 10).padStart(2, '0'));
 
@@ -264,14 +280,23 @@ export function createHud(app) {
       if (a.wp && (!a.aware || a.state === 'search')) line(at(a.wp[0], a.wp[1]), DIM);
     }
   }
+  const sway = makeSway();
+  let lastSwayAt = 0;
   function drawHUD() {
     ctx.setTransform(app.scene.view.dpr, 0, 0, app.scene.view.dpr, 0, 0);
     ctx.clearRect(0, 0, app.scene.view.W, app.scene.view.H);
     if (app.params.has('debug') || app.prefs.frameTime) drawDebug();
     if (G.state === 'menu') return;
     if (G.guide) { drawGuideHUD(); return; }
-    ctx.translate(0, (G.kick + (G.bob ? G.bob.x : 0)) * 3);  // the dashboard jolts on impacts and bobs with each step
     const P = G.player, L = hudLayout(), dash = L.dash;
+    // The cockpit and the HUD each ride their own spring (stepSway): the
+    // frame and dashboard are bolted to the mech and rattle, the projected
+    // HUD floats and settles. Without a dashboard (touch) the instruments float too.
+    const now = performance.now(), sw = stepSway(sway, G.kick + (G.bob ? G.bob.x : 0), lastSwayAt ? min(0.05, (now - lastSwayAt) / 1000) : 0);
+    lastSwayAt = now;
+    const dpr = app.scene.view.dpr, layer = name => ctx.setTransform(dpr, 0, 0, dpr, 0, (name ? sw[name] : 0) * dpr);
+    const instruments = L.frame ? 'cockpit' : 'hud';
+    layer('cockpit');
     ctx.font = '11px "Lucida Console", "Courier New", monospace';
     ctx.textBaseline = 'middle';
     ctx.lineWidth = 1;
@@ -287,10 +312,12 @@ export function createHud(app) {
     ctx.beginPath(); ctx.moveTo(0, app.scene.view.H); ctx.lineTo(0, app.scene.view.H - dash * 0.6); ctx.lineTo(app.scene.view.W * 0.1, app.scene.view.H - dash); ctx.lineTo(app.scene.view.W * 0.9, app.scene.view.H - dash); ctx.lineTo(app.scene.view.W, app.scene.view.H - dash * 0.6); ctx.lineTo(app.scene.view.W, app.scene.view.H); ctx.fill();
     }
 
+    layer(null);   // full-screen washes stay put
     // Damage flash.
     if (G.flash > 0) { ctx.fillStyle = `rgba(255,40,20,${G.flash * 0.4})`; ctx.fillRect(0, 0, app.scene.view.W, app.scene.view.H); }
     if (G.whiteFlash > 0) { ctx.fillStyle = `rgba(235,215,255,${G.whiteFlash * 0.85})`; ctx.fillRect(0, 0, app.scene.view.W, app.scene.view.H); }
 
+    layer('hud');
     // Crosshair.
     let ch = project(G.aim) || [app.scene.view.W / 2, app.scene.view.H / 2];
     // Hit-stop: the crosshair holds where it was for a beat when your shot lands.
@@ -412,6 +439,7 @@ export function createHud(app) {
     ctx.fillStyle = GREEN; ctx.fillRect(legX - 6, ty + 34, 12, 3);
     ctx.fillStyle = DIM; ctx.textAlign = 'left'; ctx.fillText('LEGS', legX + 9, ty + 36);
 
+    layer(instruments);
     // Radar.
     const { x: rx, y: ry, r: rr } = L.radar;
     ctx.fillStyle = '#031203'; ctx.beginPath(); ctx.arc(rx, ry, rr, 0, TAU); ctx.fill();
@@ -511,6 +539,7 @@ export function createHud(app) {
     ctx.textAlign = L.frame ? 'right' : 'left'; ctx.fillStyle = GREEN;
     ctx.fillText(`${Math.round(P.speed * 5.4)} KPH`, L.frame ? thx - 10 : thx, L.frame ? top + bh + 8 : top - 10);
 
+    layer('hud');
     // Target panel.
     if (t && t.alive) {
       const px = L.target.x, py = L.target.y, pw = 150, ph = 92;
@@ -553,6 +582,7 @@ export function createHud(app) {
       ctx.fillStyle = m.col; ctx.fillText(m.text, app.scene.view.W / 2, my); my += 15;
     }
     ctx.globalAlpha = 1;
+    layer(null);
     if (P.shutdown) {
       // Power's gone: the instruments go dark under a veil; only the warning stays bright.
       ctx.fillStyle = 'rgba(0,0,0,0.42)'; ctx.fillRect(0, 0, app.scene.view.W, app.scene.view.H);
@@ -560,6 +590,7 @@ export function createHud(app) {
       ctx.fillStyle = floor(G.time * 3) % 2 ? RED : AMBER;
       ctx.fillText('REACTOR SHUTDOWN', app.scene.view.W / 2, L.viewBottom * 0.4);
     }
+    layer('hud');
     if (G.zoom) { ctx.font = '11px "Lucida Console", monospace'; ctx.fillStyle = GREEN; ctx.fillText('ZOOM 2.5x', app.scene.view.W / 2, L.viewBottom - (L.frame ? 10 : 24)); }
     const left = G.mechs.filter(m => m.alive && m.team !== 0).length;
     ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'right'; ctx.fillStyle = DIM;
