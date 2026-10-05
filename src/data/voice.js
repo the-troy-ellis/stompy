@@ -15,5 +15,6 @@ export const VOICE = {
   online: ['Reactor online.', 'Reactor online. Carry on.'],
   complete: ['Mission complete.', 'Mission complete. Good stomping.'],
   failed: ['Mission failed.'],   // an objective failed (the player's own death has its own lines)
+  inbound: ['Reinforcements inbound.'],   // a wave, three seconds out
 };
 export const DRY_GAP = 60;
