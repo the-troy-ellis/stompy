@@ -1,5 +1,9 @@
 import { PALS } from './palettes.js';
 
+// A mission: { name, pal, foes, intel }, and from M3 optionally
+// `objectives` (default ELIMINATE), `entities` placed `at: [bearing°, dist]`
+// from the start, and `flat: [[bearing°, dist, radius]]` pads
+// (docs/specs/03-objectives.md; sim/objectives.js reads them).
 export const MISSIONS = [
   { name: 'Proving Grounds', pal: 'dusk', foes: ['jackal', 'jackal'],
     intel: 'Two JACKAL scouts have been shadowing the convoy route out of Redwater. Fast, lightly armoured, armed with medium lasers. Run them down.' },

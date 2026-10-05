@@ -29,15 +29,16 @@ test('enemies become aware and shoot back; the player takes damage over a minute
   assert.ok(G.fx.calls('sfx.laser').length > 0, 'no laser sounds');
 });
 
-test('the match ends when the last enemy dies', () => {
+test('the match ends when the last enemy dies', async () => {
   const G = createTestGame({ foes: ['jackal'] });
   const e = foes(G)[0];
   e.hp.T = 1;
   G.mechs[0].heat = 0;
-  // Direct damage path rather than aiming: destroy() flips the state.
-  import('../src/sim/combat.js').then(({ damage }) => {
+  // Direct damage path rather than aiming; the ELIMINATE objective ends it on the next frame.
+  await import('../src/sim/combat.js').then(({ damage }) => {
     damage(G, e, [e.x, e.y + 5, e.z], 5, G.player);
     assert.equal(e.alive, false);
+    stepFor(G, 1 / 60);
     assert.equal(G.state, 'over');
     assert.equal(G.won, true);
     assert.equal(G.stats.kills, 1);

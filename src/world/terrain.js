@@ -5,9 +5,11 @@ const { sin, floor, hypot, max } = Math;
 export const N = 96, CELL = 24, HALF = (N * CELL) / 2, BOUND = HALF - 90;
 
 // A 96x96 grid of 24 m cells: value-noise heights, a flat landing zone around
-// the start. `flat: true` gives a level map (tests). `height(x, z)` samples
-// the same triangle split as the mesh, so mechs stand exactly on what's drawn.
-export function makeTerrain(seed, { flat = false } = {}) {
+// the start. `flat: true` gives a level map (tests). `zones: [[x, z, r], ...]`
+// flattens more pads (a mission's structures, an extraction point) to the
+// height at each centre, easing back to the hills over another r. `height(x, z)`
+// samples the same triangle split as the mesh, so mechs stand exactly on what's drawn.
+export function makeTerrain(seed, { flat = false, zones = [] } = {}) {
   const hs = new Float32Array((N + 1) * (N + 1));
   const hash = (i, j) => { const s = sin(i * 127.1 + j * 311.7 + seed * 74.7) * 43758.5453; return s - floor(s); };
   const vn = (x, z) => {
@@ -22,6 +24,18 @@ export function makeTerrain(seed, { flat = false } = {}) {
     const r = hypot(x, z);
     h *= clampN((r - 70) / 200, 0, 1);       // flat landing zone around the start
     hs[j * (N + 1) + i] = h;
+  }
+  if (!flat && zones.length) {
+    const raw = hs.slice(), at = (x, z) => raw[clampN(Math.round((z + HALF) / CELL), 0, N) * (N + 1) + clampN(Math.round((x + HALF) / CELL), 0, N)];
+    const pads = zones.map(([x, z, r]) => ({ x, z, r, h: at(x, z) }));
+    for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
+      const x = -HALF + i * CELL, z = -HALF + j * CELL;
+      for (const p of pads) {
+        // A cell's margin past r, so the pad is level right out to r between grid points.
+        const u = clampN((hypot(x - p.x, z - p.z) - p.r - CELL) / p.r, 0, 1), k = u * u * (3 - 2 * u);
+        hs[j * (N + 1) + i] = lerp(p.h, hs[j * (N + 1) + i], k);
+      }
+    }
   }
   const height = (x, z) => {
     const gx = clampN((x + HALF) / CELL, 0, N - 1e-4), gz = clampN((z + HALF) / CELL, 0, N - 1e-4);

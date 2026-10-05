@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTestGame, foes, stepFor } from './helpers.js';
+import { createTestGame, foes, stepFor, DT } from './helpers.js';
 import { sectionHit, damage, DEATH_BEAT, DEATH_BUCKLE, DEATH_TOPPLE } from '../src/sim/combat.js';
 import { geoOf } from '../src/data/geo.js';
 import { VOICE } from '../src/data/voice.js';
@@ -42,6 +42,7 @@ test('torso at zero destroys the mech, leaves a wreck and ends a one-enemy match
   assert.equal(e.alive, false);
   assert.ok(e.dying, 'the fall is staged');
   assert.equal(G.stats.kills, 1);
+  stepFor(G, DT);   // the objectives see it on the next frame
   assert.equal(G.state, 'over');
   assert.equal(G.won, true);
   stepFor(G, DEATH_BEAT + DEATH_BUCKLE + DEATH_TOPPLE + 0.05);   // beat, blast, buckle, topple

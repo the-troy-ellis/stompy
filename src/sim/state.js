@@ -7,6 +7,7 @@ import { add, mul, dirOf, TAU } from '../util/math.js';
 import { initFeet } from './gait.js';
 import { eyeOf } from './geom.js';
 import { initFeel } from './feel.js';
+import { flatZones, initObjectives } from './objectives.js';
 import { applyLoadout, stockLoadout } from './loadout.js';
 
 const { sin, cos, atan2 } = Math;
@@ -47,7 +48,7 @@ export function newMech(G, type, team, x, z, yaw, opts = {}) {
 export function resetMatch(G, { def, seed, pal, terrainOpts }) {
   G.rng = makeRng(seed);
   G.pal = PALS[pal || def.pal] || PALS.dusk;
-  G.ter = makeTerrain(seed, terrainOpts);
+  G.ter = makeTerrain(seed, { ...terrainOpts, zones: flatZones(def) });
   G.worldKind = 'match';
   G.mechs = []; G.entities = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts = []; G.debris = []; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear();
   G.target = null; G.aimMech = null; G.flash = 0; G.shake = 0; G.kick = 0; G.whiteFlash = 0; G.zoom = false; G.endT = 0; G.time = 0; G.frame = 0;
@@ -70,5 +71,6 @@ export function startMatch(G, def, seed, gentle, chassis, { partsKey, terrainOpt
     e.ai.aware = i === 0 && gentle ? false : rng.chance(0.3);
     G.mechs.push(e);
   });
+  initObjectives(G, def);
   G.state = 'play'; G.paused = false;
 }
