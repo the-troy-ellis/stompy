@@ -270,7 +270,7 @@ export function createHud(app) {
     if (app.params.has('debug') || app.prefs.frameTime) drawDebug();
     if (G.state === 'menu') return;
     if (G.guide) { drawGuideHUD(); return; }
-    ctx.translate(0, G.kick * 3);  // the dashboard jolts with each step
+    ctx.translate(0, (G.kick + (G.bob ? G.bob.x : 0)) * 3);  // the dashboard jolts on impacts and bobs with each step
     const P = G.player, L = hudLayout(), dash = L.dash;
     ctx.font = '11px "Lucida Console", "Courier New", monospace';
     ctx.textBaseline = 'middle';

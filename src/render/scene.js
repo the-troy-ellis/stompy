@@ -201,7 +201,8 @@ export function createScene(app) {
       // Running hot: the view swims, a slow breath in the field of view and a sway, until the reactor trips.
       const hot = hotFrac(P.heat) * (P.shutdown ? 0 : 1) * (G.reducedMotion ? FEEL.view.reducedScale : 1);
       if (hot > 0) { fov *= 1 + HEAT.fov * hot * sin(G.time * 2.6); yaw += HEAT.sway * hot * sin(G.time * 1.9); pitch += HEAT.sway * 0.6 * hot * cos(G.time * 1.3); }
-      eye = add(G.eye, [0, -G.kick * 0.35 - (P.squash ? P.squash.x * 2 : 0) - (P.sag ? P.sag.x : 0) - (P.dying ? P.dying.drop || 0 : 0), 0]); dir = dirOf(yaw, pitch - G.kick * 0.016);
+      const drop = G.kick + (G.bob ? G.bob.x : 0);   // the instant kick plus the eased bob
+      eye = add(G.eye, [0, -drop * 0.35 - (P.squash ? P.squash.x * 2 : 0) - (P.sag ? P.sag.x : 0) - (P.dying ? P.dying.drop || 0 : 0), 0]); dir = dirOf(yaw, pitch - drop * 0.016);
       // Going down: the view goes with the body.
       const top = toppleOf(P);
       if (top) { eye = M.apply(top, eye); const toward = cos(P.dying.fallYaw - yaw); pitch -= P.dying.angle * toward; yaw += P.dying.angle * 0.3 * sin(P.dying.fallYaw - yaw); dir = dirOf(yaw, pitch); }

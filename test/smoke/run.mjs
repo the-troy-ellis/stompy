@@ -102,6 +102,7 @@ try {
   });
   await run('touch', URL_ + '&touch=1', async page => {
     // Taps, not clicks: a mouse click would switch the game back to mouse mode.
+    await page.tap('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way, as on desktop
     await page.tap('[data-sel="free"]');
     await page.tap('[data-a="go"]');
     await page.waitForFunction(() => window.__stompy?.game?.state === 'play', null, { timeout: 10000 });
@@ -122,6 +123,7 @@ try {
       page.on('console', m => { if (m.type() === 'error') errors.push(`arena ${name}: console ${m.text()}`); });
       await page.goto(URL_);
       await page.waitForSelector('.mm-title', { timeout: 15000 });
+      await page.click('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way
       await page.click('[data-sel="mp"]');
       await page.fill('#callsign', name);
       // ONE joins in a custom fit (the two tabs share storage, so it is cleared again for TWO).

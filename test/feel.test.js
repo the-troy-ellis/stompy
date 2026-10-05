@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { FEEL, FEEL_EVENTS, FEEL_COLS } from '../src/data/feel.js';
 import { makeSpring, stepSpring, kickSpring } from '../src/util/spring.js';
 import { feel, initFeel } from '../src/sim/feel.js';
-import { createTestGame, stepFor, input, foes, freeze } from './helpers.js';
+import { createTestGame, stepFor, input, foes, freeze, DT } from './helpers.js';
 import { damage } from '../src/sim/combat.js';
 import { initFeet } from '../src/sim/gait.js';
 
@@ -97,4 +97,36 @@ test('hotFrac is 0 up to 85 heat, 1 at shutdown, and linear between', async () =
   assert.ok(Math.abs(hotFrac((HEAT.from + HEAT.to) / 2) - 0.5) < 1e-9);
   assert.equal(hotFrac(HEAT.to), 1);
   assert.equal(hotFrac(140), 1);
+});
+
+test('a footstep eases the view down and back through the bob spring instead of snapping it', () => {
+  const G = createTestGame({ foes: [] });
+  G.kick = 0;
+  feel(G, 'step', { mech: G.player, k: 1 });
+  assert.equal(G.kick, 0, 'no instant jolt');
+  const trace = [];
+  for (let i = 0; i < 60; i++) { stepFor(G, DT, input()); trace.push(G.bob.x); }
+  const peak = Math.max(...trace), at = trace.indexOf(peak) * DT;
+  assert.ok(trace[0] < peak * 0.1, 'barely moved on the first frame');
+  assert.ok(at > 0.06, `peaks after ${at}s, not at once`);
+  assert.ok(peak > 0.2 && peak < 0.5, `a dip, softer than the old full kick: ${peak}`);
+  assert.ok(Math.min(...trace) > -0.02, 'no bounce past level');
+  assert.ok(Math.abs(trace[trace.length - 1]) < 0.05, 'settled within a second');
+});
+
+test('quick footsteps blend into a bob: the view never jumps more than a little in one frame', () => {
+  const G = createTestGame({ foes: [] });
+  let prev = 0, worst = 0;
+  for (let i = 0; i < 180; i++) {
+    if (i % 15 === 0) feel(G, 'step', { mech: G.player, k: 1 });   // four steps a second
+    stepFor(G, DT, input());
+    const drop = G.kick + (G.bob ? G.bob.x : 0);
+    worst = Math.max(worst, Math.abs(drop - prev)); prev = drop;
+  }
+  assert.ok(worst < 0.05, `largest one-frame change ${worst} (a kick moved 1.0 in one frame)`);
+});
+
+test('REDUCED MOTION scales the bob like the other camera columns', () => {
+  const v = reduced => { const G = createTestGame({ foes: [] }); G.reducedMotion = reduced; feel(G, 'step', { mech: G.player, k: 1 }); return G.bobIn.v; };
+  assert.ok(Math.abs(v(true) - v(false) * FEEL.view.reducedScale) < 1e-9);
 });
