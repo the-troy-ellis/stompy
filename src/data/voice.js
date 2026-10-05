@@ -16,5 +16,6 @@ export const VOICE = {
   complete: ['Mission complete.', 'Mission complete. Good stomping.'],
   failed: ['Mission failed.'],   // an objective failed (the player's own death has its own lines)
   inbound: ['Reinforcements inbound.'],   // a wave, three seconds out
+  updated: ['Objective updated.'],   // a waiting objective starts
 };
 export const DRY_GAP = 60;
