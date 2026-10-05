@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (P0 #131 perf harness, P1 #132 instanced effects, P2 #133 particle pool shipped; the owner's decisions are recorded below) |
+| Status | in progress (P0 #131 perf harness, P1 #132 instanced effects, P2 #133 particle pool, P3 #134 allocation diet shipped; the owner's decisions are recorded below) |
 | Milestone | between M3's #106 and Acts II–III (#110, #111); the rest of M4 builds on it |
 | Size | L (split: perf harness; instanced effects + particle pool; allocation diet; one-draw mechs; render scale; culling) |
 | Depends on | [07-atmosphere.md](07-atmosphere.md) (weather and explosions are the big new loads); [13-thunk.md](13-thunk.md) (effects are feedback) |
@@ -95,6 +95,16 @@ arrays, so spawning, stepping and expiring allocate nothing and the cap is
 where the old cap threw the oldest away at 420) and still allocates less:
 ~465 KB a frame. What is left is P3's: matrices built per draw for mechs and
 props, arrays built at particle and shot call sites, and the HUD.
+
+After P3 (the allocation diet): ~175 KB a frame in the deaths scene, from
+1,315 when the harness landed (about 10 MB a second instead of 80). The
+renderer's matrices come from a per-frame arena (`makeMatrixArena` in
+`util/math.js`); `limb` and `rayTerrain` use plain numbers. The surprise:
+`render()` is too big for V8's optimizing compiler, and unoptimized code
+boxes every number it computes, so its particle loop alone made ~150 bytes
+of garbage per particle until it moved into its own small function. Rule of
+thumb: keep per-frame, per-object loops in small functions. What remains is
+a long tail of a few KB each (AI rays, IK vectors, HUD strings).
 
 The simulation itself is cheap: `update()` takes 0.3 ms per frame with 6
 enemies, 0.5 ms with 12 and 0.8 ms with 20, on a desktop CPU in Node. A 2021

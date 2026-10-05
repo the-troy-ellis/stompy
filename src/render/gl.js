@@ -139,7 +139,8 @@ export function createRenderer(cv, { antialias = true } = {}) {
 
   // `heat` is for the IR view; unset, it uses drawHeat (set around groups of draws).
   const R = { drawHeat: 0, curMesh: null, draws: 0 };   // drawHeat: for the IR view, set around groups of draws; draws: per-frame count
-  const draw = (mesh, m, tint = [1, 1, 1], emis = 0, heat) => {
+  const WHITE = [1, 1, 1];
+  const draw = (mesh, m, tint = WHITE, emis = 0, heat) => {
     if (R.curMesh !== mesh) {
       gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
       gl.vertexAttribPointer(A.pos, 3, gl.FLOAT, false, 36, 0);

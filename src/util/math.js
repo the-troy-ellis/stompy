@@ -46,3 +46,43 @@ export const M = {
   },
 };
 export const chain = (...ms) => ms.reduce((a, b) => M.mul(a, b));
+
+// A per-frame matrix arena for the renderer (docs/specs/14-look-and-performance.md
+// P3): the same id, T, S, RX, RY, RZ, mul and chain as M, but every result is a
+// reused Float32Array from a fixed pool instead of a new one. Call reset() at
+// the start of each frame; a matrix from the arena is only good until then, so
+// nothing that outlives a frame (the sim, saved state) may keep one.
+export function makeMatrixArena(size = 8192) {
+  const pool = Array.from({ length: size }, () => new Float32Array(16));
+  let i = 0, warned = false;
+  const take = () => {
+    if (i === size) { i = 0; if (!warned) { warned = true; console.warn('matrix arena wrapped within a frame'); } }
+    return pool[i++];
+  };
+  const ident = m => { m.fill(0); m[0] = m[5] = m[10] = m[15] = 1; return m; };
+  const A = {
+    reset() { i = 0; },
+    get used() { return i; },
+    id: () => ident(take()),
+    T(x, y, z) { const m = ident(take()); m[12] = x; m[13] = y; m[14] = z; return m; },
+    S(x, y = x, z = x) { const m = ident(take()); m[0] = x; m[5] = y; m[10] = z; return m; },
+    RY(a) { const c = cos(a), s = sin(a), m = ident(take()); m[0] = c; m[2] = -s; m[8] = s; m[10] = c; return m; },
+    RX(a) { const c = cos(a), s = sin(a), m = ident(take()); m[5] = c; m[6] = s; m[9] = -s; m[10] = c; return m; },
+    RZ(a) { const c = cos(a), s = sin(a), m = ident(take()); m[0] = c; m[1] = s; m[4] = -s; m[5] = c; return m; },
+    mul(a, b) {
+      const o = take();
+      for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+        o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+      }
+      return o;
+    },
+    // Fixed parameters, not ...rest or `arguments`, so a call allocates nothing (up to ten matrices).
+    chain(a, b, c, d, e, f, g, h, i2, j) {
+      let r = a;
+      if (b) r = A.mul(r, b); if (c) r = A.mul(r, c); if (d) r = A.mul(r, d); if (e) r = A.mul(r, e);
+      if (f) r = A.mul(r, f); if (g) r = A.mul(r, g); if (h) r = A.mul(r, h); if (i2) r = A.mul(r, i2); if (j) r = A.mul(r, j);
+      return r;
+    },
+  };
+  return A;
+}

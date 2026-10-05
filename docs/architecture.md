@@ -118,6 +118,12 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
   Never play from a timer before the first tap.
 - **Touch and mouse are both live** and switch automatically (`G.touchUI`
   starts from `(pointer: coarse)` and flips when a mouse moves).
+- **Renderer matrices are per-frame.** `scene.js` builds every matrix from a
+  matrix arena (`makeMatrixArena`, reset at the start of `render()`), so they
+  are only good until the next frame: never store one in the sim or in saved
+  state. Per-frame loops over many objects go in small functions of their
+  own (`render()` is too big to be optimized, and unoptimized code allocates
+  for every number); `npm run perf` reports allocations per frame.
 - **`dt` is capped at 50 ms** and the sim is variable-step. Nothing may
   depend on frame count for timing.
 - **Everything the menu shows is drawn by the game renderer** (`G.worldKind

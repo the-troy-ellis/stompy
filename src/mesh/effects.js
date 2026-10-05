@@ -31,9 +31,10 @@ export function buildEffectShapes() {
   return Object.fromEntries(EFFECT_SHAPES.map(k => { const b = new Builder(); BUILD[k](b); return [k, b]; }));
 }
 
-// How particle i of the pool P looks this frame: size, colour, glow (1 ignores
-// the light) and IR heat, written into `out` so drawing thousands allocates
-// nothing. Fire shrinks and reddens, a flamer's puff swells and reddens, smoke
+// How particle i of the pool P looks this frame, written into the Float32Array
+// `out` as [size, r, g, b, glow, heat] (glow 1 ignores the light; heat is for
+// IR). A typed array, not an object, so drawing thousands allocates nothing:
+// numbers stored on an object's fields can be boxed one by one. Fire shrinks and reddens, a flamer's puff swells and reddens, smoke
 // grows and fades into the horizon colour `hor`; the rest are plain and unlit.
 export function effectLook(P, i, hor, out) {
   const f = P.life[i] / P.max[i], kind = KINDS[P.kind[i]], c = P.col, c0 = c[i * 3], c1 = c[i * 3 + 1], c2 = c[i * 3 + 2];
@@ -42,6 +43,6 @@ export function effectLook(P, i, hor, out) {
   else if (kind === 'flame') { size *= 0.5 + (1 - f) * 3; r = 0.55 + (c0 - 0.55) * f; g = 0.12 + (c1 - 0.12) * f; b = 0.04 + (c2 - 0.04) * f; heat = f; }
   else if (kind === 'smoke') { size *= 1.6 - f * 0.8; r = hor[0] + (c0 - hor[0]) * f; g = hor[1] + (c1 - hor[1]) * f; b = hor[2] + (c2 - hor[2]) * f; emis = 0.6; heat = 0.15; }
   else emis = 0;
-  out.size = size; out.r = r; out.g = g; out.b = b; out.emis = emis; out.heat = heat;
+  out[0] = size; out[1] = r; out[2] = g; out[3] = b; out[4] = emis; out[5] = heat;
   return out;
 }
