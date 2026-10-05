@@ -142,7 +142,7 @@ export function createUi(app) {
     }
     if (prefs.menuSel === 'free') {
       const mapName = FP_MAPS[prefs.fpMap] === 'random' ? 'RANDOM' : PALS[FP_MAPS[prefs.fpMap]].name.toUpperCase();
-      return `<p>One battle, your rules.</p>
+      return `<p>One fight. You pick.</p>
         <div class="mm-pick"><span>MAP</span><button data-fp="map" data-d="-1">◀</button><b>${mapName}</b><button data-fp="map" data-d="1">▶</button></div>
         <div class="mm-pick"><span>HOSTILES</span><button data-fp="foes" data-d="-1">◀</button><b>${prefs.fpFoes}</b><button data-fp="foes" data-d="1">▶</button></div>
         <div class="mm-pick"><span>MIX</span><button data-fp="mix" data-d="-1">◀</button><b>${(FP_MIXES[prefs.fpMix] || FP_MIXES[0]).label}</b><button data-fp="mix" data-d="1">▶</button></div>

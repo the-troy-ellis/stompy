@@ -18,7 +18,7 @@ const wall = (G, lo, hi, h) => { const base = G.ter.height; G.ter = { ...G.ter, 
 
 test('BEANPOLE (sniper1): the spec numbers, tall legs and a narrow stance, a placeholder name, selectable', () => {
   assert.equal(NAMES.chassis.sniper1, 'BEANPOLE');
-  assert.equal(NAMES.roles.sniper1.role, 'FORWARD-JOINT · LONG GUN, LONG LEGS');
+  assert.equal(NAMES.roles.sniper1.role, 'LONG LEGS. LONG GUN.');
   assert.ok(MECH_ORDER.includes('sniper1'));
   assert.equal(ch.speed, 13); assert.equal(ch.turn, 0.9); assert.equal(ch.sink, 11); assert.equal(ch.scale, 1);
   assert.deepEqual(ch.hp, { T: 60, LA: 26, RA: 26, LL: 36, RL: 36 });

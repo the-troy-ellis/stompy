@@ -106,9 +106,31 @@ Stompy wants.
 | Silhouettes and animation | Giant fists, a torso that rears back to punch, a mech that sits down when both legs go | Faces, eyes that blink, anything cutesy |
 | Physics | Squash on landing, wobble when hit, knockback that sends a JACKAL skidding | Ragdolls, slapstick that breaks readability |
 | Cockpit voice | Flat delivery of absurd facts, after the fact: `Target punched.` | Quips during warnings the player must act on; jokes about the player's death that land before the debrief |
-| Mission names and briefs | Names in the same silly register as the hardware (the owner's Act I: LIL SNOOZERS, TOWER TOPPLER, HELPLESS LIL BUDDIES, FOUR LEGS BAD). Briefs wry, one sentence: `Four little trucks need walking down the valley; bring back at least two.` | Sober war-film titles; a second sentence for the joke |
+| Mission names and briefs | Names in the same silly register as the hardware (the owner's Act I: LIL SNOOZERS, TOWER TOPPLER, HELPLESS LIL BUDDIES, FOUR LEGS BAD). Briefs in the board-book voice (below): `Four little trucks drive down the valley. JACKALs come to catch them. Keep two trucks safe.` | Sober war-film titles; long sentences; winking asides |
 | HUD | `OVERWEIGHT`, `PUNCH` | Jokes in instruments that must be read in half a second |
 | Debrief | A one-word verdict line (`STOMPED.` / `SQUASHED.`) above the numbers | Prose |
+
+### The board-book voice
+
+Descriptions read like a toddler's board book: *Go, Dog. Go!*, Busytown.
+Very action-first, very simple, and describing rather than infantilizing.
+It covers mission briefs, mech role lines, menu blurbs and unlock text.
+The cockpit voice (below) stays the dry machine.
+
+- **Say what is happening.** Short present-tense sentences with concrete
+  verbs: `Two scouts sleep by the road. Wake them up. Knock them down.`
+- **Name the things, and say what they do.** Things have jobs: `Three tall
+  towers talk and talk.` `IT PUNCHES.`
+- **Contrast and repetition are welcome.** Big and little, up and down, one
+  two three: `One big mech walks on four legs. Two little mechs walk with it.`
+- **Plain imperatives for the player.** `Stomp all three.` `Keep two trucks
+  safe.`
+- **Not infantilizing.** No baby talk, misspellings, cheering or exclamation
+  marks, no questions at the player, no moralising. The game's own words stay:
+  JACKAL, relay, LRM. The humour comes from saying silly things plainly.
+- **Measurable.** One to four sentences, eight words or fewer each, numbers
+  as words, every sentence ending in a full stop (`test/tone.test.js` checks
+  every brief and role line).
 
 ### The voice
 

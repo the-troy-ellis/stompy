@@ -64,9 +64,8 @@ available.` once (`New chassis available. It is purple.` for the last).
 `missionDef(n)` for n ≥ 12 picks biome by `n % 3`, weather/time by a seeded
 roll, and an objective type by `n % 5`, scaling foes as today with the full
 chassis roster weighted toward lighter mechs. Named `Contract 13`, `Contract
-14`, as now; the brief is one of a small pool (`Open contract. Pay is by the
-kill.` · `Open contract. Try not to lose the legs.` · `Open contract. Someone
-out there needs stomping.`).
+14`, as now; the brief counts them in the board-book voice: `Five mechs are out
+there. One of them is big. Go and stomp them.`
 
 ## Difficulty curve
 
@@ -102,20 +101,22 @@ was shut down too `AWKWARD.`, on a loss to a stomp `FLATTENED.`
 
 ## Briefs (the full text)
 
-Every brief is one sentence. These are proposals; the owner edits.
+Every brief is in the board-book voice (tone guide in `vision.md`): one to
+four plain sentences, eight words or fewer each. 1–4 are shipped; 5–12 are
+proposals the owner edits.
 
-1. Two scouts are poking around the convoy route. Go stomp them.
-2. Three relay towers; knock them down and expect someone to complain.
-3. Four trucks need to reach the pass. Two of them, at least.
-4. A heavy and its friends; mind your heat, it gets dark before you finish.
-5. Sit on the ridge until the weather clears; you will have company.
-6. Blow both fuel tanks and be gone before anyone asks questions.
-7. Two BEANPOLEs on the far slope with very long guns: get close, or get closer.
-8. Get the trucks across the ice at night; they will see your lights, which is the point.
-9. Someone parked a missile battery by the refinery. Unpark it.
-10. Hold the refinery for three minutes; the tanks are flammable, which cuts both ways.
-11. The canyon is the only way out, and you have four minutes.
-12. Everything they have left, against everything you have.
+1. Two scouts sleep by the road. Wake them up. Knock them down.
+2. Three tall towers talk and talk. Knock them down. Someone will come.
+3. Four little trucks drive down the valley. JACKALs come to catch them. Keep two trucks safe.
+4. One big mech walks on four legs. Two little mechs walk with it. Stomp all three.
+5. Fog rolls over the ridge. Mechs walk out of it. Stay on the ridge.
+6. Two fuel tanks sit in the snow. Pop them. Then run to the pad.
+7. Two tall mechs stand on the far slope. Their guns are long. Get close.
+8. Three trucks cross the ice at night. Their lights are on. Get them across.
+9. Three launchers sit by the refinery. They shoot back. Knock them over.
+10. Hold the refinery for three minutes. Keep the tanks in one piece.
+11. The canyon is long. The clock is short. Run to the end.
+12. Everyone is here. Big ones. Little ones. Purple ones. Stomp them all.
 
 ## Code touchpoints
 
@@ -141,8 +142,8 @@ Every brief is one sentence. These are proposals; the owner edits.
    within three attempts; total time under two and a half hours.
 3. Each objective type appears at least twice; each biome hosts four missions;
    at least three missions are at night or in weather.
-4. Text audit: no brief over one sentence; no new proper nouns beyond
-   Redwater; every verdict and brief passes the tone tests.
+4. Text audit: every brief passes `test/tone.test.js` (the board-book voice);
+   no new proper nouns beyond Redwater; every verdict and brief passes the tone tests.
 5. Unlocks appear after missions 4, 6, 8 and 11; replay works from the strip.
 6. Mission 10's PURPLE PUNCHER entrance is visible from the refinery and its
    footfalls are felt before it fires (playtest).

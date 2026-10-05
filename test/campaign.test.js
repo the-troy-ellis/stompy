@@ -29,7 +29,7 @@ test('Act I is m01-m04, named only in names.js, each on its own seed, everything
     assert.equal(def.name, NAMES.missions[def.key]);
     assert.ok(Number.isInteger(def.seed));
     assert.equal(def.pal, 'dusk');
-    assert.ok(def.intel.length > 0 && def.intel.length < 90, `${def.key}: one short brief`);
+    assert.ok(def.intel.length > 0, `${def.key}: a brief (its voice is checked in tone.test.js)`);
     for (const t of [...G.mechs, ...G.entities]) assert.ok(Math.abs(t.x) <= BOUND && Math.abs(t.z) <= BOUND, `${def.key}: ${t.id || t.type} off the map`);
     for (const e of def.entities || []) for (const p of e.path || []) assert.ok(p[1] <= BOUND, `${def.key}: path point off the map`);
     assert.equal(G.state, 'play');
