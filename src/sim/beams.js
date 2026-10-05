@@ -1,6 +1,7 @@
 import { add, mix3, mul, norm, sub } from '../util/math.js';
 import { muzzle, rayHit } from './geom.js';
 import { damage } from './combat.js';
+import { damageEntity } from './entities.js';
 import { particle } from './effects.js';
 
 const { min, max } = Math;
@@ -37,6 +38,7 @@ export function beamTick(G, m, dt, aim) {
     if (m === G.player) G.stats.shots += dt * 4;   // accuracy counts beam time in quarter-seconds
     if (!hit) continue;
     if (r.chance(dt * 25)) particle(G, end, [r.range(-3, 3), r.range(1, 5), r.range(-3, 3)], 0.25, 0.3 + 0.1 * mult, w.def.col, 'fire');
+    if (hit.ent) damageEntity(G, hit.ent, w.def.dps * dt, m, end);   // structures don't melt: plain dps
     if (t) {
       m.beamMech = t;
       damage(G, t, end, w.def.dps * mult * dt, m, true);

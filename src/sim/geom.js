@@ -24,7 +24,7 @@ export const viewYaw = m => m.yaw + m.twist;
 
 // Mechs are vertical cylinders for hits.
 export function rayCyl(o, d, m) {
-  const g = geoOf(m), R = g.radius * m.ch.scale, Hh = g.height * m.ch.scale;
+  const [R, Hh] = m.cyl || [geoOf(m).radius * m.ch.scale, geoOf(m).height * m.ch.scale];
   const ox = o[0] - m.x, oz = o[2] - m.z, a = d[0] * d[0] + d[2] * d[2];
   if (a < 1e-8) return null;
   const b = 2 * (ox * d[0] + oz * d[2]), c = ox * ox + oz * oz - R * R, disc = b * b - 4 * a * c;
@@ -56,6 +56,8 @@ export function rayTerrain(G, o, d, maxT) {
     prev = t;
   }
 }
+// Structures and vehicles are cylinders too (entities.js); a nav point has no body.
+export function rayEnt(o, d, e) { return rayCyl(o, d, { x: e.x, y: e.y, z: e.z, ch: { scale: 1, legs: null }, cyl: [e.radius, e.height] }); }
 export function rayHit(G, o, d, maxT, ignore) {
   let best = null;
   for (const m of G.mechs) {
@@ -63,8 +65,13 @@ export function rayHit(G, o, d, maxT, ignore) {
     const t = rayCyl(o, d, m);
     if (t != null && t <= maxT && (!best || t < best.t)) best = { t, mech: m };
   }
+  for (const e of G.entities || []) {
+    if (!e.alive || e.kind === 'nav') continue;
+    const t = rayEnt(o, d, e);
+    if (t != null && t <= maxT && (!best || t < best.t)) best = { t, mech: null, ent: e };
+  }
   const tt = rayTerrain(G, o, d, best ? best.t : maxT);
-  if (tt != null) best = { t: tt, mech: null };
+  if (tt != null) best = { t: tt, mech: null, ent: null };
   if (best) best.point = add(o, mul(d, best.t));
   return best;
 }

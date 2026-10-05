@@ -109,25 +109,25 @@ Shipped in #1 (all rows below), except branch protection, which the owner sets o
 
 | # | Title | Labels | Size | Spec |
 |---|---|---|---|---|
-| | M3: entities (structure, vehicle, nav): data, step, hit-test, damage, draw | sim, render | M | 03 §Entities |
-| | M3: prop meshes needed by missions (relay, tank, truck, launcher, pad) | render, content | S | 03, 07 §Props |
-| | M3: objective framework and ELIMINATE/DESTROY | sim | M | 03 §State machine |
-| | M3: SURVIVE with waves | sim, ai | S | 03 §Waves |
-| | M3: ESCORT (convoy movement, blocking, AI preference) | sim, ai | M | 03 |
-| | M3: EXTRACT with optional timer; extra flat zones in terrain | sim | S | 03 |
-| | M3: objective HUD line, markers, radar blips, voice lines | hud, audio | S | 03 §Player experience |
-| | M3: debrief with per-objective results | ui | S | 03 |
-| | M3: turret entity (mission 9 launchers) | sim, content | S | 04 §Code touchpoints |
-| | M3: campaign strip, replay, unlocks, REALLY? confirm-restart | ui | S | 04 §Progression |
-| | M3: debrief verdict words | ui | S | 04 §Debrief verdicts |
-| | M3: mission 10 PURPLE PUNCHER entrance (reveal wave entry) | content, sim | S | 04 §Code touchpoints |
-| | M3: missions 1–4 (Act I) | content | M | 04 |
-| | M3: missions 5–8 (Act II) | content | M | 04 |
-| | M3: missions 9–12 (Act III) | content | M | 04 |
-| | M3: contracts after 12 with objective types and full roster | content, sim | S | 04 §After twelve |
-| | M3: scripted "perfect player" harness and win/fail tests for all twelve | tooling, sim | S | 04 §Acceptance 1 |
-| | M3: full NORMAL playthrough report (time, attempts, text audit) | content, docs | S | 04 §Acceptance 2–4 |
-| | M3: naming round for mission names, briefs and verdicts (opened per act by the act's PR) | content, needs-owner | S | workflow §Naming things |
+| #97 | M3: entities (structure, vehicle, nav): data, step, hit-test, damage, draw | sim, render | M | 03 §Entities |
+| #98 | M3: prop meshes needed by missions (relay, tank, truck, launcher, pad) | render, content | S | 03, 07 §Props |
+| #99 | M3: objective framework and ELIMINATE/DESTROY | sim | M | 03 §State machine |
+| #100 | M3: SURVIVE with waves | sim, ai | S | 03 §Waves |
+| #101 | M3: ESCORT (convoy movement, blocking, AI preference) | sim, ai | M | 03 |
+| #102 | M3: EXTRACT with optional timer; extra flat zones in terrain | sim | S | 03 |
+| #103 | M3: objective HUD line, markers, radar blips, voice lines | hud, audio | S | 03 §Player experience |
+| #104 | M3: debrief with per-objective results | ui | S | 03 |
+| #105 | M3: turret entity (mission 9 launchers) | sim, content | S | 04 §Code touchpoints |
+| #106 | M3: campaign strip, replay, unlocks, REALLY? confirm-restart | ui | S | 04 §Progression |
+| #107 | M3: debrief verdict words | ui | S | 04 §Debrief verdicts |
+| #108 | M3: mission 10 PURPLE PUNCHER entrance (reveal wave entry) | content, sim | S | 04 §Code touchpoints |
+| #109 | M3: missions 1–4 (Act I) | content | M | 04 |
+| #110 | M3: missions 5–8 (Act II) | content | M | 04 |
+| #111 | M3: missions 9–12 (Act III) | content | M | 04 |
+| #112 | M3: contracts after 12 with objective types and full roster | content, sim | S | 04 §After twelve |
+| #113 | M3: scripted "perfect player" harness and win/fail tests for all twelve | tooling, sim | S | 04 §Acceptance 1 |
+| #114 | M3: full NORMAL playthrough report (time, attempts, text audit) | content, docs | S | 04 §Acceptance 2–4 |
+| #115 | M3: naming round for mission names, briefs and verdicts (opened per act by the act's PR) | content, needs-owner | S | workflow §Naming things |
 
 ## M4 — Atmosphere
 

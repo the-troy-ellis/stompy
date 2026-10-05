@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ready |
+| Status | in progress (#97 entities shipped) |
 | Milestone | M3 |
 | Size | L (split: framework + eliminate/structures; survive + waves; convoy; extraction) |
 | Depends on | M0; M1's AI for waves and escorts |

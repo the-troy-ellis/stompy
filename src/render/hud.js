@@ -476,7 +476,11 @@ export function createHud(app) {
       const rate = rangeMemo.rate;
       ctx.fillStyle = Math.abs(rate) < 1 ? DIM : GREEN;
       ctx.fillText(Math.abs(rate) < 1 ? 'HOLDING' : `${rate < 0 ? 'CLOSING' : 'OPENING'} ${Math.round(Math.abs(rate))} m/s`, px + 6, py + 52);
-      mechDiagram(t, px + pw - 32, py + 14, 6);
+      if (t.kind) {   // a structure: one bar of what is left
+        const bx = px + pw - 26, by = py + 14, bh = 64, f = Math.max(0, t.hp / t.max);
+        ctx.strokeStyle = DIM; ctx.strokeRect(bx + 0.5, by + 0.5, 11, bh);
+        ctx.fillStyle = f > 0.5 ? GREEN : f > 0.25 ? AMBER : RED; ctx.fillRect(bx + 2, by + 2 + (bh - 3) * (1 - f), 8, (bh - 3) * f);
+      } else mechDiagram(t, px + pw - 32, py + 14, 6);
     }
 
     // Status lines.

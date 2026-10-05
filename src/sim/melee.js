@@ -6,6 +6,7 @@ import { damage } from './combat.js';
 import { knock } from './knock.js';
 import { feel } from './feel.js';
 import { fxPunch } from '../net/protocol.js';
+import { damageEntity, solid } from './entities.js';
 
 const { atan2, hypot, sin, cos } = Math;
 
@@ -49,6 +50,14 @@ export function meleeTarget(G, m) {
     if (Math.abs(wrapA(atan2(dx, dz) - facing)) > def.arc) continue;
     best = t; bestD = d;
   }
+  // Structures and vehicles can be punched too (a punched-down tower topples away from the fist).
+  for (const e of G.entities) {
+    if (!solid(e)) continue;
+    const dx = e.x - m.x, dz = e.z - m.z, d = hypot(dx, dz) - e.radius;
+    if (d > reach || d >= bestD) continue;
+    if (Math.abs(wrapA(atan2(dx, dz) - facing)) > def.arc) continue;
+    best = e; bestD = d;
+  }
   void c;
   return best;
 }
@@ -62,7 +71,16 @@ export function meleeTick(G, m, dt) {
   if (st.phase === 'windup' && st.t >= def.windup) {
     st.phase = 'recover';
     const t = meleeTarget(G, m);
-    if (t) {
+    if (t && t.kind) {
+      // A structure or vehicle: the blow, the thunk, no knockback (it is bolted down, or a truck).
+      const dx = t.x - m.x, dz = t.z - m.z, hd = hypot(dx, dz) || 1;
+      const p = [t.x - dx / hd * t.radius, clampN(m.y + 5 * m.ch.scale, t.y + 0.5, t.y + t.height - 0.5), t.z - dz / hd * t.radius];
+      damageEntity(G, t, def.dmg, m, p, { punch: true, yaw: atan2(dx, dz) });
+      st.hit = { ent: t, p, v: 0 };
+      m.heat += def.heat;
+      feel(G, 'punch', { mech: m, k: 1, at: m === G.player ? null : p });
+      G.fx.sfx.punch(m === G.player ? null : p, true);
+    } else if (t) {
       // The blow lands on the target's skin, facing the attacker, at fist height.
       const dx = t.x - m.x, dz = t.z - m.z, hd = hypot(dx, dz) || 1, nx = dx / hd, nz = dz / hd;
       const R = geoOf(t).radius * t.ch.scale, p = [t.x - nx * R, clampN(m.y + 5 * m.ch.scale, t.y + 1, t.y + geoOf(t).height * t.ch.scale - 1), t.z - nz * R];
