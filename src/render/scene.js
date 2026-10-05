@@ -1,3 +1,4 @@
+import { backingSize } from './look.js';
 import { M, add, chain, clampN, dirOf, mix3, mul, norm, rnd, sub, len, cross, TAU } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { buildTerrainMesh } from '../world/terrainMesh.js';
@@ -87,14 +88,17 @@ export function createScene(app) {
   // Scan tone: a pulsing whine that climbs as the scan converges.
 
 
-  let W = 0, H = 0, dpr = 1;
+  // The HUD canvas is always full resolution; the 3D canvas renders R.look.lines
+  // tall (0: full) and the browser scales it up with hard edges (render/look.js).
+  let W = 0, H = 0, dpr = 1, lines = -1;
   function resize() {
     dpr = min(devicePixelRatio || 1, 1.5);
-    const w = wrap.clientWidth, h = wrap.clientHeight;
-    if (w === W && h === H) return;
-    W = w; H = h;
-    cv.width = hud.width = max(1, floor(w * dpr));
-    cv.height = hud.height = max(1, floor(h * dpr));
+    const w = wrap.clientWidth, h = wrap.clientHeight, want = R.look?.lines || 0;
+    if (w === W && h === H && want === lines) return;
+    W = w; H = h; lines = want;
+    hud.width = max(1, floor(w * dpr)); hud.height = max(1, floor(h * dpr));
+    [cv.width, cv.height] = backingSize(w, h, dpr, lines);
+    cv.classList.toggle('pixelated', cv.height < hud.height);
   }
 
   function drawMech(m, VPtint) {

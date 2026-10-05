@@ -25,6 +25,7 @@ import { createInput } from './input/input.js';
 import { createUi } from './ui/screens.js';
 import { createNet } from './net/client.js';
 import { createFeelPanel } from './ui/feelPanel.js';
+import { readLook, LOOK_DEFAULT, LOOK_KEY } from './render/look.js';
 import { DIFF } from './data/ai.js';
 import { SETTINGS, SETTING_KEYS, readSetting } from './data/settings.js';
 import { createMechlab } from './ui/mechlab.js';
@@ -70,12 +71,15 @@ function start(root) {
       <div class="mech-overlay"></div>
     </div>`;
   const wrap = $('.mech-wrap', root), cv = $('.mech-gl', root), hud = $('.mech-hud', root), ov = $('.mech-overlay', root);
-  const R = createRenderer(cv);
+  const params = new URLSearchParams(location.search);
+  // ?debug=1 can render the 3D view at a tunable resolution to settle the look (render/look.js).
+  const look = params.has('debug') ? readLook(params, store.get(LOOK_KEY, null)) : { ...LOOK_DEFAULT };
+  const R = createRenderer(cv, { antialias: look.aa });
   if (!R) {
     ov.innerHTML = '<div class="panel">Stompy needs WebGL, which this browser has turned off or does not support.</div>';
     return;
   }
-  const params = new URLSearchParams(location.search);
+  R.look = look;
   const prefs = loadPrefs();
   // Everything the page-side modules share. The sim only ever sees `G`.
   const app = { root, wrap, cv, hud, ov, ctx: hud.getContext('2d'), R, prefs, params };
