@@ -26,6 +26,7 @@ import { createUi } from './ui/screens.js';
 import { createNet } from './net/client.js';
 import { createFeelPanel } from './ui/feelPanel.js';
 import { readLook, LOOK_DEFAULT, LOOK_KEY } from './render/look.js';
+import { loadCampaign, saveCampaign } from './ui/campaign.js';
 import { DIFF } from './data/ai.js';
 import { SETTINGS, SETTING_KEYS, readSetting } from './data/settings.js';
 import { createMechlab } from './ui/mechlab.js';
@@ -37,7 +38,7 @@ function loadPrefs() {
     sound: store.get('sound', true),
     voice: store.get('mech.voice', true),
     invert: store.get('mech.invert', false),
-    mission: store.get('mech.mission', 0),
+    mission: 0,   // set from the campaign save below
     chassis: MECH_ORDER.includes(store.get('mech.chassis')) ? store.get('mech.chassis') : 'kestrel',
     menuSel: store.get('menu.sel', 'campaign'),
     fpMap: store.get('fp.map', 0), fpFoes: store.get('fp.foes', 3), fpMix: store.get('fp.mix', 0),
@@ -81,8 +82,12 @@ function start(root) {
   }
   R.look = look;
   const prefs = loadPrefs();
+  // Campaign progress under camp.* (ui/campaign.js); an old save migrates once.
+  const campaign = loadCampaign(store.get);
+  if (campaign.migrated) { delete campaign.migrated; saveCampaign(store.set, campaign); }
+  prefs.mission = campaign.mission;
   // Everything the page-side modules share. The sim only ever sees `G`.
-  const app = { root, wrap, cv, hud, ov, ctx: hud.getContext('2d'), R, prefs, params };
+  const app = { root, wrap, cv, hud, ov, ctx: hud.getContext('2d'), R, prefs, params, campaign };
   app.G = createGame({ touchUI: params.has('touch') || matchMedia('(pointer: coarse)').matches });
   const G = app.G;
   G.reducedMotion = prefs.reducedMotion;   // the sim reads a flag, never the prefs

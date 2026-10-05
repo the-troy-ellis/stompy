@@ -4,12 +4,12 @@ import { CHASSIS, MECH_ORDER, isUnlocked, lockedLook } from '../src/data/chassis
 import { NAMES } from '../src/data/names.js';
 import { menuBand } from '../src/render/scene.js';
 
-test('six chassis in the selector; the new ones unlock after missions 6, 8 and 11', () => {
+test('six chassis in the selector; WARDEN unlocks after mission 4 and the new ones after 6, 8 and 11', () => {
   assert.equal(MECH_ORDER.length, 6);
   assert.deepEqual(MECH_ORDER.slice(0, 3), ['kestrel', 'jackal', 'warden'], 'the old three first');
   assert.equal(MECH_ORDER.at(-1), 'puncher', 'the set piece last');
-  for (const k of ['kestrel', 'jackal', 'warden']) assert.ok(isUnlocked(k, 0), `${k} is open from the start`);
-  const at = { light1: 6, sniper1: 8, puncher: 11 };
+  for (const k of ['kestrel', 'jackal']) assert.ok(isUnlocked(k, 0), `${k} is open from the start`);
+  const at = { warden: 4, light1: 6, sniper1: 8, puncher: 11 };   // docs/specs/04-campaign.md § Unlocks
   for (const [k, n] of Object.entries(at)) {
     assert.ok(!isUnlocked(k, n - 1), `${k} locked after ${n - 1}`);
     assert.ok(isUnlocked(k, n), `${k} open after ${n}`);

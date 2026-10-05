@@ -6,6 +6,8 @@
 // The owner edits these; agents add candidates in a PR's NAMING section.
 export const VOICE = {
   kill: ['Target destroyed.', 'Target stomped.', 'That one is done.'],
+  unlock: ['New chassis available.'],                       // a campaign win opened a chassis (once)
+  unlockPurple: ['New chassis available. It is purple.'],   // the last one
   killPunch: ['Target punched.', 'Fist contact confirmed.'],
   killStomp: ['Target stomped.', 'Target stomped. Literally.'],
   legLost: ['Leg destroyed.', 'Leg destroyed. Recommend hopping.', 'Leg destroyed. Speed is now optional.'],

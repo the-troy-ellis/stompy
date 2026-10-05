@@ -288,3 +288,16 @@ html, body {
 .feel-look input[type=number] { width: 48px; }
 .feel-look button { margin-right: 2px; }
 .feel-res { color: #fc3; }
+/* The campaign strip: twelve squares, done / current / locked, the selected one ringed. */
+.strip { display: flex; gap: 4px; flex-wrap: wrap; margin: 2px 0 8px; }
+.strip .sq { width: 26px; height: 26px; padding: 0; font: bold 11px "Lucida Console", monospace; border: 1px solid #2a7a2a; background: #031; color: #7f7; cursor: pointer; }
+.strip .sq.done { background: #1a5a1a; color: #cfc; }
+.strip .sq.current { border-color: #fc3; color: #fc3; }
+.strip .sq.locked { background: #020a02; color: #264; border-color: #143; cursor: default; }
+.strip .sq.sel { outline: 2px solid #fc3; outline-offset: 1px; }
+.opt.really { border-color: #f44; color: #f44; }
+.unlock { color: #fc3; margin: 4px 0 2px; letter-spacing: 1px; }
+@media (max-height: 500px) {
+  .strip { gap: 3px; margin: 0 0 4px; flex-wrap: nowrap; }
+  .strip .sq { width: 21px; height: 19px; font-size: 9px; }
+}

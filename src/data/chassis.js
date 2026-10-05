@@ -27,7 +27,7 @@ export const CHASSIS = {
     hardpoints: [{ id: 'la', loc: 'LA', cat: 'energy', stock: 'mlaser' }, { id: 'ra', loc: 'RA', cat: 'energy', stock: 'mlaser' }] },
   warden: { name: NAMES.chassis.warden, legs: 'quad', speed: 9, turn: 0.7, sink: 10, scale: 1.15, pref: 330, acc0: 0.025, ai: { profile: 'line' },
     hp: { T: 58, LA: 28, RA: 28, LL: 34, RL: 34 }, col: [0.36, 0.4, 0.3], acc: [0.75, 0.7, 0.2],
-    tons: 60, frame: 30.5, systems: { sinks: 0, armour: 0, jets: 1 },
+    tons: 60, frame: 30.5, systems: { sinks: 0, armour: 0, jets: 1 }, unlock: 4,
     hardpoints: [{ id: 't1', loc: 'T', cat: 'missile', stock: 'lrm' }, { id: 'ra', loc: 'RA', cat: 'ballistic', stock: 'ac' },
       { id: 'la', loc: 'LA', cat: 'energy', stock: 'laser' }] },
   // The one with fists. Slow enough to kite, ruinous if it reaches you.

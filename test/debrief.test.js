@@ -50,6 +50,8 @@ test('losing the mech still reads MECH DESTROYED; plain missions list no rows', 
 test('a mission still on its placeholder name is not announced twice', () => {
   assert.equal(missionTitle(2, 'MISSION 2'), 'MISSION 2');
   assert.equal(missionTitle(2, 'Tower Trouble'), 'MISSION 2: TOWER TROUBLE');
+  assert.equal(missionTitle(13, 'Contract 13'), 'CONTRACT 13', 'a contract is not also a mission');
+  assert.equal(missionSpoken(13, 'Contract 13'), 'Contract 13.');
   assert.equal(missionSpoken(2, 'MISSION 2'), 'Mission 2.');
   assert.equal(missionSpoken(2, 'Tower Trouble'), 'Mission 2. Tower Trouble.');
 });

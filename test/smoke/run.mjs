@@ -71,7 +71,7 @@ try {
     const diff = await page.evaluate(() => [window.__stompy.app.prefs.diff, window.__stompy.game.diff, [...new Set(window.__stompy.game.mechs.filter(m => m.team).map(m => m.type))].join(',')]);
     console.log(`desktop: difficulty ${diff[0]} / game ${diff[1]}; HEAVY mix on a fresh save: ${diff[2]}`);
     if (!(diff[0] === 'hard' && diff[1] === 'hard')) { failed = true; console.error('FAIL: the difficulty picker did not reach the game'); }
-    if (diff[2] !== 'warden') { failed = true; console.error(`FAIL: HEAVY on a fresh save should be all WARDENs (${diff[2]})`); }
+    if (diff[2] !== 'kestrel') { failed = true; console.error(`FAIL: HEAVY on a fresh save should fall back to KESTRELs, with no heavy unlocked yet (${diff[2]})`); }
     const x0 = await page.evaluate(() => [window.__stompy.game.player.x, window.__stompy.game.player.z, window.__stompy.game.frame]);
     await page.keyboard.down('KeyW');
     await page.waitForTimeout(2500);

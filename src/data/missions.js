@@ -60,11 +60,12 @@ export const FP_MAPS = ['random', 'dusk', 'ice', 'volcanic'];
 export const FP_MIXES = [
   { key: 'mixed', label: 'MIXED', w: { jackal: 0.65, warden: 0.35 } },
   { key: 'light', label: 'LIGHT', w: { jackal: 1, light1: 1 } },
-  { key: 'heavy', label: 'HEAVY', w: { warden: 1, sniper1: 1, puncher: 1 } },
+  { key: 'heavy', label: 'HEAVY', w: { warden: 1, sniper1: 1, puncher: 1 }, fallback: 'kestrel' },   // before any heavy is unlocked: the heaviest of the starting pair
   { key: 'all', label: 'EVERYTHING', w: { kestrel: 1, jackal: 1, warden: 1, light1: 1, sniper1: 1, puncher: 1 } },
 ];
 export function pickFoes(mix, n, rand, open = () => true) {
   const w = Object.entries(mix.w).filter(([k]) => open(k)), total = w.reduce((a, [, v]) => a + v, 0);
+  if (!w.length) return Array.from({ length: n }, () => mix.fallback || 'jackal');   // nothing in the mix is open yet
   return Array.from({ length: n }, () => {
     let r = rand() * total;
     for (const [k, v] of w) if ((r -= v) < 0) return k;

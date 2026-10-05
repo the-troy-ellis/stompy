@@ -22,9 +22,10 @@ test('the draw follows the weights', () => {
   assert.equal(pickFoes(FP_MIXES[1], 5, rand).length, 5);
 });
 
-test('only unlocked chassis turn up: a fresh save\'s HEAVY is all WARDENs, and nobody meets PURPLE PUNCHER early', () => {
+test('only unlocked chassis turn up: a fresh save\'s HEAVY falls back to KESTRELs, WARDENs after mission 4, and nobody meets PURPLE PUNCHER early', () => {
   const r = makeRng(9), rand = () => r.next(), fresh = k => isUnlocked(k, 0);
-  assert.deepEqual([...new Set(pickFoes(FP_MIXES[2], 50, rand, fresh))], ['warden']);
+  assert.deepEqual([...new Set(pickFoes(FP_MIXES[2], 50, rand, fresh))], ['kestrel'], 'no heavy is open yet');
+  assert.deepEqual([...new Set(pickFoes(FP_MIXES[2], 50, rand, k => isUnlocked(k, 4)))], ['warden']);
   const all = new Set(pickFoes(FP_MIXES[3], 300, rand, fresh));
   assert.ok(!all.has('puncher') && !all.has('light1') && !all.has('sniper1'));
   const late = new Set(pickFoes(FP_MIXES[3], 600, rand, k => isUnlocked(k, 11)));

@@ -33,6 +33,7 @@ export function debriefTitle(G) {
 // "MISSION 2: TOWER TROUBLE", or just "MISSION 2" while it has no name of its own.
 export function missionTitle(n, name) {
   const up = (name || '').toUpperCase();
+  if (/^CONTRACT \d+$/.test(up)) return up;   // after the twelve, contracts carry their own number
   return !up || up === `MISSION ${n}` ? `MISSION ${n}` : `MISSION ${n}: ${up}`;
 }
 // The voice's version at launch: "Mission 2. Tower Trouble." or "Mission 2."
