@@ -17,7 +17,7 @@ relay and its tests.
 | `src/sim/` | ~900 | **The simulation.** `state.js` (`createGame`, `newMech`, `startMatch`, `resetMatch`), `update.js` (`update(game, input, dt)`), `geom.js`, `effects.js`, `combat.js`, `mech.js`, `gait.js`, `beams.js`, `fusion.js`, `missiles.js`, `ai.js` with `ai/perception.js` (line of sight, belief, shout, search) and `ai/behaviours.js` (keepRange, harass, useCover, ridge, brawler, holdLine, avoidEdge, avoidAllies; `steer` runs a plan) and `ai/fire.js` (heat cap, lock, alpha, section targeting) and `ai/profiles.js` (a plan per chassis) and `ai/group.js` (shared fixes, the flanker), `melee.js`, `knock.js`, `feel.js`, `voice.js`, `loadout.js` (mechlab: stock, validate, apply, stats), `entities.js` (M3: structures, vehicles and nav points in `G.entities`: `addEntity`, `stepEntities`, `damageEntity`, `destroyEntity`, footprints), `objectives.js` (M3: `initObjectives`, `tickObjectives`; the mission's win and loss), `placement.js` (polar `[bearing°, dist]`, flat pads), `waves.js` (`spawnWave`, difficulty ±1 mech), `rng.js`, `fx.js`. No DOM, GL, audio or input imports (lint enforces it). |
 | `src/data/` | ~200 | Weapons, chassis, body plans (`geo.js`), palettes, missions, arena colours, and `names.js` (every display name, keyed). |
 | `src/world/` | ~110 | `terrain.js` (heights, `height(x, z)`, `BOUND`, a `flat` option for tests), `terrainMesh.js`. |
-| `src/mesh/` | ~140 | `builder.js` (flat-shaded triangle soup), `mechParts.js` (each chassis's parts: legs by leg type, sized from its body plan; torso, arm and barrel by `style`). |
+| `src/mesh/` | ~140 | `builder.js` (flat-shaded triangle soup), `mechParts.js` (each chassis's parts: legs by leg type, sized from its body plan; torso, arm and barrel by `style`), `props.js` (mission props in unit space, scaled to each entity's cylinder; `<key>Wreck` once blown up, `<key>Head` turns). |
 | `src/render/` | ~730 | `gl.js` (`createRenderer`: context, shaders, `upload`, `draw`, mesh sets), `scene.js` (`createScene`: camera, sky, world, mechs with IK, effects), `hud.js` (`createHud`: the 2D instruments, the missile camera feed, the `?debug=1` readout). |
 | `src/audio/` | ~360 | `sound.js` (`createAudio`: unlock dance, samples over synthesis, spatialisation, loops, `sfx.*`, the voice `say`, the beam and scan tones, `tick`). |
 | `src/input/` | ~220 | `input.js` (`createInput`: keyboard, mouse with pointer lock, touch stick/aim/buttons, one per-frame `snapshot()`). |
@@ -203,6 +203,7 @@ src/
   mesh/
     builder.js     Builder
     mechParts.js   buildMechParts: LEGS by leg type, BODY by style
+    props.js       buildProps, propFor: relay, tank, truck, launcher (+Head), pad, wrecks
   sim/
     state.js       createGame(): the G object and factories (newMech)
     mech.js        stepMech, heat, shutdown
