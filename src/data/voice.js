@@ -19,5 +19,7 @@ export const VOICE = {
   updated: ['Objective updated.'],   // a waiting objective starts
   convoyHit: ['Convoy under fire.'],
   convoyLost: ['Convoy lost.'],
+  structureDown: ['Structure destroyed.', 'Structure destroyed. It was in the way.'],
+  extracted: ['Extraction point reached.', 'Extraction point reached. Nobody is here.'],
 };
 export const DRY_GAP = 60;

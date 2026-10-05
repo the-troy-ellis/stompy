@@ -2,6 +2,7 @@ import { TAU, clampN, len, rnd, sub } from '../util/math.js';
 import { WEAPONS, CATS, CAT_OF, CAT_LABEL, CAT_KEY } from '../data/weapons.js';
 import { MP_COLORS } from '../data/colors.js';
 import { center, leadPoint, viewYaw } from '../sim/geom.js';
+import { objectivePoint } from '../sim/objectives.js';
 import { MELT_MAX, beamMult } from '../sim/beams.js';
 import { HEAT, hotFrac } from '../data/feel.js';
 
@@ -9,6 +10,30 @@ const { sin, cos, atan2, min, max, PI, random, hypot, floor } = Math;
 
 // The compass tape's label for a heading in degrees: a cardinal letter on
 // the quarters, otherwise the heading in tens (030, 120...) as two digits.
+// The objective line (docs/specs/03-objectives.md § Player experience): one
+// short line per objective, never more than 24 characters. Pure, for the tests.
+export const fmtDist = m => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`);
+export const fmtClock = s => `${Math.floor(Math.ceil(s) / 60)}:${String(Math.ceil(s) % 60).padStart(2, '0')}`;
+export function objectiveLine(o) {
+  const d = o.def, fit = (head, tail) => `${head.slice(0, 24 - tail.length)}${tail}`.trim();
+  switch (d.type) {
+    case 'eliminate': return `ELIMINATE ${o.total - o.left}/${o.total}`;
+    case 'destroy': return fit(`DESTROY ${d.label || 'TARGETS'}`, ` ${o.done ?? 0}/${o.total ?? o.targets.length}`);
+    case 'survive': return `SURVIVE ${fmtClock(o.left ?? d.seconds)}`;
+    case 'escort': return fit(`ESCORT ${fmtDist(o.dist ?? 0)}`, o.left != null ? ` ${fmtClock(o.left)}` : '');
+    case 'extract': return fit(`EXTRACT ${fmtDist(o.dist ?? 0)}`, o.left != null ? ` ${fmtClock(o.left)}` : '');
+    default: return d.type.toUpperCase().slice(0, 24);
+  }
+}
+// Off-screen markers: the point on the view's edge in the direction of a bearing
+// relative to the view (0 ahead, positive to the left), and the arrow's angle.
+// Ahead maps to the top edge, behind to the bottom, the sides to the sides.
+export function markerEdge(W, top, bottom, m, rel) {
+  const a = Math.atan2(Math.sin(rel), Math.cos(rel)), cx = W / 2, cy = (top + bottom) / 2;
+  const dx = -Math.sin(a), dy = -Math.cos(a), hx = cx - m, hy = (bottom - top) / 2;
+  const k = Math.min(Math.abs(dx) > 1e-6 ? hx / Math.abs(dx) : Infinity, Math.abs(dy) > 1e-6 ? hy / Math.abs(dy) : Infinity);
+  return { x: cx + dx * k, y: cy + dy * k, a: Math.atan2(dx, -dy) };
+}
 export const compassLabel = d => ({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[d] || String(d / 10).padStart(2, '0'));
 
 // The ?debug=1 label over an enemy: its state, its profile, its group (with
@@ -50,6 +75,26 @@ export function createHud(app) {
     box('LA', -3.2, 0.2, 1.4, 3.6); box('T', -1.6, 0, 3.2, 4.2); box('RA', 1.8, 0.2, 1.4, 3.6);
     box('LL', -1.6, 4.4, 1.5, 4); box('RL', 0.1, 4.4, 1.5, 4);
   }
+
+  // An objective marker: a diamond with the distance under it; off-screen (or
+  // behind), held at the edge of the view with an arrow pointing the way.
+  function drawMarker(L, p, col) {
+    const P = G.player, W = app.scene.view.W, top = 72, bottom = L.viewBottom - 16, m = 18;
+    const dist = hypot(p[0] - P.x, p[2] - P.z), s = project(p);
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.textAlign = 'center';
+    if (s && s[0] > m && s[0] < W - m && s[1] > top && s[1] < bottom) {
+      ctx.beginPath(); ctx.moveTo(s[0], s[1] - 7); ctx.lineTo(s[0] + 7, s[1]); ctx.lineTo(s[0], s[1] + 7); ctx.lineTo(s[0] - 7, s[1]); ctx.closePath(); ctx.stroke();
+      ctx.fillText(fmtDist(dist), s[0], s[1] + 18);
+      return;
+    }
+    const e = edgePoint(W, top, bottom, m, viewYaw(P), P, p);
+    ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.a);
+    ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6, 3); ctx.lineTo(-6, 3); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.fillText(fmtDist(dist), e.x, e.y + (e.y > (top + bottom) / 2 ? -12 : 20));
+  }
+  // Where the view edge is crossed going from the centre toward the objective's bearing.
+  function edgePoint(W, top, bottom, m, vy, P, p) { return markerEdge(W, top, bottom, m, atan2(p[0] - P.x, p[2] - P.z) - vy); }
 
   // Where each instrument goes. Desktop: the cockpit dashboard along the
   // bottom. Touch: no dashboard -- the bottom belongs to the thumbs and the
@@ -388,6 +433,13 @@ export function createHud(app) {
       ctx.fillRect(px - 2, py - 2, m === t ? 5 : 4, m === t ? 5 : 4);
     }
     ctx.fillStyle = GREEN; ctx.fillRect(rx - 1, ry - 1, 3, 3);
+    for (const o of G.objectives || []) {   // objective blips: a hollow diamond, held at the rim when out of range
+      const p = !app.net.mp() && objectivePoint(G, o);
+      if (!p) continue;
+      const dx = p[0] - P.x, dz = p[2] - P.z, f = min(1, hypot(dx, dz) / RANGE), ang = atan2(dx, dz) - vy;
+      const bx = rx - sin(ang) * f * rr, by = ry - cos(ang) * f * rr;
+      ctx.strokeStyle = o.def.secondary ? GREEN : AMBER; ctx.beginPath(); ctx.moveTo(bx, by - 4); ctx.lineTo(bx + 4, by); ctx.lineTo(bx, by + 4); ctx.lineTo(bx - 4, by); ctx.closePath(); ctx.stroke();
+    }
     if (scr) {   // static across the radar
       ctx.fillStyle = 'rgba(140,200,255,0.35)';
       for (let i = 0; i < 14; i++) ctx.fillRect(rx - rr + random() * rr * 2, ry - rr + random() * rr * 2, random() * rr * 0.6, 1);
@@ -483,9 +535,19 @@ export function createHud(app) {
       } else mechDiagram(t, px + pw - 32, py + 14, 6);
     }
 
+    // Objectives: a line each under the compass (secondaries dimmer), a marker
+    // where each one is (clamped to the edge when off-screen) and a blip on the radar.
+    // (A mission with no objectives listed is the old ELIMINATE, which HOSTILES already counts.)
+    const objs = !app.net.mp() && G.def?.objectives && G.objectives ? G.objectives.filter(o => o.state === 'active' && (o.def.type !== 'eliminate' || o.total != null)) : [];
+    ctx.textAlign = 'center'; ctx.font = '11px "Lucida Console", monospace';
+    objs.forEach((o, i) => { ctx.fillStyle = o.def.secondary ? GREEN : AMBER; ctx.fillText(objectiveLine(o), app.scene.view.W / 2, 58 + i * 13); });
+    for (const o of objs) {
+      const p = objectivePoint(G, o);
+      if (p) drawMarker(L, p, o.def.secondary ? GREEN : AMBER);
+    }
     // Status lines.
     ctx.textAlign = 'center';
-    let my = 64;
+    let my = 64 + objs.length * 13;
     for (const m of G.msgs) {
       ctx.globalAlpha = min(1, m.t);
       ctx.fillStyle = m.col; ctx.fillText(m.text, app.scene.view.W / 2, my); my += 15;
