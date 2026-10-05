@@ -131,19 +131,19 @@ Shipped in #1 (all rows below), except branch protection, which the owner sets o
 
 ### Look and performance ([specs/14-look-and-performance.md](specs/14-look-and-performance.md))
 
-Filed when the spec merges; worked after #106 and before #110. P4, P6 and P7 can wait for M4/M5b.
+Worked after #106 and before #110 (#131–#136, milestone M3). #137–#139 are M4; #137 lands before co-op (M5b). #135 waits on the owner's resolution, tuned with the `?debug=1` LOOK control (#130).
 
 | # | Title | Labels | Size | Spec |
 |---|---|---|---|---|
-| — | Perf: `npm run perf` harness with draw, triangle, particle and allocation budgets in CI (P0) | tooling, perf | S | 14 §The plan |
-| — | Perf: instanced effects, one shape per effect kind (P1) | render, perf | M | 14 §The look, §The plan |
-| — | Perf: particle pool in typed arrays; shots and debris compacted in place (P2) | sim, perf | M | 14 §The plan |
-| — | Perf: allocation diet in scene and HUD (P3) | render, perf | S | 14 §The plan |
-| — | Look: 240-line pixels by default; PIXELS setting; PARTICLES steps down on slow phones (P5) | render, ui | S | 14 §The look 6 |
-| — | Look: dither fades for smoke, dust and shockwaves (P5b) | render | S | 14 §The look 3 |
-| — | Perf: one draw per mech (rigid skinning) (P4) | render, perf | M | 14 §The plan |
-| — | Perf: frustum culling for mechs, props and effects (P6) | render, perf | S | 14 §The plan |
-| — | Perf: HUD static-layer caching, if the harness shows it matters (P7) | hud, perf | S | 14 §The plan |
+| #131 | Perf: `npm run perf` harness with draw, triangle, particle and allocation budgets in CI (P0) | tooling, perf | S | 14 §The plan |
+| #132 | Perf: instanced effects, one shape per effect kind (P1) | render, perf | M | 14 §The look, §The plan |
+| #133 | Perf: particle pool in typed arrays; shots and debris compacted in place (P2) | sim, perf | M | 14 §The plan |
+| #134 | Perf: allocation diet in scene and HUD (P3) | render, perf | S | 14 §The plan |
+| #135 | Look: 240-line pixels by default; PIXELS setting; PARTICLES steps down on slow phones (P5) | render, ui | S | 14 §The look 6 |
+| #136 | Look: dither fades for smoke, dust and shockwaves (P5b) | render | S | 14 §The look 3 |
+| #137 | Perf: one draw per mech (rigid skinning) (P4) | render, perf | M | 14 §The plan |
+| #138 | Perf: frustum culling for mechs, props and effects (P6) | render, perf | S | 14 §The plan |
+| #139 | Perf: HUD static-layer caching, if the harness shows it matters (P7) | hud, perf | S | 14 §The plan |
 
 ## M4 — Atmosphere
 
