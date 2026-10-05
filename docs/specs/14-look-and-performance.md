@@ -184,7 +184,8 @@ enforces the countable ones (draws, triangles, allocations) in CI.
 
 ## Decisions (the owner's, 2026-10-05)
 
-1. **CHUNKIER is the look**, by default on every device: the pixelated 3D
+1. **CHUNKIER is the look**, by default on every device (its exact
+   resolution is tuned by hand, see Open questions 0): the pixelated 3D
    view is what grounds Stompy in the 90s cockpit-sim vibe. It is an
    aesthetic choice; the performance gain is a bonus that buys more on
    screen. CHUNKY and CRISP stay in Settings as preferences. (The owner saw
@@ -195,11 +196,13 @@ enforces the countable ones (draws, triangles, allocations) in CI.
 
 ## Open questions
 
-0. **How the pixel size is fixed.** By line count (~240 lines on every
-   device, as above) or by pixel size (3×3 screen points, which on a phone
-   held sideways is only ~120 lines)? *Recommended:* line count, so a phone
-   shows the same detail as a laptop and distant mechs stay readable.
-
+0. **The exact resolution.** The owner settles it by eye: `?debug=1` has a
+   LOOK row in the FEEL panel (lines tall, presets from 480 down to 120, a
+   live readout, an antialias toggle; saved, and shareable as
+   `?lines=240&aa=0`). The ~240 lines above is the starting point, not the
+   answer. Whether the final number is fixed per device by line count or by
+   pixel size is part of that tuning; line count keeps distant mechs readable
+   on phones.
 1. **Menu and briefing scenes.** The live mech on the main menu: chunky like
    the game, or crisp as a showcase? *Recommended:* chunky, so the first
    thing a player sees is the real look.
