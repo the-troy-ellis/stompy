@@ -119,7 +119,7 @@ Goal: twelve hand-authored missions with objectives, then contracts.
 - After the strip (#106) and before Acts II–III: the look-and-performance
   groundwork from [specs/14-look-and-performance.md](specs/14-look-and-performance.md)
   (perf harness, instanced effects with a shape per kind, particle pool,
-  allocation diet, chunky pixels by default, dither fades).
+  allocation diet, the 240-line pixelated look by default, dither fades).
 
 Exit: campaign playable end to end on desktop and phone in about two hours,
 every objective type used at least twice, no text longer than two sentences.

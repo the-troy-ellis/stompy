@@ -139,7 +139,7 @@ Filed when the spec merges; worked after #106 and before #110. P4, P6 and P7 can
 | — | Perf: instanced effects, one shape per effect kind (P1) | render, perf | M | 14 §The look, §The plan |
 | — | Perf: particle pool in typed arrays; shots and debris compacted in place (P2) | sim, perf | M | 14 §The plan |
 | — | Perf: allocation diet in scene and HUD (P3) | render, perf | S | 14 §The plan |
-| — | Look: chunky pixels by default; PIXELS setting with automatic step-down (P5) | render, ui | S | 14 §The look 6 |
+| — | Look: 240-line pixels by default; PIXELS setting; PARTICLES steps down on slow phones (P5) | render, ui | S | 14 §The look 6 |
 | — | Look: dither fades for smoke, dust and shockwaves (P5b) | render | S | 14 §The look 3 |
 | — | Perf: one draw per mech (rigid skinning) (P4) | render, perf | M | 14 §The plan |
 | — | Perf: frustum culling for mechs, props and effects (P6) | render, perf | S | 14 §The plan |

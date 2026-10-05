@@ -10,9 +10,12 @@
 
 ## Summary
 
-Stompy's look is flat-shaded polygons and chunky pixels: no textures, no
-sprites, no blending. That look is also what keeps it cheap: no
-texture memory, no overdraw, a tiny shader. This spec writes the look down as
+Stompy's look is flat-shaded polygons drawn in big, visible pixels: no
+textures, no sprites, no blending. The pixels are what ground it in the 90s
+cockpit-sim look, so they are an art decision. The same choices also make it
+cheap: no texture memory, no overdraw, a tiny shader, and about a ninth of the
+pixels to fill. That saving is headroom to spend on more mechs, effects and
+weather, not a setting to fall back on. This spec writes the look down as
 rules, then lays out the performance work that lets weather, bigger fights
 and more effects fit on a mid-range phone. The headline: **the cost is draw
 calls, not polygons**, and most of the draw calls are effects.
@@ -50,14 +53,16 @@ calls, not polygons**, and most of the draw calls are effects.
 5. **One light and a sky.** One directional light plus the palette's sky and
    fog. Hot things are emissive (they ignore the light). Night headlights
    ([07](07-atmosphere.md)) are the one exception: a single spotlight term.
-6. **Chunky pixels are the default look.** The 3D view renders at half
-   resolution (one chunky pixel is 2×2 screen points, the same on every
-   device whatever its pixel density) and is scaled up with hard edges: no
-   smoothing, no antialiasing. That suits the 1996 look *and* cuts the GPU's
-   pixel work by about 4×. The HUD and menus stay crisp at full resolution.
-   PIXELS in Settings offers CHUNKY (default), CRISP (today's full
-   resolution) and CHUNKIER (one-third resolution, about 9× less work, for
-   slow phones).
+6. **The pixels are part of the art.** The 3D view renders at about **240
+   lines** (the 320×240 era; the width follows the screen's shape) and is
+   scaled up with hard edges: no smoothing, no antialiasing. Every device
+   gets the same picture: a 720p laptop and a phone held sideways both show
+   240 lines, so a mech 400 m away has the same number of pixels on each.
+   The HUD and menus stay crisp at full resolution on top, so text and
+   markers always read. PIXELS in Settings offers CHUNKIER (default, ~240
+   lines), CHUNKY (~360 lines) and CRISP (full resolution), as a preference,
+   not a performance setting. The game never changes the pixel size on its
+   own.
 
 ## Where the time goes today (baseline)
 
@@ -99,7 +104,7 @@ What it shows:
 | P2 | **Particle pool.** Particles live in preallocated typed arrays (a ring buffer), not objects, so spawning and expiring allocate nothing, and the renderer uploads the live slice straight into P1's instance buffer. Shots and debris get the same treatment. | No garbage from effects; faster updates. | M |
 | P3 | **Allocation diet.** Scratch matrices reused in `scene.js` and `hud.js` instead of new ones per draw; lists compacted in place instead of filtered; no `shift()`. | Steady-state frames make no garbage (the heap budget's "no growth"). | S |
 | P4 | **One draw per mech.** Each chassis's parts go into one buffer with a part index per vertex; the shader picks that part's matrix from a small uniform array (rigid skinning, ≤ 16 parts, within WebGL1's guaranteed uniform space). The IK and gait code are unchanged; they fill the matrix array instead of issuing draws. | 12–15 draws per mech → 1. A 12-mech co-op fight: ~170 → 12. | M |
-| P5 | **Chunky pixels.** Render the 3D view to a low-resolution framebuffer (no antialiasing) and scale it up with hard edges. PIXELS: CHUNKY (default, half resolution), CRISP, CHUNKIER (one-third). When frames stay over budget for a few seconds, step down one level and say so once in the status line (`PIXELS: CHUNKIER.`); never step up on its own. The HUD canvas is untouched. | The default look, and about 4× less GPU pixel work everywhere (9× on CHUNKIER). | S |
+| P5 | **240-line pixels.** Render the 3D view to a low-resolution framebuffer (no antialiasing) about 240 lines tall, width by aspect, and scale it up with hard edges. PIXELS: CHUNKIER (default, ~240), CHUNKY (~360), CRISP (full). The HUD canvas is untouched. When a phone cannot hold the frame budget, the PARTICLES level from [07](07-atmosphere.md) steps down one notch and the status line says so once (`PARTICLES: LOW.`); the pixel size is never touched. | The look. And about 9× less GPU pixel work than today at 720p (more on high-resolution phones): headroom spent on more on screen. | S |
 | P5b | **Dither.** A `uDither` value per draw: the fragment shader skips pixels by an ordered 4×4 threshold (`discard`, no blending). Smoke, dust and the shockwave dither out over their last third; the instanced path carries it per instance. Dithered draws go after the solid ones, because skipping pixels can switch off a phone GPU's early depth rejection. | Soft fades in the period style, at almost no cost. | S |
 | P6 | **Culling.** Skip mechs, props and effects outside the view (a sphere against the view frustum), on top of today's fog distance. | Fewer draws when looking away from a fight; matters with M4's props. | S |
 | P7 | **HUD caching.** Draw the static cockpit frame and dashboard once to an offscreen canvas and copy it each frame; redraw only what changes. Only if P0 shows the HUD matters on a phone. | Less 2D canvas work per frame. | S |
@@ -129,8 +134,9 @@ it), Web Workers for the sim (it is not the bottleneck).
   debris. Particle *behaviour* (how each kind moves and fades) stays in the
   sim and stays tested headlessly.
 - `src/mesh/effects.js` (new): the effect shapes in the table above.
-- `src/data/settings.js`: PIXELS (CHUNKY default / CRISP / CHUNKIER), and the
-  PARTICLES level from [07](07-atmosphere.md).
+- `src/data/settings.js`: PIXELS (CHUNKIER default / CHUNKY / CRISP), and the
+  PARTICLES level from [07](07-atmosphere.md), which is what steps down on a
+  slow phone.
 - The main fragment shader: `uDither` and the 4×4 threshold (also a
   per-instance value on the instanced path).
 - `scripts/perf.mjs` (new) and `package.json`: `npm run perf`.
@@ -145,9 +151,10 @@ it), Web Workers for the sim (it is not the bottleneck).
    (heap snapshot or allocation counter in the harness).
 4. 4,000 particles render in one draw per shape, and the frame budget holds on
    the 2021 phone (manual check with the `?debug=1` overlay).
-5. CHUNKY (the default) renders the 3D view at half resolution with hard
-   pixel edges and no antialiasing; CRISP and CHUNKIER work from Settings;
-   the HUD stays sharp in all three; screenshots of each.
+5. CHUNKIER (the default) renders the 3D view about 240 lines tall with hard
+   pixel edges and no antialiasing, on desktop and on a phone alike; CHUNKY
+   and CRISP work from Settings; the HUD stays sharp in all three;
+   screenshots of each on both.
 6. Nothing on screen uses a texture or alpha blending (a test greps the
    renderer for `texImage2D` and `BLEND`); see-through effects use the dither
    only.
@@ -155,8 +162,10 @@ it), Web Workers for the sim (it is not the bottleneck).
    screenshots before and after for smoke, fire, sparks and explosions.
 8. Smoke dithers out over its last third instead of popping; screenshot
    sequence.
-9. On a phone that cannot hold the budget, PIXELS steps down once, says so,
-   and stays there.
+9. On a phone that cannot hold the budget, PARTICLES steps down once, says
+   so, and stays there; PIXELS never changes on its own.
+10. At the default, a WARDEN 400 m away still reads as a mech on a phone held
+    sideways (screenshot), with its HUD marker crisp on top.
 
 ## Tests
 
@@ -175,14 +184,21 @@ enforces the countable ones (draws, triangles, allocations) in CI.
 
 ## Decisions (the owner's, 2026-10-05)
 
-1. **Chunky pixels by default**, on every device. CRISP and CHUNKIER are in
-   Settings. (The owner saw CRISP, CHUNKY and CHUNKIER renders of the same
-   frame before choosing.)
+1. **CHUNKIER is the look**, by default on every device: the pixelated 3D
+   view is what grounds Stompy in the 90s cockpit-sim vibe. It is an
+   aesthetic choice; the performance gain is a bonus that buys more on
+   screen. CHUNKY and CRISP stay in Settings as preferences. (The owner saw
+   CRISP, CHUNKY and CHUNKIER renders of the same frame before choosing.)
 2. **See-through only by dither.** No alpha blending anywhere.
 3. **One shape per effect kind**, as in the table.
 4. **Order:** after #106, before Acts II–III.
 
 ## Open questions
+
+0. **How the pixel size is fixed.** By line count (~240 lines on every
+   device, as above) or by pixel size (3×3 screen points, which on a phone
+   held sideways is only ~120 lines)? *Recommended:* line count, so a phone
+   shows the same detail as a laptop and distant mechs stay readable.
 
 1. **Menu and briefing scenes.** The live mech on the main menu: chunky like
    the game, or crisp as a showcase? *Recommended:* chunky, so the first
