@@ -5,7 +5,7 @@ import { geoOf } from '../data/geo.js';
 import { AI_PUNCH, meleeOf } from '../data/melee.js';
 import { canPunch, meleePress, meleeTarget } from './melee.js';
 import { perceive } from './ai/perception.js';
-import { steer, strafeTick } from './ai/behaviours.js';
+import { keepRange, steer, strafeTick } from './ai/behaviours.js';
 import { planFor } from './ai/profiles.js';
 import { decideFire } from './ai/fire.js';
 import { PERCEPTION as K } from '../data/ai.js';
@@ -18,6 +18,8 @@ export function think(G, e, dt) {
   const plan = e.ai.plan || (e.ai.plan = planFor(e)), brawling = plan.brawler;   // how this chassis fights
   // Where it believes the player is: the truth with line of sight, the last fix otherwise.
   const bp = perceive(G, e, P, dt), seen = !!e.ai.seen;
+  const truck = e.ai.aware && convoyTarget(G, e, P);   // an escort mission: the trucks are the point
+  if (truck) return attackConvoy(G, e, truck, dt);
   const tx = bp ? bp[0] : P.x, tz = bp ? bp[1] : P.z;
   const dx = tx - e.x, dz = tz - e.z, dist = hypot(dx, dz);
   const toYaw = atan2(dx, dz);
@@ -66,4 +68,35 @@ export function think(G, e, dt) {
   if (e.melee) { e.beamOn = false; return; }
   if (!seen) { e.ai.lockT = 0; return; }   // no shooting at a memory
   decideFire(G, e, P, { dist, toYaw }, dt);
+}
+
+// Target selection for escorts (docs/specs/03-objectives.md § Entities): on
+// a mission with `prefer: 'convoy'`, an aware enemy goes for the nearest
+// truck unless the player is right on top of it (CONVOY_SELF_DEFENCE) or
+// much closer than any truck.
+export const CONVOY_SELF_DEFENCE = 150;
+export function convoyTarget(G, e, P) {
+  if (G.def?.prefer !== 'convoy') return null;
+  const dP = hypot(P.x - e.x, P.z - e.z);
+  if (P.alive && dP < CONVOY_SELF_DEFENCE) return null;
+  let best = null, bestD = Infinity;
+  for (const v of G.entities) {
+    if (v.kind !== 'vehicle' || !v.alive || v.team === e.team) continue;
+    const d = hypot(v.x - e.x, v.z - e.z);
+    if (d < bestD) { best = v; bestD = d; }
+  }
+  return best && (!P.alive || bestD < dP * 1.5) ? best : null;
+}
+// Close to a firing range on the truck, strafing, and shoot it. Trucks don't
+// shoot back, so there is nothing to hide from.
+function attackConvoy(G, e, v, dt) {
+  strafeTick(G, e, dt);
+  const dx = v.x - e.x, dz = v.z - e.z, dist = hypot(dx, dz), toYaw = atan2(dx, dz);
+  const out = keepRange(Math.min(e.ch.pref, 220))(G, e, { dist, toYaw });
+  e.yaw += clampN(wrapA(out.moveYaw - e.yaw), -e.ch.turn * dt, e.ch.turn * dt);
+  e.throttle = out.thr; e.jetting = false;
+  e.twist += clampN(wrapA(clampN(wrapA(toYaw - e.yaw), -1.9, 1.9) - e.twist), -2 * dt, 2 * dt);
+  e.pitch = atan2(v.y + v.height / 2 - (e.y + 6 * e.ch.scale), dist);
+  e.ai.seen = true;   // the route is no secret
+  decideFire(G, e, v, { dist, toYaw }, dt);
 }

@@ -14,7 +14,10 @@ export { polar, flatZones } from './placement.js';
 //   { type: 'survive', seconds: 150, waves: [{ at: 0, foes: [...], from }] }
 //                                                          hold out; waves arrive on the clock
 //   { type: 'extract', at: 'nav_lz', within: 180 }        reach a nav point, in time if `within`
-// ESCORT arrives in #101. Any objective may wait for another: `after: n`
+//   { type: 'escort', convoy: 'c1', to: 'nav_exit', minAlive: 2, label: 'CONVOY' }
+//                                     at least minAlive of the vehicles tagged c1 reach the nav point
+// (A mission with `prefer: 'convoy'` sends its enemies after the trucks; ai.js.)
+// Any objective may wait for another: `after: n`
 // (its index) holds it until that one is done, and its clock starts then.
 
 const TYPES = {
@@ -31,6 +34,21 @@ const TYPES = {
     tick(G, o) {
       o.total = o.targets.length; o.done = o.targets.filter(e => !e.alive).length;
       if (o.total && o.done === o.total) return 'done';
+    },
+  },
+  // Get the convoy home: done once minAlive of its vehicles have reached the
+  // nav point, failed the moment fewer than minAlive are left. The voice says
+  // so when it is shot at (no more than every CONVOY_WARN_EVERY seconds).
+  escort: {
+    init: (G, d) => ({ vehicles: G.entities.filter(e => e.kind === 'vehicle' && e.tags.includes(d.convoy)), nav: G.entities.find(e => e.id === d.to), warned: -Infinity }),
+    tick(G, o) {
+      const need = o.def.minAlive ?? 1, alive = o.vehicles.filter(v => v.alive), n = o.nav;
+      const home = alive.filter(v => Math.hypot(v.x - n.x, v.z - n.z) <= n.trigger);
+      o.alive = alive.length; o.total = o.vehicles.length; o.home = home.length;
+      o.dist = alive.length ? Math.min(...alive.map(v => Math.hypot(v.x - n.x, v.z - n.z))) : 0;
+      if (o.vehicles.some(v => v.lastHitAt > o.warned + CONVOY_WARN_EVERY)) { o.warned = G.time; voice(G, 'convoyHit'); }
+      if (alive.length < need) { voice(G, 'convoyLost'); return 'failed'; }
+      if (home.length >= need) return 'done';
     },
   },
   // Reach the nav point (its trigger radius); `within` seconds from when this
@@ -61,9 +79,10 @@ const TYPES = {
   },
 };
 export const OBJECTIVE_TYPES = Object.keys(TYPES);
+export const CONVOY_WARN_EVERY = 12;
 
 export function initObjectives(G, def) {
-  for (const s of def.entities || []) addEntity(G, { ...s, ...polar(s.at) });
+  for (const s of def.entities || []) addEntity(G, { ...s, ...polar(s.at), path: s.path?.map(p => { const q = polar(p); return [q.x, q.z]; }) });
   G.objectives = (def.objectives || [{ type: 'eliminate' }]).map(d => (d.after != null ? { def: d, state: 'waiting' } : { def: d, state: 'active', ...TYPES[d.type].init(G, d) }));
 }
 
