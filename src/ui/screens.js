@@ -8,12 +8,13 @@ import { PALS } from '../data/palettes.js';
 import { missionDef, FP_MAPS, FP_MIXES, pickFoes } from '../data/missions.js';
 import { MP_COLORS } from '../data/colors.js';
 import { makeTerrain } from '../world/terrain.js';
-import { newMech, startMatch } from '../sim/state.js';
+import { newMech, startMatch, foeType } from '../sim/state.js';
 import { initFeet } from '../sim/gait.js';
 import { endGuide } from '../sim/missiles.js';
 import { DIFF, DIFF_ORDER } from '../data/ai.js';
 import { SETTINGS, SETTING_KEYS, stepSetting } from '../data/settings.js';
 import { fitOf, fitOk, kitLine } from './mechlab.js';
+import { objectiveRows, debriefTitle, missionTitle, missionSpoken } from './debrief.js';
 
 const { sin, max, random, floor } = Math;
 
@@ -25,7 +26,8 @@ export function createUi(app) {
   function startMission(n) {
     prefs.mission = n; store.set('mech.mission', max(store.get('mech.mission', 0), n));
     G.diff = prefs.diff;
-    startMatch(G, missionDef(n), 7 + n * 13, n === 0, prefs.chassis, { loadout: fitOf(prefs.chassis) });
+    const def = missionDef(n);
+    startMatch(G, def, def.seed ?? 7 + n * 13, n === 0, prefs.chassis, { loadout: fitOf(prefs.chassis) });
     G.kind = 'campaign';
     app.scene.uploadWorld();
   }
@@ -131,8 +133,9 @@ export function createUi(app) {
   function menuDetail(status) {
     if (prefs.menuSel === 'campaign') {
       const d = missionDef(prefs.mission), p = PALS[d.pal];
-      const counts = d.foes.reduce((a, f) => ((a[f] = (a[f] || 0) + 1), a), {});
-      return `<div class="k">MISSION ${prefs.mission + 1}: ${esc(d.name.toUpperCase())}</div>
+      const all = [...d.foes, ...(d.waves || []).flatMap(w => w.foes)];   // waves are hostiles too
+      const counts = all.reduce((a, f) => ((a[foeType(f)] = (a[foeType(f)] || 0) + 1), a), {});
+      return `<div class="k">${esc(missionTitle(prefs.mission + 1, d.name))}</div>
         <p>${esc(d.intel)}</p>
         <p class="dim">${esc(p.name.toUpperCase())} · ${Object.entries(counts).map(([k, n]) => `${n}x ${CHASSIS[k].name}`).join(', ')}</p>
         ${prefs.mission > 0 ? '<button class="opt" data-a="restart">RESTART CAMPAIGN</button>' : ''}`;
@@ -210,7 +213,7 @@ export function createUi(app) {
     app.audio.loadSamples();
     app.input.lockPointer();
     app.input.syncWeaponButtons();
-    app.audio.say(G.kind === 'campaign' ? `Mission ${prefs.mission + 1}. ${G.def.name}. Systems online.` : 'Free play. Systems online.', true);
+    app.audio.say(G.kind === 'campaign' ? `${missionSpoken(prefs.mission + 1, G.def.name)} Systems online.` : 'Free play. Systems online.', true);
   }
 
   function debrief() {
@@ -220,11 +223,13 @@ export function createUi(app) {
     const tm = `${floor(G.time / 60)}:${String(floor(G.time % 60)).padStart(2, '0')}`;
     const camp = G.kind === 'campaign';
     if (G.won && camp) { store.set('mech.mission', max(store.get('mech.mission', 0), prefs.mission + 1)); store.set('mech.best', max(store.get('mech.best', 0), prefs.mission + 1)); }
+    const rows = objectiveRows(G).map(r => `<div class="obj ${r.ok ? 'ok' : 'no'}${r.secondary ? ' sec' : ''}"><b>${r.ok ? '&#10003;' : '&#10007;'}</b> ${esc(r.text)}${r.secondary ? ' <i>OPTIONAL</i>' : ''}</div>`).join('');
     showOverlay(`
-      <h1 style="color:${G.won ? '#5f5' : '#f44'}">${G.won ? 'MISSION COMPLETE' : 'MECH DESTROYED'}</h1>
+      <h1 style="color:${G.won ? '#5f5' : '#f44'}">${debriefTitle(G)}</h1>
       <div class="panel">
-        <div class="k">${camp ? `MISSION ${prefs.mission + 1}: ${esc(G.def.name.toUpperCase())}` : 'FREE PLAY'}</div>
-        <p>TIME ${tm}<br>KILLS ${s.kills} / ${G.def.foes.length}<br>
+        <div class="k">${camp ? esc(missionTitle(prefs.mission + 1, G.def.name)) : 'FREE PLAY'}</div>
+        ${rows ? `<div class="objs">${rows}</div>` : ''}
+        <p>TIME ${tm}<br>KILLS ${s.kills} / ${G.mechs.filter(m => m.team !== 0 && !m.remote).length}<br>
            ACCURACY ${acc}% (${Math.round(s.hits)} of ${Math.round(s.shots)})<br>
            DAMAGE DEALT ${Math.round(s.dealt)} &nbsp; TAKEN ${Math.round(s.taken)}</p>
       </div>

@@ -26,7 +26,7 @@ const TYPES = {
     tick(G, o) {
       const foes = G.mechs.filter(m => m.team !== 0 && !m.remote);
       o.left = foes.filter(m => m.alive).length; o.total = foes.length;
-      if (o.left === 0) return 'done';
+      if (o.left === 0 && !wavesPending(G)) return 'done';   // not while a wave is on its way
     },
   },
   destroy: {
@@ -97,7 +97,25 @@ export const CONVOY_WARN_EVERY = 12;
 export function initObjectives(G, def) {
   for (const s of def.entities || []) addEntity(G, { ...s, ...polar(s.at), path: s.path?.map(p => { const q = polar(p); return [q.x, q.z]; }) });
   G.objectives = (def.objectives || [{ type: 'eliminate' }]).map(d => (d.after != null ? { def: d, state: 'waiting' } : { def: d, state: 'active', ...TYPES[d.type].init(G, d) }));
+  G.waves = (def.waves || []).map(w => ({ ...w, due: w.at ?? null, warned: (w.at ?? Infinity) < WAVE_WARN, spawned: false }));
 }
+
+// The mission's own waves (a SURVIVE has its own on its clock):
+//   { at: 40, foes, from, dist }                 on the mission clock
+//   { when: { obj: 0, done: 2 }, foes, from }    once objective 0's count reaches 2
+// A wave is called in WAVE_WARN seconds before it arrives; a triggered one
+// arrives WAVE_WARN after its trigger, so the call always comes first.
+function tickWaves(G) {
+  for (const w of G.waves || []) {
+    if (w.spawned) continue;
+    if (w.due == null && w.when && (G.objectives[w.when.obj]?.done ?? 0) >= w.when.done) w.due = G.time + WAVE_WARN;
+    if (w.due == null) continue;
+    if (!w.warned && G.time >= w.due - WAVE_WARN) { w.warned = true; voice(G, 'inbound'); }
+    if (G.time >= w.due) { w.spawned = true; spawnWave(G, waveFoes(G, w.foes), w); }
+  }
+}
+// A wave that is coming for certain: timed, or triggered and on its way.
+const wavesPending = G => (G.waves || []).some(w => !w.spawned && w.due != null);
 
 // Once a frame while the match is on. Each active objective updates its
 // progress and may finish or fail; then the mission's own outcome.
@@ -109,6 +127,7 @@ export function tickObjectives(G) {
     const r = TYPES[o.def.type].tick(G, o);
     if (r) o.state = r;
   }
+  tickWaves(G);
   const main = G.objectives.filter(o => !o.def.secondary);
   if (main.some(o => o.state === 'failed')) {
     G.state = 'over'; G.endT = 3.2; G.won = false;
