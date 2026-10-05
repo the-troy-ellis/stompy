@@ -16,6 +16,7 @@ import { stepFeel } from './feel.js';
 import { netInterp } from '../net/interp.js';
 import { pushOutOfEntities, stepEntities } from './entities.js';
 import { tickObjectives } from './objectives.js';
+import { stepTurrets } from './turrets.js';
 
 const { sin, abs, min, max, hypot, cos } = Math;
 
@@ -93,6 +94,7 @@ export function update(G, input, dt) {
     }
   }
   stepEntities(G, dt);
+  stepTurrets(G, dt);
   tickObjectives(G);
   pushOutOfEntities(G, m => geoOf(m).radius * m.ch.scale);
 

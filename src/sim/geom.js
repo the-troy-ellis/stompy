@@ -66,7 +66,7 @@ export function rayHit(G, o, d, maxT, ignore) {
     if (t != null && t <= maxT && (!best || t < best.t)) best = { t, mech: m };
   }
   for (const e of G.entities || []) {
-    if (!e.alive || e.kind === 'nav') continue;
+    if (!e.alive || e.kind === 'nav' || e === ignore) continue;   // a turret's own volley leaves through it
     const t = rayEnt(o, d, e);
     if (t != null && t <= maxT && (!best || t < best.t)) best = { t, mech: null, ent: e };
   }
