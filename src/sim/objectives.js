@@ -13,7 +13,9 @@ export { polar, flatZones } from './placement.js';
 //   { type: 'destroy', targets: ['relay'], label: 'RELAY' } entities with those tags
 //   { type: 'survive', seconds: 150, waves: [{ at: 0, foes: [...], from }] }
 //                                                          hold out; waves arrive on the clock
-// ESCORT and EXTRACT arrive in #101-#102.
+//   { type: 'extract', at: 'nav_lz', within: 180 }        reach a nav point, in time if `within`
+// ESCORT arrives in #101. Any objective may wait for another: `after: n`
+// (its index) holds it until that one is done, and its clock starts then.
 
 const TYPES = {
   eliminate: {
@@ -29,6 +31,18 @@ const TYPES = {
     tick(G, o) {
       o.total = o.targets.length; o.done = o.targets.filter(e => !e.alive).length;
       if (o.total && o.done === o.total) return 'done';
+    },
+  },
+  // Reach the nav point (its trigger radius); `within` seconds from when this
+  // objective started, or it fails.
+  extract: {
+    init: (G, d) => ({ start: G.time, nav: G.entities.find(e => e.id === d.at) }),
+    tick(G, o) {
+      const P = G.player, n = o.nav;
+      o.dist = Math.hypot(n.x - P.x, n.z - P.z);
+      if (o.def.within != null) o.left = Math.max(0, o.def.within - (G.time - o.start));
+      if (o.dist <= n.trigger) return 'done';
+      if (o.left === 0) return 'failed';
     },
   },
   // The clock runs from the mission start; each wave is called in WAVE_WARN
@@ -50,7 +64,7 @@ export const OBJECTIVE_TYPES = Object.keys(TYPES);
 
 export function initObjectives(G, def) {
   for (const s of def.entities || []) addEntity(G, { ...s, ...polar(s.at) });
-  G.objectives = (def.objectives || [{ type: 'eliminate' }]).map(d => ({ def: d, state: 'active', ...TYPES[d.type].init(G, d) }));
+  G.objectives = (def.objectives || [{ type: 'eliminate' }]).map(d => (d.after != null ? { def: d, state: 'waiting' } : { def: d, state: 'active', ...TYPES[d.type].init(G, d) }));
 }
 
 // Once a frame while the match is on. Each active objective updates its
@@ -58,6 +72,7 @@ export function initObjectives(G, def) {
 export function tickObjectives(G) {
   if (G.state !== 'play' || G.mode === 'mp' || !G.objectives || !G.player.alive) return;
   for (const o of G.objectives) {
+    if (o.state === 'waiting' && G.objectives[o.def.after]?.state === 'done') { Object.assign(o, TYPES[o.def.type].init(G, o.def)); o.state = 'active'; voice(G, 'updated'); }
     if (o.state !== 'active') continue;
     const r = TYPES[o.def.type].tick(G, o);
     if (r) o.state = r;
