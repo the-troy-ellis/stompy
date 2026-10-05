@@ -274,3 +274,10 @@ html, body {
 .feel-panel td { padding: 0 1px; }
 .feel-panel input { width: 44px; font: inherit; background: #010a01; color: #9f9; border: 1px solid #1a4a1a; }
 .feel-out { display: block; width: 100%; height: 120px; margin-top: 4px; font: inherit; background: #010a01; color: #9f9; border: 1px solid #1a4a1a; }
+/* Debrief objective rows: a tick or a cross each, optional ones dimmer. */
+.objs { margin: 6px 0 2px; }
+.obj b { display: inline-block; width: 1.4em; }
+.obj.ok b { color: #5f5; }
+.obj.no b { color: #f44; }
+.obj.sec { color: #7c7; }
+.obj i { font-style: normal; font-size: 10px; color: #6a6; letter-spacing: 1px; }

@@ -14,6 +14,7 @@ import { endGuide } from '../sim/missiles.js';
 import { DIFF, DIFF_ORDER } from '../data/ai.js';
 import { SETTINGS, SETTING_KEYS, stepSetting } from '../data/settings.js';
 import { fitOf, fitOk, kitLine } from './mechlab.js';
+import { objectiveRows, debriefTitle } from './debrief.js';
 
 const { sin, max, random, floor } = Math;
 
@@ -220,11 +221,13 @@ export function createUi(app) {
     const tm = `${floor(G.time / 60)}:${String(floor(G.time % 60)).padStart(2, '0')}`;
     const camp = G.kind === 'campaign';
     if (G.won && camp) { store.set('mech.mission', max(store.get('mech.mission', 0), prefs.mission + 1)); store.set('mech.best', max(store.get('mech.best', 0), prefs.mission + 1)); }
+    const rows = objectiveRows(G).map(r => `<div class="obj ${r.ok ? 'ok' : 'no'}${r.secondary ? ' sec' : ''}"><b>${r.ok ? '&#10003;' : '&#10007;'}</b> ${esc(r.text)}${r.secondary ? ' <i>OPTIONAL</i>' : ''}</div>`).join('');
     showOverlay(`
-      <h1 style="color:${G.won ? '#5f5' : '#f44'}">${G.won ? 'MISSION COMPLETE' : 'MECH DESTROYED'}</h1>
+      <h1 style="color:${G.won ? '#5f5' : '#f44'}">${debriefTitle(G)}</h1>
       <div class="panel">
         <div class="k">${camp ? `MISSION ${prefs.mission + 1}: ${esc(G.def.name.toUpperCase())}` : 'FREE PLAY'}</div>
-        <p>TIME ${tm}<br>KILLS ${s.kills} / ${G.def.foes.length}<br>
+        ${rows ? `<div class="objs">${rows}</div>` : ''}
+        <p>TIME ${tm}<br>KILLS ${s.kills} / ${G.mechs.filter(m => m.team !== 0 && !m.remote).length}<br>
            ACCURACY ${acc}% (${Math.round(s.hits)} of ${Math.round(s.shots)})<br>
            DAMAGE DEALT ${Math.round(s.dealt)} &nbsp; TAKEN ${Math.round(s.taken)}</p>
       </div>
