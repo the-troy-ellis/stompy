@@ -106,7 +106,7 @@ export function createUi(app) {
       G.ter = makeTerrain(3);
       app.scene.uploadWorld();
     }
-    G.shots = []; G.beams = []; G.cbeams = []; G.parts = []; G.wrecks = []; G.msgs = [];
+    G.shots = []; G.beams = []; G.cbeams = []; G.parts.clear(); G.wrecks = []; G.msgs = [];
     showMech();
     renderMenu(status);
   }

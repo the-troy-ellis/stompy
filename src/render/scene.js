@@ -1,5 +1,5 @@
 import { backingSize } from './look.js';
-import { effectLook, shapeOf } from '../mesh/effects.js';
+import { effectLook, SHAPE_BY_KIND } from '../mesh/effects.js';
 import { M, add, chain, clampN, dirOf, mix3, mul, norm, rnd, sub, len, cross, TAU } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { buildTerrainMesh } from '../world/terrainMesh.js';
@@ -348,21 +348,23 @@ export function createScene(app) {
     // instancing extension is missing.
     [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.disableVertexAttribArray(a));
     if (R.instanced) {
-      for (const p of G.parts) {
-        const g = R.fx[shapeOf(p.kind)];
+      const P = G.parts;
+      for (let i = 0; i < P.n; i++) {
+        const g = R.fx[SHAPE_BY_KIND[P.kind[i]]];
         if (g.n >= R.FX_CAP) continue;
-        effectLook(p, G.pal.hor, LOOK);
-        const d = g.data, o = g.n++ * R.FX_FLOATS;
-        d[o] = p.p[0]; d[o + 1] = p.p[1]; d[o + 2] = p.p[2]; d[o + 3] = LOOK.size;
-        d[o + 4] = p.spin; d[o + 5] = p.spin * 0.7;
+        effectLook(P, i, G.pal.hor, LOOK);
+        const d = g.data, o = g.n++ * R.FX_FLOATS, i3 = i * 3;
+        d[o] = P.pos[i3]; d[o + 1] = P.pos[i3 + 1]; d[o + 2] = P.pos[i3 + 2]; d[o + 3] = LOOK.size;
+        d[o + 4] = P.spin[i]; d[o + 5] = P.spin[i] * 0.7;
         d[o + 6] = LOOK.r; d[o + 7] = LOOK.g; d[o + 8] = LOOK.b; d[o + 9] = LOOK.emis; d[o + 10] = LOOK.heat;
       }
       R.drawEffects();
     } else {
       [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.enableVertexAttribArray(a));
-      for (const p of G.parts) {
-        effectLook(p, G.pal.hor, LOOK);
-        R.draw(R.meshes.fx[shapeOf(p.kind)], chain(M.T(...p.p), M.RY(p.spin), M.RX(p.spin * 0.7), M.S(LOOK.size)), [LOOK.r, LOOK.g, LOOK.b], LOOK.emis, LOOK.heat);
+      const P = G.parts;
+      for (let i = 0; i < P.n; i++) {
+        effectLook(P, i, G.pal.hor, LOOK);
+        R.draw(R.meshes.fx[SHAPE_BY_KIND[P.kind[i]]], chain(M.T(P.pos[i * 3], P.pos[i * 3 + 1], P.pos[i * 3 + 2]), M.RY(P.spin[i]), M.RX(P.spin[i] * 0.7), M.S(LOOK.size)), [LOOK.r, LOOK.g, LOOK.b], LOOK.emis, LOOK.heat);
       }
       [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.disableVertexAttribArray(a));
     }

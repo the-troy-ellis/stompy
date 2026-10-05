@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { buildEffectShapes, EFFECT_SHAPES, SHAPE_OF, shapeOf, effectLook } from '../src/mesh/effects.js';
 import { mix3 } from '../src/util/math.js';
+import { Particles, spawn } from '../src/sim/particles.js';
 
 test('one small solid per effect kind, every kind mapped to a shape that exists', () => {
   const shapes = buildEffectShapes();
@@ -17,9 +18,12 @@ test('one small solid per effect kind, every kind mapped to a shape that exists'
 
 test('effectLook keeps the old rules: fire shrinks and reddens, flame swells, smoke fades to the horizon', () => {
   const hor = [0.8, 0.5, 0.3], out = {};
-  const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} vs ${b}`);
+  const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} vs ${b}`);   // the pool stores float32
   const check = (p, size, col, emis, heat) => {
-    const r = effectLook(p, hor, out);
+    const P = new Particles(4), G = { parts: P, rng: { next: () => 0 } };
+    spawn(G, [0, 0, 0], [0, 0, 0], p.max, p.size, p.col, p.kind);
+    P.life[0] = p.life;
+    const r = effectLook(P, 0, hor, out);
     assert.equal(r, out, 'writes into the given object, allocates nothing');
     near(r.size, size); near(r.r, col[0]); near(r.g, col[1]); near(r.b, col[2]); near(r.emis, emis); near(r.heat, heat);
   };

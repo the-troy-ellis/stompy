@@ -1,14 +1,13 @@
-import { TAU, add, clampN, len, mul, norm, sub } from '../util/math.js';
+import { add, clampN, len, mul, norm, sub } from '../util/math.js';
 import { feel } from './feel.js';
+import { spawn } from './particles.js';
 
 export function msg(G, text, col = '#7f7') {
   G.msgs.push({ text, col, t: 3.5 });
   if (G.msgs.length > 4) G.msgs.shift();
 }
-export function particle(G, p, v, life, size, col, kind, grav = 0) {
-  if (G.parts.length > 420) G.parts.shift();
-  G.parts.push({ p: [...p], v, life, max: life, size, col, kind, grav, spin: G.rng.next() * TAU });
-}
+// One particle into the pool (particles.js), which copies what it needs.
+export function particle(G, p, v, life, size, col, kind, grav = 0) { spawn(G, p, v, life, size, col, kind, grav); }
 // A piece of a mech (an arm, a thigh, a shin, a foot) that fell off: it
 // tumbles, bounces once, and lies there for `life` seconds. Drawn from the
 // mech's own part meshes by the renderer. Capped so a long fight stays cheap.

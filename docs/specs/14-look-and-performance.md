@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (P0 #131 perf harness, P1 #132 instanced effects shipped; the owner's decisions are recorded below) |
+| Status | in progress (P0 #131 perf harness, P1 #132 instanced effects, P2 #133 particle pool shipped; the owner's decisions are recorded below) |
 | Milestone | between M3's #106 and Acts II–III (#110, #111); the rest of M4 builds on it |
 | Size | L (split: perf harness; instanced effects + particle pool; allocation diet; one-draw mechs; render scale; culling) |
 | Depends on | [07-atmosphere.md](07-atmosphere.md) (weather and explosions are the big new loads); [13-thunk.md](13-thunk.md) (effects are feedback) |
@@ -88,6 +88,13 @@ average (112 at peak, from 470 / 529) and about 545 KB of garbage a frame
 (from 1,315), because effects no longer build matrices per particle. What
 remains is mostly mechs (P4) and the particle objects themselves (P2). The
 particle cap stays at 420 until the pool (P2) replaces the objects.
+
+After P2 (the particle pool, `src/sim/particles.js`): particles are typed
+arrays, so spawning, stepping and expiring allocate nothing and the cap is
+4,000. The deaths scene now keeps all its smoke (~540 particles, peak ~710,
+where the old cap threw the oldest away at 420) and still allocates less:
+~465 KB a frame. What is left is P3's: matrices built per draw for mechs and
+props, arrays built at particle and shot call sites, and the HUD.
 
 The simulation itself is cheap: `update()` takes 0.3 ms per frame with 6
 enemies, 0.5 ms with 12 and 0.8 ms with 20, on a desktop CPU in Node. A 2021
