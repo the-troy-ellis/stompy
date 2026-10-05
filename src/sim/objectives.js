@@ -32,7 +32,9 @@ const TYPES = {
   destroy: {
     init: (G, d) => ({ targets: G.entities.filter(e => e.tags.some(t => d.targets.includes(t))) }),
     tick(G, o) {
+      const was = o.done ?? 0;
       o.total = o.targets.length; o.done = o.targets.filter(e => !e.alive).length;
+      if (o.done > was) voice(G, 'structureDown', {}, true, 900);   // after the bang
       if (o.total && o.done === o.total) return 'done';
     },
   },
@@ -59,7 +61,7 @@ const TYPES = {
       const P = G.player, n = o.nav;
       o.dist = Math.hypot(n.x - P.x, n.z - P.z);
       if (o.def.within != null) o.left = Math.max(0, o.def.within - (G.time - o.start));
-      if (o.dist <= n.trigger) return 'done';
+      if (o.dist <= n.trigger) { voice(G, 'extracted'); return 'done'; }
       if (o.left === 0) return 'failed';
     },
   },
@@ -79,6 +81,17 @@ const TYPES = {
   },
 };
 export const OBJECTIVE_TYPES = Object.keys(TYPES);
+// Where the HUD marker for an objective goes (null: nowhere in particular):
+// the nearest standing target, the convoy's lead, the extraction point.
+export function objectivePoint(G, o) {
+  if (o.state !== 'active') return null;
+  const P = G.player, near = list => list.reduce((b, e) => (!b || Math.hypot(e.x - P.x, e.z - P.z) < Math.hypot(b.x - P.x, b.z - P.z) ? e : b), null);
+  const at = e => e && [e.x, e.y + (e.height || 0) / 2 + 2, e.z];
+  if (o.def.type === 'destroy') return at(near(o.targets.filter(e => e.alive)));
+  if (o.def.type === 'escort') { const n = o.nav, live = o.vehicles.filter(v => v.alive); return at(live.reduce((b, v) => (!b || Math.hypot(v.x - n.x, v.z - n.z) < Math.hypot(b.x - n.x, b.z - n.z) ? v : b), null)); }
+  if (o.def.type === 'extract') return at(o.nav);
+  return null;
+}
 export const CONVOY_WARN_EVERY = 12;
 
 export function initObjectives(G, def) {
