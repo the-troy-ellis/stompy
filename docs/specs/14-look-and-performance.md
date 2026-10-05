@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ready (the owner's decisions are recorded below) |
+| Status | in progress (P0 #131 perf harness shipped; the owner's decisions are recorded below) |
 | Milestone | between M3's #106 and Acts II–III (#110, #111); the rest of M4 builds on it |
 | Size | L (split: perf harness; instanced effects + particle pool; allocation diet; one-draw mechs; render scale; culling) |
 | Depends on | [07-atmosphere.md](07-atmosphere.md) (weather and explosions are the big new loads); [13-thunk.md](13-thunk.md) (effects are feedback) |
@@ -76,6 +76,12 @@ triangle counts are exact and the times are only relative), at 1280×720:
 | 6-mech fight | 166 (332) | 24k | 82 | 76 / 88 |
 | 6-mech fight, 3 deaths | 379 (506) | 27k | 286 | 87 / 291 |
 | After the deaths (burning wrecks) | 421 (495) | 27k | 321 | 87 / 333 |
+
+`npm run perf` (P0) now measures these scenes on every CI run, deterministic
+to the draw, and adds what this table lacked: **about 1.3 MB of garbage per
+frame** in the fight-with-deaths scene (680 KB in a plain fight, 160 KB with
+nobody shooting), which is roughly 80 MB a second for the phone's garbage
+collector at 60 fps. P2 and P3 aim straight at that number.
 
 The simulation itself is cheap: `update()` takes 0.3 ms per frame with 6
 enemies, 0.5 ms with 12 and 0.8 ms with 20, on a desktop CPU in Node. A 2021
