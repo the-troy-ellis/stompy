@@ -129,6 +129,22 @@ Shipped in #1 (all rows below), except branch protection, which the owner sets o
 | #114 | M3: full NORMAL playthrough report (time, attempts, text audit) | content, docs | S | 04 §Acceptance 2–4 |
 | #115 | M3: naming round for mission names, briefs and verdicts (opened per act by the act's PR) | content, needs-owner | S | workflow §Naming things |
 
+### Look and performance ([specs/14-look-and-performance.md](specs/14-look-and-performance.md))
+
+Filed when the spec merges; worked after #106 and before #110. P4, P6 and P7 can wait for M4/M5b.
+
+| # | Title | Labels | Size | Spec |
+|---|---|---|---|---|
+| — | Perf: `npm run perf` harness with draw, triangle, particle and allocation budgets in CI (P0) | tooling, perf | S | 14 §The plan |
+| — | Perf: instanced effects, one shape per effect kind (P1) | render, perf | M | 14 §The look, §The plan |
+| — | Perf: particle pool in typed arrays; shots and debris compacted in place (P2) | sim, perf | M | 14 §The plan |
+| — | Perf: allocation diet in scene and HUD (P3) | render, perf | S | 14 §The plan |
+| — | Look: chunky pixels by default; PIXELS setting with automatic step-down (P5) | render, ui | S | 14 §The look 6 |
+| — | Look: dither fades for smoke, dust and shockwaves (P5b) | render | S | 14 §The look 3 |
+| — | Perf: one draw per mech (rigid skinning) (P4) | render, perf | M | 14 §The plan |
+| — | Perf: frustum culling for mechs, props and effects (P6) | render, perf | S | 14 §The plan |
+| — | Perf: HUD static-layer caching, if the harness shows it matters (P7) | hud, perf | S | 14 §The plan |
+
 ## M4 — Atmosphere
 
 | # | Title | Labels | Size | Spec |

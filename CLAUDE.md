@@ -1,7 +1,9 @@
 # Stompy — notes for agents
 
-Stompy is a 90s-style browser mech sim: raw WebGL, flat-shaded, no libraries,
-touch and desktop both first-class. **The plan of record is in `docs/`.**
+Stompy is a 90s-style browser mech sim: raw WebGL, flat-shaded polygons in
+chunky pixels (no textures, sprites or blending; see
+`docs/specs/14-look-and-performance.md`), no libraries, touch and desktop both
+first-class. **The plan of record is in `docs/`.**
 Start with `docs/README.md`, then the spec your issue links to.
 
 Rules that are easy to miss:
