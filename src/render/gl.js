@@ -7,8 +7,8 @@ import { MP_COLORS } from '../data/colors.js';
 
 // The WebGL side: context, the two shaders, mesh upload, the per-draw call,
 // and the mesh sets (one per chassis, plus one per arena colour on demand).
-export function createRenderer(cv) {
-  const gl = cv.getContext('webgl', { antialias: true, alpha: false, powerPreference: 'high-performance' });
+export function createRenderer(cv, { antialias = true } = {}) {
+  const gl = cv.getContext('webgl', { antialias, alpha: false, powerPreference: 'high-performance' });
   if (!gl) return null;
   /* ---------- GL setup ---------- */
 

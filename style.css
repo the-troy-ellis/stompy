@@ -281,3 +281,10 @@ html, body {
 .obj.no b { color: #f44; }
 .obj.sec { color: #7c7; }
 .obj i { font-style: normal; font-size: 10px; color: #6a6; letter-spacing: 1px; }
+/* The 3D view at a low resolution, scaled up with hard pixel edges (render/look.js). */
+.mech-gl.pixelated { image-rendering: crisp-edges; image-rendering: pixelated; }
+.feel-look { margin: 4px 0; line-height: 1.9; }
+.feel-look input[type=range] { width: 160px; vertical-align: middle; }
+.feel-look input[type=number] { width: 48px; }
+.feel-look button { margin-right: 2px; }
+.feel-res { color: #fc3; }
