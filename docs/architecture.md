@@ -294,7 +294,7 @@ Budget going forward (see [workflow.md](workflow.md) for how it is checked):
 
 | Measure | Budget |
 |---|---|
-| Frame time, mid-range 2021 Android phone (Pixel 6a / Galaxy A53 class), DPR capped at 2 | ≤ 16.6 ms sustained in a 6-mech fight with weather on |
+| Frame time, mid-range 2021 Android phone (Pixel 6a / Galaxy A53 class), DPR capped at 1.5 (`scene.js`) | ≤ 16.6 ms sustained in a 6-mech fight with weather on |
 | Frame time, 2019 phone (Pixel 3a class) | ≤ 33 ms |
 | Draw calls per frame | ≤ 500 |
 | Triangles per frame | ≤ 300k |
@@ -305,4 +305,8 @@ Budget going forward (see [workflow.md](workflow.md) for how it is checked):
 Headroom today is decent; the things that will eat it are weather particles
 (M4), more mechs on screen (co-op and bigger missions), and buildings (M3/M4).
 Instanced particles and a particle cap are M4 work; frustum culling of props
-is M3/M4 work.
+is M3/M4 work. Measured baselines and the ordered plan (instanced effects, a
+particle pool, an allocation diet, one draw per mech, a PIXELS setting,
+culling, a perf harness) are in
+[specs/14-look-and-performance.md](specs/14-look-and-performance.md): the
+cost is draw calls, not triangles, and most draw calls are effects.

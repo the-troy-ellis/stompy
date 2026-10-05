@@ -67,7 +67,10 @@ When two good ideas conflict, the pillar higher in this list wins.
    A joke that needs a second sentence is cut.
 7. **Period-correct.** It should look and sound like it could have shipped in
    1996 on a very good machine. Flat shading, chunky geometry, synthesised
-   tones layered under CC0 clips, a monospace HUD. Modern niceties are fine
+   tones layered under CC0 clips, a monospace HUD. Polygons only: no
+   textures, no sprites, no blending; effects are small solid shapes too, and
+   the only see-through is a dither. The 3D view renders at about 240 lines in
+   big hard-edged pixels: that is the look, not a fallback ([specs/14-look-and-performance.md](specs/14-look-and-performance.md)). Modern niceties are fine
    where invisible (smooth interpolation, high DPI, 60 fps).
 
 ## Non-goals
