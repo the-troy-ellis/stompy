@@ -8,6 +8,7 @@ import { FEEL, HEAT, hotFrac } from '../data/feel.js';
 import { meleeOf } from '../data/melee.js';
 import { BARREL_AT, styleOf } from '../mesh/mechParts.js';
 import { fallAngle } from '../sim/entities.js';
+import { propFor } from '../mesh/props.js';
 import { WEAPONS } from '../data/weapons.js';
 
 // An arm gun's proportions by weapon: [thickness, length] against the stock barrel.
@@ -261,11 +262,19 @@ export function createScene(app) {
     // boxes until the prop meshes (#98) arrive; past the fog they are skipped.
     const far = G.pal.fog[1] + 60;
     for (const e of G.entities) {
-      if (e.kind === 'nav' || (!e.alive && !e.wreck)) continue;
+      if ((e.kind === 'nav' && !e.mesh) || (!e.alive && !e.wreck)) continue;
       if (Math.hypot(e.x - eye[0], e.z - eye[2]) > far) continue;
       const base = M.T(e.x, e.y, e.z), w = e.radius * 1.7, dead = !e.alive;
-      const col = dead ? mul(e.col, 0.35) : e.col;
-      if (e.kind === 'vehicle') {
+      const col = dead ? mul(e.col, 0.35) : e.col, prop = propFor(e);
+      if (prop) {
+        // Punched over: rotates about its base, away from the fist, then lies there.
+        const tilt = e.fall ? chain(M.RY(e.fall.yaw), M.RX(fallAngle(e)), M.RY(-e.fall.yaw)) : M.id();
+        const at = chain(base, tilt, M.RY(e.yaw)), size = M.S(e.radius, prop.sy, e.radius), tint = [prop.tint, prop.tint, prop.tint];
+        R.draw(R.meshes.props[prop.key], chain(at, size), tint);
+        if (prop.head) R.draw(R.meshes.props[prop.head], chain(at, M.RY(e.headYaw || 0), size), tint);
+      } else if (e.kind === 'nav') {
+        continue;
+      } else if (e.kind === 'vehicle') {
         R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, e.height / 2, -e.radius * 0.3), M.S(w, e.height, w * 1.6)), col);
         R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, e.height * 0.4, e.radius * 1.35), M.S(w * 0.9, e.height * 0.8, w * 0.55)), mul(col, 0.7));
       } else if (e.fall) {   // punched over: rotates about its base, away from the fist, then lies there

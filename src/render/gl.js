@@ -1,4 +1,5 @@
 import { M } from '../util/math.js';
+import { buildProps } from '../mesh/props.js';
 import { Builder } from '../mesh/builder.js';
 import { buildMechParts } from '../mesh/mechParts.js';
 import { CHASSIS, lockedLook } from '../data/chassis.js';
@@ -76,6 +77,7 @@ export function createRenderer(cv) {
   meshes.cube = upload(unit);
   const beam = new Builder(); beam.cube(M.T(0, 0, 0.5), [1, 1, 1]);
   meshes.beam = upload(beam);
+  meshes.props = Object.fromEntries(Object.entries(buildProps()).map(([k, b]) => [k, upload(b)]));
   const mechParts = {};
   for (const k of Object.keys(CHASSIS)) {
     const p = buildMechParts(CHASSIS[k]);
