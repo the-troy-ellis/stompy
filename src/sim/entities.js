@@ -70,7 +70,7 @@ export function damageEntity(G, e, amt, src, p, how = {}) {
   for (let i = 0; i < 3; i++) particle(G, p || [e.x, e.y + e.height / 2, e.z], [r.range(-4, 4), r.range(1, 6), r.range(-4, 4)], 0.3, 0.3, [1, 0.8, 0.4], 'fire');
   if (!Number.isFinite(e.hp)) return;   // decorative: it sparks, nothing more
   e.hp -= amt;
-  e.lastHitBy = src;
+  e.lastHitBy = src; e.lastHitAt = G.time;
   if (src === G.player) { G.stats.dealt += amt; G.hitMark = 0.25; }
   if (e.hp <= 0) destroyEntity(G, e, src, how);
 }
