@@ -28,7 +28,7 @@ export default [
   },
   {
     // The smoke test's page.evaluate callbacks run in the browser.
-    files: ['test/smoke/**/*.mjs', 'scripts/shoot.mjs', 'scripts/shootMech.mjs'],
+    files: ['test/smoke/**/*.mjs', 'scripts/shoot.mjs', 'scripts/shootMech.mjs', 'scripts/perf.mjs'],
     languageOptions: { globals: { window: 'readonly', document: 'readonly', localStorage: 'readonly' } },
   },
   {
