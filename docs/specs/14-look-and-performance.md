@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ready (the owner's decisions are recorded below) |
+| Status | in progress (P0 #131 perf harness, P1 #132 instanced effects, P2 #133 particle pool, P3 #134 allocation diet, P5b #136 dither shipped; the owner's decisions are recorded below) |
 | Milestone | between M3's #106 and Acts II–III (#110, #111); the rest of M4 builds on it |
 | Size | L (split: perf harness; instanced effects + particle pool; allocation diet; one-draw mechs; render scale; culling) |
 | Depends on | [07-atmosphere.md](07-atmosphere.md) (weather and explosions are the big new loads); [13-thunk.md](13-thunk.md) (effects are feedback) |
@@ -77,6 +77,35 @@ triangle counts are exact and the times are only relative), at 1280×720:
 | 6-mech fight, 3 deaths | 379 (506) | 27k | 286 | 87 / 291 |
 | After the deaths (burning wrecks) | 421 (495) | 27k | 321 | 87 / 333 |
 
+`npm run perf` (P0) now measures these scenes on every CI run, deterministic
+to the draw, and adds what this table lacked: **about 1.3 MB of garbage per
+frame** in the fight-with-deaths scene (680 KB in a plain fight, 160 KB with
+nobody shooting), which is roughly 80 MB a second for the phone's garbage
+collector at 60 fps. P2 and P3 aim straight at that number.
+
+After P1 (instanced effects): the fight-with-deaths scene is 106 draws on
+average (112 at peak, from 470 / 529) and about 545 KB of garbage a frame
+(from 1,315), because effects no longer build matrices per particle. What
+remains is mostly mechs (P4) and the particle objects themselves (P2). The
+particle cap stays at 420 until the pool (P2) replaces the objects.
+
+After P2 (the particle pool, `src/sim/particles.js`): particles are typed
+arrays, so spawning, stepping and expiring allocate nothing and the cap is
+4,000. The deaths scene now keeps all its smoke (~540 particles, peak ~710,
+where the old cap threw the oldest away at 420) and still allocates less:
+~465 KB a frame. What is left is P3's: matrices built per draw for mechs and
+props, arrays built at particle and shot call sites, and the HUD.
+
+After P3 (the allocation diet): ~175 KB a frame in the deaths scene, from
+1,315 when the harness landed (about 10 MB a second instead of 80). The
+renderer's matrices come from a per-frame arena (`makeMatrixArena` in
+`util/math.js`); `limb` and `rayTerrain` use plain numbers. The surprise:
+`render()` is too big for V8's optimizing compiler, and unoptimized code
+boxes every number it computes, so its particle loop alone made ~150 bytes
+of garbage per particle until it moved into its own small function. Rule of
+thumb: keep per-frame, per-object loops in small functions. What remains is
+a long tail of a few KB each (AI rays, IK vectors, HUD strings).
+
 The simulation itself is cheap: `update()` takes 0.3 ms per frame with 6
 enemies, 0.5 ms with 12 and 0.8 ms with 20, on a desktop CPU in Node. A 2021
 phone is roughly 4–6× slower, which is still inside the 4 ms budget.
@@ -113,6 +142,16 @@ Order: P0, P1, P2, P3 and P5 (with P5b) come right after #106 and before Acts
 II–III, because weather (M4) and bigger missions need the headroom and the
 look should be settled before more content is screenshotted. P4, P6 and P7
 follow, P4 before co-op (M5b) puts more mechs on screen.
+
+P5b as shipped (#136): the dither lives in the instanced effects shader, per
+instance, in a second build of it (`#define DITHER`) that only the smoke and
+dust shapes use, drawn after the other effects, so nothing else pays for
+`discard`. It runs on the screen's pixel grid, so it is as chunky as the
+pixels. A landing's dust ring is dust, so it dithers too; a real shockwave
+ring will join `DITHER_KINDS` in `mesh/effects.js` when it lands. The
+per-particle fallback (no instancing extension) does not dither: smoke and
+dust shrink and pop there, as before. The main shader gets a `uDither` when
+something solid needs to go ghostly (the arena respawn).
 
 After P1–P4 the measured worst case above would be roughly **1 terrain + 6
 effect shapes + ~10 mechs + a few beams ≈ 25–30 draws**, against 500. That

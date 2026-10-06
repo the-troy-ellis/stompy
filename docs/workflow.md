@@ -129,6 +129,12 @@ Run the whole list; it takes about eight minutes. Report deviations in the PR.
   a Free Play mission via the menu, advances 300 frames, asserts no console
   errors and that the player mech moved under throttle, and saves a
   screenshot as a CI artifact.
+- `npm run perf` → the frame-cost harness (`scripts/perf.mjs`, spec 14 P0):
+  fixed scenes on a fixed seed, stepped by hand at 60 Hz in headless Chromium,
+  reporting draw calls, triangles, particles and KB allocated per frame, and
+  failing CI when a scene is over its budget (`BUDGETS` in the script). A PR
+  that makes something cheaper lowers the budget it beat; a PR that has to
+  raise one says why. `PERF_BUDGET_SCALE=0.5` shows it failing.
 - `python3 -m unittest server/test_server.py` for the relay.
 - Sim tests build a game with `createGame({ seed })` and call
   `update(game, input, dt, fx)` directly with a fixed `dt` (1/60) and a

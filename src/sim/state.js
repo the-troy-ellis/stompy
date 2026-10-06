@@ -2,6 +2,7 @@ import { CHASSIS } from '../data/chassis.js';
 import { PALS } from '../data/palettes.js';
 import { makeTerrain, BOUND } from '../world/terrain.js';
 import { makeRng } from './rng.js';
+import { Particles } from './particles.js';
 import { nullFx } from './fx.js';
 import { add, mul, dirOf, TAU } from '../util/math.js';
 import { initFeet } from './gait.js';
@@ -20,7 +21,7 @@ const { sin, cos, atan2 } = Math;
 export function createGame({ fx = nullFx, touchUI = false, seed = 1 } = {}) {
   return {
     state: 'brief', paused: false, mode: 'sp', kind: 'free', worldKind: null,
-    mechs: [], entities: [], shots: [], beams: [], cbeams: [], parts: [], debris: [], wrecks: [], msgs: [], pulses: [], pendingHits: new Map(),
+    mechs: [], entities: [], shots: [], beams: [], cbeams: [], parts: new Particles(), debris: [], wrecks: [], msgs: [], pulses: [], pendingHits: new Map(),
     eye: [0, 0, 0], view: [0, 0, 1], aim: [0, 0, 100], aimMech: null, lock: false, VP: null,
     flash: 0, shake: 0, kick: 0, whiteFlash: 0, lastTwist: 0, hitMark: 0,
     touchUI, touchTurn: 0, zoom: false, target: null, endT: 0, time: 0, frame: 0, clock: 0,
@@ -52,7 +53,7 @@ export function resetMatch(G, { def, seed, pal, terrainOpts }) {
   G.pal = PALS[pal || def.pal] || PALS.dusk;
   G.ter = makeTerrain(seed, { ...terrainOpts, zones: flatZones(def) });
   G.worldKind = 'match';
-  G.mechs = []; G.entities = []; G.waves = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts = []; G.debris = []; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear();
+  G.mechs = []; G.entities = []; G.waves = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts.clear(); G.debris = []; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear();
   G.target = null; G.aimMech = null; G.flash = 0; G.shake = 0; G.kick = 0; G.bob = null; G.bobIn = null; G.whiteFlash = 0; G.zoom = false; G.endT = 0; G.time = 0; G.frame = 0;
   G.death = null; G.lastKill = null; G.guide = null; G.mDown = false; G.won = false; G.roundOver = false; G.hitMark = 0; G.voice = null;
   G.stats = { shots: 0, hits: 0, dealt: 0, taken: 0, kills: 0 };
