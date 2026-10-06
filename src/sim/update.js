@@ -22,7 +22,9 @@ import { stepTurrets } from './turrets.js';
 const { sin, abs, min, max, hypot, cos } = Math;
 
 // The empty input: what the sim sees when nobody is touching anything.
-export const noInput = () => ({ thrUp: false, thrDown: false, stop: false, turn: 0, twist: 0, pitch: 0, centre: false, jets: false,
+// `turn` is a rate (-1..1, the keys); `turnBy` is radians the touch aim drag
+// asked for, paid out at the legs' own turn rate (G.turnByUsed says how much).
+export const noInput = () => ({ thrUp: false, thrDown: false, stop: false, turn: 0, turnBy: 0, twist: 0, pitch: 0, centre: false, jets: false,
   held: { energy: false, ballistic: false, missile: false, fusion: false }, missileTap: false, punch: false });
 
 // One frame of the whole simulation. `input` is a snapshot (see noInput);
@@ -38,7 +40,9 @@ export function update(G, input, dt) {
     if (input.thrUp) P.throttle = min(1, P.throttle + dt * 0.9);
     if (input.thrDown) P.throttle = max(-0.35, P.throttle - dt * 0.9);
     if (input.stop) P.throttle = 0;
-    P.yaw += clampN(input.turn, -1, 1) * P.ch.turn * dt * (P.hp.LL > 0 && P.hp.RL > 0 ? 1 : 0.5) * (P.melee ? 0.5 : 1);   // half rate mid-swing
+    const legRate = P.ch.turn * dt * (P.hp.LL > 0 && P.hp.RL > 0 ? 1 : 0.5) * (P.melee ? 0.5 : 1);   // half rate on one leg, and mid-swing
+    G.turnByUsed = clampN(input.turnBy || 0, -legRate, legRate);
+    P.yaw += clampN(clampN(input.turn, -1, 1) * legRate + G.turnByUsed, -legRate, legRate);
     if (G.guide) { G.guide.yaw += input.twist * 1.4 * dt; G.guide.pitch = clampN(G.guide.pitch + input.pitch * 1.0 * dt, -1.3, 1.3); }
     else {
       P.twist = clampN(P.twist + input.twist * 1.6 * dt, -1.9, 1.9);
@@ -46,7 +50,7 @@ export function update(G, input, dt) {
     }
     if (input.centre) P.twist *= max(0, 1 - 6 * dt);
     P.jetting = !!input.jets;
-  } else P.jetting = false;
+  } else { P.jetting = false; G.turnByUsed = 0; }
 
   G.eye = eyeOf(P);
   G.view = dirOf(viewYaw(P), P.pitch);

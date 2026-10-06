@@ -45,8 +45,9 @@ export function createUi(app) {
 
   const TOUCH_CONTROLS = `
     <table class="mech-keys">
-      <tr><td>Left side</td><td>drag: sideways turns the legs, up / down sets the throttle (it stays set)</td></tr>
-      <tr><td>Right side</td><td>drag: twist the torso and aim</td></tr>
+      <tr><td>Upper left</td><td>drag: aim. Sideways turns the mech, up / down tilts. Double tap: torso back over the legs</td></tr>
+      <tr><td>Lower left</td><td>drag: up / down sets the throttle (it stays set), sideways twists the torso</td></tr>
+      <tr><td>Right side</td><td>the buttons</td></tr>
       <tr><td>ENERGY (hold)</td><td>laser beams: damage climbs the longer you hold them on one target -- watch your heat</td></tr>
       <tr><td>FUSION (hold)</td><td>keep the scan on a mech for 3 s (drag the button to aim; brief slips are forgiven): it dies outright -- and the feedback hurts your own torso and shuts your reactor down</td></tr>
       <tr><td>BALLISTIC (hold)</td><td>autocannon: big single hits, little heat, limited ammo</td></tr>

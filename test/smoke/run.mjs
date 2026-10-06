@@ -110,6 +110,43 @@ try {
     const ok = await page.evaluate(() => !document.querySelector('.touch-ui').hidden && window.__stompy.game.touchUI === true);
     console.log(`touch: cluster visible ${ok}`);
     if (!ok) { failed = true; console.error('FAIL: touch UI not shown'); }
+    // The left side flies the mech, the right side only shoots (input.js).
+    // Real touches through CDP: upper left aims (turns the legs, tilts),
+    // lower left is the throttle stick (sideways twists the torso), a double
+    // tap on the aim side centres the torso, a drag off the buttons on the
+    // right does nothing.
+    const cdp = await page.context().newCDPSession(page);
+    const touch = async (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
+    const drag = async (x0, y0, x1, y1, hold = 0) => {
+      await touch('touchStart', x0, y0);
+      for (let i = 1; i <= 6; i++) { await touch('touchMove', x0 + (x1 - x0) * i / 6, y0 + (y1 - y0) * i / 6); await page.waitForTimeout(16); }
+      if (hold) await page.waitForTimeout(hold);
+      await touch('touchEnd');
+    };
+    const P = () => page.evaluate(() => { const p = window.__stompy.game.player; return { yaw: p.yaw, twist: p.twist, pitch: p.pitch, thr: p.throttle }; });
+    await page.evaluate(() => { const g = window.__stompy.game; for (const k in g.player.hp) g.player.hp[k] = 1e6; for (const m of g.mechs) if (m.team) m.ai.aware = false; });
+    let a0 = await P();
+    await drag(200, 160, 120, 120);
+    await page.waitForTimeout(900);
+    let a1 = await P();
+    const aimOk = a1.yaw - a0.yaw > 0.1 && Math.abs(a1.twist - a0.twist) < 0.05 && a1.pitch !== a0.pitch;
+    a0 = a1;
+    await drag(200, 480, 160, 420, 500);
+    a1 = await P();
+    const stickOk = a1.thr > a0.thr + 0.3 && a1.twist - a0.twist > 0.2 && Math.abs(a1.yaw - a0.yaw) < 0.05;
+    a0 = a1;
+    await drag(760, 200, 640, 140);
+    await page.waitForTimeout(300);
+    a1 = await P();
+    const rightOk = Math.abs(a1.yaw - a0.yaw) < 0.01 && Math.abs(a1.twist - a0.twist) < 0.01 && a1.pitch === a0.pitch;
+    await page.evaluate(() => { window.__stompy.game.player.twist = 1.2; });
+    await touch('touchStart', 200, 150); await touch('touchEnd');
+    await page.waitForTimeout(80);
+    await touch('touchStart', 200, 150); await touch('touchEnd');
+    await page.waitForTimeout(800);
+    const centred = Math.abs((await P()).twist) < 0.1;
+    console.log(`touch: aim turns the legs ${aimOk}, stick sets throttle and twists ${stickOk}, right side only buttons ${rightOk}, double tap centres ${centred}`);
+    if (!(aimOk && stickOk && rightOk && centred)) { failed = true; console.error('FAIL: the touch layout did not behave'); }
   });
   // The arena: the real relay, two pilots in one browser, each sees the other walk.
   const relay = spawn('python3', ['server/server.py', '8096'], { stdio: 'ignore', env: { ...process.env, STOMPY_ROUND_GAP: '1' } });

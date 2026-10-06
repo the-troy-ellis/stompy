@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestGame, stepFor, input, foes } from './helpers.js';
 import { HPK } from '../src/data/chassis.js';
+import { update } from '../src/sim/update.js';
 
 const finite = m => ['x', 'y', 'z', 'yaw', 'twist', 'pitch', 'speed', 'heat', 'fuel'].every(k => Number.isFinite(m[k])) && HPK.every(k => Number.isFinite(m.hp[k]));
 
@@ -45,4 +46,27 @@ test('the match ends when the last enemy dies', async () => {
     stepFor(G, 4);
     assert.equal(G.state, 'debrief');
   });
+});
+
+// Touch aim (input.js): a drag asks for a turn of the legs in radians; the
+// sim pays it out at the chassis's own turn rate and says how much it used.
+test('turnBy turns the legs no faster than the chassis can, and reports what it used', () => {
+  const dt = 1 / 60;
+  for (const type of ['kestrel', 'warden']) {
+    const G = createTestGame({ chassis: type, foes: [] }), P = G.player, y0 = P.yaw;
+    update(G, input({ turnBy: 1 }), dt);
+    const step = P.ch.turn * dt;
+    assert.ok(Math.abs(P.yaw - y0 - step) < 1e-9, `${type}: one frame of its turn rate`);
+    assert.ok(Math.abs(G.turnByUsed - step) < 1e-9);
+    update(G, input({ turnBy: -0.001 }), dt);
+    assert.ok(Math.abs(G.turnByUsed + 0.001) < 1e-9, 'a small ask is paid in full');
+  }
+  const G = createTestGame({ foes: [] }), P = G.player;
+  P.hp.LL = 0;
+  update(G, input({ turnBy: 1 }), dt);
+  assert.ok(Math.abs(G.turnByUsed - P.ch.turn * dt * 0.5) < 1e-9, 'half rate on one leg');
+  P.shutdown = true; P.heat = 200;
+  const y = P.yaw;
+  update(G, input({ turnBy: 1 }), dt);
+  assert.equal(P.yaw, y); assert.equal(G.turnByUsed, 0, 'a shut-down mech turns nowhere');
 });

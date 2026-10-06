@@ -56,8 +56,9 @@ When two good ideas conflict, the pillar higher in this list wins.
 3. **Readable at a glance.** Flat shading, high-contrast palettes, a HUD that
    tells you heat, damage, target and ammo without reading. A phone player at
    arm's length must be able to parse the screen.
-4. **Two thumbs.** Every control fits the touch layout: a floating stick,
-   drag to aim, hold-to-fire buttons by category, one punch button. Desktop
+4. **Two thumbs.** Every control fits the touch layout: the left thumb flies
+   the mech (aim drag above, throttle stick below), the right thumb shoots
+   (hold-to-fire buttons by category, one punch button). Desktop
    gets more buttons, never more *necessary* buttons.
 5. **Depth from systems, not menus.** Heat, melt, ammo, per-section damage,
    knockback, the fusion cannon's trade-off. New depth should come from how
