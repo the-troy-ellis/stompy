@@ -7,6 +7,7 @@ import { center } from '../src/sim/geom.js';
 import { WEAPONS, CAT_OF } from '../src/data/weapons.js';
 import { CHASSIS } from '../src/data/chassis.js';
 import * as P from '../src/net/protocol.js';
+import { listParticles } from '../src/sim/particles.js';
 
 const D = WEAPONS.flamer;
 const total = m => Object.values(m.hp).reduce((a, v) => a + v, 0);
@@ -38,7 +39,7 @@ test('held on a target at 60 m it raises the target heat at 6/s, deals its damag
   assert.ok(Math.abs(rate - D.targetHeat) < 0.3, `target heat rose ${rate.toFixed(2)}/s`);
   assert.ok(hp0 - total(e) >= D.dps * 2 - 1e-6, 'took at least dps × 2');
   assert.equal(G.cbeams.length, 0, 'no beam line');
-  assert.ok(G.parts.some(p => p.kind === 'flame'), 'flame puffs');
+  assert.ok(listParticles(G).some(p => p.kind === 'flame'), 'flame puffs');
   assert.ok(G.player.heat > 0, 'it costs the shooter heat too');
 });
 

@@ -19,13 +19,16 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   fight-deaths 470/529/28.5k/1315 · wrecks 464/515/28.2k/1286
 // After P1 (#132, instanced effects): fight 94/112/23.6k/394 ·
 //   fight-deaths 106/112/23.6k/545 · wrecks 91/97/23.2k/499
-// Budgets are the latest numbers plus ~15%. Lower them as P2-P4 land.
+// After P2 (#133, particle pool; the cap rises from 420 to 4,000, so the deaths
+//   scene keeps ~540 particles, peak ~710): fight 94/112/23.6k/353 ·
+//   fight-deaths 106/112/23.6k/465 · wrecks 91/97/23.2k/392
+// Budgets are the latest numbers plus ~15%. Lower them as P3 and P4 land.
 export const BUDGETS = {
   menu:           { meanDraws: 15, peakDraws: 15, tris: 25000, allocKB: 45 },
   'free-start':   { meanDraws: 43, peakDraws: 43, tris: 25000, allocKB: 190 },
-  fight:          { meanDraws: 110, peakDraws: 130, tris: 28000, allocKB: 455 },
-  'fight-deaths': { meanDraws: 122, peakDraws: 130, tris: 28000, allocKB: 620 },
-  wrecks:         { meanDraws: 105, peakDraws: 112, tris: 27500, allocKB: 575 },
+  fight:          { meanDraws: 110, peakDraws: 130, tris: 28000, allocKB: 405 },
+  'fight-deaths': { meanDraws: 122, peakDraws: 130, tris: 28000, allocKB: 535 },
+  wrecks:         { meanDraws: 105, peakDraws: 112, tris: 27500, allocKB: 450 },
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;
