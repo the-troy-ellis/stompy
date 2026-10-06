@@ -1,4 +1,5 @@
 import { add, clampN, dot, len, lerp, mul, norm, sub, wrapA } from '../util/math.js';
+import { revealing } from './waves.js';
 import { geoOf } from '../data/geo.js';
 import { particle } from './effects.js';
 import { feel } from './feel.js';
@@ -115,11 +116,14 @@ function footDown(G, m, f, pace) {
   const P = G.player, r = G.rng, d = P ? hypot(m.x - P.x, m.z - P.z) : 1e9;
   // Heavier mechs thump harder; a planted foot's weight scales with scale^2.
   feel(G, 'step', { mech: m, k: (0.35 + 0.65 * pace) * m.ch.scale * m.ch.scale, at: m === P ? null : f.pos });
+  const entering = m !== P && revealing(G, m);   // a wave's big entrance (waves.js): heard and felt from anywhere
   if (m === P) G.fx.sfx.step(m, 0.4 + 0.55 * pace);
-  else if (d < 350) G.fx.sfx.step(m, 0.3 + 0.45 * pace);
+  else if (d < 350 || entering) G.fx.sfx.step(m, 0.3 + 0.45 * pace);
   // A heavy mech's steps are felt through the ground: within 40 m of the
-  // player, the dashboard twitches in time with its feet.
+  // player, the dashboard twitches in time with its feet; on its entrance,
+  // at any distance (k as if at 20 m).
   if (m !== P && m.ch.scale > 1.1 && d < 40) feel(G, 'nearStep', { mech: P, k: (1 - d / 40) * m.ch.scale * m.ch.scale, at: f.pos });
+  else if (entering) feel(G, 'nearStep', { mech: P, k: 0.5 * m.ch.scale * m.ch.scale, at: f.pos });
   // Dust at the foot, in the ground's colour, more for a faster or heavier mech.
   if (pace > 0.25 && d < 260) {
     const n = Math.round(3 * FEEL.step.dust * (0.5 + 0.5 * pace) * m.ch.scale);
