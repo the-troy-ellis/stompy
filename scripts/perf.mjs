@@ -29,13 +29,16 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 // After P4 (#137, one draw per mech; draws now counted by the renderer, so
 //   the instanced effect draws count too): menu 2/2 · free-start 4/4 ·
 //   fight 24/42 · fight-deaths 44/51 · wrecks 51/58 (tris and alloc as P3)
-// Budgets are the latest numbers plus ~15% (the deaths peak at spec 14's 60).
+// After P6 (#138, frustum culling): free-start 2/2 · fight 20/37 ·
+//   fight-deaths 28/35 · wrecks 26/33 · looking-away 10/13 (49/53 without)
+// Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
   menu:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 26 },
-  'free-start':   { meanDraws: 6, peakDraws: 6, tris: 25000, allocKB: 115 },
-  fight:          { meanDraws: 28, peakDraws: 48, tris: 28000, allocKB: 205 },
-  'fight-deaths': { meanDraws: 51, peakDraws: 60, tris: 28000, allocKB: 210 },
-  wrecks:         { meanDraws: 59, peakDraws: 67, tris: 28000, allocKB: 150 },
+  'free-start':   { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 115 },
+  fight:          { meanDraws: 24, peakDraws: 43, tris: 27000, allocKB: 205 },
+  'fight-deaths': { meanDraws: 33, peakDraws: 41, tris: 27000, allocKB: 205 },
+  wrecks:         { meanDraws: 30, peakDraws: 38, tris: 26000, allocKB: 145 },
+  'looking-away': { meanDraws: 12, peakDraws: 15, tris: 25000, allocKB: 135 },
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;
@@ -127,6 +130,10 @@ try {
   await page.evaluate(() => { const s = window.__stompy; s.game.mechs.filter(m => m.team && m.alive).slice(0, 3).forEach(m => s.kill(m)); });
   await scene('fight-deaths', 45);
   await scene('wrecks', 120, 60);
+  // The same field with the player turned away: culling (spec 14 P6) skips
+  // the mechs, wrecks and smoke behind.
+  await page.evaluate(() => { const P = window.__stompy.game.player; P.yaw += Math.PI; P.twist = 0; });
+  await scene('looking-away', 60);
 
   await browser.close();
   if (errors.length) { failed = true; console.error('page errors:\n' + errors.join('\n')); }
