@@ -4,8 +4,9 @@ import { FEEL } from '../src/data/feel.js';
 import { legSplay } from '../src/render/scene.js';
 import { createTestGame, stepFor, input, foes } from './helpers.js';
 import { initFeet } from '../src/sim/gait.js';
+import { listParticles } from '../src/sim/particles.js';
 
-const smoke = G => G.parts.filter(p => p.kind === 'smoke').length;
+const smoke = G => listParticles(G).filter(p => p.kind === 'smoke').length;
 
 test('footfall dust follows the table: none at zero, more at a higher setting', () => {
   const was = FEEL.step.dust;

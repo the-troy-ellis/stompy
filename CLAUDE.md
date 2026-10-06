@@ -35,5 +35,5 @@ Rules that are easy to miss:
 
 Run it: `npm run serve` (or any static server) and open
 `http://localhost:8000`. Arena: also `python3 server/server.py`. Check it:
-`npm test`, `npm run test:server`, `npm run test:smoke`, `npm run lint`,
-`npm run build`. See `docs/workflow.md` for the definition of done.
+`npm test`, `npm run test:server`, `npm run test:smoke`, `npm run perf`,
+`npm run lint`, `npm run build`. See `docs/workflow.md` for the definition of done.

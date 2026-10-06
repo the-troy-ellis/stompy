@@ -1,4 +1,5 @@
 import { add, clampN, dirOf, dot, len, mul, norm, sub } from '../util/math.js';
+import { stepParticles } from './particles.js';
 import { WEAPONS } from '../data/weapons.js';
 import { geoOf } from '../data/geo.js';
 import { center, eyeOf, muzzle, rayHit, viewYaw } from './geom.js';
@@ -105,15 +106,7 @@ export function update(G, input, dt) {
   for (const b of G.beams) b.life -= dt;
   G.beams = G.beams.filter(b => b.life > 0);
   const rng = G.rng;
-  for (const p of G.parts) {
-    p.life -= dt;
-    p.v[1] -= p.grav * dt;
-    if (p.kind === 'smoke') p.v = mul(p.v, 1 - dt * 0.6);
-    p.p = add(p.p, mul(p.v, dt));
-    if (p.kind === 'debris') { const g = G.ter.height(p.p[0], p.p[2]); if (p.p[1] < g) { p.p[1] = g; p.v = [p.v[0] * 0.5, -p.v[1] * 0.35, p.v[2] * 0.5]; } }
-    p.spin += dt * 3;
-  }
-  G.parts = G.parts.filter(p => p.life > 0);
+  stepParticles(G, dt);
   stepDebris(G, dt);
   for (const w of G.wrecks) {
     w.t += dt;
