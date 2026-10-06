@@ -1,4 +1,5 @@
 import { fmtClock } from '../render/hud.js';
+import { NAMES } from '../data/names.js';
 
 // The debrief's objective rows (docs/specs/03-objectives.md § Player
 // experience): each objective as it ended, with a tick or a cross.
@@ -30,6 +31,22 @@ export function debriefTitle(G) {
   if (G.won) return 'MISSION COMPLETE';
   return G.player?.alive ? 'MISSION FAILED' : 'MECH DESTROYED';
 }
+
+// One word above the numbers (spec 04 § Debrief verdicts; the words are in
+// names.js). A win with no damage taken beats a punched last enemy beats a
+// plain win; cooked next to a cooked enemy beats stomped flat beats a plain loss.
+export function verdictKey(G) {
+  if (G.won) {
+    if ((G.stats?.taken ?? 0) === 0) return 'untouched';
+    const m = G.lastKill?.melee;
+    return m && m !== 'stomp' ? 'punched' : 'won';
+  }
+  const d = G.death;
+  if (d?.shutdown && d.foeShutdown) return 'awkward';
+  if (d?.melee === 'stomp') return 'flattened';
+  return 'lost';
+}
+export const verdict = G => NAMES.verdicts[verdictKey(G)];
 
 // "MISSION 2: TOWER TROUBLE", or just "MISSION 2" while it has no name of its own.
 export function missionTitle(n, name) {

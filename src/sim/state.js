@@ -55,7 +55,7 @@ export function resetMatch(G, { def, seed, pal, terrainOpts }) {
   G.worldKind = 'match';
   G.mechs = []; G.entities = []; G.waves = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts.clear(); G.debris = []; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear();
   G.target = null; G.aimMech = null; G.flash = 0; G.shake = 0; G.kick = 0; G.bob = null; G.bobIn = null; G.whiteFlash = 0; G.zoom = false; G.endT = 0; G.time = 0; G.frame = 0;
-  G.guide = null; G.mDown = false; G.won = false; G.roundOver = false; G.hitMark = 0; G.voice = null;
+  G.death = null; G.lastKill = null; G.guide = null; G.mDown = false; G.won = false; G.roundOver = false; G.hitMark = 0; G.voice = null;
   G.stats = { shots: 0, hits: 0, dealt: 0, taken: 0, kills: 0 };
   G.def = def;
 }
