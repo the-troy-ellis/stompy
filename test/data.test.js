@@ -26,5 +26,5 @@ test('missions reference real palettes and chassis, and contracts continue', () 
     assert.ok(all.length > 0);
     for (const f of all) assert.ok(CHASSIS[foeType(f)], `${d.name}: ${foeType(f)}`);
   }
-  assert.ok(missionDef(20).foes.length > missionDef(MISSIONS.length).foes.length);
+  assert.ok(missionFoes(missionDef(20)).length > missionFoes(missionDef(MISSIONS.length)).length);
 });
