@@ -149,19 +149,19 @@ Worked after #106 and before #110 (#131–#136, milestone M3). #137–#139 are M
 
 | # | Title | Labels | Size | Spec |
 |---|---|---|---|---|
-| | M4: palette night/dawn variants and time ramps | render, content | S | 07 §Time of day |
-| | M4: headlights (spotlight uniform, lamp quads, L key / LIGHTS button, AI sight) | render, sim, hud, platform:touch | M | 07 §Headlights |
-| | M4: instanced particle path with fallback and caps | render | M | 07 §Particle system |
-| | M4: weather state, factors, wind; Free Play WEATHER/TIME pickers | sim, ui | S | 07 §Weather |
-| | M4: rain and lightning | render, audio | S | 07 |
-| | M4: snow and fog | render | S | 07 |
-| | M4: dust storm | render, sim | S | 07 |
-| | M4: prop library | render, content | M | 07 §Props |
-| | M4: prop placement per biome; frustum and distance culling | render, sim | M | 07 §Props |
-| | M4: explosions: shockwave, plates, scorch, secondaries, burning glow | render, sim | M | 07 §Explosions |
-| | M4: ambient audio beds per biome and weather | audio | S | 07 §Ambient |
-| | M4: particles LOW/MED/HIGH setting; reduced-motion hook | ui, render | S | 07, 11 |
-| | M4: frame budget verification on reference phones (worst case) | tooling, docs | S | 07 §Acceptance 6 |
+| #155 | M4: palette night/dawn variants and time ramps | render, content | S | 07 §Time of day |
+| #156 | M4: headlights (spotlight uniform, lamp quads, L key / LIGHTS button, AI sight) | render, sim, hud, platform:touch | M | 07 §Headlights |
+| #132, #133 | M4: instanced particle path with fallback and caps (done by spec 14's P1 and P2) | render | M | 07 §Particle system |
+| #157 | M4: weather state, factors, wind; Free Play WEATHER/TIME pickers | sim, ui | S | 07 §Weather |
+| #158 | M4: rain and lightning | render, audio | S | 07 |
+| #159 | M4: snow and fog | render | S | 07 |
+| #160 | M4: dust storm | render, sim | S | 07 |
+| #161 | M4: prop library | render, content | M | 07 §Props |
+| #162 | M4: prop placement per biome (culling is #138) | render, sim | M | 07 §Props |
+| #163 | M4: explosions: shockwave, plates, scorch, secondaries, burning glow | render, sim | M | 07 §Explosions |
+| #164 | M4: ambient audio beds per biome and weather | audio | S | 07 §Ambient |
+| #165 | M4: particles LOW/MED/HIGH setting; reduced-motion hook | ui, render | S | 07, 11 |
+| #166 | M4: frame budget verification on reference phones (worst case) | tooling, docs | S | 07 §Acceptance 6 |
 
 ## M5a — LAN arena polish
 
