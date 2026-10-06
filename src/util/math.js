@@ -86,3 +86,21 @@ export function makeMatrixArena(size = 8192) {
   };
   return A;
 }
+
+// Frustum culling (spec 14 P6): the six planes of a view-projection matrix
+// (column-major, as M builds them), written into `out` (Float32Array(24): a,
+// b, c, d per plane, normals pointing in and normalised), and whether a
+// sphere touches the inside of all six.
+export function frustumPlanes(VP, out = new Float32Array(24)) {
+  for (let p = 0; p < 6; p++) {
+    const row = p >> 1, sign = p & 1 ? -1 : 1, o = p * 4;
+    let a = VP[3] + sign * VP[row], b = VP[7] + sign * VP[4 + row], c = VP[11] + sign * VP[8 + row], d = VP[15] + sign * VP[12 + row];
+    const l = Math.hypot(a, b, c) || 1;
+    out[o] = a / l; out[o + 1] = b / l; out[o + 2] = c / l; out[o + 3] = d / l;
+  }
+  return out;
+}
+export function sphereVisible(planes, x, y, z, r) {
+  for (let o = 0; o < 24; o += 4) if (planes[o] * x + planes[o + 1] * y + planes[o + 2] * z + planes[o + 3] < -r) return false;
+  return true;
+}

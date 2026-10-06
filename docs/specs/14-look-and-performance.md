@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (P0 #131 perf harness, P1 #132 instanced effects, P2 #133 particle pool, P3 #134 allocation diet, P4 #137 one draw per mech, P5b #136 dither shipped; the owner's decisions are recorded below) |
+| Status | in progress (P0 #131 perf harness, P1 #132 instanced effects, P2 #133 particle pool, P3 #134 allocation diet, P4 #137 one draw per mech, P5b #136 dither, P6 #138 culling shipped; the owner's decisions are recorded below) |
 | Milestone | between M3's #106 and Acts II–III (#110, #111); the rest of M4 builds on it |
 | Size | L (split: perf harness; instanced effects + particle pool; allocation diet; one-draw mechs; render scale; culling) |
 | Depends on | [07-atmosphere.md](07-atmosphere.md) (weather and explosions are the big new loads); [13-thunk.md](13-thunk.md) (effects are feedback) |
@@ -164,6 +164,15 @@ room the per-part path stays. The picture is byte-identical either way.
 Measured (draws now counted by the renderer, instanced effects included):
 the 6-mech fight 24 mean / 42 peak, with deaths 44 / 51, wrecks 51 / 58;
 what is left is shots, beams, props, shed limbs and the effect shapes.
+
+P6 as shipped (#138): `frustumPlanes` and `sphereVisible` (`util/math.js`)
+test a generous bounding sphere per mech (bigger while it topples), wreck,
+shed limb, prop and particle against the view's six planes, on top of the
+fog distance. Full frames are byte-identical at six headings with mechs
+straddling the edges. It does more than "looking away" suggests: in a fight
+much of the smoke, debris and wreckage sits off to the sides, so the deaths
+scene drops from 44 to 28 mean draws and wrecks from 51 to 26; turned away
+from the fight, 49 becomes 10 (the new `looking-away` scene in the harness).
 
 After P1–P4 the measured worst case above would be roughly **1 terrain + 6
 effect shapes + ~10 mechs + a few beams ≈ 25–30 draws**, against 500. That

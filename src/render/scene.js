@@ -1,6 +1,6 @@
 import { backingSize } from './look.js';
 import { effectLook, SHAPE_BY_KIND } from '../mesh/effects.js';
-import { M as M0, add, makeMatrixArena, clampN, dirOf, mix3, mul, norm, rnd, sub, len, cross, TAU } from '../util/math.js';
+import { M as M0, add, makeMatrixArena, frustumPlanes, sphereVisible, clampN, dirOf, mix3, mul, norm, rnd, sub, len, cross, TAU } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { buildTerrainMesh } from '../world/terrainMesh.js';
 import { viewYaw } from '../sim/geom.js';
@@ -111,7 +111,9 @@ export function createScene(app) {
 
   // One mech's bones this frame (spec 14 P4): put() copies a part's matrix
   // into its bone, or draws the part on its own where skinning isn't available.
-  const BONES = new Float32Array(BONE_COUNT * 16);
+  const BONES = new Float32Array(BONE_COUNT * 16), PLANES = new Float32Array(24);
+  // Bounding spheres, generous: a toppling mech or a fallen tower lies along the ground.
+  const seen = (x, y, z, r) => sphereVisible(PLANES, x, y, z, r);
   let putTint = null;
   const put = (bone, mesh, mat) => {
     if (R.skinned) BONES.set(mat, bone * 16);
@@ -194,7 +196,7 @@ export function createScene(app) {
       R.drawHeat = 0.6;
       for (const d of G.debris) {
         const parts = R.mechParts[d.partsKey];
-        if (!parts || !parts[d.part]) continue;
+        if (!parts || !parts[d.part] || !seen(d.p[0], d.p[1], d.p[2], 5 * d.scale)) continue;
         const fade = d.t > d.life - 2 ? (d.life - d.t) / 2 : 1;
         R.draw(parts[d.part], chain(M.T(...d.p), M.RY(d.rot[1]), M.RX(d.rot[0]), M.RZ(d.rot[2]), M.S(d.scale * (0.6 + 0.4 * fade))), [0.6, 0.58, 0.56]);
       }
@@ -221,6 +223,7 @@ export function createScene(app) {
       for (const e of G.entities) {
         if ((e.kind === 'nav' && !e.mesh) || (!e.alive && !e.wreck)) continue;
         if (Math.hypot(e.x - eye[0], e.z - eye[2]) > far) continue;
+        if (!seen(e.x, e.y + (e.height || 0) / 2, e.z, Math.max(e.height || 0, e.radius * 2) + 2)) continue;
         const base = M.T(e.x, e.y, e.z), w = e.radius * 1.7, dead = !e.alive;
         const col = dead ? mul(e.col, 0.35) : e.col, prop = propFor(e);
         if (prop) {
@@ -302,10 +305,10 @@ export function createScene(app) {
   // per particle per frame.
   function fillEffects(P, hor) {
     for (let i = 0; i < P.n; i++) {
-      const g = R.fx[SHAPE_BY_KIND[P.kind[i]]];
-      if (g.n >= R.FX_CAP) continue;
+      const g = R.fx[SHAPE_BY_KIND[P.kind[i]]], i3 = i * 3;
+      if (g.n >= R.FX_CAP || !seen(P.pos[i3], P.pos[i3 + 1], P.pos[i3 + 2], P.size[i] * 4)) continue;   // a flame's puff grows to ~3.5x
       effectLook(P, i, hor, LOOK);
-      const d = g.data, o = g.n++ * R.FX_FLOATS, i3 = i * 3;
+      const d = g.data, o = g.n++ * R.FX_FLOATS;
       d[o] = P.pos[i3]; d[o + 1] = P.pos[i3 + 1]; d[o + 2] = P.pos[i3 + 2]; d[o + 3] = LOOK[0];
       d[o + 4] = P.spin[i]; d[o + 5] = P.spin[i] * 0.7;
       d[o + 6] = LOOK[1]; d[o + 7] = LOOK[2]; d[o + 8] = LOOK[3]; d[o + 9] = LOOK[4]; d[o + 10] = LOOK[5]; d[o + 11] = LOOK[6];
@@ -363,6 +366,7 @@ export function createScene(app) {
     const proj = M.persp(fov, W / max(1, H), 0.5, 1800);
     const VP = M.mul(proj, M.lookAt(eye, add(eye, dir)));
     G.VP = VP;
+    frustumPlanes(VP, PLANES);   // culling (spec 14 P6): what is wholly outside the view isn't drawn
 
     // Sky.
     R.gl.disable(R.gl.DEPTH_TEST);
@@ -392,11 +396,11 @@ export function createScene(app) {
     R.draw(world, M.id());
     // In the missile camera your own mech is out there too.
     R.drawHeat = 1;
-    const shown = m => (m.alive || m.dying) && (m !== P || gd || G.state === 'menu');
+    const shown = m => (m.alive || m.dying) && (m !== P || gd || G.state === 'menu') && seen(m.x, m.y + 6 * m.ch.scale, m.z, (m.dying ? 16 : 10) * m.ch.scale);
     if (R.skinned) R.beginSkinned();
     for (const m of G.mechs) if (shown(m)) drawMech(m);
     R.drawHeat = 0.45;
-    for (const w of G.wrecks) drawWreck(w);
+    for (const w of G.wrecks) if (seen(w.x, w.y + 2 * w.scale, w.z, 9 * w.scale)) drawWreck(w);
     R.drawHeat = 1;
     if (R.skinned) R.endSkinned();
     for (const m of G.mechs) if (shown(m)) drawFlash(m);
