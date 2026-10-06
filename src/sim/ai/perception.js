@@ -1,6 +1,7 @@
 import { center, eyeOf, rayTerrain } from '../geom.js';
 import { norm, sub, len } from '../../util/math.js';
 import { diffOf, PERCEPTION as K } from '../../data/ai.js';
+import { darkness, NIGHT_SIGHT } from '../../data/palettes.js';
 
 // What an enemy knows about the player (docs/specs/05-ai.md § Perception).
 // It sees the player with line of sight inside its sight range, or hears
@@ -15,10 +16,18 @@ import { diffOf, PERCEPTION as K } from '../../data/ai.js';
 
 const { hypot } = Math;
 
+// How far it can see the player: its difficulty's sight by day; at night 250
+// m, or 600 m if the player's lights are on, never more than by day.
+export function sightOf(G, P) {
+  const day = diffOf(G).sight, dark = darkness(G.pal);
+  if (!dark) return day;
+  const night = Math.min(day, P.lights && !P.shutdown ? NIGHT_SIGHT.lit : NIGHT_SIGHT.dark);
+  return day + (night - day) * dark;
+}
 export function canSee(G, e, P) {
   if (!P.alive) return false;
   const o = eyeOf(e), t = center(P), d = sub(t, o), L = len(d);
-  if (L > diffOf(G).sight) return false;
+  if (L > sightOf(G, P)) return false;
   return rayTerrain(G, o, norm(d), L) == null;
 }
 

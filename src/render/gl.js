@@ -2,7 +2,7 @@ import { M } from '../util/math.js';
 import { buildProps } from '../mesh/props.js';
 import { buildEffectShapes, EFFECT_SHAPES, DITHER_SHAPES } from '../mesh/effects.js';
 import { Builder } from '../mesh/builder.js';
-import { buildMechParts, skinMech, BONE_COUNT, SKIN_FLOATS } from '../mesh/mechParts.js';
+import { buildMechParts, skinMech, lampSpots, BONE_COUNT, SKIN_FLOATS } from '../mesh/mechParts.js';
 import { geoFor } from '../data/geo.js';
 import { CHASSIS, lockedLook } from '../data/chassis.js';
 import { MP_COLORS } from '../data/colors.js';
@@ -30,8 +30,21 @@ export function createRenderer(cv, { antialias = true } = {}) {
   const MAIN_FS = `
     precision mediump float;
     uniform vec3 uFogCol; uniform float uIR, uHeat; varying vec3 vCol; varying float vFog;
+    // The player's headlights (spec 07): one spot from the cockpit along the
+    // aim, per fragment; off (uSpotOn 0) by day.
+    uniform float uSpotOn, uSpotRange; uniform vec3 uSpotPos, uSpotDir, uSpotCol; uniform vec2 uSpotCone;
+    varying vec3 vWorld, vNrm, vBase;
     void main() {
-      vec3 c = mix(vCol, uFogCol, vFog);
+      vec3 lit = vCol;
+      if (uSpotOn > 0.5) {
+        vec3 to = vWorld - uSpotPos;
+        float dist = length(to);
+        vec3 ld = to / max(dist, 0.001);
+        float cone = smoothstep(uSpotCone.x, uSpotCone.y, dot(ld, uSpotDir));
+        float fall = clamp(1.0 - (dist * dist) / (uSpotRange * uSpotRange), 0.0, 1.0);
+        lit += vBase * uSpotCol * (cone * fall * max(dot(normalize(vNrm), -ld), 0.0));
+      }
+      vec3 c = mix(lit, uFogCol, vFog);
       if (uIR > 0.5) {
         // White-hot infrared (the missile camera): cold things are dim greys
         // by brightness; hot things -- mechs, fire, weapons -- glow white.
@@ -44,7 +57,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
   const prog = compile(`
     attribute vec3 aPos, aNrm, aCol;
     uniform mat4 uVP, uM; uniform vec3 uLight, uTint, uCam, uShade; uniform float uEmis; uniform vec2 uFog;
-    varying vec3 vCol; varying float vFog;
+    varying vec3 vCol, vWorld, vNrm, vBase; varying float vFog;
     void main() {
       vec4 wp = uM * vec4(aPos, 1.0);
       gl_Position = uVP * wp;
@@ -52,6 +65,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
       float d = max(dot(n, uLight), 0.0);
       vec3 base = aCol * uTint;
       vCol = mix(base * (0.36 + 0.78 * d) * uShade, base, uEmis);   // uShade: the time of day (palettes.js); glowing things keep their glow
+      vWorld = wp.xyz; vNrm = n; vBase = base * (1.0 - uEmis);   // for the headlights, which only light what doesn't glow
       vFog = clamp((length(wp.xyz - uCam) - uFog.x) / (uFog.y - uFog.x), 0.0, 1.0);
     }`, MAIN_FS);
   // One draw per mech (spec 14 P4): the main shader, but each vertex picks its
@@ -62,7 +76,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
   const skinProg = skinRoom && compile(`
     attribute vec3 aPos, aNrm, aCol; attribute float aBone;
     uniform mat4 uVP, uBones[${BONE_COUNT}]; uniform vec3 uLight, uTint, uCam, uShade; uniform float uEmis; uniform vec2 uFog;
-    varying vec3 vCol; varying float vFog;
+    varying vec3 vCol, vWorld, vNrm, vBase; varying float vFog;
     void main() {
       mat4 m = uBones[int(aBone + 0.5)];
       vec4 wp = m * vec4(aPos, 1.0);
@@ -71,6 +85,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
       float d = max(dot(n, uLight), 0.0);
       vec3 base = aCol * uTint;
       vCol = mix(base * (0.36 + 0.78 * d) * uShade, base, uEmis);   // uShade: the time of day (palettes.js); glowing things keep their glow
+      vWorld = wp.xyz; vNrm = n; vBase = base * (1.0 - uEmis);
       vFog = clamp((length(wp.xyz - uCam) - uFog.x) / (uFog.y - uFog.x), 0.0, 1.0);
     }`, MAIN_FS);
   // Effects, instanced (spec 14 P1): one draw per shape. Per vertex the shape's
@@ -125,7 +140,16 @@ export function createRenderer(cv, { antialias = true } = {}) {
       gl_FragColor = vec4(mix(uHor, uZen, smoothstep(0.0, 0.55, y)), 1.0);
     }`);
   const L = n => gl.getUniformLocation(prog, n);
-  const U = { VP: L('uVP'), M: L('uM'), light: L('uLight'), shade: L('uShade'), tint: L('uTint'), cam: L('uCam'), emis: L('uEmis'), fog: L('uFog'), fogCol: L('uFogCol'), ir: L('uIR'), heat: L('uHeat') };
+  const spotLocs = l => ({ spotOn: l('uSpotOn'), spotRange: l('uSpotRange'), spotPos: l('uSpotPos'), spotDir: l('uSpotDir'), spotCol: l('uSpotCol'), spotCone: l('uSpotCone') });
+  // The headlights' uniforms, for a program's locations `u`, from a spot
+  // { on, pos, dir, col, cone: [cos outer, cos inner], range }.
+  const setSpot = (u, sp) => {
+    gl.uniform1f(u.spotOn, sp && sp.on ? 1 : 0);
+    if (!sp || !sp.on) return;
+    gl.uniform3fv(u.spotPos, sp.pos); gl.uniform3fv(u.spotDir, sp.dir); gl.uniform3fv(u.spotCol, sp.col);
+    gl.uniform2f(u.spotCone, sp.cone[0], sp.cone[1]); gl.uniform1f(u.spotRange, sp.range);
+  };
+  const U = { VP: L('uVP'), M: L('uM'), light: L('uLight'), shade: L('uShade'), tint: L('uTint'), cam: L('uCam'), emis: L('uEmis'), fog: L('uFog'), fogCol: L('uFogCol'), ir: L('uIR'), heat: L('uHeat'), ...spotLocs(L) };
   const A = { pos: gl.getAttribLocation(prog, 'aPos'), nrm: gl.getAttribLocation(prog, 'aNrm'), col: gl.getAttribLocation(prog, 'aCol') };
   const SU = { zen: gl.getUniformLocation(skyProg, 'uZen'), hor: gl.getUniformLocation(skyProg, 'uHor'), h: gl.getUniformLocation(skyProg, 'uH'), res: gl.getUniformLocation(skyProg, 'uRes') };
   const skyBuf = gl.createBuffer();
@@ -156,6 +180,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
   const meshSet = ch => {
     const p = buildMechParts(ch), set = Object.fromEntries(Object.entries(p).map(([n, b]) => [n, upload(b)]));
     if (skinProg) set.skin = uploadSkin(skinMech(p, geoFor(ch).legs.length));
+    set.lamps = lampSpots(p);   // torso space, for the headlamps
     return set;
   };
   const mechParts = {};
@@ -251,7 +276,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
   let SK = null;
   if (skinProg) {
     const L3 = n => gl.getUniformLocation(skinProg, n), A3 = n => gl.getAttribLocation(skinProg, n);
-    SK = { U: { VP: L3('uVP'), bones: L3('uBones'), light: L3('uLight'), shade: L3('uShade'), tint: L3('uTint'), cam: L3('uCam'), emis: L3('uEmis'), fog: L3('uFog'), fogCol: L3('uFogCol'), ir: L3('uIR'), heat: L3('uHeat') },
+    SK = { U: { VP: L3('uVP'), bones: L3('uBones'), light: L3('uLight'), shade: L3('uShade'), tint: L3('uTint'), cam: L3('uCam'), emis: L3('uEmis'), fog: L3('uFog'), fogCol: L3('uFogCol'), ir: L3('uIR'), heat: L3('uHeat'), ...spotLocs(L3) },
       A: [A3('aPos'), A3('aNrm'), A3('aCol'), A3('aBone')] };
   }
   const beginSkinned = () => {
@@ -261,6 +286,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
     for (const a of SK.A) gl.enableVertexAttribArray(a);
     gl.uniformMatrix4fv(SU2.VP, false, f.VP); gl.uniform3fv(SU2.light, f.light); gl.uniform3fv(SU2.cam, f.cam); gl.uniform3fv(SU2.shade, f.shade);
     gl.uniform2f(SU2.fog, f.fog[0], f.fog[1]); gl.uniform3fv(SU2.fogCol, f.fogCol); gl.uniform1f(SU2.ir, f.ir);
+    setSpot(SU2, f.spot);
   };
   const drawSkinned = (mesh, bones, tint = WHITE, emis = 0, heat) => {
     const [p, n, c, b] = SK.A, st = SKIN_FLOATS * 4;
@@ -291,5 +317,5 @@ export function createRenderer(cv, { antialias = true } = {}) {
 
   return Object.assign(R, { gl, prog, skyProg, U, A, SU, skyBuf, upload, meshes, mechParts, partsKeyFor, partsKeyLocked, draw,
     instanced: !!instProg, fx, FX_FLOATS, FX_CAP, drawEffects, frame: null,
-    skinned: !!skinProg, beginSkinned, drawSkinned, endSkinned });
+    skinned: !!skinProg, beginSkinned, drawSkinned, endSkinned, setSpot });
 }

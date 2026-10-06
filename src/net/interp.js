@@ -16,5 +16,5 @@ export function netInterp(r, dt, now) {
   r.yaw += wrapA(n.yaw - r.yaw) * k;
   r.twist += wrapA(n.tw - r.twist) * k;
   r.pitch += (n.p - r.pitch) * k;
-  r.speed = n.sp; r.air = !!n.air; r.shutdown = !!n.sd;
+  r.speed = n.sp; r.air = !!n.air; r.shutdown = !!n.sd; r.lights = n.lt !== 0;   // an older client without lt keeps its lights on
 }

@@ -43,3 +43,23 @@ export function blendPal(a, b, t, out) {
   l[0] /= n; l[1] /= n; l[2] /= n;
   return out;
 }
+
+// How dark it is, 0 (day, dusk, dawn) to 1 (night), from the palette's shade;
+// a ramp passes smoothly through. Headlights and night sight scale with it.
+export function darkness(pal) {
+  const s = pal?.shade;
+  if (!s) return 0;
+  return Math.min(1, Math.max(0, (0.8 - (s[0] + s[1] + s[2]) / 3) / 0.35));
+}
+
+// Headlights (docs/specs/07-atmosphere.md § Headlights): the player's two
+// lamps as one spotlight from the cockpit along the aim; other mechs show
+// lamps. At night the AI sees 250 m, or 600 m toward a mech with its lights
+// on (never further than its difficulty's own sight).
+export const HEADLIGHTS = {
+  col: [1.7, 1.55, 1.25],   // at full dark
+  cone: [0.42, 0.24],       // rad off the beam's axis: where it ends, where it is full
+  range: 230,               // m: brightness falls as 1 - (d / range)^2
+  dip: 0.16,                // the beam points this far below the aim
+};
+export const NIGHT_SIGHT = { dark: 250, lit: 600 };

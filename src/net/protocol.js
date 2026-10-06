@@ -4,7 +4,7 @@
 import { HPK } from '../data/chassis.js';
 import { WEAPONS } from '../data/weapons.js';
 
-export const PROTOCOL = 6;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit. 5: hh (heat) on hit. 6: knuckles in lo.sys
+export const PROTOCOL = 7;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit. 5: hh (heat) on hit. 6: knuckles in lo.sys. 7: lt (headlights) in s
 export const r2 = v => Math.round(v * 100) / 100;
 const v3 = p => p.map(r2);
 
@@ -13,7 +13,8 @@ export const hello = (name, color) => ({ t: 'hello', v: PROTOCOL, name, color })
 // Your mech, 15 times a second: chassis, pose, speed, flags, armour, your
 // laser beam (bm/be/bf), and the fusion scan (fl: where the targeting laser
 // ends, sc: who it's on, sq: how far along, 0..1), and the punch phase (pu:
-// 0 none, 1 wind-up, 2 recovery) so the swing animates on every screen.
+// 0 none, 1 wind-up, 2 recovery) so the swing animates on every screen, and
+// whether its headlights are on (lt).
 // `lo`: the mechlab loadout, included when asked (see sendState).
 export function stateMessage(P, bf, withLoadout = false) {
   const fu = P.fusion;
@@ -22,7 +23,7 @@ export function stateMessage(P, bf, withLoadout = false) {
     bm: P.beaming ? 1 : 0, be: P.beaming && P.beamEnd ? v3(P.beamEnd) : 0, bf: r2(bf),
     fl: fu?.on && fu.end ? v3(fu.end) : 0, sc: fu?.mech?.netId || 0,
     sq: fu?.mech ? r2(Math.min(1, fu.t / WEAPONS.fusion.scan)) : 0,
-    pu: P.melee ? (P.melee.phase === 'windup' ? 1 : 2) : 0,
+    pu: P.melee ? (P.melee.phase === 'windup' ? 1 : 2) : 0, lt: P.lights ? 1 : 0,
     ...(withLoadout && P.loadout ? { lo: P.loadout } : {}) };
 }
 

@@ -56,6 +56,7 @@ export function createUi(app) {
       <tr><td>TGT</td><td>next target</td></tr>
       <tr><td>JUMP (hold)</td><td>jump jets</td></tr>
       <tr><td>ZOOM / STOP / II</td><td>zoom, full stop, pause</td></tr>
+      <tr><td>LIGHTS</td><td>headlights at night: on, you see; off, you are harder to see</td></tr>
     </table>`;
   const controls = () => (G.touchUI ? TOUCH_CONTROLS : CONTROLS);
   const CONTROLS = `
@@ -69,6 +70,7 @@ export function createUi(app) {
       <tr><td>R</td><td>target under crosshair</td><td>J (hold)</td><td>jump jets</td></tr>
       <tr><td>C</td><td>centre torso on legs</td><td>Z</td><td>zoom</td></tr>
       <tr><td>Arrows</td><td>twist / aim without mouse</td><td>P / Esc</td><td>pause</td></tr>
+      <tr><td>L</td><td>headlights at night: on, you see; off, you are harder to see</td><td></td><td></td></tr>
     </table>`;
 
   const OPTS = {
