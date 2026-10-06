@@ -175,11 +175,13 @@ export function destroy(G, m, src) {
     return;
   }
   if (m === G.player) {
+    // For the debrief's verdict (ui/debrief.js): stomped flat, or cooked while an enemy was cooked too.
+    G.death = { melee: m.lastHitMelee || null, shutdown: !!m.shutdown, foeShutdown: G.mechs.some(e => e.team !== m.team && e.alive && e.shutdown) };
     G.state = 'over'; G.endT = 3.2; G.won = false;
     msg(G, 'MECH DESTROYED', '#f44');
     return;
   }
-  if (src === G.player) G.stats.kills++;
+  if (src === G.player) { G.stats.kills++; G.lastKill = { melee: m.lastHitMelee || null }; }
   voice(G, m.lastHitMelee === 'stomp' ? 'killStomp' : m.lastHitMelee ? 'killPunch' : 'kill', {}, true, DEATH_BEAT * 1000);   // after the bang, not before
   // Whether that won the mission is the objectives' call (objectives.js).
 }

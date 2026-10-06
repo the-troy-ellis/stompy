@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; #106 strip, replay, unlocks and REALLY? shipped; #110 Act II and #111 Act III: `m05`-`m12` shipped with placeholder names; PURPLE PUNCHER's entrance in 10 is #108) |
+| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; #106 strip, replay, unlocks and REALLY? shipped; #110 Act II and #111 Act III: `m05`-`m12` shipped with placeholder names; PURPLE PUNCHER's entrance in 10 is #108; #107 verdicts shipped with the draft words) |
 | Milestone | M3 |
 | Size | L (each mission is an S issue once the framework exists) |
 | Depends on | [03-objectives.md](03-objectives.md), [05-ai.md](05-ai.md), [06-chassis-and-weapons.md](06-chassis-and-weapons.md), [12-melee.md](12-melee.md), [07-atmosphere.md](07-atmosphere.md) for night/weather variants (missions degrade gracefully to plain palettes if M4 is late) |
@@ -125,6 +125,12 @@ One word above the numbers, from the tone guide: on a win `STOMPED.`, on a
 win with no damage taken `UNTOUCHED.`, on a win by punching the last enemy
 `PUNCHED.`; on a loss `SQUASHED.`, on a loss by overheating while an enemy
 was shut down too `AWKWARD.`, on a loss to a stomp `FLATTENED.`
+
+As shipped (#107): the words live in `NAMES.verdicts` (drafts until the owner
+picks) and show in every debrief, Free Play too. Ties: UNTOUCHED beats
+PUNCHED beats STOMPED; AWKWARD (you died shut down while an enemy was shut
+down too) beats FLATTENED beats SQUASHED. Any melee kill but a stomp counts
+as PUNCHED; a failed objective with the mech still standing is SQUASHED.
 
 ## Briefs (the full text)
 

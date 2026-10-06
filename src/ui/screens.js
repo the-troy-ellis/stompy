@@ -14,7 +14,7 @@ import { endGuide } from '../sim/missiles.js';
 import { DIFF, DIFF_ORDER } from '../data/ai.js';
 import { SETTINGS, SETTING_KEYS, stepSetting } from '../data/settings.js';
 import { fitOf, fitOk, kitLine } from './mechlab.js';
-import { objectiveRows, debriefTitle, missionTitle, missionSpoken } from './debrief.js';
+import { objectiveRows, debriefTitle, missionTitle, missionSpoken, verdict } from './debrief.js';
 import { recordResult, saveCampaign, restartCampaign, stripSquares, canPlay } from './campaign.js';
 import { VOICE } from '../data/voice.js';
 
@@ -243,6 +243,7 @@ export function createUi(app) {
         <div class="k">${isCamp ? esc(missionTitle(prefs.mission + 1, G.def.name)) : 'FREE PLAY'}</div>
         ${rows ? `<div class="objs">${rows}</div>` : ''}
         ${fresh.length ? `<div class="unlock">NEW MECH: ${fresh.map(k => esc(CHASSIS[k].name)).join(', ')}</div>` : ''}
+        <div class="verdict ${G.won ? 'ok' : 'no'}">${esc(verdict(G))}</div>
         <p>TIME ${tm}<br>KILLS ${s.kills} / ${G.mechs.filter(m => m.team !== 0 && !m.remote).length}<br>
            ACCURACY ${acc}% (${Math.round(s.hits)} of ${Math.round(s.shots)})<br>
            DAMAGE DEALT ${Math.round(s.dealt)} &nbsp; TAKEN ${Math.round(s.taken)}</p>

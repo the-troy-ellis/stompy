@@ -289,6 +289,9 @@ html, body {
 .feel-look button { margin-right: 2px; }
 .feel-res { color: #fc3; }
 /* The campaign strip: twelve squares, done / current / locked, the selected one ringed. */
+.verdict { font: bold 26px "Lucida Console", monospace; letter-spacing: 2px; margin: 6px 0 2px; }
+.verdict.ok { color: #fc3; } .verdict.no { color: #f66; }
+@media (max-height: 500px) { .verdict { font-size: 18px; margin: 2px 0 0; } }
 .strip { display: flex; gap: 4px; flex-wrap: nowrap; margin: 2px 0 8px; }
 .strip .sq { flex: 0 1 26px; min-width: 0; height: 26px; padding: 0; font: bold 11px "Lucida Console", monospace; border: 1px solid #2a7a2a; background: #031; color: #7f7; cursor: pointer; }
 .strip .sq.done { background: #1a5a1a; color: #cfc; }

@@ -4,7 +4,9 @@ import { createGame, startMatch } from '../src/sim/state.js';
 import { recordFx } from '../src/sim/fx.js';
 import { stepFor, foes, freeze, createTestGame } from './helpers.js';
 import { destroyEntity } from '../src/sim/entities.js';
-import { objectiveRows, debriefTitle, missionTitle, missionSpoken } from '../src/ui/debrief.js';
+import { objectiveRows, debriefTitle, missionTitle, missionSpoken, verdict, verdictKey } from '../src/ui/debrief.js';
+import { destroy } from '../src/sim/combat.js';
+import { NAMES } from '../src/data/names.js';
 
 function mission(def) {
   const G = createGame({ fx: recordFx(), seed: 4 });
@@ -54,4 +56,53 @@ test('a mission still on its placeholder name is not announced twice', () => {
   assert.equal(missionSpoken(13, 'Contract 13'), 'Contract 13.');
   assert.equal(missionSpoken(2, 'MISSION 2'), 'Mission 2.');
   assert.equal(missionSpoken(2, 'Tower Trouble'), 'Mission 2. Tower Trouble.');
+});
+
+// The verdict word (spec 04 § Debrief verdicts).
+const fight = () => { const G = createTestGame({ foes: ['jackal'] }); return [G, foes(G)[0]]; };
+const finish = G => stepFor(G, 0.2);
+
+test('a win reads STOMPED., UNTOUCHED. without a scratch, PUNCHED. when a fist ended it', () => {
+  let [G, e] = fight();
+  G.stats.taken = 12; destroy(G, e, G.player); finish(G);
+  assert.equal(G.won, true);
+  assert.equal(verdictKey(G), 'won'); assert.equal(verdict(G), NAMES.verdicts.won);
+  [G, e] = fight();
+  destroy(G, e, G.player); finish(G);
+  assert.equal(verdictKey(G), 'untouched');
+  [G, e] = fight();
+  G.stats.taken = 3; e.lastHitMelee = 'punch'; destroy(G, e, G.player); finish(G);
+  assert.equal(verdictKey(G), 'punched');
+  [G, e] = fight();
+  G.stats.taken = 3; e.lastHitMelee = 'stomp'; destroy(G, e, G.player); finish(G);
+  assert.equal(verdictKey(G), 'won', 'a stomp is just stomping');
+});
+
+test('a loss reads SQUASHED., FLATTENED. under a foot, AWKWARD. when both of you overheated', () => {
+  let [G, e] = fight();
+  destroy(G, G.player, e);
+  assert.equal(G.won, false); assert.equal(verdictKey(G), 'lost');
+  [G, e] = fight();
+  G.player.lastHitMelee = 'stomp'; destroy(G, G.player, e);
+  assert.equal(verdictKey(G), 'flattened');
+  [G, e] = fight();
+  G.player.shutdown = true; e.shutdown = true; G.player.lastHitMelee = 'stomp'; destroy(G, G.player, e);
+  assert.equal(verdictKey(G), 'awkward', 'awkward beats flattened');
+  [G, e] = fight();
+  G.player.shutdown = true; destroy(G, G.player, e);
+  assert.equal(verdictKey(G), 'lost', 'cooked alone is just a loss');
+});
+
+test('a failed objective with the mech still standing is SQUASHED.; a new match forgets the last one', () => {
+  const G = mission({ objectives: [{ type: 'extract', at: 'lz', within: 1 }], entities: [{ kind: 'nav', id: 'lz', at: [0, 900] }] });
+  stepFor(G, 1.2);
+  assert.equal(verdictKey(G), 'lost');
+  const [H, e] = fight();
+  H.player.lastHitMelee = 'stomp'; destroy(H, H.player, e);
+  startMatch(H, { name: 'Again', pal: 'dusk', foes: ['jackal'], intel: '' }, 2, false, 'kestrel');
+  assert.equal(H.death, null); assert.equal(H.lastKill, null);
+});
+
+test('every verdict is one word and a full stop', () => {
+  for (const [k, v] of Object.entries(NAMES.verdicts)) assert.match(v, /^[A-Z]+\.$/, k);
 });
