@@ -113,7 +113,7 @@ export function createScene(app) {
   // into its bone, or draws the part on its own where skinning isn't available.
   const BONES = new Float32Array(BONE_COUNT * 16), PLANES = new Float32Array(24);
   // Bounding spheres, generous: a toppling mech or a fallen tower lies along the ground.
-  const seen = (x, y, z, r) => sphereVisible(PLANES, x, y, z, r);
+  const seen = (x, y, z, r) => sphereVisible(PLANES, x, y, z, r) || (R.culled++, false);   // R.culled: the ?debug=1 overlay's count
   let putTint = null;
   const put = (bone, mesh, mat) => {
     if (R.skinned) BONES.set(mat, bone * 16);
@@ -318,7 +318,7 @@ export function createScene(app) {
   function render() {
     MA.reset();
     resize();
-    R.draws = 0;
+    R.draws = 0; R.culled = 0;
     if (!G.ter) return;
     R.gl.viewport(0, 0, cv.width, cv.height);
     const P = G.player, gd = G.guide, ir = !!gd;
