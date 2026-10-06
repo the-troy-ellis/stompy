@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ready |
+| Status | in progress (#155 time of day shipped) |
 | Milestone | M4 |
 | Size | L (split: night + headlights; weather; props; explosions + particles) |
 | Depends on | M0; structures from [03-objectives.md](03-objectives.md) share the prop meshes |
@@ -23,6 +23,15 @@ Each palette gets `night` and `dawn` variants (`PALS.dusk.night` …) with their
 own `zen`, `hor`, `low/mid/high`, `fog` and `light`. A mission sets `time:
 'day' | 'dusk' | 'night' | 'dawn'` or `ramp: ['dusk', 'night', 180]` to blend
 over 180 s (uniforms are already per frame; blend the palette fields).
+
+As shipped (#155): a variant carries its own `zen`, `hor`, `fog` and `light`
+and, instead of its own ground colours, a `shade` that multiplies everything
+lit (emissive things keep their glow; the IR camera ignores it). The ground
+colours are baked into the terrain mesh, so this keeps a ramp to a per-frame
+blend of a few numbers (`blendPal`) with no mesh rebuild. `day` and `dusk`
+are each biome's own light (the desert and the volcanic plain are at dusk,
+the glacier by day). Mission 4 ramps dusk to night over 240 s; missions 8
+and 12 and night contracts are at night.
 
 **Headlights.** At night the player's mech (and in the arena every mech) has
 two headlights: one spotlight term in the main shader (`uSpotPos`, `uSpotDir`,
