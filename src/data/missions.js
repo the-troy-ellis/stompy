@@ -1,5 +1,5 @@
-import { PALS } from './palettes.js';
 import { NAMES } from './names.js';
+import { makeRng } from '../sim/rng.js';
 
 // A mission: { key, pal, seed, foes, intel }; its display name comes from
 // NAMES.missions[key]. From M3 also (docs/specs/03-objectives.md; the sim
@@ -120,11 +120,62 @@ export const missionFoes = d => [...d.foes, ...(d.waves || []).flatMap(w => w.fo
 const WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen', 'Twenty'];
 const count = n => WORDS[n] || 'Lots of';
 export function missionDef(n) {
-  if (n < MISSIONS.length) return MISSIONS[n];
-  const pals = Object.keys(PALS), k = 3 + Math.floor(n / 2), heavies = Math.floor(n / 3);
-  return { name: `Contract ${n + 1}`, pal: pals[n % pals.length],
-    foes: Array.from({ length: k }, (_, i) => (i < heavies ? 'warden' : 'jackal')),
-    intel: `${count(k)} mechs are out there. ${heavies ? `${count(heavies)} of them ${heavies > 1 ? 'are' : 'is'} big.` : 'None of them are big.'} Go and stomp them.` };
+  return n < MISSIONS.length ? MISSIONS[n] : contractDef(n);
+}
+
+// After twelve: contracts (spec 04 § After twelve). Contract n (0-based, so
+// Contract 13 is n = 12) is fixed by n alone: the biome by n % 3, weather and
+// time by a roll seeded from n, the objective by n % 5. The count of mechs and
+// of big ones grows as it always has; who they are comes from the whole
+// roster, lighter mechs more often.
+export const CONTRACT_OBJECTIVES = ['eliminate', 'destroy', 'survive', 'extract', 'escort'];
+const BIOMES = ['dusk', 'ice', 'volcanic'];
+const SKIES = { dusk: ['rain', 'dust'], ice: ['snow', 'fog'], volcanic: ['dust', 'fog'] };   // spec 07's weather per biome
+const LIGHT = { jackal: 3, light1: 3, kestrel: 2 }, BIG = { warden: 2, sniper1: 1.5, puncher: 1 };
+const RELAY_AT = [[0, 0], [100, 60], [-100, 60]];   // a triangle of targets, turned and pushed out by the roll
+function weighted(rng, w) {
+  let r = rng.next() * Object.values(w).reduce((a, b) => a + b, 0);
+  for (const [k, v] of Object.entries(w)) if ((r -= v) < 0) return k;
+  return Object.keys(w)[0];
+}
+export function contractDef(n) {
+  const rng = makeRng(9001 + n * 7919), pal = BIOMES[n % 3], type = CONTRACT_OBJECTIVES[n % 5];
+  const k = 3 + Math.floor(n / 2), heavies = Math.min(k, Math.floor(n / 3));
+  const foes = Array.from({ length: k }, (_, i) => weighted(rng, i < heavies ? BIG : LIGHT));
+  const sky = rng.next(), time = rng.chance(0.3) ? 'night' : null, turn = rng.range(0, 360);
+  const def = { name: `Contract ${n + 1}`, pal, seed: 1000 + n, foes, objectives: [{ type: 'eliminate' }] };
+  if (sky < 0.4) def.weather = SKIES[pal][sky < 0.2 ? 0 : 1];
+  if (time) def.time = time;
+  const many = `${count(k)} mechs are out there.`, big = heavies ? `${count(heavies)} of them ${heavies > 1 ? 'are' : 'is'} big.` : 'None of them are big.';
+  if (type === 'eliminate') def.intel = `${many} ${big} Go and stomp them.`;
+  if (type === 'destroy') {
+    const d = rng.range(420, 620);
+    def.entities = RELAY_AT.map(([x, z], i) => ({ ...RELAY, id: `relay${i + 1}`, at: [turn + Math.atan2(x, d + z) * 180 / Math.PI, Math.hypot(x, d + z)] }));
+    def.objectives = [{ type: 'destroy', targets: ['relay'], label: 'RELAY' }, { type: 'eliminate', secondary: true }];
+    def.intel = `Three tall towers talk and talk. Knock them down. ${many}`;
+  }
+  if (type === 'survive') {
+    const third = Math.ceil(k / 3);
+    def.objectives = [{ type: 'survive', seconds: 150, waves: [0, 1, 2].map(w => ({ at: w * 50, foes: foes.slice(w * third, (w + 1) * third), from: turn + w * 120 })).filter(w => w.foes.length) }];
+    def.foes = [];
+    def.intel = `${count(k)} mechs are coming. Stay alive for two and a half minutes.`;
+  }
+  if (type === 'extract') {
+    def.entities = [{ ...PAD, id: 'lz', at: [turn, 950] }];
+    def.objectives = [{ type: 'extract', at: 'lz', within: 240 }, { type: 'eliminate', secondary: true }];
+    def.intel = `Run to the pad. ${many} ${big}`;
+  }
+  if (type === 'escort') {
+    const route = ROUTE.map(([b, d]) => [b + turn, d]);
+    def.prefer = 'convoy';
+    def.entities = [
+      ...[0, 1, 2, 3].map(i => ({ ...TRUCK, id: `truck${i + 1}`, at: [route[0][0] + i * 6, route[0][1] + i * 16], path: route })),
+      { ...PAD, id: 'exit', at: route[route.length - 1] },
+    ];
+    def.objectives = [{ type: 'escort', convoy: 'convoy', to: 'exit', minAlive: 2, label: 'CONVOY' }];
+    def.intel = `Four little trucks drive far. Keep two trucks safe. ${many}`;
+  }
+  return def;
 }
 // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
 export const FP_MAPS = ['random', 'dusk', 'ice', 'volcanic'];
