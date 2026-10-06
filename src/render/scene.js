@@ -1,4 +1,5 @@
 import { backingSize } from './look.js';
+import { effectLook, shapeOf } from '../mesh/effects.js';
 import { M, add, chain, clampN, dirOf, mix3, mul, norm, rnd, sub, len, cross, TAU } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { buildTerrainMesh } from '../world/terrainMesh.js';
@@ -90,6 +91,7 @@ export function createScene(app) {
 
   // The HUD canvas is always full resolution; the 3D canvas renders R.look.lines
   // tall (0: full) and the browser scales it up with hard edges (render/look.js).
+  const FRAME = {}, LOOK = {};   // reused every frame: the effects' shared uniforms and one particle's look
   let W = 0, H = 0, dpr = 1, lines = -1;
   function resize() {
     dpr = min(devicePixelRatio || 1, 1.5);
@@ -238,6 +240,7 @@ export function createScene(app) {
     R.gl.uniform2f(R.U.fog, G.pal.fog[0], G.pal.fog[1]);
     R.gl.uniform3fv(R.U.fogCol, hor);
     R.gl.uniform1f(R.U.ir, ir ? 1 : 0);
+    Object.assign(FRAME, { VP, light: G.pal.light, cam: eye, fog: G.pal.fog, fogCol: hor, ir: ir ? 1 : 0 }); R.frame = FRAME;   // the instanced effects shader's copy
 
     R.drawHeat = 0;
     R.draw(world, M.id());
@@ -340,16 +343,29 @@ export function createScene(app) {
       R.draw(R.meshes.beam, chain(M.T(...b.a), M.RY(atan2(d[0], d[2])), M.RX(-Math.asin(clampN(d[1], -1, 1))), M.S(b.w * (0.6 + f), b.w * (0.6 + f), l)),
         mix3([1, 1, 1], b.col, 0.4 + 0.6 * (1 - f)), 1);
     }
-    for (const p of G.parts) {
-      const f = p.life / p.max;
-      let size = p.size, tint = p.col, emis = 1;
-      if (p.kind === 'fire') { size *= 0.4 + f * 0.8; tint = mix3([0.4, 0.1, 0.05], p.col, f); }
-      else if (p.kind === 'flame') { size *= 0.5 + (1 - f) * 3; tint = mix3([0.55, 0.12, 0.04], p.col, f); }   // a flamer's puff swells and reddens as it goes
-      else if (p.kind === 'smoke') { size *= 1.6 - f * 0.8; tint = mix3(G.pal.hor, p.col, f); emis = 0.6; }
-      else emis = 0;
-      R.draw(R.meshes.cube, chain(M.T(...p.p), M.RY(p.spin), M.RX(p.spin * 0.7), M.S(size)), tint, emis, p.kind === 'fire' || p.kind === 'flame' ? f : p.kind === 'smoke' ? 0.15 : 0.3);
-    }
+    // Effects: one instanced draw per shape (spec 14 P1), each particle a
+    // shape by its kind (mesh/effects.js); per-particle draws where the
+    // instancing extension is missing.
     [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.disableVertexAttribArray(a));
+    if (R.instanced) {
+      for (const p of G.parts) {
+        const g = R.fx[shapeOf(p.kind)];
+        if (g.n >= R.FX_CAP) continue;
+        effectLook(p, G.pal.hor, LOOK);
+        const d = g.data, o = g.n++ * R.FX_FLOATS;
+        d[o] = p.p[0]; d[o + 1] = p.p[1]; d[o + 2] = p.p[2]; d[o + 3] = LOOK.size;
+        d[o + 4] = p.spin; d[o + 5] = p.spin * 0.7;
+        d[o + 6] = LOOK.r; d[o + 7] = LOOK.g; d[o + 8] = LOOK.b; d[o + 9] = LOOK.emis; d[o + 10] = LOOK.heat;
+      }
+      R.drawEffects();
+    } else {
+      [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.enableVertexAttribArray(a));
+      for (const p of G.parts) {
+        effectLook(p, G.pal.hor, LOOK);
+        R.draw(R.meshes.fx[shapeOf(p.kind)], chain(M.T(...p.p), M.RY(p.spin), M.RX(p.spin * 0.7), M.S(LOOK.size)), [LOOK.r, LOOK.g, LOOK.b], LOOK.emis, LOOK.heat);
+      }
+      [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.disableVertexAttribArray(a));
+    }
 
   }
 

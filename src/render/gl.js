@@ -1,5 +1,6 @@
 import { M } from '../util/math.js';
 import { buildProps } from '../mesh/props.js';
+import { buildEffectShapes, EFFECT_SHAPES } from '../mesh/effects.js';
 import { Builder } from '../mesh/builder.js';
 import { buildMechParts } from '../mesh/mechParts.js';
 import { CHASSIS, lockedLook } from '../data/chassis.js';
@@ -50,6 +51,39 @@ export function createRenderer(cv, { antialias = true } = {}) {
       }
       gl_FragColor = vec4(c, 1.0);
     }`);
+  // Effects, instanced (spec 14 P1): one draw per shape. Per vertex the shape's
+  // position and normal; per instance its position and size (iPS), spin and
+  // tumble (iRot, the same RY-then-RX order the matrices used), colour, glow and
+  // IR heat (iFx). Lit, fogged and IR-shaded exactly like the main shader.
+  const ext = gl.getExtension('ANGLE_instanced_arrays');
+  const instProg = ext && compile(`
+    attribute vec3 aPos, aNrm; attribute vec4 iPS; attribute vec2 iRot; attribute vec3 iCol; attribute vec2 iFx;
+    uniform mat4 uVP; uniform vec3 uLight, uCam; uniform vec2 uFog;
+    varying vec3 vCol; varying float vFog, vHeat;
+    vec3 turn(vec3 v) {
+      float c = cos(iRot.y), s = sin(iRot.y);
+      v = vec3(v.x, c * v.y - s * v.z, s * v.y + c * v.z);
+      c = cos(iRot.x); s = sin(iRot.x);
+      return vec3(c * v.x + s * v.z, v.y, -s * v.x + c * v.z);
+    }
+    void main() {
+      vec3 wp = iPS.xyz + turn(aPos * iPS.w);
+      gl_Position = uVP * vec4(wp, 1.0);
+      float d = max(dot(normalize(turn(aNrm)), uLight), 0.0);
+      vCol = mix(iCol * (0.36 + 0.78 * d), iCol, iFx.x);
+      vHeat = iFx.y;
+      vFog = clamp((length(wp - uCam) - uFog.x) / (uFog.y - uFog.x), 0.0, 1.0);
+    }`, `
+    precision mediump float;
+    uniform vec3 uFogCol; uniform float uIR; varying vec3 vCol; varying float vFog, vHeat;
+    void main() {
+      vec3 c = mix(vCol, uFogCol, vFog);
+      if (uIR > 0.5) {
+        float l = dot(vCol, vec3(0.3, 0.59, 0.11));
+        c = vec3(mix(mix(0.1 + l * 0.3, 0.97, vHeat), 0.06, vFog * 0.9));
+      }
+      gl_FragColor = vec4(c, 1.0);
+    }`);
   const skyProg = compile(`
     attribute vec2 aP; void main() { gl_Position = vec4(aP, 0.999, 1.0); }`, `
     precision mediump float;
@@ -78,6 +112,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
   const beam = new Builder(); beam.cube(M.T(0, 0, 0.5), [1, 1, 1]);
   meshes.beam = upload(beam);
   meshes.props = Object.fromEntries(Object.entries(buildProps()).map(([k, b]) => [k, upload(b)]));
+  meshes.fx = Object.fromEntries(Object.entries(buildEffectShapes()).map(([k, b]) => [k, upload(b)]));
   const mechParts = {};
   for (const k of Object.keys(CHASSIS)) {
     const p = buildMechParts(CHASSIS[k]);
@@ -121,5 +156,49 @@ export function createRenderer(cv, { antialias = true } = {}) {
   };
 
 
-  return Object.assign(R, { gl, prog, skyProg, U, A, SU, skyBuf, upload, meshes, mechParts, partsKeyFor, partsKeyLocked, draw });
+  // Instanced effects: FX_FLOATS per instance (x y z size, spin tumble, r g b,
+  // glow heat, pad). The scene fills R.fx[shape].data and .n each frame and
+  // calls drawEffects once; R.frame holds that frame's shared uniforms.
+  const FX_FLOATS = 12, FX_CAP = 4096, fx = {};
+  let instBuf = null, IU = null, IA = null;
+  if (instProg) {
+    for (const k of EFFECT_SHAPES) fx[k] = { data: new Float32Array(FX_CAP * FX_FLOATS), n: 0 };
+    instBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, FX_CAP * FX_FLOATS * 4, gl.DYNAMIC_DRAW);
+    const L2 = n => gl.getUniformLocation(instProg, n), A2 = n => gl.getAttribLocation(instProg, n);
+    IU = { VP: L2('uVP'), light: L2('uLight'), cam: L2('uCam'), fog: L2('uFog'), fogCol: L2('uFogCol'), ir: L2('uIR') };
+    IA = { pos: A2('aPos'), nrm: A2('aNrm'), ps: A2('iPS'), rot: A2('iRot'), col: A2('iCol'), fx: A2('iFx') };
+  }
+  const drawEffects = () => {
+    const f = R.frame, inst = [IA.ps, IA.rot, IA.col, IA.fx];
+    gl.useProgram(instProg);
+    gl.uniformMatrix4fv(IU.VP, false, f.VP); gl.uniform3fv(IU.light, f.light); gl.uniform3fv(IU.cam, f.cam);
+    gl.uniform2f(IU.fog, f.fog[0], f.fog[1]); gl.uniform3fv(IU.fogCol, f.fogCol); gl.uniform1f(IU.ir, f.ir);
+    for (const a of [IA.pos, IA.nrm, ...inst]) gl.enableVertexAttribArray(a);
+    for (const a of inst) ext.vertexAttribDivisorANGLE(a, 1);
+    for (const k of EFFECT_SHAPES) {
+      const g = fx[k], mesh = meshes.fx[k];
+      if (!g.n) continue;
+      gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
+      gl.vertexAttribPointer(IA.pos, 3, gl.FLOAT, false, 36, 0);
+      gl.vertexAttribPointer(IA.nrm, 3, gl.FLOAT, false, 36, 12);
+      gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, g.data.subarray(0, g.n * FX_FLOATS));
+      gl.vertexAttribPointer(IA.ps, 4, gl.FLOAT, false, FX_FLOATS * 4, 0);
+      gl.vertexAttribPointer(IA.rot, 2, gl.FLOAT, false, FX_FLOATS * 4, 16);
+      gl.vertexAttribPointer(IA.col, 3, gl.FLOAT, false, FX_FLOATS * 4, 24);
+      gl.vertexAttribPointer(IA.fx, 2, gl.FLOAT, false, FX_FLOATS * 4, 36);
+      ext.drawArraysInstancedANGLE(gl.TRIANGLES, 0, mesh.count, g.n);
+      R.draws++;
+      g.n = 0;
+    }
+    for (const a of inst) ext.vertexAttribDivisorANGLE(a, 0);
+    for (const a of [IA.pos, IA.nrm, ...inst]) gl.disableVertexAttribArray(a);
+    gl.useProgram(prog);
+    R.curMesh = null;
+  };
+
+  return Object.assign(R, { gl, prog, skyProg, U, A, SU, skyBuf, upload, meshes, mechParts, partsKeyFor, partsKeyLocked, draw,
+    instanced: !!instProg, fx, FX_FLOATS, FX_CAP, drawEffects, frame: null });
 }
