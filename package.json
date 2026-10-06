@@ -9,6 +9,7 @@
     "test": "node --test \"test/*.test.js\"",
     "test:server": "python3 -m unittest discover server",
     "test:smoke": "node test/smoke/run.mjs",
+    "perf": "node scripts/perf.mjs",
     "lint": "eslint src test scripts",
     "build": "node scripts/build.mjs",
     "fixture:loadout": "node scripts/loadout-fixture.mjs"

@@ -26,7 +26,7 @@ relay and its tests.
 | `src/util/` | ~70 | `math.js` (scalars, vec3, `M` matrices, `chain`, cosmetic `rnd`), `store.js`, `dom.js`. |
 | `server/` | 300 + tests | `server.py` the relay (unchanged logic), `test_server.py`. |
 | `test/` | | `*.test.js` headless (`helpers.js` builds a flat-ground game with a recording fx), `smoke/run.mjs` (Playwright: desktop mission, touch layout, two-pilot arena against the real relay). |
-| `scripts/` | | `serve.mjs` (static server), `build.mjs` (esbuild). |
+| `scripts/` | | `serve.mjs` (static server), `build.mjs` (esbuild), `perf.mjs` (`npm run perf`: the frame-cost harness and its budgets, spec 14). |
 | `.github/workflows/` | | `ci.yml` (lint, test, build, server tests, smoke), `pages.yml` (gated by the `STOMPY_DEPLOY_PAGES` variable). |
 
 ### How the pieces talk
