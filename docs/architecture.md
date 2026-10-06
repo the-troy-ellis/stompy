@@ -14,10 +14,10 @@ relay and its tests.
 | Path | Lines | Role |
 |---|---|---|
 | `src/main.js` | ~120 | Bootstrap: builds the page, creates everything below, wires them through one `app` object, runs the frame loop. |
-| `src/sim/` | ~900 | **The simulation.** `state.js` (`createGame`, `newMech`, `startMatch`, `resetMatch`), `update.js` (`update(game, input, dt)`), `geom.js`, `effects.js`, `combat.js`, `mech.js`, `gait.js`, `beams.js`, `fusion.js`, `missiles.js`, `ai.js` with `ai/perception.js` (line of sight, belief, shout, search) and `ai/behaviours.js` (keepRange, harass, useCover, ridge, brawler, holdLine, avoidEdge, avoidAllies; `steer` runs a plan) and `ai/fire.js` (heat cap, lock, alpha, section targeting) and `ai/profiles.js` (a plan per chassis) and `ai/group.js` (shared fixes, the flanker), `melee.js`, `knock.js`, `feel.js`, `voice.js`, `loadout.js` (mechlab: stock, validate, apply, stats), `entities.js` (M3: structures, vehicles and nav points in `G.entities`: `addEntity`, `stepEntities`, `damageEntity`, `destroyEntity`, footprints), `objectives.js` (M3: `initObjectives`, `tickObjectives`; the mission's win and loss), `placement.js` (polar `[bearing°, dist]`, flat pads), `waves.js` (`spawnWave`, difficulty ±1 mech), `turrets.js` (mission 9's launchers: aim and fire LRM volleys via `combat.js` `volley`), `rng.js`, `fx.js`. No DOM, GL, audio or input imports (lint enforces it). |
+| `src/sim/` | ~900 | **The simulation.** `state.js` (`createGame`, `newMech`, `startMatch`, `resetMatch`), `update.js` (`update(game, input, dt)`), `geom.js`, `effects.js`, `combat.js`, `mech.js`, `gait.js`, `beams.js`, `fusion.js`, `missiles.js`, `ai.js` with `ai/perception.js` (line of sight, belief, shout, search) and `ai/behaviours.js` (keepRange, harass, useCover, ridge, brawler, holdLine, avoidEdge, avoidAllies; `steer` runs a plan) and `ai/fire.js` (heat cap, lock, alpha, section targeting) and `ai/profiles.js` (a plan per chassis) and `ai/group.js` (shared fixes, the flanker), `melee.js`, `knock.js`, `feel.js`, `voice.js`, `loadout.js` (mechlab: stock, validate, apply, stats), `entities.js` (M3: structures, vehicles and nav points in `G.entities`: `addEntity`, `stepEntities`, `damageEntity`, `destroyEntity`, footprints), `objectives.js` (M3: `initObjectives`, `tickObjectives`; the mission's win and loss), `placement.js` (polar `[bearing°, dist]`, flat pads), `waves.js` (`spawnWave`, difficulty ±1 mech), `turrets.js` (mission 9's launchers: aim and fire LRM volleys via `combat.js` `volley`), `particles.js` (the particle pool: typed arrays, `spawn`, `stepParticles`, `listParticles` for tests), `rng.js`, `fx.js`. No DOM, GL, audio or input imports (lint enforces it). |
 | `src/data/` | ~200 | Weapons, chassis, body plans (`geo.js`), palettes, missions, arena colours, and `names.js` (every display name, keyed). |
 | `src/world/` | ~110 | `terrain.js` (heights, `height(x, z)`, `BOUND`, a `flat` option for tests), `terrainMesh.js`. |
-| `src/mesh/` | ~140 | `builder.js` (flat-shaded triangle soup), `mechParts.js` (each chassis's parts: legs by leg type, sized from its body plan; torso, arm and barrel by `style`), `props.js` (mission props in unit space, scaled to each entity's cylinder; `<key>Wreck` once blown up, `<key>Head` turns). |
+| `src/mesh/` | ~140 | `builder.js` (flat-shaded triangle soup), `mechParts.js` (each chassis's parts: legs by leg type, sized from its body plan; torso, arm and barrel by `style`), `props.js` (mission props in unit space, scaled to each entity's cylinder; `<key>Wreck` once blown up, `<key>Head` turns). `effects.js` (one solid shape per effect kind, drawn instanced; `effectLook` is each particle's size, colour, glow and heat). |
 | `src/render/` | ~730 | `gl.js` (`createRenderer`: context, shaders, `upload`, `draw`, mesh sets), `scene.js` (`createScene`: camera, sky, world, mechs with IK, effects), `hud.js` (`createHud`: the 2D instruments, the missile camera feed, the `?debug=1` readout). `look.js` (the 3D view's tunable resolution: `backingSize`, `readLook`; a `?debug=1` LOOK row in the FEEL panel sets lines and antialiasing to settle the pixel look, spec 14). |
 | `src/audio/` | ~360 | `sound.js` (`createAudio`: unlock dance, samples over synthesis, spatialisation, loops, `sfx.*`, the voice `say`, the beam and scan tones, `tick`). |
 | `src/input/` | ~220 | `input.js` (`createInput`: keyboard, mouse with pointer lock, touch stick/aim/buttons, one per-frame `snapshot()`). |
@@ -26,7 +26,7 @@ relay and its tests.
 | `src/util/` | ~70 | `math.js` (scalars, vec3, `M` matrices, `chain`, cosmetic `rnd`), `store.js`, `dom.js`. |
 | `server/` | 300 + tests | `server.py` the relay (unchanged logic), `test_server.py`. |
 | `test/` | | `*.test.js` headless (`helpers.js` builds a flat-ground game with a recording fx), `smoke/run.mjs` (Playwright: desktop mission, touch layout, two-pilot arena against the real relay). |
-| `scripts/` | | `serve.mjs` (static server), `build.mjs` (esbuild). |
+| `scripts/` | | `serve.mjs` (static server), `build.mjs` (esbuild), `perf.mjs` (`npm run perf`: the frame-cost harness and its budgets, spec 14). |
 | `.github/workflows/` | | `ci.yml` (lint, test, build, server tests, smoke), `pages.yml` (gated by the `STOMPY_DEPLOY_PAGES` variable). |
 
 ### How the pieces talk
@@ -118,6 +118,12 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
   Never play from a timer before the first tap.
 - **Touch and mouse are both live** and switch automatically (`G.touchUI`
   starts from `(pointer: coarse)` and flips when a mouse moves).
+- **Renderer matrices are per-frame.** `scene.js` builds every matrix from a
+  matrix arena (`makeMatrixArena`, reset at the start of `render()`), so they
+  are only good until the next frame: never store one in the sim or in saved
+  state. Per-frame loops over many objects go in small functions of their
+  own (`render()` is too big to be optimized, and unoptimized code allocates
+  for every number); `npm run perf` reports allocations per frame.
 - **`dt` is capped at 50 ms** and the sim is variable-step. Nothing may
   depend on frame count for timing.
 - **Everything the menu shows is drawn by the game renderer** (`G.worldKind
