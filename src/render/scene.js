@@ -1,9 +1,9 @@
 import { backingSize } from './look.js';
 import { effectLook, SHAPE_BY_KIND } from '../mesh/effects.js';
-import { M, add, chain, clampN, dirOf, mix3, mul, norm, rnd, sub, len, cross, TAU } from '../util/math.js';
+import { M as M0, add, makeMatrixArena, clampN, dirOf, mix3, mul, norm, rnd, sub, len, cross, TAU } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { buildTerrainMesh } from '../world/terrainMesh.js';
-import { frame, viewYaw } from '../sim/geom.js';
+import { viewYaw } from '../sim/geom.js';
 import { solveKnee, limb } from '../sim/gait.js';
 import { meltFrac } from '../sim/beams.js';
 import { FEEL, HEAT, hotFrac } from '../data/feel.js';
@@ -12,6 +12,12 @@ import { BARREL_AT, styleOf } from '../mesh/mechParts.js';
 import { fallAngle } from '../sim/entities.js';
 import { propFor } from '../mesh/props.js';
 import { WEAPONS } from '../data/weapons.js';
+
+// Every matrix the renderer builds comes from a per-frame arena (render() resets
+// it), so drawing allocates no matrices; apply, persp and lookAt are M's own.
+const MA = makeMatrixArena();
+const M = { ...MA, apply: M0.apply, persp: M0.persp, lookAt: M0.lookAt };
+const chain = MA.chain;
 
 // An arm gun's proportions by weapon: [thickness, length] against the stock barrel.
 const BARREL = { laser: [1, 1], mlaser: [0.8, 0.7], ac: [1.45, 1.1], gauss: [0.8, 1.9], mg: [0.6, 0.75], lrm: [1.7, 0.55], srm: [2.4, 0.55] };   // srm: an arm-mounted box
@@ -91,7 +97,7 @@ export function createScene(app) {
 
   // The HUD canvas is always full resolution; the 3D canvas renders R.look.lines
   // tall (0: full) and the browser scales it up with hard edges (render/look.js).
-  const FRAME = {}, LOOK = {};   // reused every frame: the effects' shared uniforms and one particle's look
+  const FRAME = {}, LOOK = new Float32Array(6);   // reused every frame: the effects' shared uniforms and one particle's look (mesh/effects.js)
   let W = 0, H = 0, dpr = 1, lines = -1;
   function resize() {
     dpr = min(devicePixelRatio || 1, 1.5);
@@ -109,7 +115,8 @@ export function createScene(app) {
     // A one-legged mech leans toward the gap (m.lean, radians of roll about its heading).
     // A dying mech topples rigidly about the ground under it (toppleOf), feet and all.
     const top = toppleOf(m), place = p => (top ? M.apply(top, p) : p);
-    const B = chain(top || M.id(), M.T(0, -sag, 0), frame(m), M.RZ(m.lean || 0)), parts = R.mechParts[m.partsKey], sc = m.ch.scale;
+    // The body frame is frame(m) (sim/geom.js) built from the arena.
+    const B = chain(top || M.id(), M.T(0, -sag, 0), M.T(m.x, m.y + (m.bob || 0), m.z), M.RY(m.yaw), M.S(m.ch.scale), M.RZ(m.lean || 0)), parts = R.mechParts[m.partsKey], sc = m.ch.scale;
     const fwd = [sin(m.yaw), 0, cos(m.yaw)];
     // Armour under a beam glows orange as it melts, and runs hotter in IR.
     const mf = meltFrac(m), heatWas = R.drawHeat;
@@ -132,8 +139,8 @@ export function createScene(app) {
       const polePlaced = top ? norm(sub(M.apply(top, add(hull, pole)), M.apply(top, hull))) : pole;
       const K = solveKnee(H, A, polePlaced, g.l1 * sc, g.l2 * sc);
       const ankle = add(K, mul(norm(sub(A, K)), g.l2 * sc));   // stays attached even if out of reach
-      R.draw(parts.uleg, limb(H, K, polePlaced, sc), legTint);
-      R.draw(parts.lleg, limb(K, ankle, polePlaced, sc), legTint);
+      R.draw(parts.uleg, limb(H, K, polePlaced, sc, M.id()), legTint);
+      R.draw(parts.lleg, limb(K, ankle, polePlaced, sc, M.id()), legTint);
       R.draw(parts.foot, chain(top || M.id(), M.T(...(top ? M.apply(inverse3(top), ankle) : ankle)), M.RY(f.yaw), M.S(sc)), legTint);
     });
     // The thunk springs: a squash pulse on the whole body (down in y, out in x/z,
@@ -167,7 +174,129 @@ export function createScene(app) {
     R.drawHeat = heatWas;
   }
 
+  // render()'s per-object loops live in their own functions: render() is too big
+  // for the optimizing compiler, and unoptimized code boxes every number.
+  function drawRemains() {
+      // Shed arms and legs, tumbling or lying where they fell.
+      R.drawHeat = 0.6;
+      for (const d of G.debris) {
+        const parts = R.mechParts[d.partsKey];
+        if (!parts || !parts[d.part]) continue;
+        const fade = d.t > d.life - 2 ? (d.life - d.t) / 2 : 1;
+        R.draw(parts[d.part], chain(M.T(...d.p), M.RY(d.rot[1]), M.RX(d.rot[0]), M.RZ(d.rot[2]), M.S(d.scale * (0.6 + 0.4 * fade))), [0.6, 0.58, 0.56]);
+      }
+      R.drawHeat = 0.45;
+      for (const w of G.wrecks) {
+        // A fresh wreck rocks and sinks a little before it lies still.
+        const st = w.settle ?? 1, rock = (1 - st) * 0.2 * sin(w.t * 11), sink = 0.35 * w.scale * st;
+        const parts = R.mechParts[w.type], B = chain(M.T(w.x, w.y - sink, w.z), M.RY(w.yaw), M.RX(rock), M.S(w.scale));
+        const dark = [0.3, 0.28, 0.27];
+        R.draw(parts.torso, chain(B, M.T(0, 1.3, -1), M.RX(-1.2), M.RZ(w.roll)), dark);
+        R.draw(parts.hip, chain(B, M.T(0.5, 0.6, 1.5), M.RY(0.6)), dark);
+        R.draw(parts.uleg, chain(B, M.T(2.5, 0.6, 1), M.RZ(1.5)), dark);
+        R.draw(parts.lleg, chain(B, M.T(-2.6, 0.5, -0.5), M.RZ(-1.5), M.RY(1)), dark);
+      }
+  }
+  function drawEntities(eye) {
+      // World entities: structures and vehicles (a nav point has no body). Plain
+      // boxes until the prop meshes (#98) arrive; past the fog they are skipped.
+      const far = G.pal.fog[1] + 60;
+      for (const e of G.entities) {
+        if ((e.kind === 'nav' && !e.mesh) || (!e.alive && !e.wreck)) continue;
+        if (Math.hypot(e.x - eye[0], e.z - eye[2]) > far) continue;
+        const base = M.T(e.x, e.y, e.z), w = e.radius * 1.7, dead = !e.alive;
+        const col = dead ? mul(e.col, 0.35) : e.col, prop = propFor(e);
+        if (prop) {
+          // Punched over: rotates about its base, away from the fist, then lies there.
+          const tilt = e.fall ? chain(M.RY(e.fall.yaw), M.RX(fallAngle(e)), M.RY(-e.fall.yaw)) : M.id();
+          const at = chain(base, tilt, M.RY(e.yaw)), size = M.S(e.radius, prop.sy, e.radius), tint = [prop.tint, prop.tint, prop.tint];
+          R.draw(R.meshes.props[prop.key], chain(at, size), tint);
+          if (prop.head) R.draw(R.meshes.props[prop.head], chain(at, M.RY(e.headYaw || 0), size), tint);
+        } else if (e.kind === 'nav') {
+          continue;
+        } else if (e.kind === 'vehicle') {
+          R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, e.height / 2, -e.radius * 0.3), M.S(w, e.height, w * 1.6)), col);
+          R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, e.height * 0.4, e.radius * 1.35), M.S(w * 0.9, e.height * 0.8, w * 0.55)), mul(col, 0.7));
+        } else if (e.fall) {   // punched over: rotates about its base, away from the fist, then lies there
+          const tilt = chain(M.RY(e.fall.yaw), M.RX(fallAngle(e)), M.RY(-e.fall.yaw));
+          R.draw(R.meshes.cube, chain(base, tilt, M.T(0, e.height / 2, 0), M.S(w, e.height, w)), col);
+        } else {
+          const h = dead ? e.height * 0.22 : e.height;   // blown up: a collapsed stump
+          R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, h / 2, 0), M.S(w, h, w)), col);
+        }
+      }
+  }
+  function drawShotsAndBeams(eye, gd) {
+      R.drawHeat = 1;
+      for (const s of G.shots) {
+        // The nose camera can't see its own volley flying alongside it.
+        if (gd && s.guided && len(sub(s.p, eye)) < 8) continue;
+        const d = norm(s.v), yw = atan2(d[0], d[2]), pt = Math.asin(clampN(d[1], -1, 1));
+        const sd = WEAPONS[s.type];
+        if (sd?.bolt) { R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.7, 0.7, 3.4)), sd.col, 1); R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(1.3, 1.3, 1.6)), [0.8, 0.9, 1], 1); }
+        else if (sd?.tracer) R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(sd.tw ?? 0.4, sd.tw ?? 0.4, sd.tl ?? 9)), sd.tracer, 1);   // a bright streak
+        else if (s.kind === 'shell') R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.25, 0.25, 2.2)), [1, 0.85, 0.4], 1);
+        else R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.35, 0.35, 1.2)), [1, 0.55, 0.25], 1);
+      }
+      // Fusion pulses: six sine waves, each in its own plane with its own
+      // frequency and phase, writhing inside a packet that races down the
+      // beam; the straight targeting beam stays lit underneath while it flies.
+      for (const pu of G.pulses) {
+        const v = sub(pu.b, pu.a), L = len(v), d = mul(v, 1 / (L || 1));
+        const u = norm(cross(d, abs(d[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0])), w2 = cross(u, d);
+        const yw = atan2(d[0], d[2]), pt = Math.asin(clampN(d[1], -1, 1));
+        if (!pu.hit) R.draw(R.meshes.beam, chain(M.T(...pu.a), M.RY(yw), M.RX(-pt), M.S(0.05, 0.05, L)), [0.85, 0.6, 1], 1);
+        const head = min(1, pu.t / pu.dur) * L, pack = min(L, 34), fade = pu.hit ? max(0, 1 - (pu.t - pu.dur) / 0.25) : 1;
+        if (fade <= 0) continue;
+        const N = 28, tt = performance.now() / 1000;
+        for (let k = 0; k < 6; k++) {
+          const th = k * PI / 3 + pu.seed, amp = (0.9 + 0.3 * k) * fade, f = 0.22 + 0.09 * k, ph = pu.seed * (k + 1) + tt * (18 + 3 * k);
+          const dirk = add(mul(u, cos(th)), mul(w2, sin(th)));
+          let prev = null;
+          for (let i = 0; i <= N; i++) {
+            const sAlong = head - pack + (pack * i) / N;
+            if (sAlong < 0) { prev = null; continue; }
+            const env = sin(PI * i / N);   // the packet swells in the middle and tapers at both ends
+            const q = add(add(pu.a, mul(d, sAlong)), mul(dirk, amp * env * sin(TAU * f * sAlong + ph)));
+            if (prev) {
+              const sv = sub(q, prev), sl = len(sv), sd = mul(sv, 1 / (sl || 1));
+              R.draw(R.meshes.beam, chain(M.T(...prev), M.RY(atan2(sd[0], sd[2])), M.RX(-Math.asin(clampN(sd[1], -1, 1))), M.S(0.22, 0.22, sl)),
+                mix3([1, 1, 1], [0.8, 0.55, 1], k / 8), 1);
+            }
+            prev = q;
+          }
+        }
+      }
+      for (const b of G.cbeams) {
+        const v = sub(b.b, b.a), l = len(v), d = mul(v, 1 / (l || 1));
+        R.draw(R.meshes.beam, chain(M.T(...b.a), M.RY(atan2(d[0], d[2])), M.RX(-Math.asin(clampN(d[1], -1, 1))), M.S(b.w, b.w, l)), b.col, 1);
+      }
+      for (const b of G.beams) {
+        const v = sub(b.b, b.a), l = len(v), d = mul(v, 1 / (l || 1));
+        const f = b.life / b.max;
+        R.draw(R.meshes.beam, chain(M.T(...b.a), M.RY(atan2(d[0], d[2])), M.RX(-Math.asin(clampN(d[1], -1, 1))), M.S(b.w * (0.6 + f), b.w * (0.6 + f), l)),
+          mix3([1, 1, 1], b.col, 0.4 + 0.6 * (1 - f)), 1);
+      }
+  }
+
+  // The particle pool into the per-shape instance buffers. Its own small function
+  // on purpose: render() is too big for the optimizing compiler, and unoptimized
+  // code boxes every number it computes, which here meant ~150 bytes of garbage
+  // per particle per frame.
+  function fillEffects(P, hor) {
+    for (let i = 0; i < P.n; i++) {
+      const g = R.fx[SHAPE_BY_KIND[P.kind[i]]];
+      if (g.n >= R.FX_CAP) continue;
+      effectLook(P, i, hor, LOOK);
+      const d = g.data, o = g.n++ * R.FX_FLOATS, i3 = i * 3;
+      d[o] = P.pos[i3]; d[o + 1] = P.pos[i3 + 1]; d[o + 2] = P.pos[i3 + 2]; d[o + 3] = LOOK[0];
+      d[o + 4] = P.spin[i]; d[o + 5] = P.spin[i] * 0.7;
+      d[o + 6] = LOOK[1]; d[o + 7] = LOOK[2]; d[o + 8] = LOOK[3]; d[o + 9] = LOOK[4]; d[o + 10] = LOOK[5];
+    }
+  }
+
   function render() {
+    MA.reset();
     resize();
     R.draws = 0;
     if (!G.ter) return;
@@ -247,124 +376,22 @@ export function createScene(app) {
     // In the missile camera your own mech is out there too.
     R.drawHeat = 1;
     for (const m of G.mechs) if ((m.alive || m.dying) && (m !== P || gd || G.state === 'menu')) drawMech(m);
-    // Shed arms and legs, tumbling or lying where they fell.
-    R.drawHeat = 0.6;
-    for (const d of G.debris) {
-      const parts = R.mechParts[d.partsKey];
-      if (!parts || !parts[d.part]) continue;
-      const fade = d.t > d.life - 2 ? (d.life - d.t) / 2 : 1;
-      R.draw(parts[d.part], chain(M.T(...d.p), M.RY(d.rot[1]), M.RX(d.rot[0]), M.RZ(d.rot[2]), M.S(d.scale * (0.6 + 0.4 * fade))), [0.6, 0.58, 0.56]);
-    }
-    R.drawHeat = 0.45;
-    for (const w of G.wrecks) {
-      // A fresh wreck rocks and sinks a little before it lies still.
-      const st = w.settle ?? 1, rock = (1 - st) * 0.2 * sin(w.t * 11), sink = 0.35 * w.scale * st;
-      const parts = R.mechParts[w.type], B = chain(M.T(w.x, w.y - sink, w.z), M.RY(w.yaw), M.RX(rock), M.S(w.scale));
-      const dark = [0.3, 0.28, 0.27];
-      R.draw(parts.torso, chain(B, M.T(0, 1.3, -1), M.RX(-1.2), M.RZ(w.roll)), dark);
-      R.draw(parts.hip, chain(B, M.T(0.5, 0.6, 1.5), M.RY(0.6)), dark);
-      R.draw(parts.uleg, chain(B, M.T(2.5, 0.6, 1), M.RZ(1.5)), dark);
-      R.draw(parts.lleg, chain(B, M.T(-2.6, 0.5, -0.5), M.RZ(-1.5), M.RY(1)), dark);
-    }
-    // World entities: structures and vehicles (a nav point has no body). Plain
-    // boxes until the prop meshes (#98) arrive; past the fog they are skipped.
-    const far = G.pal.fog[1] + 60;
-    for (const e of G.entities) {
-      if ((e.kind === 'nav' && !e.mesh) || (!e.alive && !e.wreck)) continue;
-      if (Math.hypot(e.x - eye[0], e.z - eye[2]) > far) continue;
-      const base = M.T(e.x, e.y, e.z), w = e.radius * 1.7, dead = !e.alive;
-      const col = dead ? mul(e.col, 0.35) : e.col, prop = propFor(e);
-      if (prop) {
-        // Punched over: rotates about its base, away from the fist, then lies there.
-        const tilt = e.fall ? chain(M.RY(e.fall.yaw), M.RX(fallAngle(e)), M.RY(-e.fall.yaw)) : M.id();
-        const at = chain(base, tilt, M.RY(e.yaw)), size = M.S(e.radius, prop.sy, e.radius), tint = [prop.tint, prop.tint, prop.tint];
-        R.draw(R.meshes.props[prop.key], chain(at, size), tint);
-        if (prop.head) R.draw(R.meshes.props[prop.head], chain(at, M.RY(e.headYaw || 0), size), tint);
-      } else if (e.kind === 'nav') {
-        continue;
-      } else if (e.kind === 'vehicle') {
-        R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, e.height / 2, -e.radius * 0.3), M.S(w, e.height, w * 1.6)), col);
-        R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, e.height * 0.4, e.radius * 1.35), M.S(w * 0.9, e.height * 0.8, w * 0.55)), mul(col, 0.7));
-      } else if (e.fall) {   // punched over: rotates about its base, away from the fist, then lies there
-        const tilt = chain(M.RY(e.fall.yaw), M.RX(fallAngle(e)), M.RY(-e.fall.yaw));
-        R.draw(R.meshes.cube, chain(base, tilt, M.T(0, e.height / 2, 0), M.S(w, e.height, w)), col);
-      } else {
-        const h = dead ? e.height * 0.22 : e.height;   // blown up: a collapsed stump
-        R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, h / 2, 0), M.S(w, h, w)), col);
-      }
-    }
-    R.drawHeat = 1;
-    for (const s of G.shots) {
-      // The nose camera can't see its own volley flying alongside it.
-      if (gd && s.guided && len(sub(s.p, eye)) < 8) continue;
-      const d = norm(s.v), yw = atan2(d[0], d[2]), pt = Math.asin(clampN(d[1], -1, 1));
-      const sd = WEAPONS[s.type];
-      if (sd?.bolt) { R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.7, 0.7, 3.4)), sd.col, 1); R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(1.3, 1.3, 1.6)), [0.8, 0.9, 1], 1); }
-      else if (sd?.tracer) R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(sd.tw ?? 0.4, sd.tw ?? 0.4, sd.tl ?? 9)), sd.tracer, 1);   // a bright streak
-      else if (s.kind === 'shell') R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.25, 0.25, 2.2)), [1, 0.85, 0.4], 1);
-      else R.draw(R.meshes.beam, chain(M.T(...s.p), M.RY(yw), M.RX(-pt), M.S(0.35, 0.35, 1.2)), [1, 0.55, 0.25], 1);
-    }
-    // Fusion pulses: six sine waves, each in its own plane with its own
-    // frequency and phase, writhing inside a packet that races down the
-    // beam; the straight targeting beam stays lit underneath while it flies.
-    for (const pu of G.pulses) {
-      const v = sub(pu.b, pu.a), L = len(v), d = mul(v, 1 / (L || 1));
-      const u = norm(cross(d, abs(d[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0])), w2 = cross(u, d);
-      const yw = atan2(d[0], d[2]), pt = Math.asin(clampN(d[1], -1, 1));
-      if (!pu.hit) R.draw(R.meshes.beam, chain(M.T(...pu.a), M.RY(yw), M.RX(-pt), M.S(0.05, 0.05, L)), [0.85, 0.6, 1], 1);
-      const head = min(1, pu.t / pu.dur) * L, pack = min(L, 34), fade = pu.hit ? max(0, 1 - (pu.t - pu.dur) / 0.25) : 1;
-      if (fade <= 0) continue;
-      const N = 28, tt = performance.now() / 1000;
-      for (let k = 0; k < 6; k++) {
-        const th = k * PI / 3 + pu.seed, amp = (0.9 + 0.3 * k) * fade, f = 0.22 + 0.09 * k, ph = pu.seed * (k + 1) + tt * (18 + 3 * k);
-        const dirk = add(mul(u, cos(th)), mul(w2, sin(th)));
-        let prev = null;
-        for (let i = 0; i <= N; i++) {
-          const sAlong = head - pack + (pack * i) / N;
-          if (sAlong < 0) { prev = null; continue; }
-          const env = sin(PI * i / N);   // the packet swells in the middle and tapers at both ends
-          const q = add(add(pu.a, mul(d, sAlong)), mul(dirk, amp * env * sin(TAU * f * sAlong + ph)));
-          if (prev) {
-            const sv = sub(q, prev), sl = len(sv), sd = mul(sv, 1 / (sl || 1));
-            R.draw(R.meshes.beam, chain(M.T(...prev), M.RY(atan2(sd[0], sd[2])), M.RX(-Math.asin(clampN(sd[1], -1, 1))), M.S(0.22, 0.22, sl)),
-              mix3([1, 1, 1], [0.8, 0.55, 1], k / 8), 1);
-          }
-          prev = q;
-        }
-      }
-    }
-    for (const b of G.cbeams) {
-      const v = sub(b.b, b.a), l = len(v), d = mul(v, 1 / (l || 1));
-      R.draw(R.meshes.beam, chain(M.T(...b.a), M.RY(atan2(d[0], d[2])), M.RX(-Math.asin(clampN(d[1], -1, 1))), M.S(b.w, b.w, l)), b.col, 1);
-    }
-    for (const b of G.beams) {
-      const v = sub(b.b, b.a), l = len(v), d = mul(v, 1 / (l || 1));
-      const f = b.life / b.max;
-      R.draw(R.meshes.beam, chain(M.T(...b.a), M.RY(atan2(d[0], d[2])), M.RX(-Math.asin(clampN(d[1], -1, 1))), M.S(b.w * (0.6 + f), b.w * (0.6 + f), l)),
-        mix3([1, 1, 1], b.col, 0.4 + 0.6 * (1 - f)), 1);
-    }
+    drawRemains();
+    drawEntities(eye);
+    drawShotsAndBeams(eye, gd);
     // Effects: one instanced draw per shape (spec 14 P1), each particle a
     // shape by its kind (mesh/effects.js); per-particle draws where the
     // instancing extension is missing.
     [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.disableVertexAttribArray(a));
     if (R.instanced) {
-      const P = G.parts;
-      for (let i = 0; i < P.n; i++) {
-        const g = R.fx[SHAPE_BY_KIND[P.kind[i]]];
-        if (g.n >= R.FX_CAP) continue;
-        effectLook(P, i, G.pal.hor, LOOK);
-        const d = g.data, o = g.n++ * R.FX_FLOATS, i3 = i * 3;
-        d[o] = P.pos[i3]; d[o + 1] = P.pos[i3 + 1]; d[o + 2] = P.pos[i3 + 2]; d[o + 3] = LOOK.size;
-        d[o + 4] = P.spin[i]; d[o + 5] = P.spin[i] * 0.7;
-        d[o + 6] = LOOK.r; d[o + 7] = LOOK.g; d[o + 8] = LOOK.b; d[o + 9] = LOOK.emis; d[o + 10] = LOOK.heat;
-      }
+      fillEffects(G.parts, G.pal.hor);
       R.drawEffects();
     } else {
       [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.enableVertexAttribArray(a));
       const P = G.parts;
       for (let i = 0; i < P.n; i++) {
         effectLook(P, i, G.pal.hor, LOOK);
-        R.draw(R.meshes.fx[SHAPE_BY_KIND[P.kind[i]]], chain(M.T(P.pos[i * 3], P.pos[i * 3 + 1], P.pos[i * 3 + 2]), M.RY(P.spin[i]), M.RX(P.spin[i] * 0.7), M.S(LOOK.size)), [LOOK.r, LOOK.g, LOOK.b], LOOK.emis, LOOK.heat);
+        R.draw(R.meshes.fx[SHAPE_BY_KIND[P.kind[i]]], chain(M.T(P.pos[i * 3], P.pos[i * 3 + 1], P.pos[i * 3 + 2]), M.RY(P.spin[i]), M.RX(P.spin[i] * 0.7), M.S(LOOK[0])), [LOOK[1], LOOK[2], LOOK[3]], LOOK[4], LOOK[5]);
       }
       [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.disableVertexAttribArray(a));
     }

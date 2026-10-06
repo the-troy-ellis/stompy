@@ -42,13 +42,13 @@ export function rayTerrain(G, o, d, maxT) {
   if (!(maxT > 0) || !Number.isFinite(o[0] + o[1] + o[2] + d[0] + d[1] + d[2])) return null;   // a NaN here would march forever
   const ter = G.ter, step = 4;
   let prev = 0;
+  const below = t => o[1] + d[1] * t < ter.height(o[0] + d[0] * t, o[2] + d[2] * t);   // plain numbers: no arrays per step
   for (let t = min(step, maxT); ; t = min(t + step, maxT)) {
-    const p = add(o, mul(d, t));
-    if (p[1] < ter.height(p[0], p[2])) {
+    if (below(t)) {
       let lo = prev, hi = t;
       for (let k = 0; k < 8; k++) {
-        const mid = (lo + hi) / 2, q = add(o, mul(d, mid));
-        if (q[1] < ter.height(q[0], q[2])) hi = mid; else lo = mid;
+        const mid = (lo + hi) / 2;
+        if (below(mid)) hi = mid; else lo = mid;
       }
       return hi;
     }

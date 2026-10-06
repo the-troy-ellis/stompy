@@ -1,4 +1,4 @@
-import { add, clampN, cross, dot, len, lerp, mul, norm, sub, wrapA } from '../util/math.js';
+import { add, clampN, dot, len, lerp, mul, norm, sub, wrapA } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { particle } from './effects.js';
 import { feel } from './feel.js';
@@ -136,11 +136,20 @@ export function solveKnee(H, A, pole, l1, l2) {
   p = len(p) < 1e-4 ? [0, 0, 1] : norm(p);
   return add(H, add(mul(n, l1 * cos(a)), mul(p, l1 * sin(a))));
 }
-// A matrix that hangs a limb mesh (built along -y from its pivot) from P to Q.
-export function limb(P, Q, pole, s) {
-  const y = norm(sub(P, Q));
-  let z = sub(pole, mul(y, dot(pole, y)));
-  z = len(z) < 1e-4 ? [0, 0, 1] : norm(z);
-  const x = cross(y, z);
-  return new Float32Array([x[0] * s, x[1] * s, x[2] * s, 0, y[0] * s, y[1] * s, y[2] * s, 0, z[0] * s, z[1] * s, z[2] * s, 0, P[0], P[1], P[2], 1]);
+// A matrix that hangs a limb mesh (built along -y from its pivot) from P to Q,
+// written into `out` (the renderer passes a reused one). Plain numbers, so it
+// allocates nothing but the default `out`.
+export function limb(P, Q, pole, s, out = new Float32Array(16)) {
+  let yx = P[0] - Q[0], yy = P[1] - Q[1], yz = P[2] - Q[2];
+  const yl = Math.hypot(yx, yy, yz) || 1; yx /= yl; yy /= yl; yz /= yl;
+  const pd = pole[0] * yx + pole[1] * yy + pole[2] * yz;
+  let zx = pole[0] - yx * pd, zy = pole[1] - yy * pd, zz = pole[2] - yz * pd;
+  const zl = Math.hypot(zx, zy, zz);
+  if (zl < 1e-4) { zx = 0; zy = 0; zz = 1; } else { zx /= zl; zy /= zl; zz /= zl; }
+  const xx = yy * zz - yz * zy, xy = yz * zx - yx * zz, xz = yx * zy - yy * zx;   // cross(y, z)
+  out[0] = xx * s; out[1] = xy * s; out[2] = xz * s; out[3] = 0;
+  out[4] = yx * s; out[5] = yy * s; out[6] = yz * s; out[7] = 0;
+  out[8] = zx * s; out[9] = zy * s; out[10] = zz * s; out[11] = 0;
+  out[12] = P[0]; out[13] = P[1]; out[14] = P[2]; out[15] = 1;
+  return out;
 }

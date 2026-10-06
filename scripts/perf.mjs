@@ -22,13 +22,17 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 // After P2 (#133, particle pool; the cap rises from 420 to 4,000, so the deaths
 //   scene keeps ~540 particles, peak ~710): fight 94/112/23.6k/353 ·
 //   fight-deaths 106/112/23.6k/465 · wrecks 91/97/23.2k/392
-// Budgets are the latest numbers plus ~15%. Lower them as P3 and P4 land.
+// After P3 (#134, allocation diet: matrix arena, hot loops out of render(),
+//   allocation-free limb and terrain rays): menu 13/13/21.6k/21 ·
+//   free-start 37/37/21.8k/98 · fight 94/112/23.6k/174 ·
+//   fight-deaths 106/112/23.6k/175 · wrecks 91/97/23.2k/124
+// Budgets are the latest numbers plus ~15%. Lower them as P4 lands.
 export const BUDGETS = {
-  menu:           { meanDraws: 15, peakDraws: 15, tris: 25000, allocKB: 45 },
-  'free-start':   { meanDraws: 43, peakDraws: 43, tris: 25000, allocKB: 190 },
-  fight:          { meanDraws: 110, peakDraws: 130, tris: 28000, allocKB: 405 },
-  'fight-deaths': { meanDraws: 122, peakDraws: 130, tris: 28000, allocKB: 535 },
-  wrecks:         { meanDraws: 105, peakDraws: 112, tris: 27500, allocKB: 450 },
+  menu:           { meanDraws: 15, peakDraws: 15, tris: 25000, allocKB: 26 },
+  'free-start':   { meanDraws: 43, peakDraws: 43, tris: 25000, allocKB: 115 },
+  fight:          { meanDraws: 110, peakDraws: 130, tris: 28000, allocKB: 200 },
+  'fight-deaths': { meanDraws: 122, peakDraws: 130, tris: 28000, allocKB: 205 },
+  wrecks:         { meanDraws: 105, peakDraws: 112, tris: 27500, allocKB: 145 },
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;
