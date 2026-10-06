@@ -52,3 +52,10 @@ test('a mission picks its time; mission 4 turns from dusk to night over four min
   assert.ok(close(G.pal.shade, PALS.dusk.night.shade, 1e-4) && close(G.pal.zen, PALS.dusk.night.zen, 1e-4), 'night by four minutes, and it stays');
   assert.notEqual(PALS.dusk.zen[0], G.pal.zen[0], 'the table is untouched');
 });
+
+test('every lit shader takes the shade: per-part, skinned and instanced alike', async () => {
+  const { readFileSync } = await import('node:fs');
+  const gl = readFileSync('src/render/gl.js', 'utf8');
+  assert.equal((gl.match(/\(0\.36 \+ 0\.78 \* d\)/g) || []).length, (gl.match(/\(0\.36 \+ 0\.78 \* d\) \* uShade/g) || []).length, 'a lit shader without uShade would stay bright at night');
+  assert.ok((gl.match(/\* uShade/g) || []).length >= 3);
+});
