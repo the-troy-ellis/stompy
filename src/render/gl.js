@@ -2,7 +2,8 @@ import { M } from '../util/math.js';
 import { buildProps } from '../mesh/props.js';
 import { buildEffectShapes, EFFECT_SHAPES, DITHER_SHAPES } from '../mesh/effects.js';
 import { Builder } from '../mesh/builder.js';
-import { buildMechParts } from '../mesh/mechParts.js';
+import { buildMechParts, skinMech, BONE_COUNT, SKIN_FLOATS } from '../mesh/mechParts.js';
+import { geoFor } from '../data/geo.js';
 import { CHASSIS, lockedLook } from '../data/chassis.js';
 import { MP_COLORS } from '../data/colors.js';
 
@@ -25,19 +26,8 @@ export function createRenderer(cv, { antialias = true } = {}) {
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
     return p;
   };
-  const prog = compile(`
-    attribute vec3 aPos, aNrm, aCol;
-    uniform mat4 uVP, uM; uniform vec3 uLight, uTint, uCam; uniform float uEmis; uniform vec2 uFog;
-    varying vec3 vCol; varying float vFog;
-    void main() {
-      vec4 wp = uM * vec4(aPos, 1.0);
-      gl_Position = uVP * wp;
-      vec3 n = normalize((uM * vec4(aNrm, 0.0)).xyz);
-      float d = max(dot(n, uLight), 0.0);
-      vec3 base = aCol * uTint;
-      vCol = mix(base * (0.36 + 0.78 * d), base, uEmis);
-      vFog = clamp((length(wp.xyz - uCam) - uFog.x) / (uFog.y - uFog.x), 0.0, 1.0);
-    }`, `
+  // The main fragment shader, shared by the per-part and the skinned mech programs.
+  const MAIN_FS = `
     precision mediump float;
     uniform vec3 uFogCol; uniform float uIR, uHeat; varying vec3 vCol; varying float vFog;
     void main() {
@@ -50,7 +40,39 @@ export function createRenderer(cv, { antialias = true } = {}) {
         c = vec3(mix(g, 0.06, vFog * 0.9));
       }
       gl_FragColor = vec4(c, 1.0);
-    }`);
+    }`;
+  const prog = compile(`
+    attribute vec3 aPos, aNrm, aCol;
+    uniform mat4 uVP, uM; uniform vec3 uLight, uTint, uCam; uniform float uEmis; uniform vec2 uFog;
+    varying vec3 vCol; varying float vFog;
+    void main() {
+      vec4 wp = uM * vec4(aPos, 1.0);
+      gl_Position = uVP * wp;
+      vec3 n = normalize((uM * vec4(aNrm, 0.0)).xyz);
+      float d = max(dot(n, uLight), 0.0);
+      vec3 base = aCol * uTint;
+      vCol = mix(base * (0.36 + 0.78 * d), base, uEmis);
+      vFog = clamp((length(wp.xyz - uCam) - uFog.x) / (uFog.y - uFog.x), 0.0, 1.0);
+    }`, MAIN_FS);
+  // One draw per mech (spec 14 P4): the main shader, but each vertex picks its
+  // matrix from uBones by its bone number (mesh/mechParts.js skinMech). Only
+  // where the vertex shader has room for the bones; elsewhere mechs draw part
+  // by part, as before.
+  const skinRoom = gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS) >= BONE_COUNT * 4 + 16;
+  const skinProg = skinRoom && compile(`
+    attribute vec3 aPos, aNrm, aCol; attribute float aBone;
+    uniform mat4 uVP, uBones[${BONE_COUNT}]; uniform vec3 uLight, uTint, uCam; uniform float uEmis; uniform vec2 uFog;
+    varying vec3 vCol; varying float vFog;
+    void main() {
+      mat4 m = uBones[int(aBone + 0.5)];
+      vec4 wp = m * vec4(aPos, 1.0);
+      gl_Position = uVP * wp;
+      vec3 n = normalize((m * vec4(aNrm, 0.0)).xyz);   // a zeroed bone collapses its part to a point: nothing is drawn
+      float d = max(dot(n, uLight), 0.0);
+      vec3 base = aCol * uTint;
+      vCol = mix(base * (0.36 + 0.78 * d), base, uEmis);
+      vFog = clamp((length(wp.xyz - uCam) - uFog.x) / (uFog.y - uFog.x), 0.0, 1.0);
+    }`, MAIN_FS);
   // Effects, instanced (spec 14 P1): one draw per shape. Per vertex the shape's
   // position and normal; per instance its position and size (iPS), spin and
   // tumble (iRot, the same RY-then-RX order the matrices used), colour, glow and
@@ -123,17 +145,27 @@ export function createRenderer(cv, { antialias = true } = {}) {
   meshes.beam = upload(beam);
   meshes.props = Object.fromEntries(Object.entries(buildProps()).map(([k, b]) => [k, upload(b)]));
   meshes.fx = Object.fromEntries(Object.entries(buildEffectShapes()).map(([k, b]) => [k, upload(b)]));
+  // A chassis's part meshes (debris and wrecks use them one by one) and, where
+  // skinning works, the whole mech in one mesh as `skin`.
+  const uploadSkin = b => {
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(b.d), gl.STATIC_DRAW);
+    return { buf, count: b.d.length / SKIN_FLOATS };
+  };
+  const meshSet = ch => {
+    const p = buildMechParts(ch), set = Object.fromEntries(Object.entries(p).map(([n, b]) => [n, upload(b)]));
+    if (skinProg) set.skin = uploadSkin(skinMech(p, geoFor(ch).legs.length));
+    return set;
+  };
   const mechParts = {};
-  for (const k of Object.keys(CHASSIS)) {
-    const p = buildMechParts(CHASSIS[k]);
-    mechParts[k] = Object.fromEntries(Object.entries(p).map(([n, b]) => [n, upload(b)]));
-  }
+  for (const k of Object.keys(CHASSIS)) mechParts[k] = meshSet(CHASSIS[k]);
 
   // A mesh set per chassis + multiplayer colour, built the first time it's needed.
   // A locked chassis's silhouette (lockedLook), built the first time it's shown.
   function partsKeyLocked(type) {
     const key = `${type}:locked`;
-    if (!mechParts[key]) mechParts[key] = Object.fromEntries(Object.entries(buildMechParts({ ...CHASSIS[type], ...lockedLook(CHASSIS[type]) })).map(([n, b]) => [n, upload(b)]));
+    if (!mechParts[key]) mechParts[key] = meshSet({ ...CHASSIS[type], ...lockedLook(CHASSIS[type]) });
     return key;
   }
   function partsKeyFor(color, type = 'kestrel') {
@@ -141,8 +173,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
     const key = `${type}:${color}`;
     if (!mechParts[key]) {
       const c = MP_COLORS[color] || MP_COLORS[0];
-      const p = buildMechParts({ ...CHASSIS[type], col: c.col, acc: c.acc });
-      mechParts[key] = Object.fromEntries(Object.entries(p).map(([n, b]) => [n, upload(b)]));
+      mechParts[key] = meshSet({ ...CHASSIS[type], col: c.col, acc: c.acc });
     }
     return key;
   }
@@ -214,6 +245,44 @@ export function createRenderer(cv, { antialias = true } = {}) {
     for (const a of inst) ext.vertexAttribDivisorANGLE(a, 0);
     for (const a of [IA.pos, IA.nrm, ...inst]) gl.disableVertexAttribArray(a);
   };
+  // Skinned mechs: beginSkinned once, drawSkinned per mech (its `skin` mesh,
+  // BONE_COUNT matrices in one Float32Array), endSkinned to go back to the
+  // main program. Shared uniforms come from R.frame, like the effects'.
+  let SK = null;
+  if (skinProg) {
+    const L3 = n => gl.getUniformLocation(skinProg, n), A3 = n => gl.getAttribLocation(skinProg, n);
+    SK = { U: { VP: L3('uVP'), bones: L3('uBones'), light: L3('uLight'), tint: L3('uTint'), cam: L3('uCam'), emis: L3('uEmis'), fog: L3('uFog'), fogCol: L3('uFogCol'), ir: L3('uIR'), heat: L3('uHeat') },
+      A: [A3('aPos'), A3('aNrm'), A3('aCol'), A3('aBone')] };
+  }
+  const beginSkinned = () => {
+    const f = R.frame, SU2 = SK.U;
+    for (const a of [A.pos, A.nrm, A.col]) gl.disableVertexAttribArray(a);
+    gl.useProgram(skinProg);
+    for (const a of SK.A) gl.enableVertexAttribArray(a);
+    gl.uniformMatrix4fv(SU2.VP, false, f.VP); gl.uniform3fv(SU2.light, f.light); gl.uniform3fv(SU2.cam, f.cam);
+    gl.uniform2f(SU2.fog, f.fog[0], f.fog[1]); gl.uniform3fv(SU2.fogCol, f.fogCol); gl.uniform1f(SU2.ir, f.ir);
+  };
+  const drawSkinned = (mesh, bones, tint = WHITE, emis = 0, heat) => {
+    const [p, n, c, b] = SK.A, st = SKIN_FLOATS * 4;
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
+    gl.vertexAttribPointer(p, 3, gl.FLOAT, false, st, 0);
+    gl.vertexAttribPointer(n, 3, gl.FLOAT, false, st, 12);
+    gl.vertexAttribPointer(c, 3, gl.FLOAT, false, st, 24);
+    gl.vertexAttribPointer(b, 1, gl.FLOAT, false, st, 36);
+    gl.uniformMatrix4fv(SK.U.bones, false, bones);
+    gl.uniform3fv(SK.U.tint, tint);
+    gl.uniform1f(SK.U.emis, emis);
+    gl.uniform1f(SK.U.heat, heat === undefined ? R.drawHeat : heat);
+    gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+    R.draws++;
+  };
+  const endSkinned = () => {
+    for (const a of SK.A) gl.disableVertexAttribArray(a);
+    gl.useProgram(prog);
+    for (const a of [A.pos, A.nrm, A.col]) gl.enableVertexAttribArray(a);
+    R.curMesh = null;
+  };
+
   const drawEffects = () => {
     for (const pass of passes) drawPass(pass);
     gl.useProgram(prog);
@@ -221,5 +290,6 @@ export function createRenderer(cv, { antialias = true } = {}) {
   };
 
   return Object.assign(R, { gl, prog, skyProg, U, A, SU, skyBuf, upload, meshes, mechParts, partsKeyFor, partsKeyLocked, draw,
-    instanced: !!instProg, fx, FX_FLOATS, FX_CAP, drawEffects, frame: null });
+    instanced: !!instProg, fx, FX_FLOATS, FX_CAP, drawEffects, frame: null,
+    skinned: !!skinProg, beginSkinned, drawSkinned, endSkinned });
 }
