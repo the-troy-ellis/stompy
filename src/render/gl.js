@@ -43,7 +43,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
     }`;
   const prog = compile(`
     attribute vec3 aPos, aNrm, aCol;
-    uniform mat4 uVP, uM; uniform vec3 uLight, uTint, uCam; uniform float uEmis; uniform vec2 uFog;
+    uniform mat4 uVP, uM; uniform vec3 uLight, uTint, uCam, uShade; uniform float uEmis; uniform vec2 uFog;
     varying vec3 vCol; varying float vFog;
     void main() {
       vec4 wp = uM * vec4(aPos, 1.0);
@@ -51,7 +51,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
       vec3 n = normalize((uM * vec4(aNrm, 0.0)).xyz);
       float d = max(dot(n, uLight), 0.0);
       vec3 base = aCol * uTint;
-      vCol = mix(base * (0.36 + 0.78 * d), base, uEmis);
+      vCol = mix(base * (0.36 + 0.78 * d) * uShade, base, uEmis);   // uShade: the time of day (palettes.js); glowing things keep their glow
       vFog = clamp((length(wp.xyz - uCam) - uFog.x) / (uFog.y - uFog.x), 0.0, 1.0);
     }`, MAIN_FS);
   // One draw per mech (spec 14 P4): the main shader, but each vertex picks its
@@ -61,7 +61,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
   const skinRoom = gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS) >= BONE_COUNT * 4 + 16;
   const skinProg = skinRoom && compile(`
     attribute vec3 aPos, aNrm, aCol; attribute float aBone;
-    uniform mat4 uVP, uBones[${BONE_COUNT}]; uniform vec3 uLight, uTint, uCam; uniform float uEmis; uniform vec2 uFog;
+    uniform mat4 uVP, uBones[${BONE_COUNT}]; uniform vec3 uLight, uTint, uCam, uShade; uniform float uEmis; uniform vec2 uFog;
     varying vec3 vCol; varying float vFog;
     void main() {
       mat4 m = uBones[int(aBone + 0.5)];
@@ -70,7 +70,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
       vec3 n = normalize((m * vec4(aNrm, 0.0)).xyz);   // a zeroed bone collapses its part to a point: nothing is drawn
       float d = max(dot(n, uLight), 0.0);
       vec3 base = aCol * uTint;
-      vCol = mix(base * (0.36 + 0.78 * d), base, uEmis);
+      vCol = mix(base * (0.36 + 0.78 * d) * uShade, base, uEmis);   // uShade: the time of day (palettes.js); glowing things keep their glow
       vFog = clamp((length(wp.xyz - uCam) - uFog.x) / (uFog.y - uFog.x), 0.0, 1.0);
     }`, MAIN_FS);
   // Effects, instanced (spec 14 P1): one draw per shape. Per vertex the shape's
@@ -83,7 +83,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
   const ext = gl.getExtension('ANGLE_instanced_arrays');
   const instVS = `
     attribute vec3 aPos, aNrm; attribute vec4 iPS; attribute vec2 iRot; attribute vec3 iCol; attribute vec3 iFx;
-    uniform mat4 uVP; uniform vec3 uLight, uCam; uniform vec2 uFog;
+    uniform mat4 uVP; uniform vec3 uLight, uCam, uShade; uniform vec2 uFog;
     varying vec3 vCol; varying float vFog, vHeat, vDither;
     vec3 turn(vec3 v) {
       float c = cos(iRot.y), s = sin(iRot.y);
@@ -95,7 +95,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
       vec3 wp = iPS.xyz + turn(aPos * iPS.w);
       gl_Position = uVP * vec4(wp, 1.0);
       float d = max(dot(normalize(turn(aNrm)), uLight), 0.0);
-      vCol = mix(iCol * (0.36 + 0.78 * d), iCol, iFx.x);
+      vCol = mix(iCol * (0.36 + 0.78 * d) * uShade, iCol, iFx.x);
       vHeat = iFx.y; vDither = iFx.z;
       vFog = clamp((length(wp - uCam) - uFog.x) / (uFog.y - uFog.x), 0.0, 1.0);
     }`;
@@ -125,7 +125,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
       gl_FragColor = vec4(mix(uHor, uZen, smoothstep(0.0, 0.55, y)), 1.0);
     }`);
   const L = n => gl.getUniformLocation(prog, n);
-  const U = { VP: L('uVP'), M: L('uM'), light: L('uLight'), tint: L('uTint'), cam: L('uCam'), emis: L('uEmis'), fog: L('uFog'), fogCol: L('uFogCol'), ir: L('uIR'), heat: L('uHeat') };
+  const U = { VP: L('uVP'), M: L('uM'), light: L('uLight'), shade: L('uShade'), tint: L('uTint'), cam: L('uCam'), emis: L('uEmis'), fog: L('uFog'), fogCol: L('uFogCol'), ir: L('uIR'), heat: L('uHeat') };
   const A = { pos: gl.getAttribLocation(prog, 'aPos'), nrm: gl.getAttribLocation(prog, 'aNrm'), col: gl.getAttribLocation(prog, 'aCol') };
   const SU = { zen: gl.getUniformLocation(skyProg, 'uZen'), hor: gl.getUniformLocation(skyProg, 'uHor'), h: gl.getUniformLocation(skyProg, 'uH'), res: gl.getUniformLocation(skyProg, 'uRes') };
   const skyBuf = gl.createBuffer();
@@ -205,7 +205,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
   let instBuf = null;
   const instLocs = p => {
     const L2 = n => gl.getUniformLocation(p, n), A2 = n => gl.getAttribLocation(p, n);
-    return { p, U: { VP: L2('uVP'), light: L2('uLight'), cam: L2('uCam'), fog: L2('uFog'), fogCol: L2('uFogCol'), ir: L2('uIR') },
+    return { p, U: { VP: L2('uVP'), light: L2('uLight'), cam: L2('uCam'), shade: L2('uShade'), fog: L2('uFog'), fogCol: L2('uFogCol'), ir: L2('uIR') },
       A: { pos: A2('aPos'), nrm: A2('aNrm'), ps: A2('iPS'), rot: A2('iRot'), col: A2('iCol'), fx: A2('iFx') } };
   };
   // Two passes: the solid shapes, then the dithering ones (mesh/effects.js).
@@ -222,7 +222,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
     if (!shapes.some(k => fx[k].n)) return;
     const f = R.frame, inst = [IA.ps, IA.rot, IA.col, IA.fx];
     gl.useProgram(p);
-    gl.uniformMatrix4fv(IU.VP, false, f.VP); gl.uniform3fv(IU.light, f.light); gl.uniform3fv(IU.cam, f.cam);
+    gl.uniformMatrix4fv(IU.VP, false, f.VP); gl.uniform3fv(IU.light, f.light); gl.uniform3fv(IU.cam, f.cam); gl.uniform3fv(IU.shade, f.shade);
     gl.uniform2f(IU.fog, f.fog[0], f.fog[1]); gl.uniform3fv(IU.fogCol, f.fogCol); gl.uniform1f(IU.ir, f.ir);
     for (const a of [IA.pos, IA.nrm, ...inst]) gl.enableVertexAttribArray(a);
     for (const a of inst) ext.vertexAttribDivisorANGLE(a, 1);
@@ -251,7 +251,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
   let SK = null;
   if (skinProg) {
     const L3 = n => gl.getUniformLocation(skinProg, n), A3 = n => gl.getAttribLocation(skinProg, n);
-    SK = { U: { VP: L3('uVP'), bones: L3('uBones'), light: L3('uLight'), tint: L3('uTint'), cam: L3('uCam'), emis: L3('uEmis'), fog: L3('uFog'), fogCol: L3('uFogCol'), ir: L3('uIR'), heat: L3('uHeat') },
+    SK = { U: { VP: L3('uVP'), bones: L3('uBones'), light: L3('uLight'), shade: L3('uShade'), tint: L3('uTint'), cam: L3('uCam'), emis: L3('uEmis'), fog: L3('uFog'), fogCol: L3('uFogCol'), ir: L3('uIR'), heat: L3('uHeat') },
       A: [A3('aPos'), A3('aNrm'), A3('aCol'), A3('aBone')] };
   }
   const beginSkinned = () => {
@@ -259,7 +259,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
     for (const a of [A.pos, A.nrm, A.col]) gl.disableVertexAttribArray(a);
     gl.useProgram(skinProg);
     for (const a of SK.A) gl.enableVertexAttribArray(a);
-    gl.uniformMatrix4fv(SU2.VP, false, f.VP); gl.uniform3fv(SU2.light, f.light); gl.uniform3fv(SU2.cam, f.cam);
+    gl.uniformMatrix4fv(SU2.VP, false, f.VP); gl.uniform3fv(SU2.light, f.light); gl.uniform3fv(SU2.cam, f.cam); gl.uniform3fv(SU2.shade, f.shade);
     gl.uniform2f(SU2.fog, f.fog[0], f.fog[1]); gl.uniform3fv(SU2.fogCol, f.fogCol); gl.uniform1f(SU2.ir, f.ir);
   };
   const drawSkinned = (mesh, bones, tint = WHITE, emis = 0, heat) => {

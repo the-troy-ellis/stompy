@@ -4,7 +4,7 @@ import { clampN } from '../util/math.js';
 import { CATS, CAT_OF } from '../data/weapons.js';
 import { CHASSIS, MECH_ORDER, MECH_INFO } from '../data/chassis.js';
 import { NAMES } from '../data/names.js';
-import { PALS } from '../data/palettes.js';
+import { PALS, palAt } from '../data/palettes.js';
 import { missionDef, missionFoes, FP_MAPS, FP_MIXES, pickFoes } from '../data/missions.js';
 import { MP_COLORS } from '../data/colors.js';
 import { makeTerrain } from '../world/terrain.js';
@@ -105,7 +105,7 @@ export function createUi(app) {
     // The backdrop: a quiet patch of desert, with your mech standing in it.
     if (G.worldKind !== 'menu') {
       G.worldKind = 'menu';
-      G.pal = PALS.dusk;
+      G.pal = palAt('dusk'); G.palRamp = null;
       G.ter = makeTerrain(3);
       app.scene.uploadWorld();
     }

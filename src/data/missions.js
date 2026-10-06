@@ -45,7 +45,7 @@ export const MISSIONS = [
     objectives: [{ type: 'escort', convoy: 'convoy', to: 'exit', minAlive: 2, label: 'CONVOY' }],
     waves: [{ at: 30, foes: ['jackal', 'jackal'], from: 90 }, { at: 105, foes: ['jackal'], from: 270 }],
     intel: 'Four little trucks drive down the valley. JACKALs come to catch them. Keep two trucks safe.' },
-  { key: 'm04', pal: 'dusk', seed: 46,   // dusk into night once M4's time ramp exists
+  { key: 'm04', pal: 'dusk', seed: 46, ramp: ['dusk', 'night', 240],   // dusk into night over four minutes
     foes: [{ type: 'warden', at: [0, 720] }, { type: 'jackal', at: [330, 600] }, { type: 'jackal', at: [30, 640] }],
     objectives: [{ type: 'eliminate' }],
     intel: 'One big mech walks on four legs. Two little mechs walk with it. Stomp all three.' },

@@ -1,3 +1,4 @@
+import { blendPal } from '../data/palettes.js';
 import { add, clampN, dirOf, dot, len, mul, norm, sub } from '../util/math.js';
 import { stepParticles } from './particles.js';
 import { WEAPONS } from '../data/weapons.js';
@@ -32,6 +33,7 @@ export const noInput = () => ({ thrUp: false, thrDown: false, stop: false, turn:
 // outside to do goes through G.fx.
 export function update(G, input, dt) {
   G.time += dt;
+  if (G.palRamp) { const r = G.palRamp; blendPal(r.from, r.to, Math.min(1, G.time / r.secs), G.pal); }   // dusk into night
   G.cbeams = [];   // continuous beams are redrawn every frame they're on
   G.frame = (G.frame || 0) + 1;
   G.input = input;
