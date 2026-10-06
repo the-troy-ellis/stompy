@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; #106 strip, replay, unlocks and REALLY? shipped; #110 Act II and #111 Act III: `m05`-`m12` shipped with placeholder names; #108 PURPLE PUNCHER's entrance in 10 shipped; #107 verdicts shipped with the draft words) |
+| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; #106 strip, replay, unlocks and REALLY? shipped; #110 Act II and #111 Act III: `m05`-`m12` shipped with placeholder names; #108 PURPLE PUNCHER's entrance in 10 shipped; #107 verdicts shipped with the draft words; #112 contracts shipped) |
 | Milestone | M3 |
 | Size | L (each mission is an S issue once the framework exists) |
 | Depends on | [03-objectives.md](03-objectives.md), [05-ai.md](05-ai.md), [06-chassis-and-weapons.md](06-chassis-and-weapons.md), [12-melee.md](12-melee.md), [07-atmosphere.md](07-atmosphere.md) for night/weather variants (missions degrade gracefully to plain palettes if M4 is late) |
@@ -88,6 +88,16 @@ roll, and an objective type by `n % 5`, scaling foes as today with the full
 chassis roster weighted toward lighter mechs. Named `Contract 13`, `Contract
 14`, as now; the brief counts them in the board-book voice: `Five mechs are out
 there. One of them is big. Go and stomp them.`
+
+As shipped (#112): `contractDef(n)` in `missions.js`, fixed by n alone (its
+own seeded roll, so a contract replays the same). The count is today's
+(3 + n/2 mechs, n/3 of them big); the big ones are drawn from WARDEN,
+BEANPOLE and PURPLE PUNCHER, the rest from JACKAL, PIPSQUEAK and KESTREL
+(lighter ones more often). Objectives by n % 5: ELIMINATE; DESTROY three
+relays (ELIMINATE secondary); SURVIVE 2:30 with the mechs in three waves;
+EXTRACT to a pad 950 m out within 4:00 (ELIMINATE secondary); ESCORT four
+trucks down mission 3's route, turned to a rolled bearing. Weather 40% of
+the time (the biome's two kinds from [07](07-atmosphere.md)), night 30%.
 
 ## Difficulty curve
 
