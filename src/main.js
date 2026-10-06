@@ -55,6 +55,7 @@ function start(root) {
     <div class="mech-wrap" tabindex="-1">
       <canvas class="mech-gl"></canvas><canvas class="mech-hud"></canvas>
       <div class="touch-ui" hidden>
+        <div class="tzones"><span>AIM</span><span>THROTTLE</span></div>
         <div class="stick" hidden><div class="knob"></div></div>
         <button class="tbtn tpause" data-t="pause" aria-label="Pause">II</button>
         <button class="tbtn tzoom" data-t="zoom">ZOOM</button>

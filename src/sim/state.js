@@ -24,7 +24,7 @@ export function createGame({ fx = nullFx, touchUI = false, seed = 1 } = {}) {
     mechs: [], entities: [], shots: [], beams: [], cbeams: [], parts: new Particles(), debris: [], wrecks: [], msgs: [], pulses: [], pendingHits: new Map(),
     eye: [0, 0, 0], view: [0, 0, 1], aim: [0, 0, 100], aimMech: null, lock: false, VP: null,
     flash: 0, shake: 0, kick: 0, whiteFlash: 0, lastTwist: 0, hitMark: 0,
-    touchUI, touchTurn: 0, zoom: false, target: null, endT: 0, time: 0, frame: 0, clock: 0,
+    touchUI, touchTwist: 0, zoom: false, target: null, endT: 0, time: 0, frame: 0, clock: 0,
     player: null, def: null, stats: null, guide: null, mDown: false, won: false, roundOver: false,
     ter: null, pal: null, rng: makeRng(seed), fx,
     input: null,   // the last input snapshot, for the HUD

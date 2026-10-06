@@ -33,7 +33,7 @@ in one command.
 ### Gamepad
 
 Standard mapping, polled each frame in `src/input/gamepad.js` into the input
-snapshot: left stick turns legs and sets throttle like the touch stick (with a
+snapshot: left stick turns legs and sets throttle as A/D and W/S do (with a
 deadzone), right stick twists and pitches, RT energy, LT missile (tap/hold as
 touch), RB ballistic, LB fusion, A jump, B centre torso, X target, Y zoom,
 Start pause, Back menu. A `gamepad` sensitivity setting. Works on phones with

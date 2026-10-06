@@ -104,7 +104,7 @@ Run the whole list; it takes about eight minutes. Report deviations in the PR.
 
 **Touch (phone, landscape)**
 - [ ] Full screen and landscape lock requested on launch; upright phone shows the turn-sideways prompt.
-- [ ] Stick turns and sets throttle; aim drag works at the same time; two fire buttons can be held at once.
+- [ ] Upper left: drag turns the mech and tilts; double tap centres the torso. Lower left: the stick sets throttle and twists the torso. Right side: buttons only; two fire buttons can be held at once while the left thumb flies.
 - [ ] Missile button drag steers the guided volley; fusion button drag aims.
 - [ ] Audio plays after the first tap, including with the ring switch on silent (iOS).
 - [ ] Backgrounding and returning resumes audio and shows the pause/menu.
