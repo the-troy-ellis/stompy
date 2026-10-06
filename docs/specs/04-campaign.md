@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; #106 strip, replay, unlocks and REALLY? shipped; #110 Act II: `m05`-`m08` shipped with placeholder names; Act III is still a proposal for the owner to edit) |
+| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; #106 strip, replay, unlocks and REALLY? shipped; #110 Act II and #111 Act III: `m05`-`m12` shipped with placeholder names; PURPLE PUNCHER's entrance in 10 is #108) |
 | Milestone | M3 |
 | Size | L (each mission is an S issue once the framework exists) |
 | Depends on | [03-objectives.md](03-objectives.md), [05-ai.md](05-ai.md), [06-chassis-and-weapons.md](06-chassis-and-weapons.md), [12-melee.md](12-melee.md), [07-atmosphere.md](07-atmosphere.md) for night/weather variants (missions degrade gracefully to plain palettes if M4 is late) |
@@ -69,6 +69,18 @@ no authored ridges.
 | 11 | The Squeeze | EXTRACT 2.2 km through a canyon within 4:00; ELIMINATE secondary | 1 PURPLE PUNCHER, 2 BEANPOLE, 3 JACKAL ambushes along the route | Canyon walls make knockback matter both ways. PURPLE PUNCHER unlock. |
 | 12 | Everything | ELIMINATE | 2 PURPLE PUNCHER, 2 WARDEN, 2 PIPSQUEAK | Night, lightning. The finale. No new mechanic, everything at once, two of them. |
 
+As shipped (#111): working titles again (`MISSION 9` to `MISSION 12` in the
+game). 9's three launchers are turrets (#105) beside two scenery tanks; DESTROY
+and ELIMINATE are both required. 10's waves: 2 JACKAL at once, JACKAL +
+PIPSQUEAK at 0:40, WARDEN + 2 JACKAL at 1:20, PURPLE PUNCHER from the ridge
+at 2:00 (a plain wave until #108's entrance), 2 PIPSQUEAK at 2:30; keeping two
+of the three storage tanks is a new PROTECT objective
+([03](03-objectives.md)), secondary. 11 starts in one corner of the map and
+ends in the other (~2.2 km, a mission `start`), with the ambushers asleep
+along the way; the map has no authored canyon, so the walls are whatever the
+seed makes. 12 is at night; lightning comes with M4's weather. The dust in 10
+is a `weather` field like Act II's.
+
 ### After twelve: contracts
 
 `missionDef(n)` for n ≥ 12 picks biome by `n % 3`, weather/time by a seeded
@@ -131,7 +143,7 @@ proposals the owner edits.
 9. Three launchers sit by the refinery. They shoot back. Knock them over.
 10. Hold the refinery for three minutes. Keep the tanks in one piece.
 11. The canyon is long. The clock is short. Run to the end.
-12. Everyone is here. Big ones. Little ones. Purple ones. Stomp them all.
+12. Everyone is here. Big ones, little ones, purple ones. Stomp them all.
 
 ## Code touchpoints
 

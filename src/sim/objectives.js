@@ -16,6 +16,9 @@ export { polar, flatZones } from './placement.js';
 //   { type: 'extract', at: 'nav_lz', within: 180 }        reach a nav point, in time if `within`
 //   { type: 'escort', convoy: 'c1', to: 'nav_exit', minAlive: 2, label: 'CONVOY' }
 //                                     at least minAlive of the vehicles tagged c1 reach the nav point
+//   { type: 'protect', targets: ['store'], minAlive: 2, label: 'TANK' }
+//                                     keep minAlive of those entities standing; it goes with
+//                                     another objective (it is done when the mission is won)
 // (A mission with `prefer: 'convoy'` sends its enemies after the trucks; ai.js.)
 // Any objective may wait for another: `after: n`
 // (its index) holds it until that one is done, and its clock starts then.
@@ -65,6 +68,15 @@ const TYPES = {
       if (o.left === 0) return 'failed';
     },
   },
+  // Keep things standing: failed the moment fewer than minAlive are left,
+  // otherwise held until the mission is won, and done then.
+  protect: {
+    init: (G, d) => ({ targets: G.entities.filter(e => e.tags.some(t => d.targets.includes(t))) }),
+    tick(G, o) {
+      o.total = o.targets.length; o.alive = o.targets.filter(e => e.alive).length;
+      if (o.alive < (o.def.minAlive ?? o.total)) return 'failed';
+    },
+  },
   // The clock runs from the mission start; each wave is called in WAVE_WARN
   // seconds before it arrives (waves at the very start just arrive).
   survive: {
@@ -82,12 +94,13 @@ const TYPES = {
 };
 export const OBJECTIVE_TYPES = Object.keys(TYPES);
 // Where the HUD marker for an objective goes (null: nowhere in particular):
-// the nearest standing target, the convoy's lead, the extraction point.
+// the nearest standing target (to knock down or to guard), the convoy's lead,
+// the extraction point.
 export function objectivePoint(G, o) {
   if (o.state !== 'active') return null;
   const P = G.player, near = list => list.reduce((b, e) => (!b || Math.hypot(e.x - P.x, e.z - P.z) < Math.hypot(b.x - P.x, b.z - P.z) ? e : b), null);
   const at = e => e && [e.x, e.y + (e.height || 0) / 2 + 2, e.z];
-  if (o.def.type === 'destroy') return at(near(o.targets.filter(e => e.alive)));
+  if (o.def.type === 'destroy' || o.def.type === 'protect') return at(near(o.targets.filter(e => e.alive)));
   if (o.def.type === 'escort') { const n = o.nav, live = o.vehicles.filter(v => v.alive); return at(live.reduce((b, v) => (!b || Math.hypot(v.x - n.x, v.z - n.z) < Math.hypot(b.x - n.x, b.z - n.z) ? v : b), null)); }
   if (o.def.type === 'extract') return at(o.nav);
   return null;
@@ -128,12 +141,13 @@ export function tickObjectives(G) {
     if (r) o.state = r;
   }
   tickWaves(G);
-  const main = G.objectives.filter(o => !o.def.secondary);
+  const main = G.objectives.filter(o => !o.def.secondary), held = o => o.state === 'done' || (o.def.type === 'protect' && o.state === 'active');
   if (main.some(o => o.state === 'failed')) {
     G.state = 'over'; G.endT = 3.2; G.won = false;
     voice(G, 'failed', {}, true, 600);
-  } else if (main.every(o => o.state === 'done')) {
+  } else if (main.every(held)) {
     G.state = 'over'; G.endT = 3.5; G.won = true;
+    for (const o of G.objectives) if (o.def.type === 'protect' && o.state === 'active') o.state = 'done';
     voice(G, 'complete', {}, true, 1400);
   }
 }
