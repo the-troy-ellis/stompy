@@ -97,6 +97,7 @@ export function createScene(app) {
 
   // The HUD canvas is always full resolution; the 3D canvas renders R.look.lines
   // tall (0: full) and the browser scales it up with hard edges (render/look.js).
+  const NO_SHADE = [1, 1, 1];
   const FRAME = {}, LOOK = new Float32Array(7);   // reused every frame: the effects' shared uniforms and one particle's look (mesh/effects.js)
   let W = 0, H = 0, dpr = 1, lines = -1;
   function resize() {
@@ -386,11 +387,12 @@ export function createScene(app) {
     [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.enableVertexAttribArray(a));
     R.gl.uniformMatrix4fv(R.U.VP, false, VP);
     R.gl.uniform3fv(R.U.light, G.pal.light);
+    R.gl.uniform3fv(R.U.shade, ir ? NO_SHADE : G.pal.shade || NO_SHADE);   // the IR camera sees the same at night
     R.gl.uniform3fv(R.U.cam, eye);
     R.gl.uniform2f(R.U.fog, G.pal.fog[0], G.pal.fog[1]);
     R.gl.uniform3fv(R.U.fogCol, hor);
     R.gl.uniform1f(R.U.ir, ir ? 1 : 0);
-    Object.assign(FRAME, { VP, light: G.pal.light, cam: eye, fog: G.pal.fog, fogCol: hor, ir: ir ? 1 : 0 }); R.frame = FRAME;   // the instanced effects shader's copy
+    Object.assign(FRAME, { VP, light: G.pal.light, shade: ir ? NO_SHADE : G.pal.shade || NO_SHADE, cam: eye, fog: G.pal.fog, fogCol: hor, ir: ir ? 1 : 0 }); R.frame = FRAME;   // the instanced effects shader's copy
 
     R.drawHeat = 0;
     R.draw(world, M.id());

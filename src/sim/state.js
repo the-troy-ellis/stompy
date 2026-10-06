@@ -1,5 +1,5 @@
 import { CHASSIS } from '../data/chassis.js';
-import { PALS } from '../data/palettes.js';
+import { palAt } from '../data/palettes.js';
 import { makeTerrain, BOUND } from '../world/terrain.js';
 import { makeRng } from './rng.js';
 import { Particles } from './particles.js';
@@ -50,7 +50,11 @@ export function newMech(G, type, team, x, z, yaw, opts = {}) {
 // Reset per-match state and build the world. `terrainOpts` is for tests (flat).
 export function resetMatch(G, { def, seed, pal, terrainOpts }) {
   G.rng = makeRng(seed);
-  G.pal = PALS[pal || def.pal] || PALS.dusk;
+  // The biome's palette at the mission's time of day; `ramp: [from, to, s]`
+  // blends one into the other over s seconds (tickTime in update.js).
+  const biome = pal || def.pal, r = def.ramp;
+  G.pal = palAt(biome, r ? r[0] : def.time);
+  G.palRamp = r ? { from: palAt(biome, r[0]), to: palAt(biome, r[1]), secs: r[2] } : null;
   G.ter = makeTerrain(seed, { ...terrainOpts, zones: flatZones(def) });
   G.worldKind = 'match';
   G.mechs = []; G.entities = []; G.waves = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts.clear(); G.debris = []; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear();
