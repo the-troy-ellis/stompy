@@ -121,6 +121,9 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
   the left side flies (upper: aim drag, which turns the legs through
   `input.turnBy` at the chassis's own rate; lower: throttle stick, sideways
   twists the torso) and the right side only shoots.
+- **A mech is one draw.** Its parts live in one skinned mesh (bones in
+  `mesh/mechParts.js` `BONE`); a new part needs a bone, and a new body plan
+  must fit in `BONE_COUNT`. Debris pieces still draw part by part.
 - **Renderer matrices are per-frame.** `scene.js` builds every matrix from a
   matrix arena (`makeMatrixArena`, reset at the start of `render()`), so they
   are only good until the next frame: never store one in the sim or in saved

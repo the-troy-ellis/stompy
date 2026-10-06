@@ -204,3 +204,23 @@ const BODY = {
     };
   },
 };
+
+// One draw per mech (docs/specs/14-look-and-performance.md § The plan, P4):
+// every part of a chassis in one mesh, each vertex tagged with the bone that
+// moves it, so drawMech fills a matrix per bone and draws once. Fists ride on
+// their arm's bone. A bone whose part is gone (a shot-off limb, an empty
+// hardpoint) gets a zero matrix and draws nothing.
+export const BONE = { hip: 0, torso: 1, arm: [2, 3], barrel: [4, 5], leg: i => 6 + i * 3 };   // a leg's upper, lower, foot: leg(i), +1, +2
+export const BONE_COUNT = 18;   // up to four legs
+export const SKIN_FLOATS = 10;  // pos, normal, colour, bone
+
+// `parts` as buildMechParts returns them; `legs` how many the chassis stands on.
+export function skinMech(parts, legs) {
+  const d = [];
+  const add = (b, bone) => { if (!b) return; for (let i = 0; i < b.d.length; i += 9) d.push(...b.d.slice(i, i + 9), bone); };
+  add(parts.hip, BONE.hip);
+  add(parts.torso, BONE.torso);
+  for (const s of [0, 1]) { add(parts.arm, BONE.arm[s]); add(parts.fist, BONE.arm[s]); add(parts.barrel, BONE.barrel[s]); }
+  for (let i = 0; i < legs; i++) { add(parts.uleg, BONE.leg(i)); add(parts.lleg, BONE.leg(i) + 1); add(parts.foot, BONE.leg(i) + 2); }
+  return { d };
+}

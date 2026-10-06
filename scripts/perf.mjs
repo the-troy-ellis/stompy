@@ -26,13 +26,16 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   allocation-free limb and terrain rays): menu 13/13/21.6k/21 ·
 //   free-start 37/37/21.8k/98 · fight 94/112/23.6k/174 ·
 //   fight-deaths 106/112/23.6k/175 · wrecks 91/97/23.2k/124
-// Budgets are the latest numbers plus ~15%. Lower them as P4 lands.
+// After P4 (#137, one draw per mech; draws now counted by the renderer, so
+//   the instanced effect draws count too): menu 2/2 · free-start 4/4 ·
+//   fight 24/42 · fight-deaths 44/51 · wrecks 51/58 (tris and alloc as P3)
+// Budgets are the latest numbers plus ~15% (the deaths peak at spec 14's 60).
 export const BUDGETS = {
-  menu:           { meanDraws: 15, peakDraws: 15, tris: 25000, allocKB: 26 },
-  'free-start':   { meanDraws: 43, peakDraws: 43, tris: 25000, allocKB: 115 },
-  fight:          { meanDraws: 110, peakDraws: 130, tris: 28000, allocKB: 200 },
-  'fight-deaths': { meanDraws: 122, peakDraws: 130, tris: 28000, allocKB: 205 },
-  wrecks:         { meanDraws: 105, peakDraws: 112, tris: 27500, allocKB: 145 },
+  menu:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 26 },
+  'free-start':   { meanDraws: 6, peakDraws: 6, tris: 25000, allocKB: 115 },
+  fight:          { meanDraws: 28, peakDraws: 48, tris: 28000, allocKB: 205 },
+  'fight-deaths': { meanDraws: 51, peakDraws: 60, tris: 28000, allocKB: 210 },
+  wrecks:         { meanDraws: 59, peakDraws: 67, tris: 28000, allocKB: 150 },
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;
@@ -47,8 +50,11 @@ function setup() {
   const app = window.__stompy.app, R = app.R, G = window.__stompy.game;
   window.requestAnimationFrame = () => 0;   // the game's loop stops after its current frame
   const S = window.__perf = { draws: 0, tris: 0, frameDraws: [] };
-  const draw = R.draw;
-  R.draw = (mesh, ...a) => { S.draws++; S.tris += mesh.count / 3; return draw(mesh, ...a); };
+  // Draws from the renderer's own count (per-part, skinned and instanced alike);
+  // triangles from the per-part and skinned draw calls (effects are a few hundred).
+  const draw = R.draw, drawSkinned = R.drawSkinned;
+  R.draw = (mesh, ...a) => { S.tris += mesh.count / 3; return draw(mesh, ...a); };
+  if (R.skinned) R.drawSkinned = (mesh, ...a) => { S.tris += mesh.count / 3; return drawSkinned(mesh, ...a); };
   window.__frames = async (n, input) => {
     const { update, noInput } = await import('/src/sim/update.js');
     const out = { draws: [], tris: [], parts: [] };
@@ -56,9 +62,9 @@ function setup() {
       G.clock += 1000 / 60;
       if (G.state === 'menu') app.ui.menuTick(1 / 60);
       else update(G, input ? Object.assign(noInput(), input) : noInput(), 1 / 60);
-      S.draws = 0; S.tris = 0;
+      S.tris = 0;
       app.scene.render(); app.hud.draw();
-      out.draws.push(S.draws); out.tris.push(S.tris); out.parts.push(G.parts.length);
+      out.draws.push(R.draws); out.tris.push(S.tris); out.parts.push(G.parts.length);   // render() starts the draw count at 0
     }
     return out;
   };
