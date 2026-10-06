@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; Acts II and III are still a proposal for the owner to edit) |
+| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; #106 strip, replay, unlocks and REALLY? shipped; Acts II and III are still a proposal for the owner to edit) |
 | Milestone | M3 |
 | Size | L (each mission is an S issue once the framework exists) |
 | Depends on | [03-objectives.md](03-objectives.md), [05-ai.md](05-ai.md), [06-chassis-and-weapons.md](06-chassis-and-weapons.md), [12-melee.md](12-melee.md), [07-atmosphere.md](07-atmosphere.md) for night/weather variants (missions degrade gracefully to plain palettes if M4 is late) |
@@ -84,9 +84,14 @@ rewards not being next to it).
 ## Progression and saving
 
 `store` keys: `camp.mission` (next unplayed), `camp.best[n]` (`{ won, time,
-objectives }`), `camp.unlocked` (chassis list). RESTART CAMPAIGN clears all
-three after a confirm step (a second tap on the same button within 3 s, no
-dialog; the button reads `REALLY?` in between).
+objectives }`, the best run), `camp.unlocked` (chassis list). A save from
+before (`mech.mission`, `mech.best`) migrates once. RESTART CAMPAIGN clears
+the mission and the results after a confirm step (a second tap on the same
+button within 3 s, no dialog; the button reads `REALLY?` in between); chassis
+already unlocked stay unlocked, since they were earned and the selector
+would otherwise take away a mech the player flies. The logic is
+`src/ui/campaign.js`. Free Play only draws unlocked chassis; a mix with none
+open yet (HEAVY on a fresh save) falls back to its `fallback` (KESTREL).
 
 The campaign panel in the menu shows a strip of twelve squares (done, current,
 locked) above the current mission's name, biome and one-line brief; tapping a

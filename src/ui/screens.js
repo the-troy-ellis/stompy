@@ -2,7 +2,7 @@ import { $, esc } from '../util/dom.js';
 import { store } from '../util/store.js';
 import { clampN } from '../util/math.js';
 import { CATS, CAT_OF } from '../data/weapons.js';
-import { CHASSIS, MECH_ORDER, MECH_INFO, isUnlocked } from '../data/chassis.js';
+import { CHASSIS, MECH_ORDER, MECH_INFO } from '../data/chassis.js';
 import { NAMES } from '../data/names.js';
 import { PALS } from '../data/palettes.js';
 import { missionDef, FP_MAPS, FP_MIXES, pickFoes } from '../data/missions.js';
@@ -15,6 +15,8 @@ import { DIFF, DIFF_ORDER } from '../data/ai.js';
 import { SETTINGS, SETTING_KEYS, stepSetting } from '../data/settings.js';
 import { fitOf, fitOk, kitLine } from './mechlab.js';
 import { objectiveRows, debriefTitle, missionTitle, missionSpoken } from './debrief.js';
+import { recordResult, saveCampaign, restartCampaign, stripSquares, canPlay } from './campaign.js';
+import { VOICE } from '../data/voice.js';
 
 const { sin, max, random, floor } = Math;
 
@@ -24,7 +26,7 @@ export function createUi(app) {
   const G = app.G, prefs = app.prefs, ov = app.ov, wrap = app.wrap;
   void CATS; void CAT_OF; void clampN;
   function startMission(n) {
-    prefs.mission = n; store.set('mech.mission', max(store.get('mech.mission', 0), n));
+    prefs.mission = n;
     G.diff = prefs.diff;
     const def = missionDef(n);
     startMatch(G, def, def.seed ?? 7 + n * 13, n === 0, prefs.chassis, { loadout: fitOf(prefs.chassis) });
@@ -34,7 +36,7 @@ export function createUi(app) {
   // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
   function startSkirmish() {
     const pk = FP_MAPS[prefs.fpMap] === 'random' ? ['dusk', 'ice', 'volcanic'][floor(random() * 3)] : FP_MAPS[prefs.fpMap];
-    const foes = pickFoes(FP_MIXES[prefs.fpMix] || FP_MIXES[0], prefs.fpFoes, random, k => isUnlocked(k, cleared()));
+    const foes = pickFoes(FP_MIXES[prefs.fpMix] || FP_MIXES[0], prefs.fpFoes, random, k => !locked(k));
     G.diff = prefs.diff;
     startMatch(G, { name: 'Free Play', pal: pk, foes, intel: '' }, 1 + floor(random() * 1e5), false, prefs.chassis, { loadout: fitOf(prefs.chassis) });
     G.kind = 'free';
@@ -111,10 +113,13 @@ export function createUi(app) {
     renderMenu(status);
   }
   // The mech on show: multiplayer shows it in your arena colour.
-  // Missions cleared, ever: a restarted campaign keeps what it unlocked. ?unlock opens everything (for testing).
+  // Unlocked chassis live in the campaign save (ui/campaign.js); a restarted
+  // campaign keeps them. ?unlock opens everything (for testing).
   const unlockAll = new URLSearchParams(location.search).has('unlock');
-  const cleared = () => max(store.get('mech.mission', 0), store.get('mech.best', 0));
-  const locked = k => !unlockAll && !isUnlocked(k, cleared());
+  const REALLY_MS = 3000;
+  let reallyUntil = 0, frontierWin = false;
+  const camp = app.campaign;
+  const locked = k => !unlockAll && !camp.unlocked.includes(k);
   function showMech() {
     const key = locked(prefs.chassis) ? app.R.partsKeyLocked(prefs.chassis) : prefs.menuSel === 'mp' ? app.R.partsKeyFor(prefs.mpColor, prefs.chassis) : prefs.chassis;
     G.player = newMech(G, prefs.chassis, 0, 0, 0, 0, { partsKey: key, loadout: fitOf(prefs.chassis) });
@@ -135,10 +140,14 @@ export function createUi(app) {
       const d = missionDef(prefs.mission), p = PALS[d.pal];
       const all = [...d.foes, ...(d.waves || []).flatMap(w => w.foes)];   // waves are hostiles too
       const counts = all.reduce((a, f) => ((a[foeType(f)] = (a[foeType(f)] || 0) + 1), a), {});
-      return `<div class="k">${esc(missionTitle(prefs.mission + 1, d.name))}</div>
+      // The strip: twelve squares, done (tap to replay), the next one, the rest locked.
+      const strip = stripSquares(camp).map((st, i) => `<button class="sq ${st}${i === prefs.mission ? ' sel' : ''}" data-mis="${i}" ${st === 'locked' ? 'disabled' : ''}>${i + 1}</button>`).join('');
+      const really = performance.now() < reallyUntil;
+      return `<div class="strip">${strip}</div>
+        <div class="k">${esc(missionTitle(prefs.mission + 1, d.name))}</div>
         <p>${esc(d.intel)}</p>
         <p class="dim">${esc(p.name.toUpperCase())} · ${Object.entries(counts).map(([k, n]) => `${n}x ${CHASSIS[k].name}`).join(', ')}</p>
-        ${prefs.mission > 0 ? '<button class="opt" data-a="restart">RESTART CAMPAIGN</button>' : ''}`;
+        ${camp.mission > 0 ? `<button class="opt${really ? ' really' : ''}" data-a="restart">${really ? 'REALLY?' : 'RESTART CAMPAIGN'}</button>` : ''}`;
     }
     if (prefs.menuSel === 'free') {
       const mapName = FP_MAPS[prefs.fpMap] === 'random' ? 'RANDOM' : PALS[FP_MAPS[prefs.fpMap]].name.toUpperCase();
@@ -221,21 +230,26 @@ export function createUi(app) {
     app.input.exitLock();
     const s = G.stats, acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
     const tm = `${floor(G.time / 60)}:${String(floor(G.time % 60)).padStart(2, '0')}`;
-    const camp = G.kind === 'campaign';
-    if (G.won && camp) { store.set('mech.mission', max(store.get('mech.mission', 0), prefs.mission + 1)); store.set('mech.best', max(store.get('mech.best', 0), prefs.mission + 1)); }
+    const isCamp = G.kind === 'campaign';
+    // A campaign result goes in the save; a win may open a chassis, which the voice announces once.
+    frontierWin = isCamp && G.won && prefs.mission + 1 >= app.campaign.mission;   // the furthest one: the menu moves on to the next
+    const fresh = isCamp ? recordResult(app.campaign, prefs.mission, { won: G.won, time: G.time, objectives: objectiveRows(G).map(r => r.ok) }) : [];
+    if (isCamp) saveCampaign(store.set, app.campaign);
+    if (fresh.length) app.audio.say(VOICE[fresh.includes('puncher') ? 'unlockPurple' : 'unlock'][0], false, 900);
     const rows = objectiveRows(G).map(r => `<div class="obj ${r.ok ? 'ok' : 'no'}${r.secondary ? ' sec' : ''}"><b>${r.ok ? '&#10003;' : '&#10007;'}</b> ${esc(r.text)}${r.secondary ? ' <i>OPTIONAL</i>' : ''}</div>`).join('');
     showOverlay(`
       <h1 style="color:${G.won ? '#5f5' : '#f44'}">${debriefTitle(G)}</h1>
       <div class="panel">
-        <div class="k">${camp ? esc(missionTitle(prefs.mission + 1, G.def.name)) : 'FREE PLAY'}</div>
+        <div class="k">${isCamp ? esc(missionTitle(prefs.mission + 1, G.def.name)) : 'FREE PLAY'}</div>
         ${rows ? `<div class="objs">${rows}</div>` : ''}
+        ${fresh.length ? `<div class="unlock">NEW MECH: ${fresh.map(k => esc(CHASSIS[k].name)).join(', ')}</div>` : ''}
         <p>TIME ${tm}<br>KILLS ${s.kills} / ${G.mechs.filter(m => m.team !== 0 && !m.remote).length}<br>
            ACCURACY ${acc}% (${Math.round(s.hits)} of ${Math.round(s.shots)})<br>
            DAMAGE DEALT ${Math.round(s.dealt)} &nbsp; TAKEN ${Math.round(s.taken)}</p>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
-        ${camp && G.won ? '<button class="go" data-a="next">NEXT MISSION</button>' : ''}
-        ${camp ? `<button class="go" data-a="retry">${G.won ? 'REPLAY' : 'RETRY'}</button>` : '<button class="go" data-a="again">PLAY AGAIN</button>'}
+        ${isCamp && G.won ? '<button class="go" data-a="next">NEXT MISSION</button>' : ''}
+        ${isCamp ? `<button class="go" data-a="retry">${G.won ? 'REPLAY' : 'RETRY'}</button>` : '<button class="go" data-a="again">PLAY AGAIN</button>'}
         <button class="go" data-a="menu">MAIN MENU</button>
       </div>`);
   }
@@ -280,6 +294,8 @@ export function createUi(app) {
       const sel = e.target.closest('[data-sel]')?.dataset.sel, md = e.target.closest('[data-mech]'), fp = e.target.closest('[data-fp]');
       if (sel) { const wasMp = prefs.menuSel === 'mp'; prefs.menuSel = sel; store.set('menu.sel', sel); if (wasMp !== (sel === 'mp')) showMech(); renderMenu(); return; }
       if (md) { cycleMech(+md.dataset.mech); return; }
+      const mis = e.target.closest('[data-mis]');
+      if (mis) { const n = +mis.dataset.mis; if (canPlay(camp, n)) { prefs.mission = n; renderMenu(); } return; }
       if (fp) {
         const d = +fp.dataset.d;
         if (fp.dataset.fp === 'map') prefs.fpMap = (prefs.fpMap + d + FP_MAPS.length) % FP_MAPS.length;
@@ -290,10 +306,15 @@ export function createUi(app) {
         renderMenu(); return;
       }
       if (a === 'go') go();
-      else if (a === 'restart') { prefs.mission = 0; store.set('mech.mission', 0); renderMenu(); }
+      else if (a === 'restart') {
+        // Two taps: the first turns the button into REALLY? for 3 s, the second restarts.
+        if (performance.now() < reallyUntil) { reallyUntil = 0; restartCampaign(camp); saveCampaign(store.set, camp); prefs.mission = 0; }
+        else { reallyUntil = performance.now() + REALLY_MS; setTimeout(() => { if (G.state === 'menu' && prefs.menuSel === 'campaign') renderMenu(); }, REALLY_MS + 30); }
+        renderMenu();
+      }
       return;
     }
-    if (a === 'menu') { mainMenu(); return; }
+    if (a === 'menu') { if (frontierWin) { prefs.mission = camp.mission; frontierWin = false; } mainMenu(); return; }
     if (a === 'mp') { mainMenu('mp'); return; }
     if (a === 'leave') { app.net.leaveArena(); return; }
     if (a === 'next') { prefs.mission++; startMission(prefs.mission); launch(); }

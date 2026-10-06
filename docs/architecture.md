@@ -21,7 +21,7 @@ relay and its tests.
 | `src/render/` | ~730 | `gl.js` (`createRenderer`: context, shaders, `upload`, `draw`, mesh sets), `scene.js` (`createScene`: camera, sky, world, mechs with IK, effects), `hud.js` (`createHud`: the 2D instruments, the missile camera feed, the `?debug=1` readout). `look.js` (the 3D view's tunable resolution: `backingSize`, `readLook`; a `?debug=1` LOOK row in the FEEL panel sets lines and antialiasing to settle the pixel look, spec 14). |
 | `src/audio/` | ~360 | `sound.js` (`createAudio`: unlock dance, samples over synthesis, spatialisation, loops, `sfx.*`, the voice `say`, the beam and scan tones, `tick`). |
 | `src/input/` | ~220 | `input.js` (`createInput`: keyboard, mouse with pointer lock, touch stick/aim/buttons, one per-frame `snapshot()`). |
-| `src/ui/` | ~280 | `screens.js` (`createUi`: main menu with the live mech, briefing detail, settings, pause, debrief, mission and skirmish start, click routing), `debrief.js` (the objective rows and the banner). |
+| `src/ui/` | ~280 | `screens.js` (`createUi`: main menu with the live mech, briefing detail, settings, pause, debrief, mission and skirmish start, click routing), `debrief.js` (the objective rows and the banner). `campaign.js` (`camp.*` progress: load and migrate, results, unlocks, restart, the strip). |
 | `src/net/` | ~330 | `protocol.js` (`PROTOCOL`, message builders, `parse`), `client.js` (`createNet`: join, handler, spawn, 15 Hz state, relayed effects, `tick`), `interp.js` (`netInterp`). |
 | `src/util/` | ~70 | `math.js` (scalars, vec3, `M` matrices, `chain`, cosmetic `rnd`), `store.js`, `dom.js`. |
 | `server/` | 300 + tests | `server.py` the relay (unchanged logic), `test_server.py`. |
