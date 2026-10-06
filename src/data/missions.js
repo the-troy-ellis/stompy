@@ -78,7 +78,7 @@ export const MISSIONS = [
     waves: [{ at: 40, foes: ['jackal', 'jackal'], from: 270 }, { at: 120, foes: ['jackal', 'jackal'], from: 90 }],
     intel: 'Three trucks cross the ice at night. Their lights are on. Get them across.' },
   // Act III: the volcanic plain. Structures that shoot back at 9, PURPLE
-  // PUNCHER walks in at 10 (#108 gives it the entrance) and unlocks after 11.
+  // PUNCHER makes an entrance at 10 and unlocks after 11.
   { key: 'm09', pal: 'volcanic', seed: 111,
     foes: [{ type: 'warden', at: [5, 720] }, { type: 'warden', at: [335, 780], aware: false }, { type: 'jackal', at: [30, 480] }, { type: 'jackal', at: [320, 520], aware: false }],
     entities: [
@@ -89,13 +89,13 @@ export const MISSIONS = [
     intel: 'Three launchers sit by the refinery. They shoot back. Knock them over.' },
   { key: 'm10', pal: 'volcanic', seed: 124, weather: 'dust',
     foes: [],
-    entities: [{ ...TANK, id: 'store1', at: [0, 70], tags: ['store'] }, { ...TANK, id: 'store2', at: [120, 75], tags: ['store'] }, { ...TANK, id: 'store3', at: [240, 70], tags: ['store'] }],
+    entities: [{ kind: 'nav', id: 'ridge', at: [40, 300] }, { ...TANK, id: 'store1', at: [0, 70], tags: ['store'] }, { ...TANK, id: 'store2', at: [120, 75], tags: ['store'] }, { ...TANK, id: 'store3', at: [240, 70], tags: ['store'] }],
     objectives: [
       { type: 'survive', seconds: 180, waves: [
         { at: 0, foes: ['jackal', 'jackal'], from: 0 },
         { at: 40, foes: ['jackal', 'light1'], from: 120 },
         { at: 80, foes: ['warden', 'jackal', 'jackal'], from: 240 },
-        { at: 120, foes: ['puncher'], from: 0, dist: 600 },   // from the ridge
+        { at: 120, foes: ['puncher'], from: 'ridge', reveal: 8 },   // the set piece: it walks in off the ridge, and you feel it first
         { at: 150, foes: ['light1', 'light1'], from: 180 },
       ] },
       { type: 'protect', targets: ['store'], minAlive: 2, label: 'TANK', secondary: true },

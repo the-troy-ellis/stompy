@@ -9,6 +9,7 @@ import { keepRange, steer, strafeTick } from './ai/behaviours.js';
 import { planFor } from './ai/profiles.js';
 import { decideFire } from './ai/fire.js';
 import { PERCEPTION as K } from '../data/ai.js';
+import { revealing } from './waves.js';
 
 const { atan2, hypot, PI } = Math;
 
@@ -16,6 +17,7 @@ const { atan2, hypot, PI } = Math;
 export function think(G, e, dt) {
   const P = G.player, r = G.rng;
   const plan = e.ai.plan || (e.ai.plan = planFor(e)), brawling = plan.brawler;   // how this chassis fights
+  if (revealing(G, e)) return entrance(G, e, P, dt);
   // Where it believes the player is: the truth with line of sight, the last fix otherwise.
   const bp = perceive(G, e, P, dt), seen = !!e.ai.seen;
   const truck = e.ai.aware && convoyTarget(G, e, P);   // an escort mission: the trucks are the point
@@ -86,6 +88,15 @@ export function convoyTarget(G, e, P) {
     if (d < bestD) { best = v; bestD = d; }
   }
   return best && (!P.alive || bestD < dP * 1.5) ? best : null;
+}
+// An entrance (waves.js `reveal`): walk straight at the player at a steady
+// pace, torso on them, guns quiet. The show is the walk.
+function entrance(G, e, P, dt) {
+  const toYaw = atan2(P.x - e.x, P.z - e.z);
+  e.yaw += clampN(wrapA(toYaw - e.yaw), -e.ch.turn * dt, e.ch.turn * dt);
+  e.throttle = 0.8; e.jetting = false;
+  e.twist += clampN(wrapA(clampN(wrapA(toYaw - e.yaw), -1.9, 1.9) - e.twist), -2 * dt, 2 * dt);
+  e.ai.seen = true;
 }
 // Close to a firing range on the truck, strafing, and shoot it. Trucks don't
 // shoot back, so there is nothing to hide from.

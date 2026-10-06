@@ -102,6 +102,12 @@ foes, from }` once objective 0's count reaches 2 (it arrives 3 s after the
 trigger, so the call still comes first). ELIMINATE is not done while a wave
 is on its way.
 
+A wave with `reveal: s` makes an entrance (mission 10's PURPLE PUNCHER): for
+its first s seconds each of its mechs walks straight at the player without
+firing, and its footsteps are heard and felt (the feel table's `nearStep`, as
+if 20 m off) at any distance. `from` a nav point puts it somewhere the player
+can watch.
+
 ### Placement in mission data
 
 Positions are given as polar `[bearing°, distance]` from the start, so a

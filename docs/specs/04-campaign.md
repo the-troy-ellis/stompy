@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; #106 strip, replay, unlocks and REALLY? shipped; #110 Act II and #111 Act III: `m05`-`m12` shipped with placeholder names; PURPLE PUNCHER's entrance in 10 is #108; #107 verdicts shipped with the draft words) |
+| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; #106 strip, replay, unlocks and REALLY? shipped; #110 Act II and #111 Act III: `m05`-`m12` shipped with placeholder names; #108 PURPLE PUNCHER's entrance in 10 shipped; #107 verdicts shipped with the draft words) |
 | Milestone | M3 |
 | Size | L (each mission is an S issue once the framework exists) |
 | Depends on | [03-objectives.md](03-objectives.md), [05-ai.md](05-ai.md), [06-chassis-and-weapons.md](06-chassis-and-weapons.md), [12-melee.md](12-melee.md), [07-atmosphere.md](07-atmosphere.md) for night/weather variants (missions degrade gracefully to plain palettes if M4 is late) |
@@ -73,7 +73,7 @@ As shipped (#111): working titles again (`MISSION 9` to `MISSION 12` in the
 game). 9's three launchers are turrets (#105) beside two scenery tanks; DESTROY
 and ELIMINATE are both required. 10's waves: 2 JACKAL at once, JACKAL +
 PIPSQUEAK at 0:40, WARDEN + 2 JACKAL at 1:20, PURPLE PUNCHER from the ridge
-at 2:00 (a plain wave until #108's entrance), 2 PIPSQUEAK at 2:30; keeping two
+at 2:00 (an entrance, below), 2 PIPSQUEAK at 2:30; keeping two
 of the three storage tanks is a new PROTECT objective
 ([03](03-objectives.md)), secondary. 11 starts in one corner of the map and
 ends in the other (~2.2 km, a mission `start`), with the ambushers asleep
@@ -164,7 +164,10 @@ proposals the owner edits.
   player within range.
 - Mission 10's scripted entrance: a wave entry with `from: navId` and a
   `reveal` flag that forces the enemy to walk (not spawn awake and shooting)
-  for its first 8 s.
+  for its first 8 s. As shipped (#108): `from: 'ridge'`, a nav point on the
+  ridge 300 m north-east, about 100 m above the refinery and in plain sight
+  of it, and `reveal: 8`; while it walks in its steps are
+  heard and felt from anywhere, so the footfalls come before the first shot.
 
 ## Acceptance criteria
 
