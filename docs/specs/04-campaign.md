@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; #106 strip, replay, unlocks and REALLY? shipped; #110 Act II and #111 Act III: `m05`-`m12` shipped with placeholder names; #108 PURPLE PUNCHER's entrance in 10 shipped; #107 verdicts shipped with the draft words; #112 contracts shipped) |
+| Status | in progress (#109 Act I: `m01`-`m04` shipped and named by the owner; #106 strip, replay, unlocks and REALLY? shipped; #110 Act II and #111 Act III: `m05`-`m12` shipped with placeholder names; #108 PURPLE PUNCHER's entrance in 10 shipped; #107 verdicts shipped with the draft words; #112 contracts shipped; #113 the perfect-player harness covers acceptance 1) |
 | Milestone | M3 |
 | Size | L (each mission is an S issue once the framework exists) |
 | Depends on | [03-objectives.md](03-objectives.md), [05-ai.md](05-ai.md), [06-chassis-and-weapons.md](06-chassis-and-weapons.md), [12-melee.md](12-melee.md), [07-atmosphere.md](07-atmosphere.md) for night/weather variants (missions degrade gracefully to plain palettes if M4 is late) |
@@ -184,6 +184,8 @@ proposals the owner edits.
 1. All twelve missions load, are winnable headlessly with a scripted "perfect"
    player (a test harness that kills enemies by direct damage calls and
    teleports to nav points), and fail when their fail rule triggers.
+   (`test/harness.js` `playPerfectly`, run over all twelve and five
+   contracts on every difficulty in `test/allMissions.test.js`.)
 2. Playthrough on NORMAL by a tester in a stock KESTREL: every mission won
    within three attempts; total time under two and a half hours.
 3. Each objective type appears at least twice; each biome hosts four missions;
