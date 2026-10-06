@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { buildEffectShapes, EFFECT_SHAPES, SHAPE_OF, shapeOf, effectLook } from '../src/mesh/effects.js';
+import { buildEffectShapes, EFFECT_SHAPES, SHAPE_OF, shapeOf, effectLook, DITHER_KINDS, DITHER_SHAPES, DITHER_FROM } from '../src/mesh/effects.js';
 import { mix3 } from '../src/util/math.js';
-import { Particles, spawn } from '../src/sim/particles.js';
+import { Particles, spawn, KINDS } from '../src/sim/particles.js';
 
 test('one small solid per effect kind, every kind mapped to a shape that exists', () => {
   const shapes = buildEffectShapes();
@@ -17,7 +17,7 @@ test('one small solid per effect kind, every kind mapped to a shape that exists'
 });
 
 test('effectLook keeps the old rules: fire shrinks and reddens, flame swells, smoke fades to the horizon', () => {
-  const hor = [0.8, 0.5, 0.3], out = new Float32Array(6);
+  const hor = [0.8, 0.5, 0.3], out = new Float32Array(7);
   const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} vs ${b}`);   // the pool stores float32
   const check = (p, size, col, emis, heat) => {
     const P = new Particles(4), G = { parts: P, rng: { next: () => 0 } };
@@ -40,4 +40,29 @@ test('the look stays polygons: no textures and no blending anywhere in the rende
     assert.ok(!/texImage2D|createTexture/.test(src), `${f} uses a texture`);
     assert.ok(!/gl\.BLEND|blendFunc/.test(src), `${f} blends`);
   }
+});
+
+const lookAt = (kind, life, max = 1) => {
+  const P = new Particles(2), G = { parts: P, rng: { next: () => 0 } };
+  spawn(G, [0, 0, 0], [0, 0, 0], max, 1, [0.5, 0.5, 0.5], kind);
+  P.life[0] = life;
+  return effectLook(P, 0, [0, 0, 0], new Float32Array(7))[6];
+};
+
+test('smoke and dust dither out over the last third of their life; nothing else dithers', () => {
+  const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-5, `${a} vs ${b}`);
+  for (const k of ['smoke', 'dust']) {
+    near(lookAt(k, 1), 0); near(lookAt(k, 0.5), 0); near(lookAt(k, DITHER_FROM + 0.01), 0);
+    near(lookAt(k, DITHER_FROM / 2), 0.5);
+    assert.ok(lookAt(k, 0.01) > 0.95, 'nearly gone just before it expires');
+    near(lookAt(k, 2, 4), 0); near(lookAt(k, 4 * DITHER_FROM / 2, 4), 0.5);   // by share of its life, not seconds
+  }
+  for (const k of KINDS.filter(k => !DITHER_KINDS.includes(k))) near(lookAt(k, 0.01), 0);
+});
+
+test('dithering shapes are drawn by the dithering shader, and only dithering kinds use them', () => {
+  assert.deepEqual(DITHER_SHAPES.sort(), ['cube', 'flat']);
+  for (const k of KINDS) assert.equal(DITHER_SHAPES.includes(shapeOf(k)), DITHER_KINDS.includes(k), k);
+  const gl = readFileSync('src/render/gl.js', 'utf8');
+  assert.match(gl, /#ifdef DITHER[\s\S]*discard/, 'dither skips pixels with discard');
 });

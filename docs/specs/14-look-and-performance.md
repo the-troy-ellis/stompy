@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (P0 #131 perf harness, P1 #132 instanced effects, P2 #133 particle pool, P3 #134 allocation diet shipped; the owner's decisions are recorded below) |
+| Status | in progress (P0 #131 perf harness, P1 #132 instanced effects, P2 #133 particle pool, P3 #134 allocation diet, P5b #136 dither shipped; the owner's decisions are recorded below) |
 | Milestone | between M3's #106 and Acts II–III (#110, #111); the rest of M4 builds on it |
 | Size | L (split: perf harness; instanced effects + particle pool; allocation diet; one-draw mechs; render scale; culling) |
 | Depends on | [07-atmosphere.md](07-atmosphere.md) (weather and explosions are the big new loads); [13-thunk.md](13-thunk.md) (effects are feedback) |
@@ -142,6 +142,16 @@ Order: P0, P1, P2, P3 and P5 (with P5b) come right after #106 and before Acts
 II–III, because weather (M4) and bigger missions need the headroom and the
 look should be settled before more content is screenshotted. P4, P6 and P7
 follow, P4 before co-op (M5b) puts more mechs on screen.
+
+P5b as shipped (#136): the dither lives in the instanced effects shader, per
+instance, in a second build of it (`#define DITHER`) that only the smoke and
+dust shapes use, drawn after the other effects, so nothing else pays for
+`discard`. It runs on the screen's pixel grid, so it is as chunky as the
+pixels. A landing's dust ring is dust, so it dithers too; a real shockwave
+ring will join `DITHER_KINDS` in `mesh/effects.js` when it lands. The
+per-particle fallback (no instancing extension) does not dither: smoke and
+dust shrink and pop there, as before. The main shader gets a `uDither` when
+something solid needs to go ghostly (the arena respawn).
 
 After P1–P4 the measured worst case above would be roughly **1 terrain + 6
 effect shapes + ~10 mechs + a few beams ≈ 25–30 draws**, against 500. That

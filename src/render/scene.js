@@ -97,7 +97,7 @@ export function createScene(app) {
 
   // The HUD canvas is always full resolution; the 3D canvas renders R.look.lines
   // tall (0: full) and the browser scales it up with hard edges (render/look.js).
-  const FRAME = {}, LOOK = new Float32Array(6);   // reused every frame: the effects' shared uniforms and one particle's look (mesh/effects.js)
+  const FRAME = {}, LOOK = new Float32Array(7);   // reused every frame: the effects' shared uniforms and one particle's look (mesh/effects.js)
   let W = 0, H = 0, dpr = 1, lines = -1;
   function resize() {
     dpr = min(devicePixelRatio || 1, 1.5);
@@ -291,7 +291,7 @@ export function createScene(app) {
       const d = g.data, o = g.n++ * R.FX_FLOATS, i3 = i * 3;
       d[o] = P.pos[i3]; d[o + 1] = P.pos[i3 + 1]; d[o + 2] = P.pos[i3 + 2]; d[o + 3] = LOOK[0];
       d[o + 4] = P.spin[i]; d[o + 5] = P.spin[i] * 0.7;
-      d[o + 6] = LOOK[1]; d[o + 7] = LOOK[2]; d[o + 8] = LOOK[3]; d[o + 9] = LOOK[4]; d[o + 10] = LOOK[5];
+      d[o + 6] = LOOK[1]; d[o + 7] = LOOK[2]; d[o + 8] = LOOK[3]; d[o + 9] = LOOK[4]; d[o + 10] = LOOK[5]; d[o + 11] = LOOK[6];
     }
   }
 
@@ -380,8 +380,9 @@ export function createScene(app) {
     drawEntities(eye);
     drawShotsAndBeams(eye, gd);
     // Effects: one instanced draw per shape (spec 14 P1), each particle a
-    // shape by its kind (mesh/effects.js); per-particle draws where the
-    // instancing extension is missing.
+    // shape by its kind (mesh/effects.js), the dithering ones last; per-particle
+    // draws where the instancing extension is missing (those don't dither:
+    // smoke and dust just shrink and pop, as before).
     [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.disableVertexAttribArray(a));
     if (R.instanced) {
       fillEffects(G.parts, G.pal.hor);
