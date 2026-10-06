@@ -8,7 +8,7 @@ import { solveKnee, limb } from '../sim/gait.js';
 import { meltFrac } from '../sim/beams.js';
 import { FEEL, HEAT, hotFrac } from '../data/feel.js';
 import { meleeOf } from '../data/melee.js';
-import { BARREL_AT, styleOf } from '../mesh/mechParts.js';
+import { BARREL_AT, styleOf, BONE, BONE_COUNT } from '../mesh/mechParts.js';
 import { fallAngle } from '../sim/entities.js';
 import { propFor } from '../mesh/props.js';
 import { WEAPONS } from '../data/weapons.js';
@@ -109,6 +109,14 @@ export function createScene(app) {
     cv.classList.toggle('pixelated', cv.height < hud.height);
   }
 
+  // One mech's bones this frame (spec 14 P4): put() copies a part's matrix
+  // into its bone, or draws the part on its own where skinning isn't available.
+  const BONES = new Float32Array(BONE_COUNT * 16);
+  let putTint = null;
+  const put = (bone, mesh, mat) => {
+    if (R.skinned) BONES.set(mat, bone * 16);
+    else R.draw(mesh, mat, putTint);
+  };
   function drawMech(m, VPtint) {
     // The hips drop by the sag spring (reactor down); the feet stay put and the knees take it up.
     const sag = (m.sag ? m.sag.x : 0) + (m.dying ? m.dying.drop || 0 : 0);   // and the buckle of a dying mech
@@ -123,14 +131,15 @@ export function createScene(app) {
     const tint = mf ? mix3(VPtint || [1, 1, 1], [2.2, 0.8, 0.25], mf * 0.6) : VPtint || [1, 1, 1];
     if (mf) R.drawHeat = min(1, R.drawHeat + mf * 0.3);
     const g = geoOf(m), back = mul(fwd, -1);
-    R.draw(parts.hip, chain(B, M.T(0, g.hip, 0)), tint);
+    if (R.skinned) BONES.fill(0);   // a part that isn't drawn this frame keeps a zero matrix
+    putTint = tint;
+    put(BONE.hip, parts.hip, chain(B, M.T(0, g.hip, 0)));
     const hull = M.apply(B, [0, g.hip, 0]);
     // Legs reach for wherever the feet actually are; the knee bends forward,
     // backward (bird legs) or out and up (the quadruped's spider legs).
     m.feet.forEach((f, i) => {
       const leg = g.legs[i];
       if (m.hp[leg.hx > 0 ? 'LL' : 'RL'] <= 0) return;   // the leg came off; it's lying somewhere behind
-      const legTint = tint;
       const H = M.apply(B, [leg.hx, g.hip, leg.hz]);
       const out = norm([H[0] - hull[0], 0, H[2] - hull[2]]), splay = legSplay(m.squash ? m.squash.x : 0) + (m.dying ? (m.dying.buckle || 0) * 0.5 : 0);   // knees bow out as the legs give way
       let pole = g.knee === 'forward' ? fwd : g.knee === 'back' ? back : norm(add(out, [0, 0.9, 0]));
@@ -139,9 +148,10 @@ export function createScene(app) {
       const polePlaced = top ? norm(sub(M.apply(top, add(hull, pole)), M.apply(top, hull))) : pole;
       const K = solveKnee(H, A, polePlaced, g.l1 * sc, g.l2 * sc);
       const ankle = add(K, mul(norm(sub(A, K)), g.l2 * sc));   // stays attached even if out of reach
-      R.draw(parts.uleg, limb(H, K, polePlaced, sc, M.id()), legTint);
-      R.draw(parts.lleg, limb(K, ankle, polePlaced, sc, M.id()), legTint);
-      R.draw(parts.foot, chain(top || M.id(), M.T(...(top ? M.apply(inverse3(top), ankle) : ankle)), M.RY(f.yaw), M.S(sc)), legTint);
+      const bone = BONE.leg(i);
+      put(bone, parts.uleg, limb(H, K, polePlaced, sc, M.id()));
+      put(bone + 1, parts.lleg, limb(K, ankle, polePlaced, sc, M.id()));
+      put(bone + 2, parts.foot, chain(top || M.id(), M.T(...(top ? M.apply(inverse3(top), ankle) : ankle)), M.RY(f.yaw), M.S(sc)));
     });
     // The thunk springs: a squash pulse on the whole body (down in y, out in x/z,
     // about the feet) and a wobble of the torso about the hips.
@@ -151,27 +161,30 @@ export function createScene(app) {
     const pose = meleePose(m);
     const fists = parts.fist && meleeOf(m).fists ? fistPose(m) : null;   // with both arms gone it shoves like anyone else
     const TB = chain(B, M.T(0, g.torsoY, 0), M.S(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5), M.RY(m.twist + (fists ? fists.twist : 0)), M.T(0, 0, pose.lunge), M.RX(wp - pose.lean), M.RZ(wr));
-    R.draw(parts.torso, TB, tint);
-    for (const [s, k] of [[1, 'LA'], [-1, 'RA']]) {
+    put(BONE.torso, parts.torso, TB);
+    for (const [s, k, side] of [[1, 'LA', 0], [-1, 'RA', 1]]) {
       if (m.hp[k] <= 0) continue;
       // Fists follow the aim only a little; guns follow it all the way.
       const AM = chain(TB, M.T(s * g.armX, g.armY, 0), M.RX(fists ? -m.pitch * 0.3 + fists[k] : -m.pitch + pose.arm));
-      R.draw(parts.arm, AM, tint);
-      if (parts.fist) R.draw(parts.fist, AM, tint);
+      put(BONE.arm[side], parts.arm, AM);
+      if (parts.fist && !R.skinned) R.draw(parts.fist, AM, tint);   // skinned, the fist rides on the arm's bone
       // The arm's gun, shaped by what is fitted there; nothing for an EMPTY hardpoint.
       const w = m.weapons.find(x => x.mount === k && x.def.kind !== 'fusion');
       if (w && parts.barrel) {
         const [bw, bl] = BARREL[w.type] || [1, 1], at = BARREL_AT[styleOf(m.ch)] || BARREL_AT[m.ch.legs] || BARREL_AT.forward;
-        R.draw(parts.barrel, chain(AM, M.T(...at), M.S(bw, bw, bl), M.T(-at[0], -at[1], -at[2])), tint);
+        put(BONE.barrel[side], parts.barrel, chain(AM, M.T(...at), M.S(bw, bw, bl), M.T(-at[0], -at[1], -at[2])));
       }
     }
-    // Muzzle flash: a hot streak out of the barrel for two frames.
-    const fl = m.flash;
-    if (fl && G.frame - fl.frame <= 1) {
-      const d = fl.dir, yw = atan2(d[0], d[2]), pt = Math.asin(clampN(d[1], -1, 1)), L = fl.big ? 3.2 : 1.6, w = fl.big ? 0.9 : 0.5;
-      R.draw(R.meshes.beam, chain(M.T(...fl.p), M.RY(yw), M.RX(-pt), M.S(w, w, L)), [1, 0.9, 0.5], 1, 1);
-    }
+    if (R.skinned) R.drawSkinned(parts.skin, BONES, tint);
     R.drawHeat = heatWas;
+  }
+  // Muzzle flash: a hot streak out of the barrel for two frames. After the
+  // mechs, so the skinned ones stay one run of draws in their own program.
+  function drawFlash(m) {
+    const fl = m.flash;
+    if (!fl || G.frame - fl.frame > 1) return;
+    const d = fl.dir, yw = atan2(d[0], d[2]), pt = Math.asin(clampN(d[1], -1, 1)), L = fl.big ? 3.2 : 1.6, w = fl.big ? 0.9 : 0.5;
+    R.draw(R.meshes.beam, chain(M.T(...fl.p), M.RY(yw), M.RX(-pt), M.S(w, w, L)), [1, 0.9, 0.5], 1, 1);
   }
 
   // render()'s per-object loops live in their own functions: render() is too big
@@ -185,17 +198,21 @@ export function createScene(app) {
         const fade = d.t > d.life - 2 ? (d.life - d.t) / 2 : 1;
         R.draw(parts[d.part], chain(M.T(...d.p), M.RY(d.rot[1]), M.RX(d.rot[0]), M.RZ(d.rot[2]), M.S(d.scale * (0.6 + 0.4 * fade))), [0.6, 0.58, 0.56]);
       }
-      R.drawHeat = 0.45;
-      for (const w of G.wrecks) {
-        // A fresh wreck rocks and sinks a little before it lies still.
-        const st = w.settle ?? 1, rock = (1 - st) * 0.2 * sin(w.t * 11), sink = 0.35 * w.scale * st;
-        const parts = R.mechParts[w.type], B = chain(M.T(w.x, w.y - sink, w.z), M.RY(w.yaw), M.RX(rock), M.S(w.scale));
-        const dark = [0.3, 0.28, 0.27];
-        R.draw(parts.torso, chain(B, M.T(0, 1.3, -1), M.RX(-1.2), M.RZ(w.roll)), dark);
-        R.draw(parts.hip, chain(B, M.T(0.5, 0.6, 1.5), M.RY(0.6)), dark);
-        R.draw(parts.uleg, chain(B, M.T(2.5, 0.6, 1), M.RZ(1.5)), dark);
-        R.draw(parts.lleg, chain(B, M.T(-2.6, 0.5, -0.5), M.RZ(-1.5), M.RY(1)), dark);
-      }
+  }
+  // A wreck: the torso, hip and one leg's two halves in a heap; skinned, one
+  // draw on the mech's own mesh with the other bones left at zero.
+  const WRECK_DARK = [0.3, 0.28, 0.27];
+  function drawWreck(w) {
+    // A fresh wreck rocks and sinks a little before it lies still.
+    const st = w.settle ?? 1, rock = (1 - st) * 0.2 * sin(w.t * 11), sink = 0.35 * w.scale * st;
+    const parts = R.mechParts[w.type], B = chain(M.T(w.x, w.y - sink, w.z), M.RY(w.yaw), M.RX(rock), M.S(w.scale));
+    if (R.skinned) BONES.fill(0);
+    putTint = WRECK_DARK;
+    put(BONE.torso, parts.torso, chain(B, M.T(0, 1.3, -1), M.RX(-1.2), M.RZ(w.roll)));
+    put(BONE.hip, parts.hip, chain(B, M.T(0.5, 0.6, 1.5), M.RY(0.6)));
+    put(BONE.leg(0), parts.uleg, chain(B, M.T(2.5, 0.6, 1), M.RZ(1.5)));
+    put(BONE.leg(0) + 1, parts.lleg, chain(B, M.T(-2.6, 0.5, -0.5), M.RZ(-1.5), M.RY(1)));
+    if (R.skinned) R.drawSkinned(parts.skin, BONES, WRECK_DARK);
   }
   function drawEntities(eye) {
       // World entities: structures and vehicles (a nav point has no body). Plain
@@ -375,7 +392,14 @@ export function createScene(app) {
     R.draw(world, M.id());
     // In the missile camera your own mech is out there too.
     R.drawHeat = 1;
-    for (const m of G.mechs) if ((m.alive || m.dying) && (m !== P || gd || G.state === 'menu')) drawMech(m);
+    const shown = m => (m.alive || m.dying) && (m !== P || gd || G.state === 'menu');
+    if (R.skinned) R.beginSkinned();
+    for (const m of G.mechs) if (shown(m)) drawMech(m);
+    R.drawHeat = 0.45;
+    for (const w of G.wrecks) drawWreck(w);
+    R.drawHeat = 1;
+    if (R.skinned) R.endSkinned();
+    for (const m of G.mechs) if (shown(m)) drawFlash(m);
     drawRemains();
     drawEntities(eye);
     drawShotsAndBeams(eye, gd);

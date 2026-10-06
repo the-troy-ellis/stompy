@@ -118,6 +118,9 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
   Never play from a timer before the first tap.
 - **Touch and mouse are both live** and switch automatically (`G.touchUI`
   starts from `(pointer: coarse)` and flips when a mouse moves).
+- **A mech is one draw.** Its parts live in one skinned mesh (bones in
+  `mesh/mechParts.js` `BONE`); a new part needs a bone, and a new body plan
+  must fit in `BONE_COUNT`. Debris pieces still draw part by part.
 - **Renderer matrices are per-frame.** `scene.js` builds every matrix from a
   matrix arena (`makeMatrixArena`, reset at the start of `render()`), so they
   are only good until the next frame: never store one in the sim or in saved
