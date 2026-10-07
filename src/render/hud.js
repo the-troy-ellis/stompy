@@ -189,7 +189,14 @@ export function createHud(app) {
     drawKillFeed(x, y + (G.touchUI ? 16 : 6));
     ctx.textAlign = 'center';
     const mid = L.viewBottom * 0.5;
-    if (!P.alive) {
+    if (!P.alive && G.spectate) {
+      // Watching another pilot until the respawn (net/spectate.js): low in the view, clear of the messages.
+      const top = L.viewBottom - (L.frame ? 46 : 64), who = G.spectate.id;
+      ctx.font = 'bold 14px "Lucida Console", monospace'; ctx.fillStyle = AMBER;
+      ctx.fillText(`SPECTATING ${app.net.pilotName(who)}`, app.scene.view.W / 2, top);
+      ctx.font = '12px "Lucida Console", monospace'; ctx.fillStyle = GREEN;
+      ctx.fillText(`RESPAWN IN ${Math.ceil(max(0, (G.respawnAt - G.clock) / 1000))}  ·  ${G.touchUI ? 'TGT' : 'T'}: NEXT PILOT`, app.scene.view.W / 2, top + 18);
+    } else if (!P.alive) {
       ctx.font = 'bold 22px "Lucida Console", monospace'; ctx.fillStyle = RED;
       ctx.fillText(G.killer ? `DESTROYED BY ${app.net.pilotName(G.killer)}` : 'MECH DESTROYED', app.scene.view.W / 2, mid);
       ctx.font = '14px "Lucida Console", monospace'; ctx.fillStyle = AMBER;
@@ -347,11 +354,13 @@ export function createHud(app) {
     let ch = project(G.aim) || [app.scene.view.W / 2, app.scene.view.H / 2];
     // Hit-stop: the crosshair holds where it was for a beat when your shot lands.
     if (G.hitStop > 0) { if (!stopAt) stopAt = ch; ch = stopAt; } else stopAt = null;
-    ctx.strokeStyle = G.aimMech ? RED : GREEN;
-    ctx.beginPath();
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(ch[0] + dx * 5, ch[1] + dy * 5); ctx.lineTo(ch[0] + dx * 14, ch[1] + dy * 14); }
-    ctx.stroke();
-    ctx.strokeRect(ch[0] - 1, ch[1] - 1, 2, 2);
+    if (!G.spectate) {   // watching another pilot: nothing to aim at
+      ctx.strokeStyle = G.aimMech ? RED : GREEN;
+      ctx.beginPath();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { ctx.moveTo(ch[0] + dx * 5, ch[1] + dy * 5); ctx.lineTo(ch[0] + dx * 14, ch[1] + dy * 14); }
+      ctx.stroke();
+      ctx.strokeRect(ch[0] - 1, ch[1] - 1, 2, 2);
+    }
     // Someone is in reach: a fist beside the crosshair, and the touch button wakes up.
     if (punchBtn) punchBtn.classList.toggle('ready', !!G.punchReady);
     if (G.punchReady || (P.melee && P.melee.phase === 'windup')) {
