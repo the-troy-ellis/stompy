@@ -1,6 +1,7 @@
 # Deploys dist/ to GitHub Pages on pushes to main, once the repository
 # variable STOMPY_DEPLOY_PAGES is set to 'true' (Settings > Secrets and
-# variables > Actions > Variables). Inert until then.
+# variables > Actions > Variables). Inert until then. STOMPY_RELAY_DEFAULT
+# (e.g. wss://relay.example/ws) bakes in the relay the hosted site connects to.
 name: Pages
 on:
   push:
@@ -23,6 +24,8 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run build
+        env:
+          RELAY_DEFAULT: ${{ vars.STOMPY_RELAY_DEFAULT }}   # the hosted relay, when the repository variable is set
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with: { path: dist }
