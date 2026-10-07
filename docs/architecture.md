@@ -137,7 +137,7 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
 
 ### The network protocol (as it is)
 
-`PROTOCOL` is 7 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on).
+`PROTOCOL` is 8 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on; 8: M5a, the server enforces the version and rebuilds every state message clean). `server/server.py` keeps its own `PROTOCOL`, and a Node test fails if the two differ.
 
 Client → server: `hello {v, name, color}`, `s {state...}` (15 Hz), `fx {k, ...}`
 (`b` beam flash, `s` shell, `m` missile volley, `fu` fusion discharge, `mg`
@@ -145,7 +145,7 @@ guided volley update, `md` detonate, `pu` a punch starts), `hit {to, amt, p,
 fu, kb?, me?, st?, zap?, hh?}`, `died {by, me?}`.
 
 Server → client: `welcome {id, seed, pal, limit, over, scores}`, `full
-{max}`, `join`, `leave`, `note {k}` (`k: 'lo'`: your loadout was rejected), `s` and `fx` stamped with `id`, `hit {from, amt, p,
+{max}`, `version {need}` (your `hello` had another `v`; the socket closes and the menu says UPDATE THE GAME TO PLAY), `join`, `leave`, `note {k}` (`k: 'lo'`: your loadout was rejected), `s` and `fx` stamped with `id`, `hit {from, amt, p,
 fu, kb?, me?, st?, zap?, hh?}`, `kill {victim, killer, scores, me?}`, `roundover {winner,
 name, next, scores}`, `newround {seed, pal, scores}`.
 
@@ -174,8 +174,16 @@ Python test replays its answered cases). A malformed or overweight loadout is
 relayed as stock and the sender gets `note {k: 'lo'}`, refits to stock and
 shows LOADOUT REJECTED. (`sq` was `sp`
 before M0, which overwrote the speed; the client reads whichever it sent, so
-there was never a cross-version issue.) `hello` carries `v: PROTOCOL`; the
-server ignores it until M5a enforces it.
+there was never a cross-version issue.)
+
+What the relay checks (M5a, `docs/specs/08-lan-polish.md` § Protocol): a
+`hello` whose `v` is not the server's `PROTOCOL` gets `version {need}` and a
+close. Every `s` is rebuilt from the fields above (`clean_state`): numbers
+finite and clamped (positions to ±`HALF`, `hp` five values in 0–200, flags
+0/1, `be`/`fl` 0 or three numbers), `ch` from the chassis list (else
+`kestrel`), unknown keys dropped; a test checks that every field
+`stateMessage` sends is one the relay keeps. `fx` is limited to 40 a second
+per pilot (a bucket that refills at that rate); the rest are dropped.
 
 ## How M0 split it (kept for the record)
 

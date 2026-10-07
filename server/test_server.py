@@ -59,6 +59,13 @@ class Helpers(unittest.TestCase):
         self.assertEqual(data.check_loadout("jackal", heavy), (data.stock_loadout("jackal"), True))           # over tonnage
         self.assertEqual(data.check_loadout("nope", stock), (None, True))
 
+    def test_fx_bucket_refills_at_the_rate(self):
+        c = relay.Client(None)
+        c.fx_at = 100.0
+        self.assertEqual(sum(relay.fx_allowed(c, 100.0) for _ in range(100)), relay.FX_RATE)
+        self.assertFalse(relay.fx_allowed(c, 100.0))
+        self.assertEqual(sum(relay.fx_allowed(c, 100.5) for _ in range(100)), relay.FX_RATE // 2)   # half a second: half a bucket
+
     def test_frame_roundtrip_sizes(self):
         for n in (0, 10, 125, 126, 70000):
             f = relay.frame(relay.OP_TEXT, b"x" * n)
@@ -129,9 +136,46 @@ class Session(unittest.IsolatedAsyncioTestCase):
     async def join(self, name, color=0):
         c = await WSClient.connect(self.port)
         self.clients.append(c)
-        await c.send({"t": "hello", "name": name, "color": color})
+        await c.send({"t": "hello", "v": relay.PROTOCOL, "name": name, "color": color})
         welcome = await c.recv()
         return c, welcome
+
+    async def test_another_version_is_told_to_update_and_closed(self):
+        c = await WSClient.connect(self.port)
+        self.clients.append(c)
+        await c.send({"t": "hello", "v": relay.PROTOCOL - 1, "name": "OLD", "color": 0})
+        self.assertEqual(await c.recv(), {"t": "version", "need": relay.PROTOCOL})
+        self.assertEqual(await c.reader.read(), b"")   # and the socket closes: no hang
+        self.assertEqual(relay.players, {})
+
+    async def test_state_is_rebuilt_clean(self):
+        a, _ = await self.join("A")
+        b, _ = await self.join("B")
+        await a.recv()  # B joined
+        await a.send({"t": "s", "ch": "tank", "x": 1e12, "y": "high", "z": -5, "hp": [10, None, 900], "be": [1, 2],
+                      "fl": [1, 2, 3], "pu": 7, "lt": "yes", "evil": "<script>"})
+        m = await b.recv()
+        self.assertEqual(m["ch"], "kestrel")
+        self.assertEqual((m["x"], m["y"], m["z"]), (relay.HALF, 0, -5))
+        self.assertEqual(m["hp"], [10, 0, 200, 0, 0])
+        self.assertEqual((m["be"], m["fl"], m["pu"], m["lt"]), (0, [1, 2, 3], 2, 1))
+        self.assertNotIn("evil", m)
+
+    async def test_weapon_effects_past_the_rate_are_dropped(self):
+        a, _ = await self.join("A")
+        b, _ = await self.join("B")
+        await a.recv()  # B joined
+        for i in range(relay.FX_RATE + 20):
+            await a.send({"t": "fx", "k": "pu", "n": i})
+        got = 0
+        try:
+            while True:
+                m = await b.recv(timeout=0.3)
+                got += m["t"] == "fx"
+        except asyncio.TimeoutError:
+            pass
+        self.assertGreaterEqual(got, relay.FX_RATE)
+        self.assertLess(got, relay.FX_RATE + 10)
 
     async def test_bad_origin_is_refused(self):
         c = await WSClient.connect(self.port, origin="https://evil.example")
@@ -239,7 +283,7 @@ class Session(unittest.IsolatedAsyncioTestCase):
             await self.join(f"P{i}")
         extra = await WSClient.connect(self.port)
         self.clients.append(extra)
-        await extra.send({"t": "hello", "name": "LATE"})
+        await extra.send({"t": "hello", "v": relay.PROTOCOL, "name": "LATE"})
         full = await extra.recv()
         self.assertEqual((full["t"], full["max"]), ("full", 8))
 

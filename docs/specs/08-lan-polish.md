@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ready |
+| Status | in progress (#183 protocol v2 shipped) |
 | Milestone | M5a |
 | Size | M (split: protocol + relay URL; lobby + spectate; TDM + vote; server hardening) |
 | Depends on | M0 stage 5 |
