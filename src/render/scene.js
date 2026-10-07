@@ -103,29 +103,35 @@ export function createScene(app) {
   const NO_SHADE = [1, 1, 1], LAMP_COL = [1, 0.95, 0.75];
   const SPOT = { on: false, pos: [0, 0, 0], dir: [0, 0, 1], col: [0, 0, 0], cone: [Math.cos(HEADLIGHTS.cone[0]), Math.cos(HEADLIGHTS.cone[1])], range: HEADLIGHTS.range };
   let DARK = 0;   // how dark this frame is (palettes.js darkness)
-  const FOG = [0, 0];
-  const SHADE = [1, 1, 1], SKY_Z = [0, 0, 0], SKY_H = [0, 0, 0], FLASH_SHADE = [1.8, 1.8, 2.0], FLASH_SKY = [0.78, 0.8, 0.92];
-  // Rain (spec 07): slivers in a box round the camera, leaning with the wind.
-  const RAIN = { count: 1500, fall: 22, size: 1.8, col: [0.6, 0.66, 0.76], glow: 0.3, clear: 6 };   // clear: m round the cockpit with no drops in it
-  const box = makeWeatherBox(2500), RAIN_VEL = [0, 0, 0];
+  const FOG = [0, 0];   // this frame's fog distances: the palette's, cut by the weather (data/weather.js)
+  const SHADE = [1, 1, 1], SKY_Z = [0, 0, 0], SKY_H = [0, 0, 0], FLASH_SHADE = [1.8, 1.8, 2.0], FLASH_SKY = [0.78, 0.8, 0.92], WHITE_SKY = [0.86, 0.89, 0.94];
+  // Rain and snow (spec 07): drops in a box round the camera, one instanced
+  // draw each. Rain is thin streaks leaning with the wind; snow is small
+  // octahedra drifting down, turning and swaying. `clear`: metres round the
+  // cockpit kept free, so nothing sits on the canopy.
+  const WX_LOOK = {
+    rain: { shape: 'streak', count: 1500, fall: 22, size: 1.8, col: [0.6, 0.66, 0.76], glow: 0.3, clear: 6, lean: true },
+    snow: { shape: 'octa', count: 800, fall: 1.6, size: 0.32, col: [0.95, 0.96, 1], glow: 0.55, clear: 5, sway: 0.5 },
+  };
+  const box = makeWeatherBox(2500), WX_VEL = [0, 0, 0];
   let wxTime = null;
   function fillWeather(eye) {
-    const w = G.weather;
-    if (!w || w.kind !== 'rain') { box.n = 0; return; }
+    const w = G.weather, L = w && WX_LOOK[w.kind];
+    if (!L) { box.n = 0; return; }
     const dt = wxTime == null ? 0 : Math.min(0.1, Math.max(0, G.time - wxTime));
     wxTime = G.time;
-    RAIN_VEL[0] = w.wind[0]; RAIN_VEL[1] = -RAIN.fall; RAIN_VEL[2] = w.wind[1];   // the wind is [x, z]
-    stepWeatherBox(box, eye, Math.round(RAIN.count * w.intensity * (G.touchUI ? 0.6 : 1)), RAIN_VEL, dt);
-    const g = R.fx.streak, yaw = Math.atan2(w.wind[0], w.wind[1]), lean = Math.atan2(Math.hypot(w.wind[0], w.wind[1]), RAIN.fall);
+    WX_VEL[0] = w.wind[0]; WX_VEL[1] = -L.fall; WX_VEL[2] = w.wind[1];   // the wind is [x, z]
+    stepWeatherBox(box, eye, Math.round(L.count * w.intensity * (G.touchUI ? 0.6 : 1)), WX_VEL, dt);
+    const g = R.fx[L.shape], yaw = Math.atan2(w.wind[0], w.wind[1]), lean = L.lean ? Math.atan2(Math.hypot(w.wind[0], w.wind[1]), L.fall) : 0, t = G.time;
     for (let i = 0; i < box.n && g.n < R.FX_CAP; i++) {
       const i3 = i * 3, dx = box.pos[i3] - eye[0], dz = box.pos[i3 + 2] - eye[2];
-      if (dx * dx + dz * dz < RAIN.clear * RAIN.clear) continue;   // none on the canopy
-      const d = g.data, o = g.n++ * R.FX_FLOATS;
-      d[o] = box.pos[i3]; d[o + 1] = box.pos[i3 + 1]; d[o + 2] = box.pos[i3 + 2]; d[o + 3] = RAIN.size;
-      d[o + 4] = yaw; d[o + 5] = lean;
-      d[o + 6] = RAIN.col[0]; d[o + 7] = RAIN.col[1]; d[o + 8] = RAIN.col[2]; d[o + 9] = RAIN.glow; d[o + 10] = 0; d[o + 11] = 0;
+      if (dx * dx + dz * dz < L.clear * L.clear) continue;
+      const d = g.data, o = g.n++ * R.FX_FLOATS, sw = L.sway ? Math.sin(t * 0.9 + i * 1.7) * L.sway : 0;
+      d[o] = box.pos[i3] + sw; d[o + 1] = box.pos[i3 + 1]; d[o + 2] = box.pos[i3 + 2] + sw * 0.6; d[o + 3] = L.size;
+      d[o + 4] = L.lean ? yaw : t * 0.7 + i * 1.3; d[o + 5] = L.lean ? lean : t * 0.45 + i;
+      d[o + 6] = L.col[0]; d[o + 7] = L.col[1]; d[o + 8] = L.col[2]; d[o + 9] = L.glow; d[o + 10] = 0; d[o + 11] = 0;
     }
-  }   // this frame's fog distances: the palette's, cut by the weather (data/weather.js)
+  }
   // A point through a matrix into `out`, without allocating.
   const placeInto = (m, p, out) => { for (let i = 0; i < 3; i++) out[i] = m[i] * p[0] + m[4 + i] * p[1] + m[8 + i] * p[2] + m[12 + i]; };
   const FRAME = {}, LOOK = new Float32Array(7);   // reused every frame: the effects' shared uniforms and one particle's look (mesh/effects.js)
@@ -367,8 +373,11 @@ export function createScene(app) {
     for (let i = 0; i < 3; i++) {
       const s = (G.pal.shade ? G.pal.shade[i] : 1) * (wx && wx.dim ? wx.dim : 1);
       SHADE[i] = s + (FLASH_SHADE[i] - s) * flash;
-      SKY_Z[i] = G.pal.zen[i] + (FLASH_SKY[i] - G.pal.zen[i]) * flash * 0.8;
-      SKY_H[i] = G.pal.hor[i] + (FLASH_SKY[i] - G.pal.hor[i]) * flash * 0.6;
+      const wh = wx && wx.whiten ? wx.whiten * G.weather.intensity : 0;   // snow whitens the sky and the fog
+      const h = G.pal.hor[i] + (WHITE_SKY[i] - G.pal.hor[i]) * wh, hz = wx && wx.haze ? wx.haze * G.weather.intensity : 0;   // fog and dust grey the zenith into the horizon
+      const z0 = G.pal.zen[i] + (WHITE_SKY[i] - G.pal.zen[i]) * wh * 0.6, z = z0 + (h - z0) * hz;
+      SKY_Z[i] = z + (FLASH_SKY[i] - z) * flash * 0.8;
+      SKY_H[i] = h + (FLASH_SKY[i] - h) * flash * 0.6;
     }
     const hor = ir ? IR_HOR : SKY_H;
     R.gl.clearColor(hor[0], hor[1], hor[2], 1);

@@ -65,3 +65,13 @@ test('missions carry their weather; Free Play RANDOM picks one that suits the ma
   }
   assert.equal(fpWeather('rain', 'ice', rand), 'rain', 'a chosen kind is the player\'s call');
 });
+
+test('snow whitens the sky and falls as the snow shape; fog and dust grey the zenith', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { shapeOf } = await import('../src/mesh/effects.js');
+  assert.ok(WEATHER.snow.whiten > 0);
+  assert.ok(WEATHER.fog.haze > 0 && WEATHER.dust.haze > 0);
+  const scene = readFileSync('src/render/scene.js', 'utf8');
+  assert.match(scene, new RegExp(`snow: \\{ shape: '${shapeOf('snow')}'`), 'snow drawn as the snow effect shape');
+  assert.match(scene, new RegExp(`rain: \\{ shape: '${shapeOf('rain')}'`));
+});

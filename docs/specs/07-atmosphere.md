@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning shipped) |
+| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning, #159 snow and fog shipped) |
 | Milestone | M4 |
 | Size | L (split: night + headlights; weather; props; explosions + particles) |
 | Depends on | M0; structures from [03-objectives.md](03-objectives.md) share the prop meshes |
@@ -79,7 +79,14 @@ instanced draw. Rain dims the light to 80%. Lightning: `strikeAt(seed, k)`
 gives every strike's time (8-20 s apart) and distance from the seed alone;
 `sim/weather.js` flashes the shading and the sky toward white for 120 ms and
 rolls `sfx.thunder` (a slowed boom and a low rumble, quieter when far) 0.5-3
-s later. The perf harness has a `rain` scene.
+s later. The perf harness has a `rain` scene (free-start in a downpour).
+
+As shipped (#159): snow is 800 small octahedra (480 on touch) in the same box,
+falling at 1.6 m/s with the wind, turning and swaying, none within 5 m of the
+cockpit; snow whitens the sky and fog colour by 35%. Fog has no particles: its
+fog distances (x0.3) and a haze that greys the zenith into the horizon (80%;
+dust gets 60%) do it. The perf harness has a `snow` scene; rain and snow
+each cost one draw over free-start and no more garbage.
 
 **Wind** moves smoke and missile trails (`particle` velocities get `wind × dt`)
 and leans rain/snow. Dust storms push the mech by 0.5 m/s laterally when
