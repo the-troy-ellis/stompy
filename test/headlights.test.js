@@ -43,9 +43,9 @@ test('a JACKAL 400 m off sees a lit mech at night and loses a dark one', () => {
   P.lights = false; assert.equal(canSee(G, e, P), false);
 });
 
-test('the arena carries the lights: lt in the state message, PROTOCOL 7', () => {
+test('the arena carries the lights: lt in the state message, PROTOCOL 7 or later', () => {
   const G = createTestGame({ foes: [] }), P = G.player;
-  assert.equal(PROTOCOL, 7);
+  assert.ok(PROTOCOL >= 7);
   P.lights = true; assert.equal(stateMessage(P, 1).lt, 1);
   P.lights = false; assert.equal(stateMessage(P, 1).lt, 0);
 });

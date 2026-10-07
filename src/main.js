@@ -30,6 +30,7 @@ import { loadCampaign, saveCampaign } from './ui/campaign.js';
 import { DIFF } from './data/ai.js';
 import { SETTINGS, SETTING_KEYS, readSetting, particleScales } from './data/settings.js';
 import { createMechlab } from './ui/mechlab.js';
+import { normalRelay, resolveRelay } from './net/relay.js';
 
 // Settings and progress, from localStorage. Each screen writes back the key
 // it owns (store.set) when the player changes something.
@@ -45,6 +46,7 @@ function loadPrefs() {
     diff: DIFF[store.get('diff')] ? store.get('diff') : 'normal',
     frameTime: store.get('debug.frametime', false),
     ...Object.fromEntries(SETTING_KEYS.map(k => [k, readSetting(k, store.get(SETTINGS[k].key))])),
+    relay: store.get('net.relay', ''),   // the RELAY field (net/relay.js)
     mpName: store.get('mp.name', ''), mpColor: store.get('mp.color', Math.floor(Math.random() * MP_COLORS.length)),
     reducedMotion: store.get('motion.reduced', false), haptics: store.get('haptics', true),
   };
@@ -84,12 +86,16 @@ function start(root) {
   }
   R.look = look;
   const prefs = loadPrefs();
+  // ?relay=host[:port] or a ws[s]:// address: saved as the RELAY field (net/relay.js).
+  const qRelay = normalRelay(params.get('relay'), location.protocol === 'https:');
+  if (qRelay) { prefs.relay = qRelay; store.set('net.relay', qRelay); }
   // Campaign progress under camp.* (ui/campaign.js); an old save migrates once.
   const campaign = loadCampaign(store.get);
   if (campaign.migrated) { delete campaign.migrated; saveCampaign(store.set, campaign); }
   prefs.mission = campaign.mission;
   // Everything the page-side modules share. The sim only ever sees `G`.
   const app = { root, wrap, cv, hud, ov, ctx: hud.getContext('2d'), R, prefs, params, campaign };
+  app.relay = () => resolveRelay({ query: null, saved: prefs.relay, location });   // where MULTIPLAYER connects
   app.G = createGame({ touchUI: params.has('touch') || matchMedia('(pointer: coarse)').matches });
   const G = app.G;
   G.reducedMotion = prefs.reducedMotion;   // the sim reads a flag, never the prefs

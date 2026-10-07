@@ -76,3 +76,13 @@ test('the state message carries the loadout only when asked', async () => {
   roundTrip(s);
   assert.ok(P.PROTOCOL >= 3);
 });
+
+test('the relay speaks the same protocol version as the game, and every state field is one it rebuilds', async () => {
+  const { readFileSync } = await import('node:fs');
+  const py = readFileSync(new URL('../server/server.py', import.meta.url), 'utf8');
+  assert.equal(+py.match(/^PROTOCOL = (\d+)/m)[1], P.PROTOCOL, 'server/server.py PROTOCOL');
+  // clean_state keeps a whitelist: a field the game sends that it doesn't know would vanish on the way.
+  const kept = new Set([...py.slice(py.indexOf('def clean_state'), py.indexOf('def fx_allowed')).matchAll(/"(\w+)":/g)].map(m => m[1]));
+  const sent = Object.keys(P.stateMessage({ type: 'kestrel', x: 0, y: 0, z: 0, yaw: 0, twist: 0, pitch: 0, speed: 0, hp: { LA: 1, RA: 1, T: 1, LL: 1, RL: 1 } }, 1));
+  for (const k of sent) assert.ok(kept.has(k), `the relay drops ${k}`);
+});

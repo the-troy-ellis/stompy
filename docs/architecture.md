@@ -22,7 +22,7 @@ relay and its tests.
 | `src/audio/` | ~400 | `sound.js` (`createAudio`: unlock dance, samples over synthesis, spatialisation, loops, `sfx.*`, the voice `say`, the beam and scan tones, `tick`), `thump.js`, `ambience.js` (M4: the biome and weather beds from `data/ambience.js`, synthesised). |
 | `src/input/` | ~220 | `input.js` (`createInput`: keyboard, mouse with pointer lock, touch stick/aim/buttons, one per-frame `snapshot()`). |
 | `src/ui/` | ~280 | `screens.js` (`createUi`: main menu with the live mech, briefing detail, settings, pause, debrief, mission and skirmish start, click routing), `debrief.js` (the objective rows and the banner). `campaign.js` (`camp.*` progress: load and migrate, results, unlocks, restart, the strip). |
-| `src/net/` | ~330 | `protocol.js` (`PROTOCOL`, message builders, `parse`), `client.js` (`createNet`: join, handler, spawn, 15 Hz state, relayed effects, `tick`), `interp.js` (`netInterp`), `spectate.js` (M5a: the arena's spectator camera while you wait to respawn). |
+| `src/net/` | ~330 | `protocol.js` (`PROTOCOL`, message builders, `parse`), `client.js` (`createNet`: join, handler, spawn, 15 Hz state, relayed effects, `tick`), `interp.js` (`netInterp`), `relay.js` (M5a: the relay address from `?relay=`, the RELAY field or the page's host), `spectate.js` (M5a: the arena's spectator camera while you wait to respawn). |
 | `src/util/` | ~70 | `math.js` (scalars, vec3, `M` matrices, `chain`, cosmetic `rnd`), `store.js`, `dom.js`. |
 | `server/` | 300 + tests | `server.py` the relay (unchanged logic), `test_server.py`. |
 | `test/` | | `*.test.js` headless (`helpers.js` builds a flat-ground game with a recording fx), `smoke/run.mjs` (Playwright: desktop mission, touch layout, two-pilot arena against the real relay). |
@@ -137,7 +137,7 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
 
 ### The network protocol (as it is)
 
-`PROTOCOL` is 7 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on).
+`PROTOCOL` is 8 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on; 8: M5a, the server enforces the version and rebuilds every state message clean). `server/server.py` keeps its own `PROTOCOL`, and a Node test fails if the two differ.
 
 Client → server: `hello {v, name, color}`, `s {state...}` (15 Hz), `fx {k, ...}`
 (`b` beam flash, `s` shell, `m` missile volley, `fu` fusion discharge, `mg`
@@ -145,7 +145,7 @@ guided volley update, `md` detonate, `pu` a punch starts), `hit {to, amt, p,
 fu, kb?, me?, st?, zap?, hh?}`, `died {by, me?}`.
 
 Server → client: `welcome {id, seed, pal, limit, over, scores}`, `full
-{max}`, `join`, `leave`, `note {k}` (`k: 'lo'`: your loadout was rejected), `s` and `fx` stamped with `id`, `hit {from, amt, p,
+{max}`, `version {need}` (your `hello` had another `v`; the socket closes and the menu says UPDATE THE GAME TO PLAY), `join`, `leave`, `note {k}` (`k: 'lo'`: your loadout was rejected), `s` and `fx` stamped with `id`, `hit {from, amt, p,
 fu, kb?, me?, st?, zap?, hh?}`, `kill {victim, killer, scores, me?}`, `roundover {winner,
 name, next, scores}`, `newround {seed, pal, scores}`.
 
@@ -174,8 +174,16 @@ Python test replays its answered cases). A malformed or overweight loadout is
 relayed as stock and the sender gets `note {k: 'lo'}`, refits to stock and
 shows LOADOUT REJECTED. (`sq` was `sp`
 before M0, which overwrote the speed; the client reads whichever it sent, so
-there was never a cross-version issue.) `hello` carries `v: PROTOCOL`; the
-server ignores it until M5a enforces it.
+there was never a cross-version issue.)
+
+What the relay checks (M5a, `docs/specs/08-lan-polish.md` § Protocol): a
+`hello` whose `v` is not the server's `PROTOCOL` gets `version {need}` and a
+close. Every `s` is rebuilt from the fields above (`clean_state`): numbers
+finite and clamped (positions to ±`HALF`, `hp` five values in 0–200, flags
+0/1, `be`/`fl` 0 or three numbers), `ch` from the chassis list (else
+`kestrel`), unknown keys dropped; a test checks that every field
+`stateMessage` sends is one the relay keeps. `fx` is limited to 40 a second
+per pilot (a bucket that refills at that rate); the rest are dropped.
 
 ## How M0 split it (kept for the record)
 
