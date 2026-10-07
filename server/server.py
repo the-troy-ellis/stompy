@@ -39,7 +39,7 @@ PING_EVERY = 10
 DROP_AFTER = 25           # seconds of silence (a phone that went to sleep)
 MAX_BUFFERED = 256 * 1024 # a client this far behind is dropped, not waited for
 PALETTES = ("dusk", "ice", "volcanic")
-PROTOCOL = 8              # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
+PROTOCOL = 9              # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
 HALF = 96 * 24 / 2        # the map's half width (src/world/terrain.js): positions are clamped to it
 FX_RATE = 40              # weapon effects per second per pilot; more are dropped (a beam flash is per shot, guided updates 15 Hz)
 
@@ -56,6 +56,9 @@ class Client:
         self.id = 0
         self.name = ""
         self.color = 0
+        self.ch = "kestrel"   # the chassis, for the lobby's pilot list (hello, then each state message)
+        self.ready = False    # in the lobby until READY
+        self.ping = 0         # ms, as the client last measured its round trip
         self.kills = 0
         self.deaths = 0
         self.last = time.monotonic()
@@ -173,7 +176,8 @@ def broadcast(obj, skip=None):
 # ---------------------------------------------------------------- the arena
 
 def scores():
-    return [{"id": c.id, "name": c.name, "color": c.color, "kills": c.kills, "deaths": c.deaths}
+    return [{"id": c.id, "name": c.name, "color": c.color, "kills": c.kills, "deaths": c.deaths,
+             "ch": c.ch, "ready": 1 if c.ready else 0, "ping": c.ping}
             for c in sorted(players.values(), key=lambda c: c.id)]
 
 
@@ -244,6 +248,8 @@ def handle_message(c, msg):
         if t == "fx" and not fx_allowed(c):
             return
         out = clean_state(msg) if t == "s" else msg
+        if t == "s":
+            c.ch = out["ch"]
         out["id"] = c.id
         if t == "s" and "lo" in msg:
             # A mechlab loadout rides the state message now and then, checked
@@ -256,6 +262,17 @@ def handle_message(c, msg):
             if rejected:
                 send(c, {"t": "note", "k": "lo"})
         broadcast(out, skip=c)
+    elif t == "ready":
+        # Out of the lobby and into the arena: everyone's pilot list says so.
+        if not c.ready:
+            c.ready = True
+            broadcast({"t": "ready", "id": c.id, "scores": scores()})
+    elif t == "ping":
+        # The lobby's ping: echoed at once with the server's time and every
+        # pilot's last round trip; the client reports its own with the next.
+        c.ping = int(num(msg.get("rtt"), 0, 9999))
+        send(c, {"t": "ping", "n": msg.get("n") if isinstance(msg.get("n"), int) else 0, "ts": int(time.time() * 1000),
+                 "pings": {str(p.id): p.ping for p in players.values()}})
     elif t == "hit":
         target = players.get(int(num(msg.get("to"), 0, 99)))
         if target and target is not c and not arena["over"]:
@@ -316,9 +333,10 @@ async def session(reader, writer):
         c.id = next(i for i in range(1, MAX_PLAYERS + 1) if i not in players)
         c.name = clean_name(hello.get("name"), c.id)
         c.color = int(num(hello.get("color"), 0, 7))
+        c.ch = hello.get("ch") if hello.get("ch") in CHASSIS else "kestrel"
         players[c.id] = c
         log(f"join {c.id} {c.name} from {peer[0] if peer else '?'} ({len(players)} playing)")
-        send(c, {"t": "welcome", "id": c.id, "seed": arena["seed"], "pal": arena["pal"],
+        send(c, {"t": "welcome", "id": c.id, "seed": arena["seed"], "pal": arena["pal"], "mode": "ffa",
                  "limit": SCORE_LIMIT, "over": arena["over"], "scores": scores()})
         broadcast({"t": "join", "id": c.id, "name": c.name, "color": c.color, "scores": scores()}, skip=c)
 

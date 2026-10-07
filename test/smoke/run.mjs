@@ -168,6 +168,10 @@ try {
       if (name === 'ONE') await page.evaluate(() => localStorage.setItem('stompy.fit.kestrel', JSON.stringify({ hp: { la: 'mlaser', ra: 'mlaser', t1: null, t2: 'lrm' }, sys: { sinks: 2, armour: 0, jets: 1 } })));
       await page.click('[data-a="go"]');
       await page.waitForFunction(() => window.__stompy?.game?.mode === 'mp' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+      // The lobby (#185): the pilots listed, then READY drops you in.
+      await page.waitForSelector('[data-a="ready"]', { timeout: 5000 });
+      await page.click('[data-a="ready"]');
+      await page.waitForFunction(() => !window.__stompy.game.lobby && window.__stompy.game.player.alive, null, { timeout: 5000 });
       if (name === 'ONE') await page.evaluate(() => localStorage.removeItem('stompy.fit.kestrel'));
       pages.push(page);
     }

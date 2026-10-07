@@ -137,15 +137,15 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
 
 ### The network protocol (as it is)
 
-`PROTOCOL` is 8 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on; 8: M5a, the server enforces the version and rebuilds every state message clean). `server/server.py` keeps its own `PROTOCOL`, and a Node test fails if the two differ.
+`PROTOCOL` is 9 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on; 8: M5a, the server enforces the version and rebuilds every state message clean; 9: the lobby, `ch` in `hello`, `ready`, `ping`, and `ch`/`ready`/`ping` in each pilot's scores entry). `server/server.py` keeps its own `PROTOCOL`, and a Node test fails if the two differ.
 
-Client → server: `hello {v, name, color}`, `s {state...}` (15 Hz), `fx {k, ...}`
+Client → server: `hello {v, name, color, ch}`, `ready` (out of the lobby), `ping {n, rtt}` (every 2 s), `s {state...}` (15 Hz), `fx {k, ...}`
 (`b` beam flash, `s` shell, `m` missile volley, `fu` fusion discharge, `mg`
 guided volley update, `md` detonate, `pu` a punch starts), `hit {to, amt, p,
 fu, kb?, me?, st?, zap?, hh?}`, `died {by, me?}`.
 
-Server → client: `welcome {id, seed, pal, limit, over, scores}`, `full
-{max}`, `version {need}` (your `hello` had another `v`; the socket closes and the menu says UPDATE THE GAME TO PLAY), `join`, `leave`, `note {k}` (`k: 'lo'`: your loadout was rejected), `s` and `fx` stamped with `id`, `hit {from, amt, p,
+Server → client: `welcome {id, seed, pal, mode, limit, over, scores}` (a scores entry: `id, name, color, kills, deaths, ch, ready, ping`), `full
+{max}`, `version {need}` (your `hello` had another `v`; the socket closes and the menu says UPDATE THE GAME TO PLAY), `ready {id, scores}`, `ping {n, ts, pings}` (the echo, with every pilot's last round trip), `join`, `leave`, `note {k}` (`k: 'lo'`: your loadout was rejected), `s` and `fx` stamped with `id`, `hit {from, amt, p,
 fu, kb?, me?, st?, zap?, hh?}`, `kill {victim, killer, scores, me?}`, `roundover {winner,
 name, next, scores}`, `newround {seed, pal, scores}`.
 
