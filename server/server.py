@@ -15,6 +15,7 @@ frames, ping/pong, close) so this stays stdlib-only.
 
     python3 server.py [port]        # default 8096; the game connects to :8096/ws
 """
+import argparse
 import asyncio
 import base64
 import hashlib
@@ -23,7 +24,6 @@ import json
 import os
 import random
 import struct
-import sys
 import time
 from urllib.parse import urlsplit
 
@@ -42,12 +42,25 @@ PALETTES = ("dusk", "ice", "volcanic")
 PROTOCOL = 9              # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
 HALF = 96 * 24 / 2        # the map's half width (src/world/terrain.js): positions are clamped to it
 FX_RATE = 40              # weapon effects per second per pilot; more are dropped (a beam flash is per shot, guided updates 15 Hz)
+PER_IP = int(os.environ.get("STOMPY_PER_IP", 4))   # sockets from one address at once (phones and a laptop behind one NAT)
+MODE = os.environ.get("STOMPY_MODE", "ffa")         # the arena's mode: free-for-all (team deathmatch comes with TDM)
+LOG_FILE = os.environ.get("STOMPY_LOG")             # also log to this file (appended; rotation is logrotate's job)
+_log_out = None
 
 OP_CONT, OP_TEXT, OP_BIN, OP_CLOSE, OP_PING, OP_PONG = 0x0, 0x1, 0x2, 0x8, 0x9, 0xA
 
 
 def log(*a):
+    """A line to stdout (systemd's journal) and, with STOMPY_LOG, to that file, timestamped."""
+    global _log_out
     print(*a, flush=True)
+    if LOG_FILE:
+        try:
+            if _log_out is None:
+                _log_out = open(LOG_FILE, "a", encoding="utf-8", buffering=1)
+            _log_out.write(time.strftime("%Y-%m-%d %H:%M:%S ") + " ".join(str(x) for x in a) + "\n")
+        except OSError as e:
+            print(f"log file {LOG_FILE}: {e}", flush=True)
 
 
 class Client:
@@ -66,6 +79,7 @@ class Client:
 
 
 players: dict[int, Client] = {}
+conns: dict[str, int] = {}   # open sockets per address, for the PER_IP cap
 arena = {"seed": random.randrange(1, 10**6), "pal": random.choice(PALETTES), "over": False}
 
 
@@ -317,6 +331,14 @@ def handle_message(c, msg):
 
 async def session(reader, writer):
     peer = writer.get_extra_info("peername")
+    ip = peer[0] if peer else "?"
+    if conns.get(ip, 0) >= PER_IP:
+        # One address holding too many sockets: refused before the upgrade.
+        writer.write(b"HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        log(f"refused {ip}: {PER_IP} sockets already")
+        writer.close()
+        return
+    conns[ip] = conns.get(ip, 0) + 1
     c = None
     try:
         if not await handshake(reader, writer):
@@ -359,7 +381,10 @@ async def session(reader, writer):
                 except ValueError:
                     continue
                 if isinstance(msg, dict):
-                    handle_message(c, msg)
+                    try:
+                        handle_message(c, msg)
+                    except Exception as e:   # one malformed message is dropped, not the pilot (the fuzz tests try)
+                        log(f"bad message from {c.id} {c.name}: {e!r}")
     except (asyncio.IncompleteReadError, ConnectionError, asyncio.TimeoutError, OSError, ValueError):
         pass
     finally:
@@ -367,6 +392,9 @@ async def session(reader, writer):
             del players[c.id]
             log(f"leave {c.id} {c.name} ({len(players)} playing)")
             broadcast({"t": "leave", "id": c.id, "scores": scores()})
+        conns[ip] -= 1
+        if conns[ip] <= 0:
+            del conns[ip]
         writer.close()
 
 
@@ -383,10 +411,30 @@ async def heartbeat():
                 c.writer.write(frame(OP_PING))
 
 
+def parse_args(argv=None):
+    """Flags, each with an environment variable as its default; a bare port
+    as the only argument still works (`server.py 8096`)."""
+    p = argparse.ArgumentParser(description="Stompy's arena relay")
+    p.add_argument("port_arg", nargs="?", type=int, help=argparse.SUPPRESS)
+    p.add_argument("--host", default=os.environ.get("STOMPY_HOST", "0.0.0.0"), help="address to listen on (STOMPY_HOST, default 0.0.0.0)")
+    p.add_argument("--port", type=int, default=int(os.environ.get("STOMPY_PORT", 8096)), help="port (STOMPY_PORT, default 8096)")
+    p.add_argument("--mode", choices=["ffa"], default=MODE, help="arena mode (STOMPY_MODE, default ffa)")
+    p.add_argument("--limit", type=int, default=SCORE_LIMIT, help=f"kills to win a round (STOMPY_SCORE_LIMIT, default {SCORE_LIMIT})")
+    p.add_argument("--gap", type=int, default=ROUND_GAP, help=f"seconds between rounds (STOMPY_ROUND_GAP, default {ROUND_GAP})")
+    p.add_argument("--per-ip", type=int, default=PER_IP, help=f"sockets from one address at once (STOMPY_PER_IP, default {PER_IP})")
+    p.add_argument("--log", default=LOG_FILE, help="also log to this file (STOMPY_LOG)")
+    a = p.parse_args(argv)
+    if a.port_arg is not None:
+        a.port = a.port_arg
+    return a
+
+
 async def main():
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8096
-    server = await asyncio.start_server(session, "0.0.0.0", port, limit=16 * 1024)
-    log(f"stompy arena on :{port}/ws (max {MAX_PLAYERS}, first to {SCORE_LIMIT})")
+    global SCORE_LIMIT, ROUND_GAP, PER_IP, MODE, LOG_FILE
+    a = parse_args()
+    SCORE_LIMIT, ROUND_GAP, PER_IP, MODE, LOG_FILE = a.limit, a.gap, a.per_ip, a.mode, a.log
+    server = await asyncio.start_server(session, a.host, a.port, limit=16 * 1024)
+    log(f"stompy arena on {a.host}:{a.port}/ws ({MODE}, max {MAX_PLAYERS}, first to {SCORE_LIMIT}, {PER_IP} per address)")
     asyncio.ensure_future(heartbeat())
     async with server:
         await server.serve_forever()

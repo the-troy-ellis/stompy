@@ -24,7 +24,7 @@ relay and its tests.
 | `src/ui/` | ~280 | `screens.js` (`createUi`: main menu with the live mech, briefing detail, settings, pause, debrief, mission and skirmish start, click routing), `debrief.js` (the objective rows and the banner). `campaign.js` (`camp.*` progress: load and migrate, results, unlocks, restart, the strip). `lobby.js` (M5a: the arena lobby's pilot list, updated in place). |
 | `src/net/` | ~330 | `protocol.js` (`PROTOCOL`, message builders, `parse`), `client.js` (`createNet`: join, handler, spawn, 15 Hz state, relayed effects, `tick`), `interp.js` (`netInterp`), `relay.js` (M5a: the relay address from `?relay=`, the RELAY field or the page's host), `spectate.js` (M5a: the arena's spectator camera while you wait to respawn), `killfeed.js` (M5a: the arena's kill feed, drawn by the HUD). |
 | `src/util/` | ~70 | `math.js` (scalars, vec3, `M` matrices, `chain`, cosmetic `rnd`), `store.js`, `dom.js`. |
-| `server/` | 300 + tests | `server.py` the relay (unchanged logic), `test_server.py`. |
+| `server/` | 420 + tests | `server.py` the relay (M5a: version check, clean state messages, fx rate limit, flags, per-address cap, file log), `data.py` (loadout tables and checks), `test_server.py` (with fuzz tests), `stompy-relay.service` (systemd), `README.md`. |
 | `test/` | | `*.test.js` headless (`helpers.js` builds a flat-ground game with a recording fx), `smoke/run.mjs` (Playwright: desktop mission, touch layout, two-pilot arena against the real relay). |
 | `scripts/` | | `serve.mjs` (static server), `build.mjs` (esbuild), `perf.mjs` (`npm run perf`: the frame-cost harness and its budgets, spec 14). |
 | `.github/workflows/` | | `ci.yml` (lint, test, build, server tests, smoke), `pages.yml` (gated by the `STOMPY_DEPLOY_PAGES` variable). |

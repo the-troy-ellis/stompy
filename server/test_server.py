@@ -66,6 +66,50 @@ class Helpers(unittest.TestCase):
         self.assertFalse(relay.fx_allowed(c, 100.0))
         self.assertEqual(sum(relay.fx_allowed(c, 100.5) for _ in range(100)), relay.FX_RATE // 2)   # half a second: half a bucket
 
+    def test_flags_and_the_bare_port(self):
+        a = relay.parse_args(["--host", "127.0.0.1", "--port", "9000", "--limit", "20", "--per-ip", "8", "--log", "/tmp/x.log"])
+        self.assertEqual((a.host, a.port, a.limit, a.per_ip, a.log, a.mode), ("127.0.0.1", 9000, 20, 8, "/tmp/x.log", "ffa"))
+        self.assertEqual(relay.parse_args(["8123"]).port, 8123, "server.py <port> as before")
+        self.assertEqual(relay.parse_args([]).port, 8096)
+
+    def test_log_goes_to_the_file_too(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "relay.log")
+            relay.LOG_FILE, relay._log_out = path, None
+            try:
+                relay.log("join 1 ACE")
+            finally:
+                relay._log_out.close()
+                relay.LOG_FILE, relay._log_out = None, None
+            with open(path, encoding="utf-8") as f:
+                self.assertRegex(f.read(), r"^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d join 1 ACE\n$")
+
+    def test_fuzz_state_messages_never_crash_or_pass_junk(self):
+        # Acceptance 8: a thousand state messages of NaNs, strings, huge numbers
+        # and odd shapes; every one comes out finite and in range, and serialisable.
+        import math
+        import random as rnd
+        r = rnd.Random(8)
+        junk = [float("nan"), float("inf"), -float("inf"), 1e308, -1e308, "12", "x", None, True, [], {}, [1, 2], [float("nan")] * 3, 2**70, -0.0]
+        pick = lambda: r.choice(junk + [r.uniform(-1e6, 1e6)])
+        keys = ["ch", "x", "y", "z", "yaw", "tw", "p", "sp", "air", "al", "sd", "hp", "bm", "be", "bf", "fl", "sc", "sq", "pu", "lt", "zz"]
+        for _ in range(1000):
+            msg = {"t": "s"}
+            for k in r.sample(keys, r.randint(0, len(keys))):
+                msg[k] = [pick() for _ in range(r.randint(0, 7))] if k in ("hp", "be", "fl") and r.random() < 0.7 else pick()
+            out = relay.clean_state(msg)
+            json.dumps(out, allow_nan=False)   # no NaN or Infinity goes out
+            self.assertNotIn("zz", out)
+            for k, v in out.items():
+                for n in (v if isinstance(v, list) else [v]):
+                    if isinstance(n, (int, float)) and not isinstance(n, bool):
+                        self.assertTrue(math.isfinite(n), (k, v))
+            self.assertTrue(abs(out["x"]) <= relay.HALF and abs(out["z"]) <= relay.HALF)
+            self.assertEqual(len(out["hp"]), 5)
+            self.assertTrue(all(0 <= h <= 200 for h in out["hp"]))
+            self.assertIn(out["ch"], data.CHASSIS)
+
     def test_frame_roundtrip_sizes(self):
         for n in (0, 10, 125, 126, 70000):
             f = relay.frame(relay.OP_TEXT, b"x" * n)
@@ -121,6 +165,8 @@ class WSClient:
 class Session(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         relay.players.clear()
+        relay.conns.clear()
+        relay.PER_IP = 99   # every test client is 127.0.0.1; the cap has its own test
         relay.arena.update(seed=5, pal="dusk", over=False)
         self.server = await asyncio.start_server(relay.session, "127.0.0.1", 0, limit=16 * 1024)
         self.port = self.server.sockets[0].getsockname()[1]
@@ -206,6 +252,36 @@ class Session(unittest.IsolatedAsyncioTestCase):
         await a.recv(); await b.recv()  # C joined
         await a.send({"t": "s", "ch": "jackal"})
         self.assertEqual((await b.recv())["ch"], "jackal")
+
+    async def test_a_fuzzing_pilot_never_takes_the_relay_down(self):
+        import random as rnd
+        r = rnd.Random(9)
+        a, _ = await self.join("A")
+        b, _ = await self.join("B")
+        await a.recv()  # B joined
+        junk = [float("nan"), 1e308, "x", None, True, [], {}, [1, "a", None], {"k": 1}, -5, 2**60]
+        for _ in range(300):
+            msg = {"t": r.choice(["s", "fx", "hit", "died", "ready", "ping", "zz", 5, None])}
+            for k in r.sample(["ch", "x", "hp", "to", "amt", "p", "kb", "by", "lo", "k", "fu", "hh", "n", "rtt"], r.randint(0, 6)):
+                msg[k] = r.choice(junk)
+            await b.send(msg)
+        await b.send({"t": "s", "x": 7})   # and B is still connected and relayed
+        while True:
+            m = await a.recv()
+            if m.get("t") == "s" and m.get("x") == 7:
+                break
+        self.assertIn(2, relay.players)
+
+    async def test_one_address_gets_at_most_per_ip_sockets(self):
+        relay.PER_IP = 2
+        a, _ = await self.join("A")
+        b, _ = await self.join("B")
+        self.assertIsNone(await WSClient.connect(self.port), "a third socket from 127.0.0.1 is refused")
+        b.close()
+        await asyncio.sleep(0.1)
+        c = await WSClient.connect(self.port)
+        self.assertIsNotNone(c, "one closed, room for another")
+        self.clients.append(c)
 
     async def test_bad_origin_is_refused(self):
         c = await WSClient.connect(self.port, origin="https://evil.example")
