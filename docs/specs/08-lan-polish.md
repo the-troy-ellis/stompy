@@ -36,6 +36,19 @@ SETTINGS field RELAY (saved under `net.relay`), else today's rule
 (`ws[s]://<page host>:8096/ws`). The MULTIPLAYER panel shows the resolved
 address in the dim style so a LAN host can read it out.
 
+As shipped (#184): `src/net/relay.js` (`normalRelay`, `resolveRelay`) holds
+the rules.
+- **Entries:** a full `ws://` or `wss://` address keeps its own port (the
+  scheme's own behind TLS). A bare host or host:port gets port 8096 and
+  `/ws`. Any other scheme is not a relay.
+- **`?relay=`** is saved as the field, so it sticks.
+- **The field lives on the MULTIPLAYER panel**, not SETTINGS. That's where a
+  player joins, and SETTINGS is already taller than a phone held sideways.
+- **The dim line under it** reads `CONNECTS TO <address>`, or `NOT A RELAY
+  ADDRESS -- USING <address>` for an entry that isn't one.
+- **On a phone held sideways** the panel's colour swatches shrink to one row,
+  so JOIN ARENA stays on screen.
+
 ### Lobby
 
 Joining no longer launches straight into the arena. `welcome` puts the client
