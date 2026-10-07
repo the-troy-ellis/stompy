@@ -83,7 +83,7 @@ test('a guest runs no objectives, turrets or waves; its clock follows the host\'
   stepFor(Gs, 0.5);
   assert.equal(Gs.state, 'play');
   H.time += 5;
-  relay();
+  for (let i = 0; i < 20; i++) relay();   // a frozen enemy sends nothing new; the full report every 2 s carries the clock
   assert.ok(Math.abs(Gs.time - H.time) <= GT_SLACK + 0.01, 'game time pulled to the host\'s (lightning)');
 });
 
