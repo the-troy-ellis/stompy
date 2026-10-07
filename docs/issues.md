@@ -167,15 +167,15 @@ Worked after #106 and before #110 (#131–#136, milestone M3). #137–#139 are M
 
 | # | Title | Labels | Size | Spec |
 |---|---|---|---|---|
-| | M5a: protocol v2: version check, sq rename, validation, fx rate limit | net, server | S | 08 §Protocol |
-| | M5a: configurable relay URL (query, setting, default) | net, ui | S | 08 §Relay URL |
-| | M5a: lobby with pilot list, ping, READY | ui, net, server | M | 08 §Lobby |
-| | M5a: team deathmatch | server, net, sim | M | 08 §Modes |
-| | M5a: round-end summary and vote | ui, server | S | 08 §Vote |
-| | M5a: spectator camera | render, hud | S | 08 §Spectate |
-| | M5a: reconnect with score token | net, server | S | 08 §Reconnect |
-| | M5a: kill feed | hud | S | 08 §Kill feed |
-| | M5a: server flags, logging, systemd unit, per-IP cap, fuzz test | server | S | 08 §Server operations |
+| #183 | M5a: protocol v2: version check, sq rename, validation, fx rate limit | net, server | S | 08 §Protocol |
+| #184 | M5a: configurable relay URL (query, setting, default) | net, ui | S | 08 §Relay URL |
+| #185 | M5a: lobby with pilot list, ping, READY | ui, net, server | M | 08 §Lobby |
+| #186 | M5a: team deathmatch | server, net, sim | M | 08 §Modes |
+| #187 | M5a: round-end summary and vote | ui, server | S | 08 §Vote |
+| #188 | M5a: spectator camera | render, hud | S | 08 §Spectate |
+| #189 | M5a: reconnect with score token | net, server | S | 08 §Reconnect |
+| #190 | M5a: kill feed | hud | S | 08 §Kill feed |
+| #191 | M5a: server flags, logging, systemd unit, per-IP cap, fuzz test | server | S | 08 §Server operations |
 
 ## M5b — Co-op
 

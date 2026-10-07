@@ -27,7 +27,7 @@ import sys
 import time
 from urllib.parse import urlsplit
 
-from data import check_loadout
+from data import CHASSIS, check_loadout
 
 GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 MAX_PLAYERS = 8
@@ -39,6 +39,9 @@ PING_EVERY = 10
 DROP_AFTER = 25           # seconds of silence (a phone that went to sleep)
 MAX_BUFFERED = 256 * 1024 # a client this far behind is dropped, not waited for
 PALETTES = ("dusk", "ice", "volcanic")
+PROTOCOL = 8              # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
+HALF = 96 * 24 / 2        # the map's half width (src/world/terrain.js): positions are clamped to it
+FX_RATE = 40              # weapon effects per second per pilot; more are dropped (a beam flash is per shot, guided updates 15 Hz)
 
 OP_CONT, OP_TEXT, OP_BIN, OP_CLOSE, OP_PING, OP_PONG = 0x0, 0x1, 0x2, 0x8, 0x9, 0xA
 
@@ -56,6 +59,7 @@ class Client:
         self.kills = 0
         self.deaths = 0
         self.last = time.monotonic()
+        self.fx_tokens, self.fx_at = float(FX_RATE), time.monotonic()   # the fx rate limit: a bucket that refills at FX_RATE a second
 
 
 players: dict[int, Client] = {}
@@ -186,6 +190,41 @@ def num(v, lo, hi, default=0.0):
     return default if v != v else max(lo, min(hi, v))   # v != v: NaN
 
 
+def flag(v):
+    return 1 if v else 0
+
+
+def vec3(v, lim=1e4):
+    """0 (none) or a point of three clamped numbers."""
+    return [num(x, -lim, lim) for x in v[:3]] if isinstance(v, list) and len(v) >= 3 else 0
+
+
+def clean_state(msg):
+    """A state message rebuilt from the fields the game sends, every number
+    finite and in range, so nothing malformed reaches the other screens."""
+    hp = msg.get("hp")
+    hp = [num(v, 0, 200) for v in hp[:5]] if isinstance(hp, list) else []
+    out = {"t": "s", "ch": msg.get("ch") if msg.get("ch") in CHASSIS else "kestrel",
+           "x": num(msg.get("x"), -HALF, HALF), "y": num(msg.get("y"), -100, 2000), "z": num(msg.get("z"), -HALF, HALF),
+           "yaw": num(msg.get("yaw"), -1e3, 1e3), "tw": num(msg.get("tw"), -4, 4), "p": num(msg.get("p"), -2, 2),
+           "sp": num(msg.get("sp"), -60, 60), "air": flag(msg.get("air")), "al": flag(msg.get("al")), "sd": flag(msg.get("sd")),
+           "hp": hp + [0.0] * (5 - len(hp)), "bm": flag(msg.get("bm")), "be": vec3(msg.get("be")), "bf": num(msg.get("bf"), 0, 10),
+           "fl": vec3(msg.get("fl")), "sc": int(num(msg.get("sc"), 0, 99)), "sq": num(msg.get("sq"), 0, 1),
+           "pu": int(num(msg.get("pu"), 0, 2)), "lt": flag(msg.get("lt"))}
+    return out
+
+
+def fx_allowed(c, now=None):
+    """Spend one from the pilot's fx bucket; False when it's empty."""
+    now = time.monotonic() if now is None else now
+    c.fx_tokens = min(float(FX_RATE), c.fx_tokens + (now - c.fx_at) * FX_RATE)
+    c.fx_at = now
+    if c.fx_tokens < 1:
+        return False
+    c.fx_tokens -= 1
+    return True
+
+
 async def end_round(winner):
     arena["over"] = True
     log(f"round over: {winner.name} wins")
@@ -200,20 +239,23 @@ async def end_round(winner):
 def handle_message(c, msg):
     t = msg.get("t")
     if t in ("s", "fx"):
-        # Movement and weapon effects: stamp the sender and pass them on.
-        msg["id"] = c.id
+        # Movement and weapon effects: stamp the sender and pass them on. A
+        # state message is rebuilt clean; effects past the rate are dropped.
+        if t == "fx" and not fx_allowed(c):
+            return
+        out = clean_state(msg) if t == "s" else msg
+        out["id"] = c.id
         if t == "s" and "lo" in msg:
-            # A mechlab loadout rides the state message now and then. One that
-            # is malformed or over its tonnage goes out as stock, and the
-            # sender is told so its HUD can say LOADOUT REJECTED.
+            # A mechlab loadout rides the state message now and then, checked
+            # against the chassis as sent. One that is malformed or over its
+            # tonnage goes out as stock, and the sender is told so its HUD can
+            # say LOADOUT REJECTED; one for an unknown chassis is dropped.
             lo, rejected = check_loadout(msg.get("ch"), msg["lo"])
-            if lo is None:
-                del msg["lo"]
-            else:
-                msg["lo"] = lo
+            if lo is not None:
+                out["lo"] = lo
             if rejected:
                 send(c, {"t": "note", "k": "lo"})
-        broadcast(msg, skip=c)
+        broadcast(out, skip=c)
     elif t == "hit":
         target = players.get(int(num(msg.get("to"), 0, 99)))
         if target and target is not c and not arena["over"]:
@@ -262,6 +304,11 @@ async def session(reader, writer):
         op, data = await asyncio.wait_for(read_message(reader), HELLO_TIMEOUT)
         hello = json.loads(data) if op == OP_TEXT else {}
         if hello.get("t") != "hello":
+            return
+        if hello.get("v") != PROTOCOL:
+            # Another version of the game: say which one to get, and close.
+            send(c, {"t": "version", "need": PROTOCOL})
+            log(f"turned away v{hello.get('v')} from {peer[0] if peer else '?'} (need v{PROTOCOL})")
             return
         if len(players) >= MAX_PLAYERS:
             send(c, {"t": "full", "max": MAX_PLAYERS})

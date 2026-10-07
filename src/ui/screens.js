@@ -1,6 +1,7 @@
 import { $, esc } from '../util/dom.js';
 import { store } from '../util/store.js';
 import { clampN } from '../util/math.js';
+import { normalRelay } from '../net/relay.js';
 import { CATS, CAT_OF } from '../data/weapons.js';
 import { CHASSIS, MECH_ORDER, MECH_INFO } from '../data/chassis.js';
 import { NAMES } from '../data/names.js';
@@ -60,6 +61,8 @@ export function createUi(app) {
       <tr><td>LIGHTS</td><td>headlights at night: on, you see; off, you are harder to see</td></tr>
     </table>`;
   const controls = () => (G.touchUI ? TOUCH_CONTROLS : CONTROLS);
+  // The address MULTIPLAYER will use, for a LAN host to read out; a RELAY entry that isn't one says so.
+  const relayLine = () => (prefs.relay && !normalRelay(prefs.relay) ? `NOT A RELAY ADDRESS -- USING ${app.relay().url}` : `CONNECTS TO ${app.relay().url}`);
   const CONTROLS = `
     <table class="mech-keys">
       <tr><td>W / S</td><td>throttle up / down (it stays set)</td><td>X</td><td>full stop</td></tr>
@@ -168,6 +171,10 @@ export function createUi(app) {
         <p class="lobby-row"><label for="callsign">CALLSIGN</label>
           <input id="callsign" class="callsign" maxlength="12" value="${esc(prefs.mpName)}" placeholder="PILOT"
             autocomplete="off" spellcheck="false" autocapitalize="characters" enterkeyhint="go"></p>
+        <p class="lobby-row"><label for="relay">RELAY</label>
+          <input id="relay" class="relay" maxlength="120" value="${esc(prefs.relay)}" placeholder="THIS PAGE'S HOST"
+            autocomplete="off" spellcheck="false" autocapitalize="off" inputmode="url" enterkeyhint="go"></p>
+        <p class="dim relay-at">${esc(relayLine())}</p>
         <div class="swatches">${MP_COLORS.map((c, i) => `<button class="swatch${i === prefs.mpColor ? ' on' : ''}" data-col="${i}"
           style="background:${c.css}" aria-label="${c.name}" title="${c.name}"></button>`).join('')}</div>
         <p class="status k">${esc(status)}</p>`;
@@ -340,7 +347,10 @@ export function createUi(app) {
     if (locked(prefs.chassis)) app.mechlab.fit.open = false;   // nothing to fit on a silhouette
     showMech(); renderMenu();
   }
-  ov.addEventListener('input', e => { if (e.target.matches('.callsign')) { prefs.mpName = e.target.value.toUpperCase().slice(0, 12); store.set('mp.name', prefs.mpName); } });
+  ov.addEventListener('input', e => {
+    if (e.target.matches('.callsign')) { prefs.mpName = e.target.value.toUpperCase().slice(0, 12); store.set('mp.name', prefs.mpName); }
+    if (e.target.matches('.relay')) { prefs.relay = e.target.value.trim(); store.set('net.relay', prefs.relay); const at = $('.relay-at', ov); if (at) at.textContent = relayLine(); }
+  });
   // Drag anywhere off the menu panel to turn the mech round.
   ov.addEventListener('pointerdown', e => {
     if (G.state !== 'menu' || e.target.closest('button, input, a, .mm-left, .mm-select')) return;

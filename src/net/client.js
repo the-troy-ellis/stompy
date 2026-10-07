@@ -33,13 +33,12 @@ export function createNet(app) {
   const ov = app.ov;
   void ov; void esc; void $;
 
-  // A free-for-all for up to eight pilots via server.py (port 8096). Each
+  // A free-for-all for up to eight pilots via server.py (net/relay.js finds it). Each
   // client is the authority for its own mech: it sends its state ~15 times a
   // second, reports hits it lands, applies hits it takes, and declares its
   // own death. Other pilots are drawn from their latest state, smoothed and
   // extrapolated, and walk with the same gait. Their shots arrive as effects
   // ("ghosts") that look real but never score -- their shooter scores them.
-  const NET_PORT = 8096;
   const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10, loSent: '', loN: 0, feed: [] };
   const mp = () => G.mode === 'mp';
   const pilotName = id => Net.info.get(id)?.name || `PILOT ${id}`;
@@ -55,7 +54,7 @@ export function createNet(app) {
     app.audio.Sound.unlock(); app.audio.loadSamples();
     app.ui.setStatus('CONNECTING...');
     let ws, welcomed = false;
-    try { ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:${NET_PORT}/ws`); }
+    try { ws = new WebSocket(app.relay().url); }   // net/relay.js: ?relay=, the RELAY field, or this page's host
     catch { app.ui.setStatus('COULD NOT CONNECT'); return; }
     Net.ws = ws;
     ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', v: PROTOCOL, name: prefs.mpName, color: prefs.mpColor }));
@@ -67,7 +66,7 @@ export function createNet(app) {
     ws.onclose = () => {
       if (Net.ws !== ws) return;   // we closed it on purpose
       Net.ws = null;
-      if (!welcomed) { if (G.state === 'menu' && !/FULL/.test($('.status', ov)?.textContent || '')) app.ui.setStatus('THE ARENA SERVER IS NOT ANSWERING'); }
+      if (!welcomed) { if (G.state === 'menu' && !/FULL|UPDATE/.test($('.status', ov)?.textContent || '')) app.ui.setStatus('THE ARENA SERVER IS NOT ANSWERING'); }
       else if (mp()) lostConnection();
     };
   }
@@ -90,6 +89,7 @@ export function createNet(app) {
   function onNet(m) {
     switch (m.t) {
       case 'full': app.ui.setStatus(`THE ARENA IS FULL (${m.max} PILOTS) -- TRY AGAIN LATER`); break;
+      case 'version': app.ui.setStatus(`UPDATE THE GAME TO PLAY (v${m.need})`); break;   // the server runs another version
       case 'welcome':
         Net.id = m.id; Net.limit = m.limit || 10;
         setScores(m.scores);

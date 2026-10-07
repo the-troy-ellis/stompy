@@ -12,7 +12,7 @@ M0 Foundations ──► M1 Feel & AI ──► M2 Content & Mechlab ──► M
                          └──► M5a LAN polish ──► M5b Co-op ──► M5c Internet
 ```
 
-Current milestone: **M3** (M0, M1 and M2 shipped, bar M2's balance pass #79; M3 issues are #97–#115).
+Current milestone: **M5a** (M0–M4 shipped, bar the owner's items: M2's balance pass #79, M3's playthrough #114 and naming #115, M4's pixel default #135 and phone budget #166; M5a issues are #183–#191).
 
 ## M0 — Foundations
 
