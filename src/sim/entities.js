@@ -1,6 +1,8 @@
 import { norm, sub, wrapA, clampN } from '../util/math.js';
 import { explode, particle } from './effects.js';
 import { feel } from './feel.js';
+import { flatZones } from './placement.js';
+import { missionAvoid, scatterProps } from '../world/props.js';
 
 const { hypot, atan2, sin, cos, min, PI } = Math;
 
@@ -19,6 +21,11 @@ export const FALL_TIME = 1.2;    // s: a punched-down structure's topple
 // the same way they do on a mech: a name and a scale that puts the centre at
 // half height.
 export function addEntity(G, spec) {
+  const e = makeEntity(G, spec);
+  G.entities.push(e);
+  return e;
+}
+function makeEntity(G, spec) {
   const kind = spec.kind || 'structure', height = spec.height ?? (kind === 'vehicle' ? 3 : kind === 'nav' ? 0 : kind === 'turret' ? 6 : 10);
   const e = {
     kind, id: spec.id || `${kind}${G.entities.length}`, tags: spec.tags || [], team: spec.team ?? (kind === 'vehicle' ? 0 : 1),
@@ -30,8 +37,60 @@ export function addEntity(G, spec) {
   };
   e.max = e.hp;
   e.targetable = kind !== 'nav' && e.team !== 0 && Number.isFinite(e.hp);
-  G.entities.push(e);
   return e;
+}
+
+// The map's scenery (world/props.js): indestructible structures with a mesh
+// each, kept apart from G.entities in G.scenery, with a grid of SCENERY_CELL
+// metre cells that lists each prop in every cell its footprint touches. They
+// never move, and there are about a hundred, so the per-frame questions
+// (pushing a mech out, a punch, a shot) look only in the cells concerned:
+// walking the whole list from code that runs a few times a frame made
+// garbage. Placed after the mission's own entities so it keeps clear of them;
+// `props: false` in a mission leaves the map bare, as does a flat test map.
+export const SCENERY_CELL = 64;
+const cellOf = v => Math.floor(v / SCENERY_CELL), key = (i, j) => i * 4096 + j;
+export function placeScenery(G, def, start = { x: 0, z: 0 }) {
+  G.scenery = []; G.sceneryGrid = new Map();
+  if (def.props === false || G.ter.flat) return;
+  for (const p of scatterProps(G.ter.seed, G.biome, G.ter, missionAvoid(start, flatZones(def), G.entities))) {
+    const e = makeEntity(G, { ...p, kind: 'structure', hp: Infinity });
+    G.scenery.push(e);
+    for (let i = cellOf(e.x - e.radius); i <= cellOf(e.x + e.radius); i++) for (let j = cellOf(e.z - e.radius); j <= cellOf(e.z + e.radius); j++) {
+      const cell = G.sceneryGrid.get(key(i, j));
+      if (cell) cell.push(e); else G.sceneryGrid.set(key(i, j), [e]);
+    }
+  }
+}
+// The scenery whose cells lie within r of (x, z), into `out`; returns how
+// many (a prop may come twice, and a little further: callers test exactly).
+export function sceneryNear(G, x, z, r, out) {
+  const grid = G.sceneryGrid;
+  let n = 0;
+  if (!grid || !grid.size) return 0;
+  const i0 = cellOf(x - r), i1 = cellOf(x + r), j0 = cellOf(z - r), j1 = cellOf(z + r);
+  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+    const cell = grid.get(key(i, j));
+    if (cell) for (let k = 0; k < cell.length; k++) out[n++] = cell[k];
+  }
+  return n;
+}
+// The scenery in the cells a segment (x0, z0) to (x1, z1) crosses, the same
+// way: cell by cell along it (a 2D DDA).
+export function sceneryAlong(G, x0, z0, x1, z1, out) {
+  const grid = G.sceneryGrid, C = SCENERY_CELL;
+  let n = 0;
+  if (!grid || !grid.size) return 0;
+  let i = cellOf(x0), j = cellOf(z0);
+  const i1 = cellOf(x1), j1 = cellOf(z1), dx = x1 - x0, dz = z1 - z0, si = dx > 0 ? 1 : -1, sj = dz > 0 ? 1 : -1;
+  const adx = Math.abs(dx), adz = Math.abs(dz), tdx = adx > 1e-9 ? C / adx : Infinity, tdz = adz > 1e-9 ? C / adz : Infinity;
+  let tx = adx > 1e-9 ? (si > 0 ? (i + 1) * C - x0 : x0 - i * C) / adx : Infinity, tz = adz > 1e-9 ? (sj > 0 ? (j + 1) * C - z0 : z0 - j * C) / adz : Infinity;
+  for (let steps = Math.abs(i1 - i) + Math.abs(j1 - j); steps >= 0; steps--) {
+    const cell = grid.get(key(i, j));
+    if (cell) for (let k = 0; k < cell.length; k++) out[n++] = cell[k];
+    if (tx < tz) { tx += tdx; i += si; } else { tz += tdz; j += sj; }
+  }
+  return n;
 }
 
 export const solid = e => e.alive && e.kind !== 'nav';
@@ -40,7 +99,8 @@ export const solid = e => e.alive && e.kind !== 'nav';
 // (or another vehicle) stands within BLOCK_AHEAD in front of it, and resumes
 // when the way is clear. A toppling structure finishes its fall.
 export function stepEntities(G, dt) {
-  for (const e of G.entities) {
+  for (let i = 0; i < G.entities.length; i++) {
+    const e = G.entities[i];
     if (e.fall && e.fall.t < FALL_TIME) e.fall.t = min(FALL_TIME, e.fall.t + dt);
     if (e.kind !== 'vehicle' || !e.alive || !e.path) continue;
     if (e.wp >= e.path.length) { e.speed = 0; e.arrived = true; continue; }
@@ -59,7 +119,7 @@ export function stepEntities(G, dt) {
 function ahead(G, e, fx, fz) {
   const near = (x, z, r) => { const ox = x - e.x, oz = z - e.z, along = ox * fx + oz * fz, side = Math.abs(ox * fz - oz * fx); return along > 0 && along < BLOCK_AHEAD + r && side < e.radius + r; };
   for (const m of G.mechs) if (m.alive && near(m.x, m.z, 2)) return true;
-  for (const o of G.entities) if (o !== e && solid(o) && o.kind === 'vehicle' && near(o.x, o.z, o.radius)) return true;
+  for (let i = 0; i < G.entities.length; i++) { const o = G.entities[i]; if (o !== e && o.kind === 'vehicle' && solid(o) && near(o.x, o.z, o.radius)) return true; }
   return false;
 }
 
@@ -89,17 +149,37 @@ export function destroyEntity(G, e, src, how = {}) {
 
 // Nothing walks through a structure or a vehicle: mechs this client owns are
 // pushed out of their footprints (unless they are clear above them).
+// Indexed loops and a squared-distance reject: with a map's scenery this runs
+// for about a hundred props a frame, not often enough for V8 to optimize, and
+// an unoptimized for-of or hypot makes garbage.
 export function pushOutOfEntities(G, radiusOf) {
-  for (const e of G.entities) {
+  const E = G.entities, ms = G.mechs;
+  for (let i = 0; i < E.length; i++) {
+    const e = E[i];
     if (!solid(e)) continue;
-    for (const m of G.mechs) {
+    for (let j = 0; j < ms.length; j++) {
+      const m = ms[j];
       if (!m.alive || m.remote || m.y > e.y + e.height - 0.5) continue;
-      const dx = m.x - e.x, dz = m.z - e.z, d = hypot(dx, dz), r = e.radius + radiusOf(m);
-      if (d >= r) continue;
-      const nx = d > 0.01 ? dx / d : 1, nz = d > 0.01 ? dz / d : 0;
-      m.x = e.x + nx * r; m.z = e.z + nz * r;
+      const dx = m.x - e.x, dz = m.z - e.z, r = e.radius + radiusOf(m);
+      if (dx * dx + dz * dz >= r * r) continue;
+      pushOff(m, e, r, dx, dz);
     }
   }
+  for (let j = 0; j < ms.length; j++) {
+    const m = ms[j];
+    if (!m.alive || m.remote) continue;
+    const rm = radiusOf(m), n = sceneryNear(G, m.x, m.z, rm, NEAR);
+    for (let k = 0; k < n; k++) {
+      const e = NEAR[k], dx = m.x - e.x, dz = m.z - e.z, r = e.radius + rm;
+      if (m.y > e.y + e.height - 0.5 || dx * dx + dz * dz >= r * r) continue;
+      pushOff(m, e, r, dx, dz);
+    }
+  }
+}
+const NEAR = [];
+function pushOff(m, e, r, dx, dz) {
+  const d = Math.sqrt(dx * dx + dz * dz), nx = d > 0.01 ? dx / d : 1, nz = d > 0.01 ? dz / d : 0;
+  m.x = e.x + nx * r; m.z = e.z + nz * r;
 }
 
 // A toppling or fallen structure's rotation: about the base, toward fall.yaw.

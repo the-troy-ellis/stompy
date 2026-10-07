@@ -6,7 +6,7 @@ import { damage } from './combat.js';
 import { knock } from './knock.js';
 import { feel } from './feel.js';
 import { fxPunch } from '../net/protocol.js';
-import { damageEntity, solid } from './entities.js';
+import { damageEntity, solid, sceneryNear } from './entities.js';
 
 const { atan2, hypot, sin, cos } = Math;
 
@@ -39,6 +39,7 @@ export function meleeGhost(m, dt, pu) {
   if (m.melee.t >= def.windup + def.recover) m.melee = null;
 }
 
+const NEAR = [];
 // The mech this one's swing would land on right now, or null.
 export function meleeTarget(G, m) {
   const def = meleeOf(m), c = center(m), facing = viewYaw(m), reach = def.reach * m.ch.scale;
@@ -51,9 +52,14 @@ export function meleeTarget(G, m) {
     best = t; bestD = d;
   }
   // Structures and vehicles can be punched too (a punched-down tower topples away from the fist).
-  for (const e of G.entities) {
+  // The map's scenery too (it sparks; it's bolted down), from the cells nearby.
+  const E = G.entities, n = sceneryNear(G, m.x, m.z, reach, NEAR);
+  for (let i = 0; i < E.length + n; i++) {   // indexed, far ones rejected squared: see pushOutOfEntities
+    const e = i < E.length ? E[i] : NEAR[i - E.length];
     if (!solid(e)) continue;
-    const dx = e.x - m.x, dz = e.z - m.z, d = hypot(dx, dz) - e.radius;
+    const dx = e.x - m.x, dz = e.z - m.z, far = reach + e.radius;
+    if (dx * dx + dz * dz > far * far) continue;
+    const d = Math.sqrt(dx * dx + dz * dz) - e.radius;
     if (d > reach || d >= bestD) continue;
     if (Math.abs(wrapA(atan2(dx, dz) - facing)) > def.arc) continue;
     best = e; bestD = d;

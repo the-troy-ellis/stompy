@@ -1,8 +1,9 @@
 import { Builder } from '../mesh/builder.js';
-import { M, TAU, chain, clampN, mix3, mul } from '../util/math.js';
+import { M, chain, clampN, mix3, mul } from '../util/math.js';
 import { N, CELL, HALF, BOUND } from './terrain.js';
+import { outposts } from './props.js';
 
-const { sin, cos, hypot } = Math;
+const { hypot } = Math;
 
 // The terrain mesh plus the rocks and abandoned outposts baked into it.
 export function buildTerrainMesh(ter, pal, seed) {
@@ -29,17 +30,13 @@ export function buildTerrainMesh(ter, pal, seed) {
       M.S(sz, sz * (0.5 + r01() * 0.8), sz * (0.7 + r01() * 0.6))), mul(pal.rock, 0.85 + r01() * 0.3), 0.55 + r01() * 0.3, 0.55 + r01() * 0.3);
   }
   // A few abandoned outposts.
-  for (let o = 0; o < 4; o++) {
-    const a = r01() * TAU, d = 280 + r01() * 600, cx = sin(a) * d, cz = cos(a) * d;
-    for (let k = 0; k < 7; k++) {
-      const x = cx + (r01() - 0.5) * 90, z = cz + (r01() - 0.5) * 90;
-      const w = 9 + r01() * 14, hgt = 7 + r01() * 22, dd = 9 + r01() * 14;
+  for (const { blocks, tower } of outposts(seed)) {   // the props cluster round them (world/props.js)
+    for (const { x, z, w, h: hgt, d: dd, g, yaw } of blocks) {
       const base = ter.height(x, z) - 2;
-      const g = 0.45 + r01() * 0.2;
-      b.cube(chain(M.T(x, base + hgt / 2, z), M.RY(r01() * 0.4), M.S(w, hgt, dd)), [g, g * 0.97, g * 0.93], 0.97, 0.97);
+      b.cube(chain(M.T(x, base + hgt / 2, z), M.RY(yaw), M.S(w, hgt, dd)), [g, g * 0.97, g * 0.93], 0.97, 0.97);
       b.cube(chain(M.T(x, base + hgt + 0.6, z), M.S(w * 0.6, 1.2, dd * 0.6)), [g * 0.6, g * 0.6, g * 0.6]);
     }
-    const tx = cx + 40, tz = cz - 30, tb = ter.height(tx, tz);
+    const tx = tower.x, tz = tower.z, tb = ter.height(tx, tz);
     b.cube(chain(M.T(tx, tb + 22, tz), M.S(1.4, 44, 1.4)), [0.35, 0.33, 0.3], 0.4, 0.4);
     b.cube(chain(M.T(tx, tb + 44, tz), M.S(2.5, 1, 2.5)), [0.9, 0.15, 0.1]);
   }

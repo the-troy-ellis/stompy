@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning, #159 snow and fog, #160 dust storm, #161 prop library shipped) |
+| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning, #159 snow and fog, #160 dust storm, #161 prop library, #162 prop placement shipped) |
 | Milestone | M4 |
 | Size | L (split: night + headlights; weather; props; explosions + particles) |
 | Depends on | M0; structures from [03-objectives.md](03-objectives.md) share the prop meshes |
@@ -145,6 +145,37 @@ mission marks them destructible. Mission placements override.
 
 Props are drawn in one pass with a frustum test (sphere vs the view
 frustum's planes from `VP`) and a distance cull at `fog[1]`.
+
+As shipped (#162): `scatterProps(seed, biome, ter, { avoid, paths })` gives
+90 to 120 props a map, about 2 ms:
+- **Outposts:** `outposts(seed)` lays out the four outposts' abandoned
+  blocks and towers, which `terrainMesh.js` bakes into the ground mesh as
+  before. Round each go a bunker, two crate stacks, a tank, a three-segment
+  pipe run and a four-segment wall, clear of the blocks.
+- **Pylons:** two lines of masts cross the map every 150 m.
+- **Singles:** dusk adds crates, bunkers, tanks and wall stubs; ice adds 30
+  dead trees and 14 spires; volcanic adds 12 lava vents.
+- **Clear ground:** nothing lands within 140 m of the start, on a mission's
+  flat pads or structures, within 30 m of a convoy's road, on a steep slope,
+  or on another prop. A mission with `props: false` and a flat test map get
+  none.
+
+They are `structure` entities with `hp: Infinity`, but they live in
+`G.scenery`, apart from `G.entities`, with a 64 m grid listing each prop in
+every cell its footprint touches. Pushing a mech out, a punch's target and a
+shot's ray (a 2D walk along the cells it crosses) look only in the cells
+concerned. Walking the whole list from code that runs a few times a frame
+made 50–150 KB of garbage a frame. Mission entities are placed first, so the
+scatter keeps clear of them; a mission that wants a destructible prop lists
+it among its entities, as missions already do.
+
+Drawing (`render/propBatch.js` and `R.drawProps`): one instanced draw per
+prop mesh with anything in view, lit, fogged, headlit and IR-shaded by the
+main fragment shader. A toppling prop is drawn on its own. Without the
+instancing extension, each instance is an `R.draw`. The perf scenes gain 1
+to 4 draws and 1–3k triangles, with no more garbage. Acceptance 4 is a
+headless test: facing away from an outpost issues none of its props, and
+they count as culled in `?debug=1`.
 
 ### Explosions and debris
 
