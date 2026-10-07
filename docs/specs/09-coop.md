@@ -129,12 +129,36 @@ Enemy count scales with pilots: +1 light mech per extra pilot in ELIMINATE
 and waves; convoy and structure counts unchanged; EXTRACT requires all alive
 pilots in the zone. Never HP.
 
+As shipped (#204): `coopDef(def, pilots)` in `src/sim/coopRules.js`.
+- **Elimination missions:** each pilot past the first adds one light mech,
+  a JACKAL (`COOP_EXTRA` in `src/data/coop.js`), at the end of `foes`.
+  Only the host builds the mission this way, and the extras reach the
+  guests as enemies they hadn't seen.
+- **Waves:** each one gets the same extras on the host (`waveExtra`).
+- **Unchanged:** structures and convoys, and every mech's armour.
+- **EXTRACT:** waits for every pilot still standing, and its distance is the
+  furthest one's.
+
 ### Death and respawn
 
 A dead pilot spectates (M5a's camera) and respawns at the next objective
 change or after 45 s at the start zone with full armour but no ammo refill,
 whichever is first. Mission fails when all pilots are dead at once. The
 single-player rule (die = fail) is kept for one-pilot rooms.
+
+As shipped (#204): `coopLives(G)` is true for a guest, and for a host with
+another pilot.
+- **Going down:** `destroy` sends `died`, says MECH DESTROYED and arms the
+  respawn. It doesn't end the mission.
+- **Coming back:** `tickCoopRespawn` brings the pilot back at the mission's
+  start (`G.startAt`) after `COOP_RESPAWN` (45 s), or at once when any
+  objective changes state. Armour comes back full and the guns work again;
+  the ammunition is what it went down with.
+- **Failing:** the host fails the mission when every pilot is down at once
+  (`allDown`).
+- **A host alone:** dying ends it, as in single player.
+- **While down:** the host keeps running the objectives, since its teammates
+  are still fighting.
 
 ### UI
 

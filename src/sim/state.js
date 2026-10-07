@@ -63,7 +63,7 @@ export function resetMatch(G, { def, seed, pal, terrainOpts }) {
   G.worldKind = 'match';
   G.mechs = []; G.entities = []; G.scenery = []; G.sceneryGrid = null; G.waves = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts.clear(); G.debris = []; G.scorches = []; G.scorchId = 0; G.scorchRev++; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear(); G.pendingEHits.clear();
   G.target = null; G.aimMech = null; G.flash = 0; G.shake = 0; G.kick = 0; G.bob = null; G.bobIn = null; G.whiteFlash = 0; G.zoom = false; G.endT = 0; G.time = 0; G.frame = 0;
-  G.death = null; G.lastKill = null; G.guide = null; G.mDown = false; G.won = false; G.roundOver = false; G.hitMark = 0; G.voice = null;
+  G.death = null; G.coopRespawn = null; G.lastKill = null; G.guide = null; G.mDown = false; G.won = false; G.roundOver = false; G.hitMark = 0; G.voice = null;
   G.stats = { shots: 0, hits: 0, dealt: 0, taken: 0, kills: 0 };
   G.def = def;
 }
@@ -79,6 +79,7 @@ export function startMatch(G, def, seed, gentle, chassis, { partsKey, terrainOpt
   // (mission 11's long run); every other position stays measured from the centre.
   const st = def.start ? polar(def.start) : { x: 0, z: 0 }, face = def.start?.[2] ? -def.start[2] * Math.PI / 180 : 0;
   G.player = newMech(G, chassis, 0, st.x, st.z, face, { partsKey, loadout });
+  G.startAt = { x: st.x, z: st.z, yaw: face };   // where a co-op pilot comes back (sim/coopRules.js)
   G.mechs.push(G.player);
   G.eye = eyeOf(G.player); G.view = dirOf(0, 0); G.aim = add(G.eye, mul(G.view, 100));
   const rng = G.rng;

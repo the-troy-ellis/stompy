@@ -31,8 +31,10 @@ export function numberEnemies(G) {
 
 // Into co-op as 'host' or 'guest', once the mission's world is built. A
 // guest's enemies become remote copies, waiting for the host's first report.
-export function startCoop(G, role) {
-  G.role = role; G.eidN = 0;
+// `pilots`: how many are in the room at the start; each one past the first
+// adds a light mech to every wave (the host's; sim/coopRules.js).
+export function startCoop(G, role, pilots = 1) {
+  G.role = role; G.eidN = 0; G.coopExtra = role === 'host' ? Math.max(0, pilots - 1) : 0;
   G.coop = { sendT: 0, n: 0, entT: 0, objKey: '', objSent: '', overSent: false };
   numberEnemies(G);
   if (role === 'guest') for (const m of G.mechs) if (m.eid) { m.remote = true; m.net = null; }

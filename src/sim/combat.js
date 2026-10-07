@@ -15,6 +15,7 @@ import { alertEnemy } from './ai/perception.js';
 import { WEAPONS } from '../data/weapons.js';
 import { knock } from './knock.js';
 import { hitQueue, sendFx } from './hitqueue.js';
+import { coopDown, coopLives } from './coopRules.js';
 import { damageEntity } from './entities.js';
 
 const { sin, cos } = Math;
@@ -184,6 +185,12 @@ export function destroy(G, m, src) {
     // Real time, not game time: a slow phone shouldn't make the wait longer.
     G.respawnAt = G.clock + 5000; G.killer = src?.netId || 0;
     msg(G, 'MECH DESTROYED', '#f44');
+    return;
+  }
+  if (m === G.player && coopLives(G)) {
+    // Co-op with company: down, not out; back at the start soon (sim/coopRules.js).
+    G.fx.netSend(died(src?.netId, m.lastHitMelee));
+    coopDown(G);
     return;
   }
   if (m === G.player) {

@@ -20,6 +20,7 @@ import { netInterp } from '../net/interp.js';
 import { pushOutOfEntities, stepEntities } from './entities.js';
 import { tickObjectives } from './objectives.js';
 import { stepTurrets } from './turrets.js';
+import { tickCoopRespawn } from './coopRules.js';
 
 const { sin, abs, min, max, hypot, cos } = Math;
 
@@ -114,6 +115,7 @@ export function update(G, input, dt) {
   // A co-op guest doesn't run the world: the host's turrets, objectives and
   // waves arrive over the wire (docs/specs/09-coop.md).
   if (G.role !== 'guest') { stepTurrets(G, dt); tickObjectives(G); }
+  if (G.role !== 'solo') tickCoopRespawn(G);   // co-op: down is not out (sim/coopRules.js)
   pushOutOfEntities(G, m => geoOf(m).radius * m.ch.scale);
 
   stepBursts(G, dt);
