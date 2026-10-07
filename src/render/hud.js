@@ -7,6 +7,7 @@ import { objectivePoint } from '../sim/objectives.js';
 import { MELT_MAX, beamMult } from '../sim/beams.js';
 import { HEAT, hotFrac, FEEL } from '../data/feel.js';
 import { makeSpring, stepSpring } from '../util/spring.js';
+import { liveKills, killWords } from '../net/killfeed.js';
 
 const { sin, cos, atan2, min, max, PI, random, hypot, floor } = Math;
 
@@ -148,6 +149,23 @@ export function createHud(app) {
     };
   }
 
+  // The kill feed (net/killfeed.js): right-aligned at x from y down, newest at
+  // the bottom, the names in the pilots' colours, each fading over 6 s.
+  function drawKillFeed(x, y) {
+    const name = app.net.pilotName, css = id => MP_COLORS[app.net.Net.info.get(id)?.color]?.css || GREEN;
+    ctx.textAlign = 'left';
+    for (const e of liveKills(app.net.Net.feed, performance.now())) {
+      const [k, verb, v] = killWords(e, name), parts = [[k, css(e.killer)], [` ${verb} `, e.killer === app.net.Net.id || e.victim === app.net.Net.id ? AMBER : GREEN], [v, css(e.victim)]];
+      const w = parts.reduce((sum, [t]) => sum + ctx.measureText(t).width, 0);
+      let px = x - w;
+      ctx.globalAlpha = clampN(e.alpha, 0, 1);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(px - 4, y - 9, w + 8, 12);   // a dark band, so a pale name reads against the sky
+      for (const [t, c] of parts) { ctx.fillStyle = c; ctx.fillText(t, px, y); px += ctx.measureText(t).width; }
+      y += 13;
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'right';
+  }
   // Scoreboard, death / respawn, spawn shield, and the round banner.
   function drawArenaHUD(L) {
     const P = G.player;
@@ -168,6 +186,7 @@ export function createHud(app) {
       ctx.fillRect(x - 128, y - 4, 8, 8);
       y += 14;
     }
+    drawKillFeed(x, y + (G.touchUI ? 16 : 6));
     ctx.textAlign = 'center';
     const mid = L.viewBottom * 0.5;
     if (!P.alive) {
