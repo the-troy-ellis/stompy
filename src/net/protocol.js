@@ -4,7 +4,7 @@
 import { HPK } from '../data/chassis.js';
 import { WEAPONS } from '../data/weapons.js';
 
-export const PROTOCOL = 13;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit. 5: hh (heat) on hit. 6: knuckles in lo.sys. 7: lt (headlights) in s. 8: the server enforces the version (version message) and rebuilds s clean. 9: the lobby (ch in hello; ready; ping; ch, ready, ping in scores). 10: team deathmatch (team; team in scores; teams, mode and limit in newround; teams in welcome, kill and roundover). 11: the round-end vote (vote, stats; tally; best and acc in scores; vote in newround). 12: reconnect (token in hello; token and resumed in welcome). 13: rooms (room and create in hello; room, kind, host, def, started in welcome; noroom; host; started in ready; the co-op routing of es, ent, entx, obj, over, ehit)
+export const PROTOCOL = 14;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit. 5: hh (heat) on hit. 6: knuckles in lo.sys. 7: lt (headlights) in s. 8: the server enforces the version (version message) and rebuilds s clean. 9: the lobby (ch in hello; ready; ping; ch, ready, ping in scores). 10: team deathmatch (team; team in scores; teams, mode and limit in newround; teams in welcome, kill and roundover). 11: the round-end vote (vote, stats; tally; best and acc in scores; vote in newround). 12: reconnect (token in hello; token and resumed in welcome). 13: rooms (room and create in hello; room, kind, host, def, started in welcome; noroom; host; started in ready; the co-op routing of es, ent, entx, obj, over, ehit). 14: co-op enemies (es; ehit; eid on an enemy's fx, te on a volley at one, e2 on a fusion shot at one)
 export const r2 = v => Math.round(v * 100) / 100;
 const v3 = p => p.map(r2);
 
@@ -49,7 +49,8 @@ export function stateMessage(P, bf, withLoadout = false) {
 // Weapon effects: drawn by everyone, scored by the shooter.
 export const fxBeam = (type, a, b) => ({ t: 'fx', k: 'b', w: type, a: v3(a), b: v3(b) });
 export const fxShell = (p, v, w = 'ac') => ({ t: 'fx', k: 's', p: v3(p), v: v3(v), w });
-export const fxMissiles = (p, d, targetId, vid, w = 'lrm') => ({ t: 'fx', k: 'm', p: v3(p), d: v3(d), tg: targetId || 0, v: vid, w });
+// tg: the pilot it homes on; te: the co-op enemy (eid) it homes on.
+export const fxMissiles = (p, d, targetId, vid, w = 'lrm', te = 0) => (te ? { t: 'fx', k: 'm', p: v3(p), d: v3(d), tg: targetId || 0, te, v: vid, w } : { t: 'fx', k: 'm', p: v3(p), d: v3(d), tg: targetId || 0, v: vid, w });
 export const fxGuide = (vid, p, d) => ({ t: 'fx', k: 'mg', v: vid, p: v3(p), d: v3(d) });
 export const fxDetonate = vid => ({ t: 'fx', k: 'md', v: vid });
 export const fxFusion = (a, targetId, b) => ({ t: 'fx', k: 'fu', a: v3(a), id2: targetId || 0, b: v3(b) });
@@ -66,6 +67,12 @@ export function hit(to, amt, p, fu = false, { kb, me, st, zap, hh } = {}) {
   if (zap) m.zap = 1;   // a bolt: the victim's HUD scrambles
   if (hh > 0) m.hh = r2(hh);   // heat poured in (TOASTER): the victim adds it
   return m;
+}
+// Co-op: a guest's damage to an enemy (eid), for the host to apply; the same fields as hit.
+export function ehit(eid, amt, p, extra = {}) {
+  const m = hit(0, amt, p, false, extra);
+  delete m.to;
+  return { ...m, t: 'ehit', eid };
 }
 export const died = (by, me = false) => (me ? { t: 'died', by: by || 0, me: 1 } : { t: 'died', by: by || 0 });
 

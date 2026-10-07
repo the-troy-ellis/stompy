@@ -4,6 +4,7 @@ import { meleeOf, punchArm } from '../data/melee.js';
 import { center, viewYaw } from './geom.js';
 import { damage } from './combat.js';
 import { knock } from './knock.js';
+import { hitQueue } from './hitqueue.js';
 import { feel } from './feel.js';
 import { fxPunch } from '../net/protocol.js';
 import { damageEntity, solid, sceneryNear } from './entities.js';
@@ -123,7 +124,7 @@ export function tryStomp(G, m, airT) {
     t.lastHitMelee = 'stomp';
     damage(G, t, [t.x, top - 0.5, t.z], def.stompDmg, m, false, true);
     knock(G, { target: t, attacker: m, base: def.stompKnock, dir: [nx, nz] });
-    if (t.remote) { const q = G.pendingHits.get(t.netId); if (q) q.st = 1; }
+    if (t.remote) { const q = hitQueue(G, t); if (q) q.st = 1; }
     m.vy = 4; m.push[0] -= nx * def.stompKnock * 0.5; m.push[1] -= nz * def.stompKnock * 0.5;
     feel(G, 'stomp', { mech: m, k: 1, at: m === G.player ? null : [t.x, top, t.z] });
     feel(G, 'punched', { mech: t, k: 1.2, at: t === G.player ? null : [t.x, top, t.z] });

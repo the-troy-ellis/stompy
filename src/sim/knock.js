@@ -1,5 +1,6 @@
 import { clampN } from '../util/math.js';
 import { FEEL } from '../data/feel.js';
+import { hitQueue } from './hitqueue.js';
 
 // Knockback (docs/specs/12-melee.md): a horizontal impulse on a mech, scaled
 // by the masses involved, so a shove sends a light mech skidding and a heavy
@@ -19,9 +20,8 @@ export function knock(G, { target, attacker = null, base, dir, recoil = true }) 
     // Another pilot: its own client applies the shove. Ride along with the
     // next batched hit (flushHits), creating one if nothing else hurt it.
     if (G.roundOver) return v;
-    const q = G.pendingHits.get(target.netId) || { amt: 0, p: [target.x, target.y, target.z] };
+    const q = hitQueue(G, target, [target.x, target.y, target.z]);
     q.kb = [(q.kb?.[0] || 0) + dir[0] * v, (q.kb?.[1] || 0) + dir[1] * v];
-    G.pendingHits.set(target.netId, q);
     return v;
   }
   if (!target.push) target.push = [0, 0];

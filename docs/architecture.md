@@ -22,7 +22,7 @@ relay and its tests.
 | `src/audio/` | ~400 | `sound.js` (`createAudio`: unlock dance, samples over synthesis, spatialisation, loops, `sfx.*`, the voice `say`, the beam and scan tones, `tick`), `thump.js`, `ambience.js` (M4: the biome and weather beds from `data/ambience.js`, synthesised). |
 | `src/input/` | ~220 | `input.js` (`createInput`: keyboard, mouse with pointer lock, touch stick/aim/buttons, one per-frame `snapshot()`). |
 | `src/ui/` | ~280 | `screens.js` (`createUi`: main menu with the live mech, briefing detail, settings, pause, debrief, mission and skirmish start, click routing), `debrief.js` (the objective rows and the banner). `campaign.js` (`camp.*` progress: load and migrate, results, unlocks, restart, the strip). `lobby.js` (M5a: the arena lobby's pilot list, updated in place), `summary.js` (M5a: the arena's round-end summary and vote). |
-| `src/net/` | ~330 | `protocol.js` (`PROTOCOL`, message builders, `parse`), `client.js` (`createNet`: join, handler, spawn, 15 Hz state, relayed effects, `tick`), `interp.js` (`netInterp`), `relay.js` (M5a: the relay address from `?relay=`, the RELAY field or the page's host), `spectate.js` (M5a: the arena's spectator camera while you wait to respawn), `teams.js` (M5a: team deathmatch's sides, colours and `spawnPoint(G, side)`), `killfeed.js` (M5a: the arena's kill feed, drawn by the HUD). |
+| `src/net/` | ~330 | `protocol.js` (`PROTOCOL`, message builders, `parse`), `client.js` (`createNet`: join, handler, spawn, 15 Hz state, relayed effects, `tick`), `interp.js` (`netInterp`), `relay.js` (M5a: the relay address from `?relay=`, the RELAY field or the page's host), `spectate.js` (M5a: the arena's spectator camera while you wait to respawn), `remote.js` (a mech another client runs, brought up to its report), `coop.js` (M5b: the host's enemies out as `es`, a guest's hits on them back as `ehit`), `teams.js` (M5a: team deathmatch's sides, colours and `spawnPoint(G, side)`), `killfeed.js` (M5a: the arena's kill feed, drawn by the HUD). |
 | `src/util/` | ~70 | `math.js` (scalars, vec3, `M` matrices, `chain`, cosmetic `rnd`), `store.js`, `dom.js`. |
 | `server/` | 420 + tests | `server.py` the relay (M5a: version check, clean state messages, fx rate limit, flags, per-address cap, file log), `data.py` (loadout tables and checks), `test_server.py` (with fuzz tests), `stompy-relay.service` (systemd), `README.md`. |
 | `test/` | | `*.test.js` headless (`helpers.js` builds a flat-ground game with a recording fx), `smoke/run.mjs` (Playwright: desktop mission, touch layout, two-pilot arena against the real relay). |
@@ -137,7 +137,7 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
 
 ### The network protocol (as it is)
 
-`PROTOCOL` is 13 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on; 8: M5a, the server enforces the version and rebuilds every state message clean; 9: the lobby, `ch` in `hello`, `ready`, `ping`, and `ch`/`ready`/`ping` in each pilot's scores entry; 10: team deathmatch, `team` from the lobby, `team` in each scores entry, `teams` (each side's kills) in `welcome`, `kill`, `roundover` and `newround`, and `mode`/`limit` in `newround`; 11: the round-end vote, `vote` and `stats` between rounds, the relay's `tally`, `best`/`acc` in each scores entry, and `vote` in `newround`; 12: reconnect, `token` in `hello`, `token` and `resumed` in `welcome`; 13: M5b rooms, `room`/`create` in `hello`, `room`/`kind`/`host` in `welcome`, and the co-op messages below). `server/server.py` keeps its own `PROTOCOL`, and a Node test fails if the two differ.
+`PROTOCOL` is 14 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on; 8: M5a, the server enforces the version and rebuilds every state message clean; 9: the lobby, `ch` in `hello`, `ready`, `ping`, and `ch`/`ready`/`ping` in each pilot's scores entry; 10: team deathmatch, `team` from the lobby, `team` in each scores entry, `teams` (each side's kills) in `welcome`, `kill`, `roundover` and `newround`, and `mode`/`limit` in `newround`; 11: the round-end vote, `vote` and `stats` between rounds, the relay's `tally`, `best`/`acc` in each scores entry, and `vote` in `newround`; 12: reconnect, `token` in `hello`, `token` and `resumed` in `welcome`; 13: M5b rooms, `room`/`create` in `hello`, `room`/`kind`/`host` in `welcome`, and the co-op messages below; 14: co-op enemies, `es` and `ehit`, and `eid`/`te`/`e2` on weapon effects). `server/server.py` keeps its own `PROTOCOL`, and a Node test fails if the two differ.
 
 Client → server: `hello {v, name, color, ch, token?, room?, create?}` (`token`: from the last `welcome`, to come back after a drop; `room`: a co-op room's code, the arena when absent; `create {mission, diff, seed}`: open a co-op room), `ready` (out of the lobby), `team {team}` (team deathmatch: a side from the lobby, before READY), `vote {map, mode}` and `stats {acc}` (between rounds: the next round, and your accuracy in % for the summary), `ping {n, rtt}` (every 2 s), `s {state...}` (15 Hz), `fx {k, ...}`
 (`b` beam flash, `s` shell, `m` missile volley, `fu` fusion discharge, `mg`
@@ -162,6 +162,25 @@ clamped like `hit` and stamped `from`. Only the host's `hit` (enemy fire,
 `from: 0`, `eid`) reaches a pilot, and `died` sends a `kill` with no killer.
 A room holds four and closes when its last pilot leaves. When the host
 leaves, the lowest id left gets `host`.
+
+Co-op enemies (`src/net/coop.js`, #202): `G.role` is `solo`, `host` or
+`guest`.
+- **Numbering:** every enemy gets an `eid`, in `G.mechs` order at the
+  mission's start, so every client of a seed agrees. The host numbers later
+  ones (waves).
+- **The host:** runs them as single player does. Ten times a second it sends
+  `es` per enemy: a state message plus `eid`, `type`, `ai` (its state, for
+  debug) and `gt` (the host's game time; a guest more than 0.1 s off is set
+  to it, for lightning). An enemy's `fx` carries its `eid`, a volley at one
+  carries `te` and a fusion shot at one `e2`.
+- **A guest:** draws the enemies as remote mechs (`net/remote.js`, shared
+  with other pilots) and runs no objectives, turrets or waves. Its damage to
+  an enemy queues in `G.pendingEHits` (`sim/hitqueue.js`) and goes out as
+  `ehit {eid, amt, p, fu?, kb?, me?, st?, zap?, hh?}`.
+- **Applying hits:** the host applies an `ehit` with the guest's mech as the
+  source. Enemy fire on a guest is the host's batched `hit`.
+- **Targets:** as host, an enemy fights the nearest pilot alive, and switches
+  only for one 30% closer (`preyOf` in `sim/ai.js`).
 
 Melee on the wire (`docs/specs/12-melee.md` § Arena): the shooter-scores rule
 holds. A punch or stomp on another pilot rides the batched `hit` with `me: 1`

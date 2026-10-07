@@ -3,6 +3,7 @@ import { muzzle, rayHit } from './geom.js';
 import { damage } from './combat.js';
 import { damageEntity } from './entities.js';
 import { particle } from './effects.js';
+import { hitQueue } from './hitqueue.js';
 
 const { min, max } = Math;
 
@@ -56,7 +57,7 @@ export function beamTick(G, m, dt, aim) {
 // apply: it rides the batched hit as hh.
 export function toast(G, t, amt) {
   if (!t.remote) { t.heat += amt; return; }
-  const q = G.pendingHits.get(t.netId);
+  const q = hitQueue(G, t);
   if (q) q.hh = (q.hh || 0) + amt;
 }
 // The start-of-fire sound: each recipe among the beams once (TOASTER's

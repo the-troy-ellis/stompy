@@ -9,7 +9,7 @@ import { placeScenery } from '../sim/entities.js';
 import { eyeOf } from '../sim/geom.js';
 import { initFeet } from '../sim/gait.js';
 import { msg, particle, explode } from '../sim/effects.js';
-import { beginDeath, damage, destroy, scramble, shedSection } from '../sim/combat.js';
+import { damage, destroy, scramble } from '../sim/combat.js';
 import { knock } from '../sim/knock.js';
 import { feel } from '../sim/feel.js';
 import { voice } from '../sim/voice.js';
@@ -20,9 +20,11 @@ import { hit, hello, ping as pingMsg, ready as readyMsg, team as teamMsg, vote a
 import { lobbyHTML, lobbyHead, lobbyRows } from '../ui/lobby.js';
 import { summaryHTML, summaryRows, voteCount, voteOf } from '../ui/summary.js';
 import { fitOf } from '../ui/mechlab.js';
-import { applyLoadout, stockLoadout, validate } from '../sim/loadout.js';
+import { applyLoadout, stockLoadout } from '../sim/loadout.js';
 import { startSpectate } from './spectate.js';
 import { addKill } from './killfeed.js';
+import { applyRemote } from './remote.js';
+import { applyEHit, applyEnemyState, enemyByEid, flushEHits, hostTick } from './coop.js';
 import { sideOf, spawnPoint, teamName } from './teams.js';
 
 const { atan2, min, max, random, hypot } = Math;
@@ -215,6 +217,9 @@ export function createNet(app) {
         break;
       }
       case 's': netState(m); break;
+      // Co-op (net/coop.js): the host's enemies reach a guest; a guest's hits on them reach the host.
+      case 'es': if (G.role === 'guest') applyEnemyState(G, m, performance.now()); break;
+      case 'ehit': if (G.role === 'host') applyEHit(G, m, mechById(m.from) || null); break;
       case 'note':
         // The server would not take our loadout (a version mismatch, or a fit
         // over its tonnage): fight in stock, as everyone else now sees us.
@@ -336,37 +341,18 @@ export function createNet(app) {
       Object.assign(r, { netId: s.id, remote: true, net: null, mate: mate(s.id) });
       G.mechs.push(r);
     }
-    const first = !r.net;
-    r.net = { ...s, at: performance.now() };
-    // Their mechlab fit: weapons drawn and fired as they carry them, armour to scale.
-    if (s.lo) {
-      const key = JSON.stringify(s.lo);
-      if (key !== r.loKey) { r.loKey = key; applyLoadout(G, r, validate(r.type, s.lo).loadout); }
-    }
+    applyRemote(G, r, s, performance.now());   // pose, fit, armour, life (net/remote.js)
     // Someone's resonance scan is on us: warn, with an alarm.
     if (s.sc === Net.id && s.sq > 0) {
       if (!G.scanWarn || performance.now() - G.scanWarn.at > 1000) app.audio.say('Warning. Resonance scan.', true);
       G.scanWarn = { by: s.id, p: s.sq, at: performance.now() };
       if (random() < 0.3) app.audio.sfx.beep();
     }
-    if (Array.isArray(s.hp)) HPK.forEach((k, i) => {
-      const v = +s.hp[i] || 0;
-      if (r.alive && !first && r.hp[k] > 0 && v <= 0 && k !== 'T') { r.hp[k] = 0; shedSection(G, r, k, [r.x, r.y + 4, r.z]); }
-      r.hp[k] = v;
-    });
-    if (first || (s.al && !r.alive)) {
-      // Appeared or respawned: jump straight there.
-      Object.assign(r, { x: s.x, y: s.y, z: s.z, yaw: s.yaw, twist: s.tw, pitch: s.p, alive: !!s.al });
-      initFeet(G, r); r.lastYaw = r.yaw;
-    } else if (!s.al && r.alive) {
-      // Its own client says it's dead: the same beat, blast and topple as a local kill.
-      beginDeath(G, r);
-    }
   }
 
   const centroid = list => mul(list.reduce((a, s) => add(a, s.p), [0, 0, 0]), 1 / list.length);
   function netFx(f) {
-    const src = mechById(f.id) || null;
+    const src = (f.eid ? enemyByEid(G, f.eid) : mechById(f.id)) || null;   // a co-op enemy's fire comes from the host with its eid
     if (f.k === 'b') {
       const d = WEAPONS[f.w] || WEAPONS.laser;
       G.beams.push({ a: f.a, b: f.b, col: d.col, w: d.w, life: 0.14, max: 0.14 });
@@ -377,7 +363,7 @@ export function createNet(app) {
       G.shots.push({ kind: 'shell', type: WEAPONS[f.w] ? f.w : 'ac', p: f.p, v: f.v, owner: src, dmg: 0, life: d.range / d.speed, ghost: true });
       app.audio.sfx[d.sfx || 'cannon'](f.p);
     } else if (f.k === 'm') {
-      const d = WEAPONS[f.w]?.kind === 'missile' ? WEAPONS[f.w] : WEAPONS.lrm, target = f.tg ? mechById(f.tg) : null;
+      const d = WEAPONS[f.w]?.kind === 'missile' ? WEAPONS[f.w] : WEAPONS.lrm, target = f.te ? enemyByEid(G, f.te) : f.tg ? mechById(f.tg) : null;
       for (let i = 0; i < d.count; i++) {
         const sp = d.spread ?? 0.08, spread = norm(add(f.d, [rnd(-sp, sp), rnd(0, d.lift ?? 0.12), rnd(-sp, sp)]));
         G.shots.push({ kind: 'missile', p: add(f.p, [rnd(-0.6, 0.6), rnd(-0.4, 0.4), rnd(-0.6, 0.6)]), v: mul(spread, d.speed * rnd(0.85, 1.1)),
@@ -385,7 +371,7 @@ export function createNet(app) {
       }
       app.audio.sfx.missile(f.p);
     } else if (f.k === 'fu') {
-      launchPulse(G, f.a, f.id2 ? mechById(f.id2) : null, src, true, f.b);
+      launchPulse(G, f.a, f.e2 ? enemyByEid(G, f.e2) : f.id2 ? mechById(f.id2) : null, src, true, f.b);
       app.audio.sfx.fusionCrack();
     } else if (f.k === 'pu') {
       // A swing starts: the wind-up shows now rather than at the next state report.
@@ -415,7 +401,8 @@ export function createNet(app) {
     if (!P.alive && G.respawnAt && G.clock >= G.respawnAt) respawn();
     // Down and done toppling: watch another pilot until the respawn (net/spectate.js).
     else if (!P.alive && !P.dying && G.respawnAt && !G.spectate) startSpectate(G, G.killer);
-    if ((Net.sendT += dt) >= 1 / SEND_HZ && !G.lobby) { Net.sendT = 0; sendState(); flushHits(); }   // in the lobby, nobody sees you yet
+    if ((Net.sendT += dt) >= 1 / SEND_HZ && !G.lobby) { Net.sendT = 0; sendState(); flushHits(); if (G.role === 'guest') flushEHits(G, netSend); }   // in the lobby, nobody sees you yet
+    if (G.role === 'host' && !G.lobby) hostTick(G, dt, netSend);   // co-op: the enemies, ES_HZ times a second
     if (G.summary && G.banner) {   // the summary's countdown, written when the second changes
       const n = Math.max(0, Math.ceil((G.banner.until - performance.now()) / 1000));
       if (n !== Net.next) { Net.next = n; const el = app.ov.querySelector('.next-in'); if (el) el.textContent = n; }

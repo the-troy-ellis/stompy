@@ -70,6 +70,26 @@ Enemy awareness and targeting: the host's AI picks targets among pilots per
 [05-ai.md](05-ai.md). The fusion cannon works on enemies for every pilot (the
 `fu` flag on `ehit`); the host applies the outright kill.
 
+As shipped (#202, `PROTOCOL` 14):
+- **`src/net/coop.js`** has `startCoop`, `hostTick`, `applyEnemyState`,
+  `flushEHits` and `applyEHit`. `G.role` gates the sim.
+- **Numbering:** enemies are numbered (`eid`) in `G.mechs` order at the
+  start, the same on every client, and the host numbers waves as they come.
+- **A guest's enemies** are remote copies, moved by `net/remote.js`. That's
+  the code that already moved other pilots, now shared.
+- **`es`** carries `gt`, and a guest's clock is pulled to it when more than
+  0.1 s off.
+- **Hits on enemies** queue by `eid` (`sim/hitqueue.js`, which every hit site
+  now uses). A guest's fusion pulse sends `ehit {fu: 1}` straight away.
+- **Enemy fire** on the wire carries `eid`, and a volley or fusion shot at an
+  enemy carries `te` / `e2`.
+- **Guests** run no objectives, turrets or waves.
+- **Targets:** as host, `preyOf` picks each enemy's pilot. It takes the
+  nearest alive and keeps it unless another is 30% closer; solo play always
+  fights you, as before.
+- **Not yet:** the client sets `G.role` once co-op has a UI (#205); until
+  then nothing outside the tests is host or guest.
+
 ### Determinism needs
 
 Terrain: seeded already. Props (M4): seeded. Spawns: host-only, relayed, so
