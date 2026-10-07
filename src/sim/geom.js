@@ -1,5 +1,6 @@
 import { M, add, chain, mul, sub, len } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
+import { sceneryAlong } from './entities.js';
 
 const { sqrt, min } = Math;
 
@@ -24,17 +25,21 @@ export const viewYaw = m => m.yaw + m.twist;
 
 // Mechs are vertical cylinders for hits.
 export function rayCyl(o, d, m) {
-  const [R, Hh] = m.cyl || [geoOf(m).radius * m.ch.scale, geoOf(m).height * m.ch.scale];
-  const ox = o[0] - m.x, oz = o[2] - m.z, a = d[0] * d[0] + d[2] * d[2];
+  if (m.cyl) return rayUpright(o, d, m.x, m.y, m.z, m.cyl[0], m.cyl[1]);
+  const g = geoOf(m);
+  return rayUpright(o, d, m.x, m.y, m.z, g.radius * m.ch.scale, g.height * m.ch.scale);
+}
+// A ray against an upright cylinder standing at (x, y, z): the nearest t >= 0
+// on its side that's within its height, or null. Plain numbers, no garbage:
+// every shot and sight line tests every mech and prop.
+function rayUpright(o, d, x, y, z, R, H) {
+  const ox = o[0] - x, oz = o[2] - z, a = d[0] * d[0] + d[2] * d[2];
   if (a < 1e-8) return null;
   const b = 2 * (ox * d[0] + oz * d[2]), c = ox * ox + oz * oz - R * R, disc = b * b - 4 * a * c;
   if (disc < 0) return null;
-  const sq = sqrt(disc);
-  for (const t of [(-b - sq) / (2 * a), (-b + sq) / (2 * a)]) {
-    if (t < 0) continue;
-    const y = o[1] + d[1] * t;
-    if (y >= m.y && y <= m.y + Hh) return t;
-  }
+  const sq = sqrt(disc), t0 = (-b - sq) / (2 * a), t1 = (-b + sq) / (2 * a);
+  if (t0 >= 0) { const h = o[1] + d[1] * t0; if (h >= y && h <= y + H) return t0; }
+  if (t1 >= 0) { const h = o[1] + d[1] * t1; if (h >= y && h <= y + H) return t1; }
   return null;
 }
 // Terrain is ray-marched in 4 m steps, then bisected.
@@ -57,19 +62,30 @@ export function rayTerrain(G, o, d, maxT) {
   }
 }
 // Structures and vehicles are cylinders too (entities.js); a nav point has no body.
-export function rayEnt(o, d, e) { return rayCyl(o, d, { x: e.x, y: e.y, z: e.z, ch: { scale: 1, legs: null }, cyl: [e.radius, e.height] }); }
+export function rayEnt(o, d, e) { return rayUpright(o, d, e.x, e.y, e.z, e.radius, e.height); }
+const NEAR = [];
 export function rayHit(G, o, d, maxT, ignore) {
-  let best = null;
+  let bt = Infinity, bm = null, be = null;
   for (const m of G.mechs) {
     if (!m.alive || m === ignore) continue;
     const t = rayCyl(o, d, m);
-    if (t != null && t <= maxT && (!best || t < best.t)) best = { t, mech: m };
+    if (t != null && t <= maxT && t < bt) { bt = t; bm = m; be = null; }
   }
-  for (const e of G.entities || []) {
+  // The entities, then the map's scenery in the grid cells the ray crosses
+  // (entities.js), both indexed: see pushOutOfEntities.
+  const E = G.entities || [];
+  for (let i = 0; i < E.length; i++) {
+    const e = E[i];
     if (!e.alive || e.kind === 'nav' || e === ignore) continue;   // a turret's own volley leaves through it
     const t = rayEnt(o, d, e);
-    if (t != null && t <= maxT && (!best || t < best.t)) best = { t, mech: null, ent: e };
+    if (t != null && t <= maxT && t < bt) { bt = t; bm = null; be = e; }
   }
+  const n = sceneryAlong(G, o[0], o[2], o[0] + d[0] * maxT, o[2] + d[2] * maxT, NEAR);
+  for (let i = 0; i < n; i++) {
+    const t = rayEnt(o, d, NEAR[i]);
+    if (t != null && t <= maxT && t < bt) { bt = t; bm = null; be = NEAR[i]; }
+  }
+  let best = bt < Infinity ? { t: bt, mech: bm, ent: be } : null;
   const tt = rayTerrain(G, o, d, best ? best.t : maxT);
   if (tt != null) best = { t: tt, mech: null, ent: null };
   if (best) best.point = add(o, mul(d, best.t));

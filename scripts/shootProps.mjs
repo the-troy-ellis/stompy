@@ -1,6 +1,7 @@
 // The prop sheet for a props PR (spec 07 § Props): every scenery prop in a
 // row across the view at about 130 m, by day on each biome and at night on
-// the volcanic map (the lava vent glows), then the same row at 400 m zoomed.
+// the volcanic map (the lava vent glows), then the same row at 400 m zoomed;
+// then a map's own scattered scenery round an outpost, in play.
 //   node scripts/shootProps.mjs
 // Writes test-results/props-*.png. Needs playwright-core and the
 // preinstalled Chromium (as the smoke test does).
@@ -24,7 +25,7 @@ try {
       const { startMatch } = await import('/src/sim/state.js');
       const { addEntity } = await import('/src/sim/entities.js');
       const G = window.__stompy.game, app = window.__stompy.app;
-      startMatch(G, { name: 'Props', pal, time, weather: 'clear', foes: ['jackal'], intel: '' }, 77, false, 'kestrel');
+      startMatch(G, { name: 'Props', pal, time, weather: 'clear', foes: ['jackal'], intel: '', props: false }, 77, false, 'kestrel');
       G.kind = 'free';
       app.scene.uploadWorld(); app.ui.launch();
       for (const m of G.mechs) if (m.team) m.alive = false, m.gone = true;
@@ -47,6 +48,37 @@ try {
     await page.waitForTimeout(900);
     await page.evaluate(() => { document.querySelector('.mech-overlay').hidden = true; });
     await page.screenshot({ path: `test-results/props-${pal}-${time}-${D}m.png` });
+  }
+  // In play (#162): a Free Play map's own scenery, from 180 m off an outpost
+  // looking at it, on each biome; volcanic also at night for the vents.
+  for (const [pal, time] of [['dusk', 'day'], ['ice', 'day'], ['volcanic', 'day'], ['volcanic', 'night']]) {
+    await page.evaluate(async ([pal, time]) => {
+      const { startMatch } = await import('/src/sim/state.js');
+      const { outpostSites } = await import('/src/world/props.js');
+      const { initFeet } = await import('/src/sim/gait.js');
+      const G = window.__stompy.game, app = window.__stompy.app;
+      startMatch(G, { name: 'Props', pal, time, weather: 'clear', foes: ['jackal'], intel: '' }, 4242, false, 'kestrel');
+      G.kind = 'free';
+      app.scene.uploadWorld(); app.ui.launch();
+      for (const m of G.mechs) if (m.team) m.alive = false, m.gone = true;
+      // From whichever side of whichever outpost the ground least hides it.
+      const P = G.player, H = G.ter.height, D = 180;
+      const block = (ox, oz, a) => {
+        const x = ox + Math.sin(a) * D, z = oz + Math.cos(a) * D, ey = H(x, z) + 7, ty = H(ox, oz) + 5;
+        let worst = -Infinity;
+        for (let t = 0.05; t < 0.9; t += 0.05) worst = Math.max(worst, H(x + (ox - x) * t, z + (oz - z) * t) - (ey + (ty - ey) * t));
+        return worst;
+      };
+      let best = null;
+      for (const [ox, oz] of outpostSites(G.ter.seed)) for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8, b = block(ox, oz, a); if (!best || b < best.b) best = { ox, oz, a, b }; }
+      const { ox, oz, a } = best;
+      P.x = ox + Math.sin(a) * D; P.z = oz + Math.cos(a) * D; P.y = H(P.x, P.z); initFeet(G, P);
+      P.yaw = Math.atan2(ox - P.x, oz - P.z); P.twist = 0; P.pitch = Math.atan2(H(ox, oz) + 8 - (P.y + 7), D);
+      G.zoom = false;
+    }, [pal, time]);
+    await page.waitForTimeout(900);
+    await page.evaluate(() => { document.querySelector('.mech-overlay').hidden = true; });
+    await page.screenshot({ path: `test-results/props-play-${pal}-${time}.png` });
   }
   console.log('wrote test-results/props-*.png');
 } finally { await browser.close(); server.kill(); }

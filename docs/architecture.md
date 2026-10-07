@@ -14,9 +14,9 @@ relay and its tests.
 | Path | Lines | Role |
 |---|---|---|
 | `src/main.js` | ~120 | Bootstrap: builds the page, creates everything below, wires them through one `app` object, runs the frame loop. |
-| `src/sim/` | ~900 | **The simulation.** `state.js` (`createGame`, `newMech`, `startMatch`, `resetMatch`), `update.js` (`update(game, input, dt)`), `geom.js`, `effects.js`, `combat.js`, `mech.js`, `gait.js`, `beams.js`, `fusion.js`, `missiles.js`, `ai.js` with `ai/perception.js` (line of sight, belief, shout, search) and `ai/behaviours.js` (keepRange, harass, useCover, ridge, brawler, holdLine, avoidEdge, avoidAllies; `steer` runs a plan) and `ai/fire.js` (heat cap, lock, alpha, section targeting) and `ai/profiles.js` (a plan per chassis) and `ai/group.js` (shared fixes, the flanker), `melee.js`, `knock.js`, `feel.js`, `voice.js`, `loadout.js` (mechlab: stock, validate, apply, stats), `entities.js` (M3: structures, vehicles and nav points in `G.entities`: `addEntity`, `stepEntities`, `damageEntity`, `destroyEntity`, footprints), `objectives.js` (M3: `initObjectives`, `tickObjectives`; the mission's win and loss), `placement.js` (polar `[bearing°, dist]`, flat pads), `waves.js` (`spawnWave`, difficulty ±1 mech), `turrets.js` (mission 9's launchers: aim and fire LRM volleys via `combat.js` `volley`), `particles.js` (the particle pool: typed arrays, `spawn`, `stepParticles`, `listParticles` for tests), `rng.js`, `fx.js`. No DOM, GL, audio or input imports (lint enforces it). |
+| `src/sim/` | ~900 | **The simulation.** `state.js` (`createGame`, `newMech`, `startMatch`, `resetMatch`), `update.js` (`update(game, input, dt)`), `geom.js`, `effects.js`, `combat.js`, `mech.js`, `gait.js`, `beams.js`, `fusion.js`, `missiles.js`, `ai.js` with `ai/perception.js` (line of sight, belief, shout, search) and `ai/behaviours.js` (keepRange, harass, useCover, ridge, brawler, holdLine, avoidEdge, avoidAllies; `steer` runs a plan) and `ai/fire.js` (heat cap, lock, alpha, section targeting) and `ai/profiles.js` (a plan per chassis) and `ai/group.js` (shared fixes, the flanker), `melee.js`, `knock.js`, `feel.js`, `voice.js`, `loadout.js` (mechlab: stock, validate, apply, stats), `entities.js` (M3: structures, vehicles and nav points in `G.entities`: `addEntity`, `stepEntities`, `damageEntity`, `destroyEntity`, footprints; M4: the map's scenery in `G.scenery` with its grid, `placeScenery`, `sceneryNear`, `sceneryAlong`), `objectives.js` (M3: `initObjectives`, `tickObjectives`; the mission's win and loss), `placement.js` (polar `[bearing°, dist]`, flat pads), `waves.js` (`spawnWave`, difficulty ±1 mech), `turrets.js` (mission 9's launchers: aim and fire LRM volleys via `combat.js` `volley`), `particles.js` (the particle pool: typed arrays, `spawn`, `stepParticles`, `listParticles` for tests), `rng.js`, `fx.js`. No DOM, GL, audio or input imports (lint enforces it). |
 | `src/data/` | ~200 | Weapons, chassis, body plans (`geo.js`), palettes, missions, arena colours, and `names.js` (every display name, keyed). |
-| `src/world/` | ~110 | `terrain.js` (heights, `height(x, z)`, `BOUND`, a `flat` option for tests), `terrainMesh.js`. |
+| `src/world/` | ~230 | `terrain.js` (heights, `height(x, z)`, `BOUND`, a `flat` option for tests), `terrainMesh.js`, `props.js` (M4: `scatterProps` by biome from the seed, `outposts`). |
 | `src/mesh/` | ~140 | `builder.js` (flat-shaded triangle soup), `mechParts.js` (each chassis's parts: legs by leg type, sized from its body plan; torso, arm and barrel by `style`), `props.js` (mission props in unit space, scaled to each entity's cylinder; `<key>Wreck` once blown up, `<key>Head` turns). `effects.js` (one solid shape per effect kind, drawn instanced; `effectLook` is each particle's size, colour, glow and heat). |
 | `src/render/` | ~730 | `gl.js` (`createRenderer`: context, shaders, `upload`, `draw`, mesh sets), `scene.js` (`createScene`: camera, sky, world, mechs with IK, effects), `hud.js` (`createHud`: the 2D instruments, the missile camera feed, the `?debug=1` readout). `look.js` (the 3D view's tunable resolution: `backingSize`, `readLook`; a `?debug=1` LOOK row in the FEEL panel sets lines and antialiasing to settle the pixel look, spec 14). |
 | `src/audio/` | ~360 | `sound.js` (`createAudio`: unlock dance, samples over synthesis, spatialisation, loops, `sfx.*`, the voice `say`, the beam and scan tones, `tick`). |
@@ -212,11 +212,11 @@ src/
   world/
     terrain.js     makeTerrain, height sampling, BOUND
     terrainMesh.js buildTerrainMesh (Builder in; GL out)
-    props.js       buildings, rocks, structures as entities (M3/M4)
+    props.js       scatterProps, outposts: scenery by biome from the seed (M4)
   mesh/
     builder.js     Builder
     mechParts.js   buildMechParts: LEGS by leg type, BODY by style
-    props.js       buildProps, propFor: relay, tank, truck, launcher (+Head), pad, wrecks
+    props.js       buildProps, propFor/propInto: mission props, wrecks, heads, the M4 scenery (+Glow)
   sim/
     state.js       createGame(): the G object and factories (newMech)
     mech.js        stepMech, heat, shutdown
@@ -233,6 +233,7 @@ src/
   render/
     gl.js          context, shaders, upload, draw
     scene.js       render(): camera, sky, world, mechs, effects
+    propBatch.js   props batched by mesh, culled (M4); gl.js drawProps draws them instanced
     hud.js         drawHUD and friends (2D canvas)
     menuScene.js   the menu mech view
   audio/

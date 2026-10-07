@@ -6,6 +6,7 @@ import { CHASSIS, HPK } from '../data/chassis.js';
 import { MP_COLORS } from '../data/colors.js';
 import { BOUND } from '../world/terrain.js';
 import { newMech, resetMatch } from '../sim/state.js';
+import { placeScenery } from '../sim/entities.js';
 import { eyeOf } from '../sim/geom.js';
 import { initFeet } from '../sim/gait.js';
 import { msg, particle, explode } from '../sim/effects.js';
@@ -156,7 +157,9 @@ export function createNet(app) {
 
   function startArena(seed, palName) {
     G.mode = 'mp';
-    resetMatch(G, { def: { name: 'Arena', foes: [] }, seed, pal: palName });
+    const def = { name: 'Arena', foes: [] };
+    resetMatch(G, { def, seed, pal: palName });
+    placeScenery(G, def);
     app.scene.uploadWorld();
     G.banner = null;
     G.player = newMech(G, prefs.chassis, 0, 0, 0, 0, { partsKey: app.R.partsKeyFor(prefs.mpColor, prefs.chassis), loadout: fitOf(prefs.chassis) });

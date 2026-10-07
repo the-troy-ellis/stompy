@@ -20,7 +20,8 @@ export function turretRange(G, e) {
 
 export function stepTurrets(G, dt) {
   const P = G.player;
-  for (const e of G.entities) {
+  for (let i = 0; i < G.entities.length; i++) {
+    const e = G.entities[i];
     if (e.kind !== 'turret' || !e.alive) continue;
     e.cd = Math.max(0, (e.cd ?? 0) - dt);
     const mz = [e.x, e.y + e.height * TURRET.muzzle, e.z], at = P && P.alive ? center(P) : null;

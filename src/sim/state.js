@@ -10,6 +10,7 @@ import { initFeet } from './gait.js';
 import { eyeOf } from './geom.js';
 import { initFeel } from './feel.js';
 import { flatZones, initObjectives } from './objectives.js';
+import { placeScenery } from './entities.js';
 import { polar } from './placement.js';
 import { PROFILES } from './ai/profiles.js';
 import { applyLoadout, stockLoadout } from './loadout.js';
@@ -22,7 +23,7 @@ const { sin, cos, atan2 } = Math;
 export function createGame({ fx = nullFx, touchUI = false, seed = 1 } = {}) {
   return {
     state: 'brief', paused: false, mode: 'sp', kind: 'free', worldKind: null,
-    mechs: [], entities: [], shots: [], beams: [], cbeams: [], parts: new Particles(), debris: [], wrecks: [], msgs: [], pulses: [], pendingHits: new Map(),
+    mechs: [], entities: [], scenery: [], sceneryGrid: null, shots: [], beams: [], cbeams: [], parts: new Particles(), debris: [], wrecks: [], msgs: [], pulses: [], pendingHits: new Map(),
     eye: [0, 0, 0], view: [0, 0, 1], aim: [0, 0, 100], aimMech: null, lock: false, VP: null,
     flash: 0, shake: 0, kick: 0, whiteFlash: 0, lastTwist: 0, hitMark: 0,
     touchUI, touchTwist: 0, zoom: false, target: null, endT: 0, time: 0, frame: 0, clock: 0,
@@ -54,12 +55,13 @@ export function resetMatch(G, { def, seed, pal, terrainOpts }) {
   // The biome's palette at the mission's time of day; `ramp: [from, to, s]`
   // blends one into the other over s seconds (tickTime in update.js).
   const biome = pal || def.pal, r = def.ramp;
+  G.biome = biome;
   G.pal = palAt(biome, r ? r[0] : def.time);
   G.palRamp = r ? { from: palAt(biome, r[0]), to: palAt(biome, r[1]), secs: r[2] } : null;
   G.weather = makeWeather(def.weather, seed);   // fog, radar and wind (data/weather.js)
   G.ter = makeTerrain(seed, { ...terrainOpts, zones: flatZones(def) });
   G.worldKind = 'match';
-  G.mechs = []; G.entities = []; G.waves = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts.clear(); G.debris = []; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear();
+  G.mechs = []; G.entities = []; G.scenery = []; G.sceneryGrid = null; G.waves = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts.clear(); G.debris = []; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear();
   G.target = null; G.aimMech = null; G.flash = 0; G.shake = 0; G.kick = 0; G.bob = null; G.bobIn = null; G.whiteFlash = 0; G.zoom = false; G.endT = 0; G.time = 0; G.frame = 0;
   G.death = null; G.lastKill = null; G.guide = null; G.mDown = false; G.won = false; G.roundOver = false; G.hitMark = 0; G.voice = null;
   G.stats = { shots: 0, hits: 0, dealt: 0, taken: 0, kills: 0 };
@@ -92,5 +94,6 @@ export function startMatch(G, def, seed, gentle, chassis, { partsKey, terrainOpt
     G.mechs.push(e);
   });
   initObjectives(G, def);
+  placeScenery(G, def, st);
   G.state = 'play'; G.paused = false;
 }

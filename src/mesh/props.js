@@ -178,10 +178,14 @@ export function buildProps() {
 // key: the base mesh; head: an extra mesh that turns with `e.headYaw`;
 // glow: an extra mesh drawn glowing (lava); sy: the vertical scale; tint:
 // dark once it's been punched over.
-export function propFor(e) {
+export const propFor = e => propInto(e, {});
+// The same into `out`, for the per-frame draw (no allocation); null if none.
+const WRECK = {}, HEAD = {}, GLOW = {};
+for (const k of PROP_KEYS) { if (BUILD[`${k}Wreck`]) WRECK[k] = `${k}Wreck`; if (BUILD[`${k}Head`]) HEAD[k] = `${k}Head`; if (BUILD[`${k}Glow`]) GLOW[k] = `${k}Glow`; }
+export function propInto(e, out) {
   if (!e.mesh || !BUILD[e.mesh]) return null;
-  const wreck = !e.alive && !e.fall && BUILD[`${e.mesh}Wreck`] ? `${e.mesh}Wreck` : null;
-  const key = wreck || e.mesh, head = !wreck && BUILD[`${e.mesh}Head`] ? `${e.mesh}Head` : null;
-  const glow = !wreck && BUILD[`${e.mesh}Glow`] ? `${e.mesh}Glow` : null;
-  return { key, head, glow, sy: FLAT.has(e.mesh) ? e.radius : e.height, tint: !e.alive && !wreck ? 0.45 : 1 };
+  const wreck = !e.alive && !e.fall && WRECK[e.mesh] || null;
+  out.key = wreck || e.mesh; out.head = !wreck && HEAD[e.mesh] || null; out.glow = !wreck && GLOW[e.mesh] || null;
+  out.sy = FLAT.has(e.mesh) ? e.radius : e.height; out.tint = !e.alive && !wreck ? 0.45 : 1;
+  return out;
 }
