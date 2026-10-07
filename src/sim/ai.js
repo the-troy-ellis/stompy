@@ -10,12 +10,27 @@ import { planFor } from './ai/profiles.js';
 import { decideFire } from './ai/fire.js';
 import { PERCEPTION as K } from '../data/ai.js';
 import { revealing } from './waves.js';
+import { pilotsOf } from './hitqueue.js';
 
 const { atan2, hypot, PI } = Math;
 
+// The pilot an enemy fights: you; or, in a co-op game you host, the nearest
+// pilot alive, keeping the one it has unless another is much closer
+// (PREY_SWITCH), so it doesn't flip between two at the same range.
+export const PREY_SWITCH = 0.7;
+export function preyOf(G, e) {
+  if (G.role !== 'host') return G.player;   // solo and guests: no list to build every frame
+  const pilots = pilotsOf(G);
+  const d = m => hypot(m.x - e.x, m.z - e.z);
+  let cur = e.ai.prey && e.ai.prey.alive && pilots.includes(e.ai.prey) ? e.ai.prey : null, best = null;
+  for (const m of pilots) if (m.alive && (!best || d(m) < d(best))) best = m;
+  if (best && (!cur || d(best) < d(cur) * PREY_SWITCH)) cur = best;
+  return (e.ai.prey = cur || G.player);
+}
+
 // One enemy, one frame. State lives in e.ai.
 export function think(G, e, dt) {
-  const P = G.player, r = G.rng;
+  const P = preyOf(G, e), r = G.rng;
   const plan = e.ai.plan || (e.ai.plan = planFor(e)), brawling = plan.brawler;   // how this chassis fights
   if (revealing(G, e)) return entrance(G, e, P, dt);
   // Where it believes the player is: the truth with line of sight, the last fix otherwise.

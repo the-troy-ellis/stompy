@@ -6,6 +6,7 @@ import { destroy } from './combat.js';
 import { explode, particle } from './effects.js';
 import { r2 } from '../net/protocol.js';
 import { feel } from './feel.js';
+import { sendFx } from './hitqueue.js';
 
 const { sin, abs, atan2, hypot, min, max } = Math;
 
@@ -70,7 +71,7 @@ export function nearMiss(G, m, mz, dir, d) {
 export function fusionFire(G, m, w, mz, t) {
   const d = w.def;
   launchPulse(G, mz, t, m, false);
-  if (G.mode === 'mp' && m === G.player) G.fx.netSend({ t: 'fx', k: 'fu', a: mz.map(r2), id2: t.netId || 0, b: center(t).map(r2) });
+  sendFx(G, m, { t: 'fx', k: 'fu', a: mz.map(r2), id2: t.netId || 0, e2: t.eid || 0, b: center(t).map(r2) });
   m.heat = d.overload; m.shutdown = true; w.cd = d.cd;
   m.fusion.t = 0; m.fusion.mech = null; m.fusion.on = false;
   feel(G, 'fusionFire', { mech: m, at: m === G.player ? null : mz });
@@ -102,7 +103,8 @@ export function updatePulses(G, dt) {
     // Resonance: the whole frame shakes itself apart, however much armour.
     const t = pu.target;
     if (t.remote) {
-      G.fx.netSend({ t: 'hit', to: t.netId, amt: 40, p: pu.b.map(r2), fu: 1 });
+      // Another pilot's client, or the co-op host for an enemy, applies the kill.
+      G.fx.netSend(t.eid && G.role === 'guest' ? { t: 'ehit', eid: t.eid, amt: 40, p: pu.b.map(r2), fu: 1 } : { t: 'hit', to: t.netId, amt: 40, p: pu.b.map(r2), fu: 1 });
       if (pu.shooter === G.player) { G.stats.hits++; G.hitMark = 0.6; }
     } else { t.hp.T = 0; destroy(G, t, pu.shooter); }
   }

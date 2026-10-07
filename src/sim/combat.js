@@ -14,6 +14,7 @@ import { voice } from './voice.js';
 import { alertEnemy } from './ai/perception.js';
 import { WEAPONS } from '../data/weapons.js';
 import { knock } from './knock.js';
+import { hitQueue, sendFx } from './hitqueue.js';
 import { damageEntity } from './entities.js';
 
 const { sin, cos } = Math;
@@ -38,7 +39,7 @@ export function onShotHit(G, s, t, p) {
   if (d.knock && t.alive) { const h = Math.hypot(s.v[0], s.v[2]) || 1; knock(G, { target: t, attacker: s.owner, base: d.knock, dir: [s.v[0] / h, s.v[2] / h], recoil: false }); }
 }
 export function scramble(G, t, secs, p) {
-  if (t.remote) { const q = G.pendingHits.get(t.netId); if (q) q.zap = 1; return; }   // their client scrambles itself
+  if (t.remote) { const q = hitQueue(G, t); if (q) q.zap = 1; return; }   // their client (or the co-op host) scrambles it
   t.scramble = Math.max(t.scramble || 0, secs);
   const a = viewYaw(t), side = -Math.sign((p[0] - t.x) * cos(a) - (p[2] - t.z) * sin(a)) || 1;
   feel(G, 'bolt', { mech: t, k: 1, roll: side, at: t === G.player ? null : p });
@@ -53,10 +54,9 @@ export function damage(G, m, p, amt, src, beam = false, melee = false) {
     // frame) and flushed a few times a second -- see flushHits.
     if (G.roundOver || m.mate) return;   // a teammate (team deathmatch): friendly fire is off
     if (!beam) hitSparks(G, m, p, sectionHit(m, p), amt);   // the shooter sees the sparks; the damage is the victim's to apply
-    const q = G.pendingHits.get(m.netId) || { amt: 0, p };
+    const q = hitQueue(G, m, p);
     q.amt += amt; q.p = p;
     if (melee) q.me = 1;
-    G.pendingHits.set(m.netId, q);
     if (src === G.player) { if (!beam) { G.stats.hits++; G.hitStop = HIT_STOP; } G.stats.dealt += amt; G.hitMark = 0.25; }
     return;
   }
@@ -215,7 +215,7 @@ export function fire(G, m, w, aim, target) {
     m.flash = { frame: G.frame, p: mz, dir, big: false };
     if (m === G.player) { G.lastVolley = vid; feel(G, 'fireLrm', { mech: m, dir: [-dir[0], -dir[2]] }); }
     G.fx.sfx.missile(mz);
-    if (mp(G) && m === G.player) G.fx.netSend(fxMissiles(mz, dir, d.homing === false ? 0 : target?.netId, G.lastVolley, w.type));
+    sendFx(G, m, fxMissiles(mz, dir, d.homing === false ? 0 : target?.netId, vid, w.type, d.homing === false ? 0 : target?.eid));
   }
   return true;
 }
@@ -242,7 +242,7 @@ function round(G, m, w, mz, dir) {
   if (d.jitter) dir = norm(add(dir, [r.range(-d.jitter, d.jitter), r.range(-d.jitter, d.jitter), r.range(-d.jitter, d.jitter)]));
   if (G.shots.length >= MAX_SHOTS) { const i = G.shots.findIndex(s => !s.guided); if (i >= 0) G.shots.splice(i, 1); }
   G.shots.push({ kind: 'shell', type: w.type, p: mz, v: mul(dir, d.speed), owner: m, dmg: d.dmg, life: d.range / d.speed });
-  if (mp(G) && m === G.player) G.fx.netSend(fxShell(mz, mul(dir, d.speed), w.type));
+  sendFx(G, m, fxShell(mz, mul(dir, d.speed), w.type));
   for (let i = 0; i < (d.burst ? 2 : 5); i++) particle(G, add(mz, mul(dir, 1.5)), add(mul(dir, r.range(4, 12)), [r.range(-2, 2), r.range(-1, 2), r.range(-2, 2)]), 0.15, 0.6, [1, 0.8, 0.3], 'fire');
   G.fx.sfx[d.sfx || 'cannon'](mz);
   m.flash = { frame: G.frame, p: mz, dir, big: !d.burst };   // muzzle flash, drawn for two frames

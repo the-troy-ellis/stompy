@@ -111,8 +111,9 @@ export function update(G, input, dt) {
     }
   }
   stepEntities(G, dt);
-  stepTurrets(G, dt);
-  tickObjectives(G);
+  // A co-op guest doesn't run the world: the host's turrets, objectives and
+  // waves arrive over the wire (docs/specs/09-coop.md).
+  if (G.role !== 'guest') { stepTurrets(G, dt); tickObjectives(G); }
   pushOutOfEntities(G, m => geoOf(m).radius * m.ch.scale);
 
   stepBursts(G, dt);
