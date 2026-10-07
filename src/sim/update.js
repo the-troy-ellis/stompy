@@ -1,4 +1,5 @@
 import { blendPal } from '../data/palettes.js';
+import { tickWeather } from './weather.js';
 import { add, clampN, dirOf, dot, len, mul, norm, sub } from '../util/math.js';
 import { stepParticles } from './particles.js';
 import { WEAPONS } from '../data/weapons.js';
@@ -8,7 +9,7 @@ import { stepMech } from './mech.js';
 import { gait } from './gait.js';
 import { think } from './ai.js';
 import { groupPass } from './ai/group.js';
-import { stepBursts, stepShots, stepDying, WRECK_SETTLE } from './combat.js';
+import { stepBursts, stepShots, stepDying, WRECK_BURN, WRECK_SETTLE } from './combat.js';
 import { beamTick, coolArmour, remoteBeam } from './beams.js';
 import { fusionTick, updatePulses } from './fusion.js';
 import { fireCat, missileTrigger, steerVolley } from './missiles.js';
@@ -34,6 +35,7 @@ export const noInput = () => ({ thrUp: false, thrDown: false, stop: false, turn:
 export function update(G, input, dt) {
   G.time += dt;
   if (G.palRamp) { const r = G.palRamp; blendPal(r.from, r.to, Math.min(1, G.time / r.secs), G.pal); }   // dusk into night
+  tickWeather(G);   // lightning and thunder (weather.js)
   G.cbeams = [];   // continuous beams are redrawn every frame they're on
   G.frame = (G.frame || 0) + 1;
   G.input = input;
@@ -125,9 +127,16 @@ export function update(G, input, dt) {
   for (const w of G.wrecks) {
     w.t += dt;
     w.settle = min(1, w.t / WRECK_SETTLE);   // it rocks and sinks for a moment after it lands
-    // Secondaries: a few more pops in the first seconds after it goes down.
-    if (w.pops > 0 && w.t > 0.4 && rng.chance(dt * 1.3)) { w.pops--; explode(G, [w.x + rng.range(-2, 2), w.y + rng.range(1, 3), w.z + rng.range(-2, 2)], false); }
-    if (w.t < 30 && rng.chance(dt * 5)) particle(G, [w.x + rng.range(-2, 2), w.y + 2, w.z + rng.range(-2, 2)], [rng.range(-0.5, 0.5), rng.range(3, 5), rng.range(-0.5, 0.5)], rng.range(2, 3.5), rng.range(1, 2.2), [0.18, 0.17, 0.17], 'smoke');
+    // Secondaries (combat.js makeWreck): its pops as they come due, each with a
+    // burst of smoke, and the ammunition's one big bang.
+    while (w.pops.length && w.t >= w.pops[0]) {
+      w.pops.shift();
+      const p = [w.x + rng.range(-2, 2) * w.scale, w.y + rng.range(1, 3) * w.scale, w.z + rng.range(-2, 2) * w.scale];
+      explode(G, p, false);
+      for (let i = 0; i < 4; i++) particle(G, p, [rng.range(-2, 2), rng.range(2, 5), rng.range(-2, 2)], rng.range(1.5, 2.5), rng.range(1.2, 2.2) * w.scale, [0.2, 0.19, 0.18], 'smoke');
+    }
+    if (w.bigPop != null && w.t >= w.bigPop) { w.bigPop = null; explode(G, [w.x, w.y + 2 * w.scale, w.z], true); }
+    if (w.t < WRECK_BURN && rng.chance(dt * 5)) particle(G, [w.x + rng.range(-2, 2), w.y + 2, w.z + rng.range(-2, 2)], [rng.range(-0.5, 0.5), rng.range(3, 5), rng.range(-0.5, 0.5)], rng.range(2, 3.5), rng.range(1, 2.2), [0.18, 0.17, 0.17], 'smoke');
   }
   for (const m of G.msgs) m.t -= dt;
   G.msgs = G.msgs.filter(m => m.t > 0);

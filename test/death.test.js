@@ -39,14 +39,14 @@ test('a kill is a beat of silence, then the blast, then a topple, then a wreck t
   assert.equal(e.dying, null);
   assert.ok(e.gone);
   assert.equal(G.wrecks.length, 1);
-  assert.ok(G.wrecks[0].pops >= 2);
+  assert.ok(G.wrecks[0].pops.length >= 2);
   assert.ok(G.wrecks[0].settle < 1, 'a fresh wreck is still settling');
   stepFor(G, WRECK_SETTLE + 0.1);
   assert.equal(G.wrecks[0].settle, 1);
   const before = G.fx.calls('sfx.boom').length;
   stepFor(G, 4);
   assert.ok(G.fx.calls('sfx.boom').length > before, 'no secondaries');
-  assert.equal(G.wrecks[0].pops, 0);
+  assert.equal(G.wrecks[0].pops.length, 0);
   // The voice waits for the bang.
   const said = G.fx.calls('say').find(c => VOICE.kill.includes(c.args[0]));
   assert.ok(said && said.args[2] >= DEATH_BEAT * 1000);

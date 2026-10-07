@@ -1,5 +1,5 @@
 import { backingSize } from './look.js';
-import { effectLook, SHAPE_BY_KIND } from '../mesh/effects.js';
+import { effectLook, SHAPE_BY_KIND, TUMBLE_BY_KIND } from '../mesh/effects.js';
 import { M as M0, add, makeMatrixArena, frustumPlanes, sphereVisible, clampN, dirOf, mix3, mul, norm, rnd, sub, len, cross, TAU } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { buildTerrainMesh } from '../world/terrainMesh.js';
@@ -10,9 +10,13 @@ import { FEEL, HEAT, hotFrac } from '../data/feel.js';
 import { meleeOf } from '../data/melee.js';
 import { BARREL_AT, styleOf, BONE, BONE_COUNT } from '../mesh/mechParts.js';
 import { darkness, HEADLIGHTS } from '../data/palettes.js';
-import { fogOf } from '../data/weather.js';
+import { fogOf, flashOf, WEATHER } from '../data/weather.js';
+import { makeWeatherBox, stepWeatherBox } from './weatherBox.js';
 import { fallAngle } from '../sim/entities.js';
-import { propFor } from '../mesh/props.js';
+import { WRECK_BURN } from '../sim/combat.js';
+import { SCORCH_MAX } from '../sim/effects.js';
+import { propInto } from '../mesh/props.js';
+import { batchEntities, clearProps, makePropBatches } from './propBatch.js';
 import { WEAPONS } from '../data/weapons.js';
 
 // Every matrix the renderer builds comes from a per-frame arena (render() resets
@@ -103,6 +107,49 @@ export function createScene(app) {
   const SPOT = { on: false, pos: [0, 0, 0], dir: [0, 0, 1], col: [0, 0, 0], cone: [Math.cos(HEADLIGHTS.cone[0]), Math.cos(HEADLIGHTS.cone[1])], range: HEADLIGHTS.range };
   let DARK = 0;   // how dark this frame is (palettes.js darkness)
   const FOG = [0, 0];   // this frame's fog distances: the palette's, cut by the weather (data/weather.js)
+  const SHADE = [1, 1, 1], SKY_Z = [0, 0, 0], SKY_H = [0, 0, 0], FLASH_SHADE = [1.8, 1.8, 2.0], FLASH_SKY = [0.78, 0.8, 0.92], WHITE_SKY = [0.86, 0.89, 0.94];
+  // Rain and snow (spec 07): drops in a box round the camera, one instanced
+  // draw each. Rain is thin streaks leaning with the wind; snow is small
+  // octahedra drifting down, turning and swaying. `clear`: metres round the
+  // cockpit kept free, so nothing sits on the canopy.
+  const WX_LOOK = {
+    rain: { shape: 'streak', count: 1500, fall: 22, size: 1.8, col: [0.6, 0.66, 0.76], glow: 0.3, clear: 6, lean: true },
+    snow: { shape: 'octa', count: 800, fall: 1.6, size: 0.32, col: [0.95, 0.96, 1], glow: 0.55, clear: 5, sway: 0.5 },
+    dust: { shape: 'flat', count: 2500, fall: 0.6, size: 0.22, col: [0.7, 0.5, 0.32], glow: 0.15, clear: 4, sway: 0.3, gust: 1.4 },   // grains streaming sideways
+  };
+  const box = makeWeatherBox(2500), WX_VEL = [0, 0, 0];
+  let wxTime = null;
+  function fillWeather(eye) {
+    const w = G.weather, L = w && WX_LOOK[w.kind];
+    if (!L) { box.n = 0; return; }
+    const dt = wxTime == null ? 0 : Math.min(0.1, Math.max(0, G.time - wxTime));
+    wxTime = G.time;
+    const gust = L.gust || 1;
+    WX_VEL[0] = w.wind[0] * gust; WX_VEL[1] = -L.fall; WX_VEL[2] = w.wind[1] * gust;   // the wind is [x, z]
+    stepWeatherBox(box, eye, Math.round(L.count * w.intensity * (G.weatherScale ?? 1)), WX_VEL, dt);
+    const g = R.fx[L.shape], wind = Math.hypot(w.wind[0], w.wind[1]);
+    g.n = L.lean ? fillDrops(g.data, g.n, box, eye, L, Math.atan2(w.wind[0], w.wind[1]), Math.atan2(wind, L.fall), 0, 0, G.time)
+      : fillDrops(g.data, g.n, box, eye, L, 0, 0, 1, L.sway || 0, G.time);
+  }
+  // The drops into an effect shape's instances, from `n` on; returns the new
+  // count. Rain leans (yaw, lean) with spin 0; snow and dust have spin 1 and
+  // turn and sway instead. No ternaries in the loop: V8 boxes a number picked
+  // between a passed-in value and fresh arithmetic, which is a heap number per
+  // drop per frame.
+  function fillDrops(d, n, box, eye, L, yaw, lean, spin, sway, t) {
+    const cap = R.FX_CAP, F = R.FX_FLOATS, pos = box.pos, ex = eye[0], ez = eye[2], clear2 = L.clear * L.clear;
+    const size = L.size, cr = L.col[0], cg = L.col[1], cb = L.col[2], glow = L.glow;
+    for (let i = 0; i < box.n && n < cap; i++) {
+      const i3 = i * 3, dx = pos[i3] - ex, dz = pos[i3 + 2] - ez;
+      if (dx * dx + dz * dz < clear2) continue;
+      const o = n * F, sw = Math.sin(t * 0.9 + i * 1.7) * sway;
+      n++;
+      d[o] = pos[i3] + sw; d[o + 1] = pos[i3 + 1]; d[o + 2] = pos[i3 + 2] + sw * 0.6; d[o + 3] = size;
+      d[o + 4] = yaw + spin * (t * 0.7 + i * 1.3); d[o + 5] = lean + spin * (t * 0.45 + i);
+      d[o + 6] = cr; d[o + 7] = cg; d[o + 8] = cb; d[o + 9] = glow; d[o + 10] = 0; d[o + 11] = 0;
+    }
+    return n;
+  }
   // A point through a matrix into `out`, without allocating.
   const placeInto = (m, p, out) => { for (let i = 0; i < 3; i++) out[i] = m[i] * p[0] + m[4 + i] * p[1] + m[8 + i] * p[2] + m[12 + i]; };
   const FRAME = {}, LOOK = new Float32Array(7);   // reused every frame: the effects' shared uniforms and one particle's look (mesh/effects.js)
@@ -211,54 +258,106 @@ export function createScene(app) {
       for (const d of G.debris) {
         const parts = R.mechParts[d.partsKey];
         if (!parts || !parts[d.part] || !seen(d.p[0], d.p[1], d.p[2], 5 * d.scale)) continue;
-        const fade = d.t > d.life - 2 ? (d.life - d.t) / 2 : 1;
-        R.draw(parts[d.part], chain(M.T(...d.p), M.RY(d.rot[1]), M.RX(d.rot[0]), M.RZ(d.rot[2]), M.S(d.scale * (0.6 + 0.4 * fade))), [0.6, 0.58, 0.56]);
+        R.draw(parts[d.part], chain(M.T(...d.p), M.RY(d.rot[1]), M.RX(d.rot[0]), M.RZ(d.rot[2]), M.S(d.scale)), [0.6, 0.58, 0.56]);   // at the end it sinks (sim/effects.js)
       }
   }
   // A wreck: the torso, hip and one leg's two halves in a heap; skinned, one
   // draw on the mech's own mesh with the other bones left at zero.
   const WRECK_DARK = [0.3, 0.28, 0.27];
-  function drawWreck(w) {
-    // A fresh wreck rocks and sinks a little before it lies still.
+  // A fresh wreck rocks and sinks a little before it lies still.
+  function wreckBase(w) {
     const st = w.settle ?? 1, rock = (1 - st) * 0.2 * sin(w.t * 11), sink = 0.35 * w.scale * st;
-    const parts = R.mechParts[w.type], B = chain(M.T(w.x, w.y - sink, w.z), M.RY(w.yaw), M.RX(rock), M.S(w.scale));
+    return chain(M.T(w.x, w.y - sink, w.z), M.RY(w.yaw), M.RX(rock), M.S(w.scale));
+  }
+  const wreckTorso = (B, w) => chain(B, M.T(0, 1.3, -1), M.RX(-1.2), M.RZ(w.roll));
+  function drawWreck(w) {
+    const parts = R.mechParts[w.type], B = wreckBase(w);
     if (R.skinned) BONES.fill(0);
     putTint = WRECK_DARK;
-    put(BONE.torso, parts.torso, chain(B, M.T(0, 1.3, -1), M.RX(-1.2), M.RZ(w.roll)));
+    put(BONE.torso, parts.torso, wreckTorso(B, w));
     put(BONE.hip, parts.hip, chain(B, M.T(0.5, 0.6, 1.5), M.RY(0.6)));
     put(BONE.leg(0), parts.uleg, chain(B, M.T(2.5, 0.6, 1), M.RZ(1.5)));
     put(BONE.leg(0) + 1, parts.lleg, chain(B, M.T(-2.6, 0.5, -0.5), M.RZ(-1.5), M.RY(1)));
     if (R.skinned) R.drawSkinned(parts.skin, BONES, WRECK_DARK);
   }
-  function drawEntities(eye) {
-      // World entities: structures and vehicles (a nav point has no body). Plain
-      // boxes until the prop meshes (#98) arrive; past the fog they are skipped.
-      const far = FOG[1] + 60;
-      for (const e of G.entities) {
-        if ((e.kind === 'nav' && !e.mesh) || (!e.alive && !e.wreck)) continue;
-        if (Math.hypot(e.x - eye[0], e.z - eye[2]) > far) continue;
-        if (!seen(e.x, e.y + (e.height || 0) / 2, e.z, Math.max(e.height || 0, e.radius * 2) + 2)) continue;
-        const base = M.T(e.x, e.y, e.z), w = e.radius * 1.7, dead = !e.alive;
-        const col = dead ? mul(e.col, 0.35) : e.col, prop = propFor(e);
-        if (prop) {
-          // Punched over: rotates about its base, away from the fist, then lies there.
-          const tilt = e.fall ? chain(M.RY(e.fall.yaw), M.RX(fallAngle(e)), M.RY(-e.fall.yaw)) : M.id();
-          const at = chain(base, tilt, M.RY(e.yaw)), size = M.S(e.radius, prop.sy, e.radius), tint = [prop.tint, prop.tint, prop.tint];
-          R.draw(R.meshes.props[prop.key], chain(at, size), tint);
-          if (prop.head) R.draw(R.meshes.props[prop.head], chain(at, M.RY(e.headYaw || 0), size), tint);
-        } else if (e.kind === 'nav') {
-          continue;
-        } else if (e.kind === 'vehicle') {
-          R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, e.height / 2, -e.radius * 0.3), M.S(w, e.height, w * 1.6)), col);
-          R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, e.height * 0.4, e.radius * 1.35), M.S(w * 0.9, e.height * 0.8, w * 0.55)), mul(col, 0.7));
-        } else if (e.fall) {   // punched over: rotates about its base, away from the fist, then lies there
-          const tilt = chain(M.RY(e.fall.yaw), M.RX(fallAngle(e)), M.RY(-e.fall.yaw));
-          R.draw(R.meshes.cube, chain(base, tilt, M.T(0, e.height / 2, 0), M.S(w, e.height, w)), col);
-        } else {
-          const h = dead ? e.height * 0.22 : e.height;   // blown up: a collapsed stump
-          R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, h / 2, 0), M.S(w, h, w)), col);
-        }
+  // A burning wreck (spec 07 § Explosions): a glowing shell over its torso
+  // that flickers and dies down over WRECK_BURN seconds. Its own draw, after
+  // the skinned pass, so it works whichever way the wreck was drawn.
+  const EMBER = [1, 0.4, 0.1], BURN_TINT = [0, 0, 0];
+  function drawBurn(w) {
+    const k = 1 - w.t / WRECK_BURN;
+    if (k <= 0) return;
+    const f = clampN(0.6 + 0.4 * sin(w.t * 13 + w.x) * sin(w.t * 7.7 + w.z), 0, 1), g = k * f;
+    for (let i = 0; i < 3; i++) BURN_TINT[i] = WRECK_DARK[i] + (EMBER[i] - WRECK_DARK[i]) * g;
+    R.draw(R.mechParts[w.type].torso, chain(wreckTorso(wreckBase(w), w), M.S(1.04)), BURN_TINT, g, 0.4 + 0.6 * g);
+  }
+  // Scorches (sim/effects.js scorch): one buffer of dark ragged octagons that
+  // hug the ground, a slot per scorch. A new one rewrites only its own slot
+  // (no garbage, however often missiles land); one draw for them all, with a
+  // polygon offset so they sit on the terrain without fighting it.
+  const SC_V = 24, SC_F = SC_V * 9, SC = new Float32Array(SCORCH_MAX * SC_F), SC_IDS = new Int32Array(SCORCH_MAX).fill(-1);
+  const SCORCH_COL = [0.09, 0.08, 0.07], SCORCH_MESH = { buf: null, count: SCORCH_MAX * SC_V };
+  let scorchRev = -1;
+  function writeScorch(s) {
+    const H = G.ter.height, o = s.slot * SC_F, cy = H(s.x, s.z) + 0.05;
+    for (let k = 0; k < 8; k++) for (let v = 0; v < 3; v++) {
+      const q = o + (k * 3 + v) * 9, j = k + v - 1, a = s.yaw + (j / 8) * TAU, r = s.r * (j % 2 ? 0.72 : 1);   // v 0: the middle; 1, 2: the rim
+      const x = v === 0 ? s.x : s.x + sin(a) * r, z = v === 0 ? s.z : s.z + cos(a) * r;
+      SC[q] = x; SC[q + 1] = v === 0 ? cy : H(x, z) + 0.05; SC[q + 2] = z;
+      SC[q + 3] = 0; SC[q + 4] = 1; SC[q + 5] = 0;
+      SC[q + 6] = SCORCH_COL[0]; SC[q + 7] = SCORCH_COL[1]; SC[q + 8] = SCORCH_COL[2];
+    }
+  }
+  function drawScorches() {
+    const gl = R.gl;
+    if (!SCORCH_MESH.buf) { SCORCH_MESH.buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, SCORCH_MESH.buf); gl.bufferData(gl.ARRAY_BUFFER, SC, gl.DYNAMIC_DRAW); R.curMesh = null; }
+    if (scorchRev !== G.scorchRev) {
+      scorchRev = G.scorchRev;
+      gl.bindBuffer(gl.ARRAY_BUFFER, SCORCH_MESH.buf); R.curMesh = null;
+      if (!G.scorches.length && SC_IDS.some(i => i >= 0)) { SC.fill(0); SC_IDS.fill(-1); gl.bufferSubData(gl.ARRAY_BUFFER, 0, SC); }   // a new match
+      for (const s of G.scorches) {
+        if (SC_IDS[s.slot] === s.id) continue;
+        writeScorch(s); SC_IDS[s.slot] = s.id;
+        gl.bufferSubData(gl.ARRAY_BUFFER, s.slot * SC_F * 4, SC.subarray(s.slot * SC_F, (s.slot + 1) * SC_F));
       }
+    }
+    if (!G.scorches.length) return;
+    gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(-1, -4);
+    R.draw(SCORCH_MESH, M.id(), NO_SHADE, 0, 0);   // empty slots are all zeros: nothing drawn
+    gl.disable(gl.POLYGON_OFFSET_FILL);
+  }
+  // World entities: structures and vehicles (a nav point has no body). Props
+  // go into one instanced draw per mesh (render/propBatch.js); a toppled one,
+  // and anything without a prop mesh, is drawn here on its own.
+  const PROPS = makePropBatches(), ONE = {};
+  function drawEntity(e) {
+    const base = M.T(e.x, e.y, e.z), w = e.radius * 1.7, dead = !e.alive;
+    const col = dead ? mul(e.col, 0.35) : e.col, prop = propInto(e, ONE);
+    if (prop) {
+      // Punched over: rotates about its base, away from the fist, then lies there.
+      const tilt = e.fall ? chain(M.RY(e.fall.yaw), M.RX(fallAngle(e)), M.RY(-e.fall.yaw)) : M.id();
+      const at = chain(base, tilt, M.RY(e.yaw)), size = M.S(e.radius, prop.sy, e.radius), tint = [prop.tint, prop.tint, prop.tint];
+      R.draw(R.meshes.props[prop.key], chain(at, size), tint);
+      if (prop.head) R.draw(R.meshes.props[prop.head], chain(at, M.RY(e.headYaw || 0), size), tint);
+      if (prop.glow) R.draw(R.meshes.props[prop.glow], chain(at, size), tint, 1);   // lava keeps its glow at night and in the fog's shade
+    } else if (e.kind === 'nav') {
+      return;
+    } else if (e.kind === 'vehicle') {
+      R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, e.height / 2, -e.radius * 0.3), M.S(w, e.height, w * 1.6)), col);
+      R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, e.height * 0.4, e.radius * 1.35), M.S(w * 0.9, e.height * 0.8, w * 0.55)), mul(col, 0.7));
+    } else if (e.fall) {   // punched over: rotates about its base, away from the fist, then lies there
+      const tilt = chain(M.RY(e.fall.yaw), M.RX(fallAngle(e)), M.RY(-e.fall.yaw));
+      R.draw(R.meshes.cube, chain(base, tilt, M.T(0, e.height / 2, 0), M.S(w, e.height, w)), col);
+    } else {
+      const h = dead ? e.height * 0.22 : e.height;   // blown up: a collapsed stump
+      R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, h / 2, 0), M.S(w, h, w)), col);
+    }
+  }
+  function drawEntities(eye) {
+    clearProps(PROPS);
+    batchEntities(PROPS, G.entities, eye, FOG[1] + 60, seen, drawEntity);   // past the fog: skipped
+    batchEntities(PROPS, G.scenery, eye, FOG[1] + 60, seen, drawEntity);
+    R.drawProps(PROPS, R.meshes.props);
   }
   function drawShotsAndBeams(eye, gd) {
       R.drawHeat = 1;
@@ -324,7 +423,7 @@ export function createScene(app) {
       effectLook(P, i, hor, LOOK);
       const d = g.data, o = g.n++ * R.FX_FLOATS;
       d[o] = P.pos[i3]; d[o + 1] = P.pos[i3 + 1]; d[o + 2] = P.pos[i3 + 2]; d[o + 3] = LOOK[0];
-      d[o + 4] = P.spin[i]; d[o + 5] = P.spin[i] * 0.7;
+      d[o + 4] = P.spin[i]; d[o + 5] = P.spin[i] * TUMBLE_BY_KIND[P.kind[i]];
       d[o + 6] = LOOK[1]; d[o + 7] = LOOK[2]; d[o + 8] = LOOK[3]; d[o + 9] = LOOK[4]; d[o + 10] = LOOK[5]; d[o + 11] = LOOK[6];
     }
   }
@@ -338,7 +437,20 @@ export function createScene(app) {
     R.gl.viewport(0, 0, cv.width, cv.height);
     const P = G.player, gd = G.guide, ir = !!gd;
     const IR_ZEN = [0.03, 0.03, 0.03], IR_HOR = [0.1, 0.1, 0.1];
-    const hor = ir ? IR_HOR : G.pal.hor;
+    // Rain darkens the light; a lightning flash lifts the shading and the sky
+    // toward white for 120 ms (data/weather.js).
+    const wx = G.weather && WEATHER[G.weather.kind], flash = ir ? 0 : flashOf(G);
+    for (let i = 0; i < 3; i++) {
+      const s = (G.pal.shade ? G.pal.shade[i] : 1) * (wx && wx.dim ? wx.dim : 1);
+      SHADE[i] = s + (FLASH_SHADE[i] - s) * flash;
+      const wh = wx && wx.whiten ? wx.whiten * G.weather.intensity : 0;   // snow whitens the sky and the fog
+      const tn = wx && wx.tint ? 0.5 * G.weather.intensity : 0, h0 = G.pal.hor[i] + (WHITE_SKY[i] - G.pal.hor[i]) * wh;   // dust turns the horizon orange
+      const h = h0 + ((tn ? wx.tint[i] : 0) - h0) * tn, hz = wx && wx.haze ? wx.haze * G.weather.intensity : 0;   // fog and dust grey the zenith into the horizon
+      const z0 = G.pal.zen[i] + (WHITE_SKY[i] - G.pal.zen[i]) * wh * 0.6, z = z0 + (h - z0) * hz;
+      SKY_Z[i] = z + (FLASH_SKY[i] - z) * flash * 0.8;
+      SKY_H[i] = h + (FLASH_SKY[i] - h) * flash * 0.6;
+    }
+    const hor = ir ? IR_HOR : SKY_H;
     R.gl.clearColor(hor[0], hor[1], hor[2], 1);
     R.gl.clear(R.gl.COLOR_BUFFER_BIT | R.gl.DEPTH_BUFFER_BIT);
     let fov, yaw, pitch, eye, dir;
@@ -390,7 +502,7 @@ export function createScene(app) {
     const ap = R.gl.getAttribLocation(R.skyProg, 'aP');
     R.gl.enableVertexAttribArray(ap);
     R.gl.vertexAttribPointer(ap, 2, R.gl.FLOAT, false, 0, 0);
-    R.gl.uniform3fv(R.SU.zen, ir ? IR_ZEN : G.pal.zen); R.gl.uniform3fv(R.SU.hor, hor);
+    R.gl.uniform3fv(R.SU.zen, ir ? IR_ZEN : SKY_Z); R.gl.uniform3fv(R.SU.hor, hor);
     R.gl.uniform1f(R.SU.h, 0.5 - 0.5 * Math.tan(pitch) / Math.tan(fov / 2)); R.gl.uniform1f(R.SU.res, cv.height);
     R.gl.drawArrays(R.gl.TRIANGLES, 0, 3);
     R.gl.disableVertexAttribArray(ap);
@@ -401,7 +513,7 @@ export function createScene(app) {
     [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.enableVertexAttribArray(a));
     R.gl.uniformMatrix4fv(R.U.VP, false, VP);
     R.gl.uniform3fv(R.U.light, G.pal.light);
-    R.gl.uniform3fv(R.U.shade, ir ? NO_SHADE : G.pal.shade || NO_SHADE);   // the IR camera sees the same at night
+    R.gl.uniform3fv(R.U.shade, ir ? NO_SHADE : SHADE);   // the IR camera sees the same at night
     // Headlights (spec 07): one spot from the player's cockpit along the aim,
     // dipped a little, as strong as it is dark. Off in the IR camera, when the
     // player switches them off, and when the reactor is down.
@@ -419,10 +531,11 @@ export function createScene(app) {
     R.gl.uniform2f(R.U.fog, FOG[0], FOG[1]);
     R.gl.uniform3fv(R.U.fogCol, hor);
     R.gl.uniform1f(R.U.ir, ir ? 1 : 0);
-    Object.assign(FRAME, { VP, spot: SPOT, light: G.pal.light, shade: ir ? NO_SHADE : G.pal.shade || NO_SHADE, cam: eye, fog: FOG, fogCol: hor, ir: ir ? 1 : 0 }); R.frame = FRAME;   // the instanced effects shader's copy
+    Object.assign(FRAME, { VP, spot: SPOT, light: G.pal.light, shade: ir ? NO_SHADE : SHADE, cam: eye, fog: FOG, fogCol: hor, ir: ir ? 1 : 0 }); R.frame = FRAME;   // the instanced effects shader's copy
 
     R.drawHeat = 0;
     R.draw(world, M.id());
+    drawScorches();
     // In the missile camera your own mech is out there too.
     R.drawHeat = 1;
     const shown = m => (m.alive || m.dying) && (m !== P || gd || G.state === 'menu') && seen(m.x, m.y + 6 * m.ch.scale, m.z, (m.dying ? 16 : 10) * m.ch.scale);
@@ -432,6 +545,7 @@ export function createScene(app) {
     for (const w of G.wrecks) if (seen(w.x, w.y + 2 * w.scale, w.z, 9 * w.scale)) drawWreck(w);
     R.drawHeat = 1;
     if (R.skinned) R.endSkinned();
+    for (const w of G.wrecks) if (w.t < WRECK_BURN && seen(w.x, w.y + 2 * w.scale, w.z, 9 * w.scale)) drawBurn(w);
     for (const m of G.mechs) if (shown(m)) drawFlash(m);
     drawRemains();
     drawEntities(eye);
@@ -443,13 +557,14 @@ export function createScene(app) {
     [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.disableVertexAttribArray(a));
     if (R.instanced) {
       fillEffects(G.parts, G.pal.hor);
+      fillWeather(eye);
       R.drawEffects();
     } else {
       [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.enableVertexAttribArray(a));
       const P = G.parts;
       for (let i = 0; i < P.n; i++) {
         effectLook(P, i, G.pal.hor, LOOK);
-        R.draw(R.meshes.fx[SHAPE_BY_KIND[P.kind[i]]], chain(M.T(P.pos[i * 3], P.pos[i * 3 + 1], P.pos[i * 3 + 2]), M.RY(P.spin[i]), M.RX(P.spin[i] * 0.7), M.S(LOOK[0])), [LOOK[1], LOOK[2], LOOK[3]], LOOK[4], LOOK[5]);
+        R.draw(R.meshes.fx[SHAPE_BY_KIND[P.kind[i]]], chain(M.T(P.pos[i * 3], P.pos[i * 3 + 1], P.pos[i * 3 + 2]), M.RY(P.spin[i]), M.RX(P.spin[i] * TUMBLE_BY_KIND[P.kind[i]]), M.S(LOOK[0])), [LOOK[1], LOOK[2], LOOK[3]], LOOK[4], LOOK[5]);
       }
       [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.disableVertexAttribArray(a));
     }

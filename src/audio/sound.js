@@ -3,6 +3,7 @@ import { msg } from '../sim/effects.js';
 import { viewYaw } from '../sim/geom.js';
 import { MELT_MAX, beamMult } from '../sim/beams.js';
 import { createThump } from './thump.js';
+import { createAmbience } from './ambience.js';
 import { HEAT, hotFrac } from '../data/feel.js';
 
 const { sin, cos, atan2, min, max, abs, PI, random, hypot, floor } = Math;
@@ -110,6 +111,7 @@ export function createAudio(app) {
   }
 
   const thumper = createThump({ ctx: ac, out, spatial });
+  const ambience = createAmbience({ ac, bus: () => thumper.loopBus() || out(), noise });
 
   // name -> number of takes (files name0..nameN-1, or just name.mp3 for 1).
   const SAMPLES = { step: 5, punch: 3, plate: 2, laser: 5, mlaser: 5, crunch: 5, boom_big: 1, boom_low: 1,
@@ -252,6 +254,14 @@ export function createAudio(app) {
       play('crunch', { ...at, vol: 0.8, rate: 0.6 });
       play('boom_low', { ...at, vol: 0.5, rate: 1.6, delay: 0.03 });
       this.osc('sine', 55, 30, 0.6, 0.35, at);
+    },
+    // Thunder (spec 07 § Lightning): a slowed boom and a long low rumble,
+    // quieter and duller the further off the strike (`dist`, 0..1).
+    thunder(dist = 0.5) {
+      const v = 1 - 0.7 * dist;
+      play('boom_low', { vol: 0.7 * v, rate: 0.45 - 0.1 * dist, vary: 0.1 });
+      play('boom_big', { vol: 0.35 * v, rate: 0.5, delay: 0.15 });
+      this.noise(2.4 + dist, 0.18 * v, 260 - 120 * dist, 40, 'lowpass');
     },
     // BIG BONKER: the cannon's thunk an octave down, carrying twice as far,
     // with a ringing crack on top. Clips: punch (half speed), crunch, plate (sped up). Synth: a low sine drop, a triangle ring.
@@ -404,6 +414,7 @@ export function createAudio(app) {
     const twistRate = G.twistRate || 0;
     loopSet('servo_loop', live ? min(0.13, twistRate * 0.07) : 0, 0.75 + min(0.6, twistRate * 0.25));
     beamSound(P.beaming && !G.paused, beamMult(P));
+    ambience.tick(G, !G.paused);   // the biome's bed and the weather's layer (audio/ambience.js)
   }
 
 
@@ -415,5 +426,5 @@ export function createAudio(app) {
     thumper.duck(duck);
     if (haptic > 2 && G.touchUI && prefs.haptics !== false) { try { navigator.vibrate?.(min(100, Math.round(haptic))); } catch { /* unsupported */ } }
   }
-  return { Sound, settings, loadSamples, play, loopSet, loops, sfx, say, beamSound, fusionSound, thump, tick: audioTick };
+  return { Sound, settings, loadSamples, play, loopSet, loops, sfx, say, beamSound, fusionSound, thump, tick: audioTick, ambience };
 }

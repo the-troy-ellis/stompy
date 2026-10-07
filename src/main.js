@@ -28,7 +28,7 @@ import { createFeelPanel } from './ui/feelPanel.js';
 import { readLook, LOOK_DEFAULT, LOOK_KEY } from './render/look.js';
 import { loadCampaign, saveCampaign } from './ui/campaign.js';
 import { DIFF } from './data/ai.js';
-import { SETTINGS, SETTING_KEYS, readSetting } from './data/settings.js';
+import { SETTINGS, SETTING_KEYS, readSetting, particleScales } from './data/settings.js';
 import { createMechlab } from './ui/mechlab.js';
 
 // Settings and progress, from localStorage. Each screen writes back the key
@@ -93,6 +93,9 @@ function start(root) {
   app.G = createGame({ touchUI: params.has('touch') || matchMedia('(pointer: coarse)').matches });
   const G = app.G;
   G.reducedMotion = prefs.reducedMotion;   // the sim reads a flag, never the prefs
+  if (store.get(SETTINGS.particles.key) == null) prefs.particles = G.touchUI ? 1 : 2;   // MED on a phone, HIGH on a desktop, until chosen
+  app.applyParticles = () => Object.assign(G, particleScales(prefs.particles, prefs.reducedMotion));
+  app.applyParticles();
   app.audio = createAudio(app);
   app.scene = createScene(app);
   app.hud = createHud(app);
@@ -107,7 +110,7 @@ function start(root) {
   // ?debug=1 exposes the state for the smoke test and for poking at in the console.
   if (params.has('debug')) { window.__stompy = { game: G, app, kill: m => destroy(G, m, G.player) }; createFeelPanel(app); }
 
-  const quiet = () => { for (const k of Object.keys(app.audio.loops)) app.audio.loopSet(k, 0); app.audio.beamSound(false, 1); app.audio.fusionSound(false, 0); };
+  const quiet = () => { for (const k of Object.keys(app.audio.loops)) app.audio.loopSet(k, 0); app.audio.beamSound(false, 1); app.audio.fusionSound(false, 0); app.audio.ambience.tick(G, false); };
   let last = 0, lastAudioCheck = 0;
   const loop = ts => {
     requestAnimationFrame(loop);

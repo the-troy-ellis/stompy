@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#155 time of day, #156 headlights, #157 weather state shipped) |
+| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning, #159 snow and fog, #160 dust storm, #161 prop library, #162 prop placement, #163 explosions, #164 ambient audio, #165 particles setting shipped) |
 | Milestone | M4 |
 | Size | L (split: night + headlights; weather; props; explosions + particles) |
 | Depends on | M0; structures from [03-objectives.md](03-objectives.md) share the prop meshes |
@@ -71,6 +71,30 @@ message (PROTOCOL 7).
 scaled by a random distance. In the arena, lightning is seeded from
 `game.time` so everyone sees the same flashes.
 
+As shipped (#158): rain is 1,500 thin streaks (a new `streak` effect shape;
+900 on touch until the PARTICLES setting, #165) in a 60 x 30 x 60 m box round
+the camera (`render/weatherBox.js`, render-side and unseeded: it is only
+looks), falling at 22 m/s with the wind, none within 6 m of the cockpit, one
+instanced draw. Rain dims the light to 80%. Lightning: `strikeAt(seed, k)`
+gives every strike's time (8-20 s apart) and distance from the seed alone;
+`sim/weather.js` flashes the shading and the sky toward white for 120 ms and
+rolls `sfx.thunder` (a slowed boom and a low rumble, quieter when far) 0.5-3
+s later. The perf harness has a `rain` scene (free-start in a downpour).
+
+As shipped (#159): snow is 800 small octahedra (480 on touch) in the same box,
+falling at 1.6 m/s with the wind, turning and swaying, none within 5 m of the
+cockpit; snow whitens the sky and fog colour by 35%. Fog has no particles: its
+fog distances (x0.3) and a haze that greys the zenith into the horizon (80%;
+dust gets 60%) do it. The perf harness has a `snow` scene; rain and snow
+each cost one draw over free-start and no more garbage.
+
+As shipped (#160): dust is 2,500 small flat grains (1,500 on touch) streaming
+sideways at 1.4x the 9 m/s wind, with an orange-tinted horizon and fog
+(halfway to `tint`) on top of its haze. A mech in the air is pushed 0.5 m/s
+with the wind; on the ground nothing. Mission 10's PURPLE PUNCHER now walks
+in out of the dust at about 350 m, which is the set piece spec 04 asked for.
+The perf harness has a `dust` scene.
+
 **Wind** moves smoke and missile trails (`particle` velocities get `wind × dt`)
 and leans rain/snow. Dust storms push the mech by 0.5 m/s laterally when
 airborne (jets), nothing on the ground.
@@ -79,6 +103,20 @@ Weather particles live in a box around the camera (60 m × 30 m × 60 m),
 recycled when they leave it. They are drawn with the instanced particle path
 below, 1500 for rain, 800 for snow, 2500 for dust at intensity 1, scaled by a
 `particles` setting (LOW / MED / HIGH, default MED on touch, HIGH on desktop).
+
+As shipped (#165): PARTICLES is a Settings dial (`data/settings.js`, saved as
+`fx.particles`). Unset, it is MED on touch and HIGH on a desktop.
+- **What a level keeps:** LOW keeps no weather particles and half the
+  gameplay effects; MED 60% and 75%; HIGH all.
+- **REDUCED MOTION** takes it down a step (LOW is the floor).
+- **Where it applies:** the renderer reads `G.weatherScale`, and the sim's
+  `spawn` reads `G.effectScale`. The sim drops particles evenly by a running
+  count, not by chance, and always after the spin's RNG roll, so the RNG runs
+  the same at any setting and a fight plays out identically. The shockwave
+  is never dropped.
+- **Layout:** on a phone held sideways the Settings dials go to two columns,
+  and the column still scrolls with a thumb.
+- **Not here:** #135 owns stepping this down automatically on a slow phone.
 
 Weather affects the AI (`sight` × radar factor) and the HUD (radar ring
 shrinks; the target box drops at 1.2× the visible range).
@@ -105,6 +143,15 @@ with dish, truck (the escort vehicle), launcher (mission 9 turret), relay
 (mission 2), crate stacks, dead tree (ice), lava vent (volcanic: emissive
 glow), ice spire.
 
+As shipped (#161): bunker, pipe run, wall segment, antenna mast, crate stack,
+dead tree, lava vent and ice spire join the mission props, 46 to 116
+triangles each (`props.test.js`). Each is built in the same unit space (1
+across the footprint radius, 1 tall), so a long one (pipe run, wall) is a
+strip along z in a round footprint: #162 should chain short segments rather
+than place one long one. The mast is built for a height about seven times
+its radius. The vent's lava is a second mesh, `ventGlow`, drawn glowing, so
+it shows at night. `node scripts/shootProps.mjs` shoots the sheet.
+
 `src/world/props.js` places them by biome rules from the seed: clusters near
 the existing outposts, lines of pylons across the map, scattered singles.
 Props become `game.entities` of kind `structure` with `hp: Infinity` unless a
@@ -112,6 +159,37 @@ mission marks them destructible. Mission placements override.
 
 Props are drawn in one pass with a frustum test (sphere vs the view
 frustum's planes from `VP`) and a distance cull at `fog[1]`.
+
+As shipped (#162): `scatterProps(seed, biome, ter, { avoid, paths })` gives
+90 to 120 props a map, about 2 ms:
+- **Outposts:** `outposts(seed)` lays out the four outposts' abandoned
+  blocks and towers, which `terrainMesh.js` bakes into the ground mesh as
+  before. Round each go a bunker, two crate stacks, a tank, a three-segment
+  pipe run and a four-segment wall, clear of the blocks.
+- **Pylons:** two lines of masts cross the map every 150 m.
+- **Singles:** dusk adds crates, bunkers, tanks and wall stubs; ice adds 30
+  dead trees and 14 spires; volcanic adds 12 lava vents.
+- **Clear ground:** nothing lands within 140 m of the start, on a mission's
+  flat pads or structures, within 30 m of a convoy's road, on a steep slope,
+  or on another prop. A mission with `props: false` and a flat test map get
+  none.
+
+They are `structure` entities with `hp: Infinity`, but they live in
+`G.scenery`, apart from `G.entities`, with a 64 m grid listing each prop in
+every cell its footprint touches. Pushing a mech out, a punch's target and a
+shot's ray (a 2D walk along the cells it crosses) look only in the cells
+concerned. Walking the whole list from code that runs a few times a frame
+made 50–150 KB of garbage a frame. Mission entities are placed first, so the
+scatter keeps clear of them; a mission that wants a destructible prop lists
+it among its entities, as missions already do.
+
+Drawing (`render/propBatch.js` and `R.drawProps`): one instanced draw per
+prop mesh with anything in view, lit, fogged, headlit and IR-shaded by the
+main fragment shader. A toppling prop is drawn on its own. Without the
+instancing extension, each instance is an `R.draw`. The perf scenes gain 1
+to 4 draws and 1–3k triangles, with no more garbage. Acceptance 4 is a
+headless test: facing away from an outpost issues none of its props, and
+they count as culled in `?debug=1`.
 
 ### Explosions and debris
 
@@ -127,6 +205,27 @@ frustum's planes from `VP`) and a distance cull at `fog[1]`.
 - **Burning wrecks**: the smoke column already exists; add a flickering
   emissive glow on the wreck's torso part for 30 s.
 
+As shipped (#163):
+- **Shockwave:** a new particle kind, `shock`. It is a ring, eight segments
+  with the outer edge raised a little so it shows edge-on from a cockpit. It
+  lies on the ground under any blast within 10 m of it, never tumbles, grows
+  to 26 m (big) or 9 m across in 0.4 s, and dithers out (`DITHER_KINDS`).
+- **Debris:** landed debris sinks into the ground over its last 2 of 20 s
+  instead of shrinking.
+- **Scorches:** `G.scorches`, at most 64, oldest first out. A blast where a
+  scorch at least as big already covers the spot adds none. The yaw comes
+  from the place, so the RNG is untouched. The renderer keeps one buffer with
+  a slot per scorch (id mod 64) and rewrites only a new one's slot, so a
+  missile volley makes no garbage. It is one draw with a polygon offset.
+- **Secondaries:** `makeWreck` sets 2 to 4 pop times in the first 3 s, each
+  pop with a burst of smoke. A mech still carrying ammunition (any weapon
+  with `ammo` left: autocannon, missiles, gauss, machine gun) also gets one
+  big pop between 1 and 2 s. They are all show, with no damage.
+- **Burning wrecks:** a shell over the torso, 4% larger, drawn after the
+  skinned pass. It flickers from ember orange back to the wreck's grey, and
+  its glow dies down over 30 s, when the smoke stops too.
+- **Cost:** one draw per burning wreck plus the scorch draw.
+
 ### Particle system rework
 
 One `instancedArrays` draw per particle kind (ANGLE_instanced_arrays is
@@ -141,6 +240,26 @@ oldest smoke first.
 A per-biome bed (synthesised: filtered noise with slow LFOs, no new clips)
 and a per-weather layer, mixed on the existing `loops` path. Volume follows
 the SFX setting.
+
+As shipped (#164): the table is `data/ambience.js`, and `audio/ambience.js`
+builds it.
+- **Layers:** each layer is the shared white-noise buffer, looping from its
+  own offset, through one filter, with an LFO on the filter frequency and
+  another on the level.
+- **Beds:** dusk is a warm low wind with some air on top; ice is a thin cold
+  wind over a low hush; volcanic is a ground rumble with a high sputter.
+- **Weather:** rain is a hiss and a patter, snow a whistling gusty wind, and
+  dust a resonant howl with grit. Fog has no layer of its own: it closes a
+  500 Hz lowpass over the bed.
+- **Mixing:** everything goes through the loop bus, so impacts duck it like
+  the hum. A change of biome or weather fades the old layers out over 1.5 s
+  and stops them. Pause, the menu and a hidden tab fade it all down.
+- **Sound off or no gesture:** there's no context, so nothing is built.
+  There is no volume slider, so "follows the SFX setting" means the sound
+  on/off pref.
+- **Levels** (rendered offline in Chromium, after the fade-in): the beds are
+  −43 to −45 dBFS RMS, rain −33, dust −36, snow −40, and fog −44 to −51. All
+  sit well under the reactor hum, and each weather is 4–12 dB over its bed.
 
 ## Code touchpoints
 

@@ -43,5 +43,5 @@ export function makeTerrain(seed, { flat = false, zones = [] } = {}) {
     const h00 = hs[j * (N + 1) + i], h10 = hs[j * (N + 1) + i + 1], h01 = hs[(j + 1) * (N + 1) + i], h11 = hs[(j + 1) * (N + 1) + i + 1];
     return fx + fz < 1 ? h00 + (h10 - h00) * fx + (h01 - h00) * fz : h11 + (h01 - h11) * (1 - fx) + (h10 - h11) * (1 - fz);
   };
-  return { hs, height, seed };
+  return { hs, height, seed, flat };
 }

@@ -31,14 +31,27 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   fight 24/42 · fight-deaths 44/51 · wrecks 51/58 (tris and alloc as P3)
 // After P6 (#138, frustum culling): free-start 2/2 · fight 20/37 ·
 //   fight-deaths 28/35 · wrecks 26/33 · looking-away 10/13 (49/53 without)
+// After #162 (scenery props, one instanced draw per prop mesh in view, ~1-3k
+//   more triangles; garbage unchanged): free-start 5/5 · fight 22/39 ·
+//   fight-deaths 34/38 · wrecks 32/39 · looking-away 16/19 · rain 4 ·
+//   snow 6 (dead trees and spires) · dust 4. Props add at most one draw per
+//   scenery mesh the biome has (dusk 6; ice and volcanic 8, the vent's glow
+//   included), so where they matter the budgets are the pre-prop number plus
+//   that, not the latest view of a reshuffled field.
+// After #163 (explosions: the scorches are one more draw, each burning wreck
+//   one more for 30 s; garbage unchanged): fight 27/44 · fight-deaths 36/42 ·
+//   wrecks 37/44 · looking-away 18/21
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
   menu:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 26 },
-  'free-start':   { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 115 },
-  fight:          { meanDraws: 24, peakDraws: 43, tris: 27000, allocKB: 205 },
-  'fight-deaths': { meanDraws: 33, peakDraws: 41, tris: 27000, allocKB: 205 },
-  wrecks:         { meanDraws: 30, peakDraws: 38, tris: 26000, allocKB: 145 },
-  'looking-away': { meanDraws: 12, peakDraws: 15, tris: 25000, allocKB: 135 },
+  'free-start':   { meanDraws: 8, peakDraws: 8, tris: 25000, allocKB: 115 },
+  fight:          { meanDraws: 31, peakDraws: 50, tris: 27000, allocKB: 205 },
+  'fight-deaths': { meanDraws: 41, peakDraws: 48, tris: 27000, allocKB: 205 },
+  wrecks:         { meanDraws: 42, peakDraws: 50, tris: 26000, allocKB: 145 },
+  'looking-away': { meanDraws: 21, peakDraws: 24, tris: 27000, allocKB: 135 },
+  rain:           { meanDraws: 9, peakDraws: 9, tris: 25000, allocKB: 90 },   // free-start in a downpour: one more draw (the rain), no more garbage
+  snow:           { meanDraws: 11, peakDraws: 11, tris: 25000, allocKB: 90 },   // and in snow
+  dust:           { meanDraws: 11, peakDraws: 11, tris: 25000, allocKB: 90 },   // and in a dust storm (2,500 grains)
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;
@@ -58,6 +71,8 @@ function setup() {
   const draw = R.draw, drawSkinned = R.drawSkinned;
   R.draw = (mesh, ...a) => { S.tris += mesh.count / 3; return draw(mesh, ...a); };
   if (R.skinned) R.drawSkinned = (mesh, ...a) => { S.tris += mesh.count / 3; return drawSkinned(mesh, ...a); };
+  const drawProps = R.drawProps;   // instanced props: each mesh's triangles times its instances
+  R.drawProps = (B, meshes) => { for (const k in B) S.tris += meshes[k].count / 3 * B[k].n; return drawProps(B, meshes); };
   window.__frames = async (n, input) => {
     const { update, noInput } = await import('/src/sim/update.js');
     const out = { draws: [], tris: [], parts: [] };
@@ -99,6 +114,12 @@ try {
     const f = await page.evaluate(n => window.__frames(n), frames);
     const { profile } = await cdp.send('HeapProfiler.stopSampling');
     const bytes = (function sum(node) { return node.selfSize + node.children.reduce((a, c) => a + sum(c), 0); })(profile.head);
+    if (process.env.PERF_TOP) {   // PERF_TOP=1 npm run perf: where each scene's garbage comes from
+      const by = {};
+      (function walk(n) { const cf = n.callFrame, key = `${cf.functionName || '(anon)'} ${cf.url.split('/src/').pop()}:${cf.lineNumber + 1}`; if (n.selfSize) by[key] = (by[key] || 0) + n.selfSize; n.children.forEach(walk); })(profile.head);
+      console.log(`top allocators, ${name} (KB/frame):`);
+      Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 12).forEach(([k, v]) => console.log(String(Math.round(v / frames / 1024)).padStart(6), k));
+    }
     const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
     results[name] = { frames, meanDraws: Math.round(mean(f.draws)), peakDraws: Math.max(...f.draws), tris: Math.round(Math.max(...f.tris)), parts: Math.round(mean(f.parts)), peakParts: Math.max(...f.parts), allocKB: Math.round(bytes / frames / 1024) };
   };
@@ -134,6 +155,20 @@ try {
   // the mechs, wrecks and smoke behind.
   await page.evaluate(() => { const P = window.__stompy.game.player; P.yaw += Math.PI; P.twist = 0; });
   await scene('looking-away', 60);
+  // Weather on its own: the free-start match again, in rain and in snow, to
+  // compare with free-start (spec 07: the box of drops is one more draw and
+  // no garbage).
+  for (const [name, pal, weather] of [['rain', 'dusk', 'rain'], ['snow', 'ice', 'snow'], ['dust', 'volcanic', 'dust']]) {
+    await page.evaluate(async ([pal, weather]) => {
+      const { startMatch } = await import('/src/sim/state.js');
+      const G = window.__stompy.game, app = window.__stompy.app;
+      startMatch(G, { name: 'Perf', pal, weather, foes: ['jackal', 'jackal', 'jackal'], intel: '' }, 1234, false, 'kestrel');
+      G.kind = 'free'; G.diff = 'normal';
+      app.scene.uploadWorld(); app.ui.launch();
+      window.requestAnimationFrame = () => 0;
+    }, [pal, weather]);
+    await scene(name, 60, 30);
+  }
 
   await browser.close();
   if (errors.length) { failed = true; console.error('page errors:\n' + errors.join('\n')); }
