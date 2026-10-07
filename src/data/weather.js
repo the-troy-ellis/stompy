@@ -6,7 +6,7 @@ export const WEATHER = {
   clear: { fog: 1, radar: 1, wind: 0, biomes: ['dusk', 'ice', 'volcanic'] },
   rain: { fog: 0.7, radar: 0.9, wind: 4, biomes: ['dusk'], dim: 0.8, lightning: true },   // dim: the palette darkens
   snow: { fog: 0.5, radar: 0.8, wind: 2.5, biomes: ['ice'], whiten: 0.35 },   // whiten: the sky and fog go pale
-  dust: { fog: 0.35, radar: 0.5, wind: 9, biomes: ['dusk', 'volcanic'], haze: 0.6 },
+  dust: { fog: 0.35, radar: 0.5, wind: 9, biomes: ['dusk', 'volcanic'], haze: 0.6, tint: [0.78, 0.48, 0.26], push: 0.5 },   // tint: the sky and fog go orange; push: m/s on a mech in the air
   fog: { fog: 0.3, radar: 0.6, wind: 0.5, biomes: ['ice', 'volcanic'], haze: 0.8 },   // haze: the sky overhead greys into the horizon
 };
 export const WEATHER_KINDS = Object.keys(WEATHER);

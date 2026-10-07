@@ -1,3 +1,4 @@
+import { WEATHER } from '../data/weather.js';
 import { add, clampN, mul } from '../util/math.js';
 import { BOUND } from '../world/terrain.js';
 import { particle } from './effects.js';
@@ -72,6 +73,9 @@ export function stepMech(G, m, dt) {
   m.y += m.vy * dt;
   if (m.air) {
     m.airT = (m.airT || 0) + dt;
+    // A dust storm shoves a mech that is up on its jets (spec 07), never one on the ground.
+    const w = G.weather, push = w && WEATHER[w.kind].push;
+    if (push) { const s = Math.hypot(w.wind[0], w.wind[1]) || 1; m.x += w.wind[0] / s * push * w.intensity * dt; m.z += w.wind[1] / s * push * w.intensity * dt; }
     // Coming down onto a mech: a stomp, and a bounce back up off it.
     if (m.vy < 0 && !jets && tryStomp(G, m, m.airT)) m.airT = 0;
   }

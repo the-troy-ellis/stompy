@@ -112,6 +112,7 @@ export function createScene(app) {
   const WX_LOOK = {
     rain: { shape: 'streak', count: 1500, fall: 22, size: 1.8, col: [0.6, 0.66, 0.76], glow: 0.3, clear: 6, lean: true },
     snow: { shape: 'octa', count: 800, fall: 1.6, size: 0.32, col: [0.95, 0.96, 1], glow: 0.55, clear: 5, sway: 0.5 },
+    dust: { shape: 'flat', count: 2500, fall: 0.6, size: 0.22, col: [0.7, 0.5, 0.32], glow: 0.15, clear: 4, sway: 0.3, gust: 1.4 },   // grains streaming sideways
   };
   const box = makeWeatherBox(2500), WX_VEL = [0, 0, 0];
   let wxTime = null;
@@ -120,17 +121,31 @@ export function createScene(app) {
     if (!L) { box.n = 0; return; }
     const dt = wxTime == null ? 0 : Math.min(0.1, Math.max(0, G.time - wxTime));
     wxTime = G.time;
-    WX_VEL[0] = w.wind[0]; WX_VEL[1] = -L.fall; WX_VEL[2] = w.wind[1];   // the wind is [x, z]
+    const gust = L.gust || 1;
+    WX_VEL[0] = w.wind[0] * gust; WX_VEL[1] = -L.fall; WX_VEL[2] = w.wind[1] * gust;   // the wind is [x, z]
     stepWeatherBox(box, eye, Math.round(L.count * w.intensity * (G.touchUI ? 0.6 : 1)), WX_VEL, dt);
-    const g = R.fx[L.shape], yaw = Math.atan2(w.wind[0], w.wind[1]), lean = L.lean ? Math.atan2(Math.hypot(w.wind[0], w.wind[1]), L.fall) : 0, t = G.time;
-    for (let i = 0; i < box.n && g.n < R.FX_CAP; i++) {
-      const i3 = i * 3, dx = box.pos[i3] - eye[0], dz = box.pos[i3 + 2] - eye[2];
-      if (dx * dx + dz * dz < L.clear * L.clear) continue;
-      const d = g.data, o = g.n++ * R.FX_FLOATS, sw = L.sway ? Math.sin(t * 0.9 + i * 1.7) * L.sway : 0;
-      d[o] = box.pos[i3] + sw; d[o + 1] = box.pos[i3 + 1]; d[o + 2] = box.pos[i3 + 2] + sw * 0.6; d[o + 3] = L.size;
-      d[o + 4] = L.lean ? yaw : t * 0.7 + i * 1.3; d[o + 5] = L.lean ? lean : t * 0.45 + i;
-      d[o + 6] = L.col[0]; d[o + 7] = L.col[1]; d[o + 8] = L.col[2]; d[o + 9] = L.glow; d[o + 10] = 0; d[o + 11] = 0;
+    const g = R.fx[L.shape], wind = Math.hypot(w.wind[0], w.wind[1]);
+    g.n = L.lean ? fillDrops(g.data, g.n, box, eye, L, Math.atan2(w.wind[0], w.wind[1]), Math.atan2(wind, L.fall), 0, 0, G.time)
+      : fillDrops(g.data, g.n, box, eye, L, 0, 0, 1, L.sway || 0, G.time);
+  }
+  // The drops into an effect shape's instances, from `n` on; returns the new
+  // count. Rain leans (yaw, lean) with spin 0; snow and dust have spin 1 and
+  // turn and sway instead. No ternaries in the loop: V8 boxes a number picked
+  // between a passed-in value and fresh arithmetic, which is a heap number per
+  // drop per frame.
+  function fillDrops(d, n, box, eye, L, yaw, lean, spin, sway, t) {
+    const cap = R.FX_CAP, F = R.FX_FLOATS, pos = box.pos, ex = eye[0], ez = eye[2], clear2 = L.clear * L.clear;
+    const size = L.size, cr = L.col[0], cg = L.col[1], cb = L.col[2], glow = L.glow;
+    for (let i = 0; i < box.n && n < cap; i++) {
+      const i3 = i * 3, dx = pos[i3] - ex, dz = pos[i3 + 2] - ez;
+      if (dx * dx + dz * dz < clear2) continue;
+      const o = n * F, sw = Math.sin(t * 0.9 + i * 1.7) * sway;
+      n++;
+      d[o] = pos[i3] + sw; d[o + 1] = pos[i3 + 1]; d[o + 2] = pos[i3 + 2] + sw * 0.6; d[o + 3] = size;
+      d[o + 4] = yaw + spin * (t * 0.7 + i * 1.3); d[o + 5] = lean + spin * (t * 0.45 + i);
+      d[o + 6] = cr; d[o + 7] = cg; d[o + 8] = cb; d[o + 9] = glow; d[o + 10] = 0; d[o + 11] = 0;
     }
+    return n;
   }
   // A point through a matrix into `out`, without allocating.
   const placeInto = (m, p, out) => { for (let i = 0; i < 3; i++) out[i] = m[i] * p[0] + m[4 + i] * p[1] + m[8 + i] * p[2] + m[12 + i]; };
@@ -374,7 +389,8 @@ export function createScene(app) {
       const s = (G.pal.shade ? G.pal.shade[i] : 1) * (wx && wx.dim ? wx.dim : 1);
       SHADE[i] = s + (FLASH_SHADE[i] - s) * flash;
       const wh = wx && wx.whiten ? wx.whiten * G.weather.intensity : 0;   // snow whitens the sky and the fog
-      const h = G.pal.hor[i] + (WHITE_SKY[i] - G.pal.hor[i]) * wh, hz = wx && wx.haze ? wx.haze * G.weather.intensity : 0;   // fog and dust grey the zenith into the horizon
+      const tn = wx && wx.tint ? 0.5 * G.weather.intensity : 0, h0 = G.pal.hor[i] + (WHITE_SKY[i] - G.pal.hor[i]) * wh;   // dust turns the horizon orange
+      const h = h0 + ((tn ? wx.tint[i] : 0) - h0) * tn, hz = wx && wx.haze ? wx.haze * G.weather.intensity : 0;   // fog and dust grey the zenith into the horizon
       const z0 = G.pal.zen[i] + (WHITE_SKY[i] - G.pal.zen[i]) * wh * 0.6, z = z0 + (h - z0) * hz;
       SKY_Z[i] = z + (FLASH_SKY[i] - z) * flash * 0.8;
       SKY_H[i] = h + (FLASH_SKY[i] - h) * flash * 0.6;

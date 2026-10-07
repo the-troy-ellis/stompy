@@ -75,3 +75,23 @@ test('snow whitens the sky and falls as the snow shape; fog and dust grey the ze
   assert.match(scene, new RegExp(`snow: \\{ shape: '${shapeOf('snow')}'`), 'snow drawn as the snow effect shape');
   assert.match(scene, new RegExp(`rain: \\{ shape: '${shapeOf('rain')}'`));
 });
+
+test('a dust storm shoves a mech up on its jets 0.5 m/s with the wind, never one on the ground', async () => {
+  const { input, stepFor } = await import('./helpers.js');
+  const run = (weather, air) => {
+    const G = createTestGame({ foes: [] }), P = G.player;
+    G.weather = makeWeather(weather, 77);
+    const x0 = P.x, z0 = P.z;
+    stepFor(G, 1, input({ jets: air }));
+    return [P.x - x0, P.z - z0, G.weather.wind, P.air];
+  };
+  const [dx, dz, w, up] = run('dust', true);
+  assert.ok(up, 'it got airborne');
+  const along = (dx * w[0] + dz * w[1]) / Math.hypot(...w);
+  assert.ok(along > 0.2 && along < 0.6, `pushed ${along.toFixed(2)} m downwind`);
+  const [gx, gz] = run('dust', false);
+  assert.ok(Math.hypot(gx, gz) < 1e-6, 'on the ground: not a nudge');
+  const [cx, cz] = run('clear', true);
+  assert.ok(Math.hypot(cx, cz) < 1e-6, 'clear air: straight up');
+  assert.ok(WEATHER.dust.tint, 'dust turns the sky orange');
+});
