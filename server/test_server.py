@@ -223,6 +223,36 @@ class Session(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(got, relay.FX_RATE)
         self.assertLess(got, relay.FX_RATE + 10)
 
+    async def test_lobby_ready_and_ping(self):
+        a, wa = await self.join("A")
+        self.assertEqual(wa["mode"], "ffa")
+        self.assertEqual((wa["scores"][0]["ch"], wa["scores"][0]["ready"]), ("kestrel", 0), "in the lobby until READY")
+        b = await WSClient.connect(self.port)
+        self.clients.append(b)
+        await b.send({"t": "hello", "v": relay.PROTOCOL, "name": "B", "color": 1, "ch": "warden"})
+        await b.recv()  # welcome
+        joined = await a.recv()
+        self.assertEqual(joined["scores"][1]["ch"], "warden")
+        await b.send({"t": "ready"})
+        ready = await a.recv()
+        self.assertEqual((ready["t"], ready["id"]), ("ready", 2))
+        self.assertEqual(ready["scores"][1]["ready"], 1)
+        self.assertEqual((await b.recv())["t"], "ready", "the pilot readying hears it too")
+        await b.send({"t": "ping", "n": 7, "rtt": 42.4})
+        pong = await b.recv()
+        self.assertEqual((pong["t"], pong["n"]), ("ping", 7))
+        self.assertEqual(pong["pings"], {"1": 0, "2": 42})
+        await b.send({"t": "ping", "n": "x", "rtt": "NaN"})
+        self.assertEqual((await b.recv())["n"], 0, "a junk ping is answered, not trusted")
+        await b.send({"t": "hello", "v": relay.PROTOCOL, "name": "X", "ch": "tank"})   # a second hello is ignored
+        c = await WSClient.connect(self.port)
+        self.clients.append(c)
+        await c.send({"t": "hello", "v": relay.PROTOCOL, "name": "C", "ch": ["not", "a", "chassis"]})
+        self.assertEqual((await c.recv())["scores"][2]["ch"], "kestrel", "a junk chassis in hello is stock, not a crash")
+        await a.recv(); await b.recv()  # C joined
+        await a.send({"t": "s", "ch": "jackal"})
+        self.assertEqual((await b.recv())["ch"], "jackal")
+
     async def test_a_fuzzing_pilot_never_takes_the_relay_down(self):
         import random as rnd
         r = rnd.Random(9)
@@ -231,8 +261,8 @@ class Session(unittest.IsolatedAsyncioTestCase):
         await a.recv()  # B joined
         junk = [float("nan"), 1e308, "x", None, True, [], {}, [1, "a", None], {"k": 1}, -5, 2**60]
         for _ in range(300):
-            msg = {"t": r.choice(["s", "fx", "hit", "died", "zz", 5, None])}
-            for k in r.sample(["ch", "x", "hp", "to", "amt", "p", "kb", "by", "lo", "k", "fu", "hh"], r.randint(0, 6)):
+            msg = {"t": r.choice(["s", "fx", "hit", "died", "ready", "ping", "zz", 5, None])}
+            for k in r.sample(["ch", "x", "hp", "to", "amt", "p", "kb", "by", "lo", "k", "fu", "hh", "n", "rtt"], r.randint(0, 6)):
                 msg[k] = r.choice(junk)
             await b.send(msg)
         await b.send({"t": "s", "x": 7})   # and B is still connected and relayed

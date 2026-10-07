@@ -269,6 +269,7 @@ export function createUi(app) {
   }
 
   function pause(on) {
+    if (G.lobby) return;   // the arena lobby is its own overlay; READY or LEAVE
     if (G.state !== 'play') return;
     G.paused = on;
     app.input.clearHeld();
@@ -334,6 +335,7 @@ export function createUi(app) {
     if (a === 'menu') { if (frontierWin) { prefs.mission = camp.mission; frontierWin = false; } mainMenu(); return; }
     if (a === 'mp') { mainMenu('mp'); return; }
     if (a === 'leave') { app.net.leaveArena(); return; }
+    if (a === 'ready') { app.net.ready(); return; }   // the arena lobby
     if (a === 'next') { prefs.mission++; startMission(prefs.mission); launch(); }
     else if (a === 'retry') { startMission(prefs.mission); launch(); }
     else if (a === 'again') { startSkirmish(); launch(); }

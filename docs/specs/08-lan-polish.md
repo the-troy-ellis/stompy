@@ -61,6 +61,24 @@ anyone can join a round in progress as today.
 Ping: the server echoes `{ t: 'ping', n }` with its time; the client shows
 the round trip in the lobby and, with `?debug=1`, on the HUD.
 
+As shipped (#185, `PROTOCOL` 9): `src/ui/lobby.js` builds the overlay.
+- **Joining:** `welcome` builds the arena and opens the LOBBY over it. The
+  pilot is placed but not spawned, sends no state (nobody sees a ghost),
+  has no cockpit HUD, can't pause, and keeps the cursor.
+- **The overlay:** each pilot's swatch, callsign, chassis (from `hello`,
+  then their state messages), ping, and IN or HERE, under
+  `FREE-FOR-ALL · <MAP> · FIRST TO n`, with READY and LEAVE.
+- **READY** sends `ready`, spawns you and hides the lobby; the others' lists
+  say IN.
+- **Updates:** the lobby updates in place as pilots join, ready up and
+  ping. Rebuilding it lost taps on READY on a phone.
+- **Ping:** `ping {n, rtt}` every 2 s carries your last round trip. The
+  echo `{n, ts, pings}` carries everyone's, and `?debug=1` shows yours.
+- **A new round** keeps a pilot still in the lobby there.
+- **Not here:** the server does not hold a round until someone readies; the
+  round runs from the server's start, as before. The team picker comes with
+  TDM (#186).
+
 ### Modes
 
 `mode: 'ffa' | 'tdm'` on the server, in `welcome` and `newround`. TDM: two

@@ -17,7 +17,8 @@ import { voice } from '../sim/voice.js';
 import { beamMult } from '../sim/beams.js';
 import { launchPulse } from '../sim/fusion.js';
 import { SEND_HZ } from '../sim/missiles.js';
-import { PROTOCOL, hit, stateMessage } from './protocol.js';
+import { hit, hello, ping as pingMsg, ready as readyMsg, stateMessage, PING_EVERY } from './protocol.js';
+import { lobbyHTML, lobbyHead, lobbyRows } from '../ui/lobby.js';
 import { fitOf } from '../ui/mechlab.js';
 import { applyLoadout, stockLoadout, validate } from '../sim/loadout.js';
 import { startSpectate } from './spectate.js';
@@ -40,7 +41,7 @@ export function createNet(app) {
   // own death. Other pilots are drawn from their latest state, smoothed and
   // extrapolated, and walk with the same gait. Their shots arrive as effects
   // ("ghosts") that look real but never score -- their shooter scores them.
-  const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10, loSent: '', loN: 0, feed: [] };
+  const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10, loSent: '', loN: 0, mode: 'ffa', pal: 'dusk', pingT: 0, pingN: 0, pingAt: new Map(), rtt: 0, feed: [] };
   const mp = () => G.mode === 'mp';
   const pilotName = id => Net.info.get(id)?.name || `PILOT ${id}`;
   const pilotCss = id => MP_COLORS[Net.info.get(id)?.color ?? 0]?.css || '#f44';
@@ -58,7 +59,7 @@ export function createNet(app) {
     try { ws = new WebSocket(app.relay().url); }   // net/relay.js: ?relay=, the RELAY field, or this page's host
     catch { app.ui.setStatus('COULD NOT CONNECT'); return; }
     Net.ws = ws;
-    ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', v: PROTOCOL, name: prefs.mpName, color: prefs.mpColor }));
+    ws.onopen = () => ws.send(JSON.stringify(hello(prefs.mpName, prefs.mpColor, prefs.chassis)));
     ws.onmessage = e => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.t === 'welcome') welcomed = true;
@@ -74,17 +75,35 @@ export function createNet(app) {
   function netSend(obj) { if (Net.ws && Net.ws.readyState === 1) Net.ws.send(JSON.stringify(obj)); }
   function leaveArena() {
     const ws = Net.ws; Net.ws = null; ws?.close();
-    G.mode = 'sp'; Net.info.clear();
+    G.mode = 'sp'; G.lobby = false; Net.info.clear(); Net.pingAt.clear();
     app.ui.mainMenu('mp');
   }
   function lostConnection() {
-    Net.info.clear();
+    Net.info.clear(); G.lobby = false; Net.pingAt.clear();
     app.ui.mainMenu('mp', 'CONNECTION LOST -- A PHONE THAT SLEEPS DROPS OUT. JOIN AGAIN?');
   }
 
   function setScores(list) {
     if (!Array.isArray(list)) return;
     Net.info = new Map(list.map(p => [p.id, p]));
+    showLobby();
+  }
+  // The lobby (ui/lobby.js): shown from `welcome` until READY, redrawn as
+  // pilots come, ready up and report their pings.
+  function showLobby() {
+    if (!G.lobby) return;
+    const o = { pilots: [...Net.info.values()].sort((a, b) => a.id - b.id), me: Net.id, mode: Net.mode, pal: Net.pal, limit: Net.limit };
+    const table = app.ov.hidden ? null : app.ov.querySelector('table.lobby'), head = app.ov.querySelector('.lobby-head');
+    if (table && head) { table.innerHTML = lobbyRows(o); head.innerHTML = lobbyHead(o); }   // in place: READY stays put under a thumb
+    else app.ui.showOverlay(lobbyHTML(o));
+  }
+  function ready() {
+    if (!G.lobby) return;
+    G.lobby = false;
+    netSend(readyMsg());
+    respawn();
+    app.ui.hideOverlay(); app.wrap.focus();
+    app.input.syncTouchUI(); app.input.lockPointer();
   }
 
   function onNet(m) {
@@ -92,11 +111,22 @@ export function createNet(app) {
       case 'full': app.ui.setStatus(`THE ARENA IS FULL (${m.max} PILOTS) -- TRY AGAIN LATER`); break;
       case 'version': app.ui.setStatus(`UPDATE THE GAME TO PLAY (v${m.need})`); break;   // the server runs another version
       case 'welcome':
-        Net.id = m.id; Net.limit = m.limit || 10;
+        Net.id = m.id; Net.limit = m.limit || 10; Net.mode = m.mode || 'ffa'; Net.pal = m.pal;
         setScores(m.scores);
-        startArena(m.seed, m.pal);
+        startArena(m.seed, m.pal, true);   // into the lobby: READY spawns you
         G.roundOver = !!m.over;
         break;
+      case 'ready': setScores(m.scores); break;
+      case 'ping': {
+        // The round trip to the relay, and every pilot's last one for the lobby.
+        const sent = Net.pingAt.get(m.n);
+        if (sent != null) { Net.rtt = Math.round(performance.now() - sent); Net.pingAt.delete(m.n); }
+        if (m.pings && typeof m.pings === 'object') for (const [id, ms] of Object.entries(m.pings)) { const p = Net.info.get(+id); if (p) p.ping = ms; }
+        const me = Net.info.get(Net.id);
+        if (me) me.ping = Net.rtt;
+        showLobby();
+        break;
+      }
       case 'join': setScores(m.scores); msg(G, `${pilotName(m.id)} JOINED`); break;
       case 'leave': {
         msg(G, `${pilotName(m.id)} LEFT`);
@@ -149,14 +179,17 @@ export function createNet(app) {
         app.audio.say(m.winner === Net.id ? 'Round won.' : 'Round over.', true);
         break;
       case 'newround':
+        Net.pal = m.pal; Net.mode = m.mode || Net.mode;
         setScores(m.scores);
-        startArena(m.seed, m.pal);
+        startArena(m.seed, m.pal, G.lobby);   // still in the lobby: stay there
         app.audio.say('New round.', true);
         break;
     }
   }
 
-  function startArena(seed, palName) {
+  // A round's world. `lobby`: the pilot waits in the lobby (not spawned, not
+  // sending state) until READY; otherwise straight in, as at a new round.
+  function startArena(seed, palName, lobby = false) {
     G.mode = 'mp'; G.spectate = null; Net.feed.length = 0;
     const def = { name: 'Arena', foes: [] };
     resetMatch(G, { def, seed, pal: palName });
@@ -167,13 +200,14 @@ export function createNet(app) {
     G.player.netId = Net.id;
     G.mechs.push(G.player);
     respawn();
-    app.ui.hideOverlay(); app.wrap.focus();
+    G.lobby = lobby;
+    if (lobby) { G.player.alive = false; showLobby(); } else { app.ui.hideOverlay(); app.wrap.focus(); }
     G.state = 'play'; G.paused = false;
     app.input.syncTouchUI();
     if (G.touchUI && !document.fullscreenElement && document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape')).catch(() => {});
     }
-    app.input.lockPointer();
+    if (!lobby) app.input.lockPointer();   // the lobby needs the cursor for READY
     app.input.syncWeaponButtons();
   }
 
@@ -294,7 +328,8 @@ export function createNet(app) {
     if (!P.alive && G.respawnAt && G.clock >= G.respawnAt) respawn();
     // Down and done toppling: watch another pilot until the respawn (net/spectate.js).
     else if (!P.alive && !P.dying && G.respawnAt && !G.spectate) startSpectate(G, G.killer);
-    if ((Net.sendT += dt) >= 1 / SEND_HZ) { Net.sendT = 0; sendState(); flushHits(); }
+    if ((Net.sendT += dt) >= 1 / SEND_HZ && !G.lobby) { Net.sendT = 0; sendState(); flushHits(); }   // in the lobby, nobody sees you yet
+    if (G.clock - Net.pingT >= PING_EVERY) { Net.pingT = G.clock; Net.pingAt.set(++Net.pingN, performance.now()); netSend(pingMsg(Net.pingN, Net.rtt)); }
   }
   const arenaBoard = () => [...Net.info.values()].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
   const boardHTML = () => `<table class="mech-keys scoreboard">${arenaBoard().map((p, i) => `<tr${p.id === Net.id ? ' class="me"' : ''}>
@@ -302,5 +337,5 @@ export function createNet(app) {
 
 
   return { Net, mp, join, send: netSend, leaveArena, lostConnection, setScores, onNet, startArena, spawnPoint, respawn, sendState, netState, netFx,
-    flushHits, tick: netTick, pilotName, pilotCss, mechById, arenaBoard, boardHTML };
+    flushHits, tick: netTick, ready, pilotName, pilotCss, mechById, arenaBoard, boardHTML };
 }

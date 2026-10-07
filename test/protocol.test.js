@@ -7,7 +7,9 @@ import { initFeet } from '../src/sim/gait.js';
 const roundTrip = m => { const back = P.parse(JSON.stringify(m)); assert.deepEqual(back, m); return back; };
 
 test('every builder survives JSON and parse rejects junk', () => {
-  roundTrip(P.hello('PILOT', 3));
+  roundTrip(P.hello('PILOT', 3, 'kestrel'));
+  roundTrip(P.ready());
+  roundTrip(P.ping(4, 37.6));
   roundTrip(P.fxBeam('laser', [1.234, 2, 3], [4, 5, 6.789]));
   roundTrip(P.fxShell([0, 0, 0], [1, 2, 3]));
   roundTrip(P.fxMissiles([0, 1, 2], [0, 0, 1], 4, 9));
