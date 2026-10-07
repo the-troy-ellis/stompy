@@ -143,13 +143,14 @@ export function createAudio(app) {
 
   function loadSamples() {
     const c = Sound.ctx;
-    if (!c || loading) return;
+    if (!c || loading) return loading;
     loading = Promise.all(Object.entries(SAMPLES).flatMap(([name, n]) => Array.from({ length: n }, (_, i) =>
       fetch(`sounds/${n > 1 ? name + i : name}.mp3`)
         .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
         .then(b => new Promise((ok, fail) => c.decodeAudioData(b, ok, fail)))   // callback form: every Safari
         .then(buf => { (buffers[name] ||= []).push(name.endsWith('_loop') ? seamless(buf) : buf); })
         .catch(() => { /* synthesis covers it */ }))));
+    return loading;   // resolves when every take has loaded or failed (the perf harness waits on it)
   }
   // Play one random take. Lower rate = deeper and longer = heavier.
   // At most this many one-shot sounds at once. Eight mechs stepping plus a
