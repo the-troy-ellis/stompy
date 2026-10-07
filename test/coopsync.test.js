@@ -74,7 +74,9 @@ test('acceptance 2: the host leaves mid-mission; the guest takes over, enemies m
   assert.equal(Gs.state, 'over'); assert.equal(Gs.won, true);
   out.length = 0;
   hostTick(Gs, 0.01, m => out.push(m));
-  assert.deepEqual(out.find(m => m.t === 'over'), { t: 'over', won: 1 });
+  const over = out.find(m => m.t === 'over');
+  assert.equal(over?.won, 1);
+  assert.equal(typeof over.kills, 'object', 'with each pilot\'s kills for the shared debrief');
 });
 
 test('the end reaches the guest: over, won', () => {

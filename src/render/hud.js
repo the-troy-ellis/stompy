@@ -167,6 +167,26 @@ export function createHud(app) {
     ctx.globalAlpha = 1;
     ctx.textAlign = 'right';
   }
+  // Co-op, down: who you're watching and when you're back (sim/coopRules.js).
+  function drawCoopDown(L) {
+    const P = G.player, r = G.coopRespawn;
+    if (P.alive || !r) return;
+    const n = Math.ceil(max(0, r.at - G.time)), W2 = app.scene.view.W / 2;
+    ctx.textAlign = 'center';
+    if (G.spectate) {
+      const top = L.viewBottom - (L.frame ? 46 : 64);
+      ctx.font = 'bold 14px "Lucida Console", monospace'; ctx.fillStyle = AMBER;
+      ctx.fillText(`SPECTATING ${app.net.pilotName(G.spectate.id)}`, W2, top);
+      ctx.font = '12px "Lucida Console", monospace'; ctx.fillStyle = GREEN;
+      ctx.fillText(`BACK IN ${n}  ·  ${G.touchUI ? 'TGT' : 'T'}: NEXT PILOT`, W2, top + 18);
+    } else {
+      ctx.font = 'bold 22px "Lucida Console", monospace'; ctx.fillStyle = RED;
+      ctx.fillText('MECH DESTROYED', W2, L.viewBottom * 0.5);
+      ctx.font = '14px "Lucida Console", monospace'; ctx.fillStyle = AMBER;
+      ctx.fillText(`BACK IN ${n}`, W2, L.viewBottom * 0.5 + 26);
+    }
+    ctx.font = '11px "Lucida Console", monospace';
+  }
   // Scoreboard, death / respawn, spawn shield, and the round banner.
   function drawArenaHUD(L) {
     const P = G.player;
@@ -642,6 +662,7 @@ export function createHud(app) {
     ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'right'; ctx.fillStyle = DIM;
     ctx.fillText(app.net.mp() ? `${app.net.tdm() ? '' : `PILOTS ${app.net.Net.info.size}  `}FIRST TO ${app.net.Net.limit}` : `HOSTILES ${left}`, L.hostiles.x, L.hostiles.y);
     if (app.net.mp()) drawArenaHUD(L);
+    else if (G.mode === 'coop') drawCoopDown(L);
     // Phones held upright get a cramped, stretched view.
     if (G.touchUI && app.scene.view.H > app.scene.view.W) {
       ctx.font = 'bold 16px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.fillStyle = AMBER;

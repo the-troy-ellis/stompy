@@ -172,6 +172,46 @@ carries per-pilot stats) and each client saves campaign progress if it won
 Text: `HOST`, `JOIN`, `ROOM CODE`, `ROOM <CODE>`, `WAITING FOR HOST`,
 `<NAME> IS NOW HOST`. Voice: existing lines.
 
+As shipped (#205):
+- **The MULTIPLAYER panel:** one row reads ARENA / CO-OP, and in co-op also
+  HOST / JOIN.
+  - **HOST:** picks a mission from the campaign strip (any you can play)
+    and a difficulty, and opens a room.
+  - **JOIN:** takes the four-letter ROOM CODE, in any case.
+  - **On a phone held sideways:** the blurb goes and the pickers sit one to a
+    line, so the launch button (JOIN ARENA, HOST, JOIN) stays on screen.
+- **The lobby:** `ROOM <CODE> · MISSION n: NAME · DIFFICULTY` over the
+  pilots, with HOST marked and READY for those who have pressed it.
+  - **A guest's READY** says WAITING FOR HOST.
+  - **The host's READY** starts the mission on every screen at once.
+  - **The room's mission:** everyone builds the same mission and seed, and
+    the host builds it for the pilots in the room (more enemies,
+    `coopDef`).
+  - **Joining late:** a guest who joins a mission under way goes straight
+    in. Enemies already down are reported as gone every 2 s, and the
+    entities and objectives catch up from the host's snapshots.
+- **In the mission:**
+  - `G.mode` is `coop`, and the other pilots are teammates: team 0, never a
+    target, with friendly fire off.
+  - Punches and guided volleys show on the others' screens, as in the arena.
+  - Down, you watch a teammate with M5a's spectator camera, and the HUD says
+    `BACK IN n`.
+  - `<NAME> IS NOW HOST` when the host leaves.
+- **The debrief:** each screen shows its own debrief, plus a table of every
+  pilot's kills (the host counts them and sends them with `over`) and deaths
+  (the relay's). A win is saved to every pilot's campaign, and a loss to
+  none. LEAVE goes back to the menu.
+- **Dropping:** a pilot who drops comes back to the room (#207's token, kept
+  per room). If the tries run out, JOIN from the menu goes back to the same
+  room.
+- **Acceptance 1:** the smoke run plays it on mission 2 with two browsers
+  against the real relay:
+  - ONE hosts, and TWO joins by the code.
+  - Both see the same enemies, and each other as teammates.
+  - TWO's hit on a relay lands on the host's.
+  - The relays down, both get the debrief with the crew table, and both
+    saves move to mission 3.
+
 ## Code touchpoints
 
 - `server/server.py`: rooms, routing table (`ehit` → host, `es`/`ent`/`obj`

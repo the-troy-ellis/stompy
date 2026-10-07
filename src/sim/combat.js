@@ -201,6 +201,7 @@ export function destroy(G, m, src) {
     return;
   }
   if (src === G.player) { G.stats.kills++; G.lastKill = { melee: m.lastHitMelee || null }; }
+  if (G.role === 'host' && src?.netId) (G.coopKills ||= {})[src.netId] = (G.coopKills[src.netId] || 0) + 1;   // co-op: who got it, for everyone's debrief
   voice(G, m.lastHitMelee === 'stomp' ? 'killStomp' : m.lastHitMelee ? 'killPunch' : 'kill', {}, true, DEATH_BEAT * 1000);   // after the bang, not before
   // Whether that won the mission is the objectives' call (objectives.js).
 }
