@@ -137,7 +137,7 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
 
 ### The network protocol (as it is)
 
-`PROTOCOL` is 17 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on; 8: M5a, the server enforces the version and rebuilds every state message clean; 9: the lobby, `ch` in `hello`, `ready`, `ping`, and `ch`/`ready`/`ping` in each pilot's scores entry; 10: team deathmatch, `team` from the lobby, `team` in each scores entry, `teams` (each side's kills) in `welcome`, `kill`, `roundover` and `newround`, and `mode`/`limit` in `newround`; 11: the round-end vote, `vote` and `stats` between rounds, the relay's `tally`, `best`/`acc` in each scores entry, and `vote` in `newround`; 12: reconnect, `token` in `hello`, `token` and `resumed` in `welcome`; 13: M5b rooms, `room`/`create` in `hello`, `room`/`kind`/`host` in `welcome`, and the co-op messages below; 14: co-op enemies, `es` and `ehit`, and `eid`/`te`/`e2` on weapon effects; 15: co-op world sync, `ehit {ent}` for a mission entity and the host's `ent`, `entx`, `obj` and `over`; 17: `ts` on the state message, the sender's clock, so remote mechs are drawn smoothly through internet jitter). `server/server.py` keeps its own `PROTOCOL`, and a Node test fails if the two differ.
+`PROTOCOL` is 17 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on; 8: M5a, the server enforces the version and rebuilds every state message clean; 9: the lobby, `ch` in `hello`, `ready`, `ping`, and `ch`/`ready`/`ping` in each pilot's scores entry; 10: team deathmatch, `team` from the lobby, `team` in each scores entry, `teams` (each side's kills) in `welcome`, `kill`, `roundover` and `newround`, and `mode`/`limit` in `newround`; 11: the round-end vote, `vote` and `stats` between rounds, the relay's `tally`, `best`/`acc` in each scores entry, and `vote` in `newround`; 12: reconnect, `token` in `hello`, `token` and `resumed` in `welcome`; 13: M5b rooms, `room`/`create` in `hello`, `room`/`kind`/`host` in `welcome`, and the co-op messages below; 14: co-op enemies, `es` and `ehit`, and `eid`/`te`/`e2` on weapon effects; 15: co-op world sync, `ehit {ent}` for a mission entity and the host's `ent`, `entx`, `obj` and `over`; 16: `es` batched, one message a tick with each enemy's changes; 17: `ts` on the state message, the sender's clock, so remote mechs are drawn smoothly through internet jitter). `server/server.py` keeps its own `PROTOCOL`, and a Node test fails if the two differ.
 
 Client → server: `hello {v, name, color, ch, token?, room?, create?}` (`token`: from the last `welcome`, to come back after a drop; `room`: a co-op room's code, the arena when absent; `create {mission, diff, seed}`: open a co-op room), `ready` (out of the lobby), `team {team}` (team deathmatch: a side from the lobby, before READY), `vote {map, mode}` and `stats {acc}` (between rounds: the next round, and your accuracy in % for the summary), `ping {n, rtt}` (every 2 s), `s {state...}` (15 Hz), `fx {k, ...}`
 (`b` beam flash, `s` shell, `m` missile volley, `fu` fusion discharge, `mg`
@@ -169,9 +169,16 @@ Co-op enemies (`src/net/coop.js`, #202): `G.role` is `solo`, `host` or
   mission's start, so every client of a seed agrees. The host numbers later
   ones (waves).
 - **The host:** runs them as single player does. Ten times a second it sends
-  `es` per enemy: a state message plus `eid`, `type`, `ai` (its state, for
-  debug) and `gt` (the host's game time; a guest more than 0.1 s off is set
-  to it, for lightning). An enemy's `fx` carries its `eid`, a volley at one
+  one `es {gt, l}`: `gt` is the host's game time (a guest more than 0.1 s off
+  is set to it, for lightning), and `l` is one entry per enemy.
+  - **An entry:** the state message's fields plus `eid`, `type` and `ai` (its
+    state, for debug), positions and armour to 0.1.
+  - **Changes only:** an entry carries only what changed since that enemy's
+    last one (the socket is reliable and in order), and an enemy standing
+    still sends nothing.
+  - **Full reports:** every 2 s each entry is complete, against the
+    defaults, with the loadout, so a late joiner catches up.
+  - **Enemies already down:** they go as `{eid, gone: 1}` then. An enemy's `fx` carries its `eid`, a volley at one
   carries `te` and a fusion shot at one `e2`.
 - **A guest:** draws the enemies as remote mechs (`net/remote.js`, shared
   with other pilots) and runs no objectives, turrets or waves. Its damage to

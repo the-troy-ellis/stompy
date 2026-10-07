@@ -41,9 +41,26 @@ export function startCoop(G, role, pilots = 1) {
 }
 
 // One enemy as the guests get it: a state message, plus which enemy, its
-// chassis, what its AI is doing (for ?debug) and the host's game time.
-export const enemyState = (G, m, withLo = false) =>
-  ({ ...stateMessage(m, beamMult(m), withLo), t: 'es', eid: m.eid, type: m.type, ai: m.ai?.state || '', gt: r2(G.time) });
+// chassis and what its AI is doing (for ?debug); positions and armour to a
+// tenth, which is all the drawing needs. `t` and `ch` go: the batch says es,
+// and `type` is the chassis.
+const r1 = v => Math.round(v * 10) / 10;
+export function enemyEntry(m, withLo = false) {
+  const { t, ch, x, y, z, hp, ...rest } = stateMessage(m, beamMult(m), withLo);
+  void t; void ch;
+  return { ...rest, x: r1(x), y: r1(y), z: r1(z), hp: hp.map(r1), eid: m.eid, type: m.type, ai: m.ai?.state || '' };
+}
+// What a guest assumes for a field an entry leaves out the first time.
+const ES_DEFAULTS = { x: 0, y: 0, z: 0, yaw: 0, tw: 0, p: 0, sp: 0, air: 0, al: 1, sd: 0, bm: 0, be: 0, bf: 1, fl: 0, sc: 0, sq: 0, pu: 0, lt: 1, ai: '' };
+const same = (a, b) => a === b || (typeof a === 'object' && a !== null && JSON.stringify(a) === JSON.stringify(b));
+// The fields of `full` a guest doesn't already have: against what was last
+// sent (the socket is reliable and in order), or against the defaults for a
+// full report. The eid always goes.
+function changes(full, last) {
+  const out = { eid: full.eid };
+  for (const k in full) if (k !== 'eid' && !same(full[k], last ? last[k] : ES_DEFAULTS[k])) out[k] = full[k];
+  return out;
+}
 
 // The mission's entities with something to tell: hp for those that can fall,
 // position and waypoint for vehicles. Rows [id, hp, x, z, yaw, wp].
@@ -69,6 +86,7 @@ export function objState(G) {
 export function hostTick(G, dt, send) {
   numberEnemies(G);
   const c = G.coop;
+  c.last ||= new Map();
   const states = (G.objectives || []).map(o => o.state).join();
   const entDue = (c.entT += dt) >= 1 / ENT_HZ;
   if (states !== c.objKey || entDue) {
@@ -80,12 +98,18 @@ export function hostTick(G, dt, send) {
   if (G.state === 'over' && !c.overSent) { c.overSent = true; send({ t: 'over', won: G.won ? 1 : 0, kills: G.coopKills || {} }); }   // kills: per pilot id, for the shared debrief
   if ((c.sendT += dt) < 1 / ES_HZ) return;
   c.sendT = 0;
-  const withLo = c.n++ % LO_EVERY === 0;
+  // One batch for every enemy: what changed since its last entry, or every
+  // LO_EVERY ticks (2 s) all of it, with the loadout, so a late joiner (or
+  // anything that drifted) catches up. One standing still sends nothing.
+  const full = c.n++ % LO_EVERY === 0, l = [];
   for (const m of G.mechs) {
     if (!m.eid) continue;
-    if (!m.gone) send(enemyState(G, m, withLo));
-    else if (withLo) send({ t: 'es', eid: m.eid, gone: 1 });   // long down: a late joiner still learns it (every 2 s)
+    if (m.gone) { if (full) l.push({ eid: m.eid, gone: 1 }); continue; }   // long down: a late joiner still learns it
+    const e = enemyEntry(m, full), d = changes(e, full ? null : c.last.get(m.eid));
+    c.last.set(m.eid, e);
+    if (Object.keys(d).length > 1) l.push(d);
   }
+  if (l.length || full) send({ t: 'es', gt: r2(G.time), l });
 }
 
 // A guest, on `ent`: hp and, for vehicles, where they are (between snapshots
@@ -135,7 +159,7 @@ export function applyOver(G, m) {
 // A guest, on any of the host's world messages: which one it is. True if it was one.
 export function guestApply(G, m, now) {
   switch (m.t) {
-    case 'es': applyEnemyState(G, m, now); return true;
+    case 'es': applyEnemies(G, m, now); return true;
     case 'ent': applyEnt(G, m); return true;
     case 'entx': applyEntx(G, m); return true;
     case 'obj': applyObj(G, m); return true;
@@ -160,20 +184,28 @@ export function becomeHost(G) {
   Object.assign(G.coop, { objKey: '', objSent: '', overSent: G.state !== 'play' });
 }
 
-// A guest, on `es`: the enemy brought up to the host's report (one it hasn't
-// seen yet, a wave's, appears), and the game clock pulled to the host's.
+// A guest, on `es`: each entry folded into what it knew of that enemy, which
+// is brought up to date (one it hasn't seen yet, a wave's, appears from its
+// first full report), and the game clock pulled to the host's.
 // `now`: the clock net/interp.js reads, in ms.
-export function applyEnemyState(G, s, now) {
-  let e = enemyByEid(G, s.eid);
-  if (s.gone) { if (e && !e.gone) Object.assign(e, { alive: false, dying: null, gone: true }); return; }
+export function applyEnemies(G, m, now) {
+  if (Array.isArray(m.l)) for (const d of m.l) applyEnemyState(G, d, now, m.gt);
+  if (typeof m.gt === 'number' && Math.abs(G.time - m.gt) > GT_SLACK) G.time = m.gt;
+}
+export function applyEnemyState(G, d, now, gt) {   // gt: the batch's host game time
+  if (!d || typeof d.eid !== 'number') return;
+  let e = enemyByEid(G, d.eid);
+  if (d.gone) { if (e && !e.gone) Object.assign(e, { alive: false, dying: null, gone: true }); return; }
+  if (!e && !d.type) return;   // a change to one we haven't met: its full report comes within 2 s
+  const s = { ...(e?.esKnown || ES_DEFAULTS), ...d };
   if (!e) {
     const type = CHASSIS[s.type] ? s.type : 'kestrel';
     e = newMech(G, type, 1, +s.x || 0, +s.z || 0, +s.yaw || 0);
     Object.assign(e, { eid: s.eid, remote: true, net: null });
     G.mechs.push(e);
   }
-  applyRemote(G, e, typeof s.gt === 'number' ? { ...s, ts: s.gt * 1000 } : s, now);   // drawn on the host's clock (net/interp.js)
-  if (typeof s.gt === 'number' && Math.abs(G.time - s.gt) > GT_SLACK) G.time = s.gt;
+  e.esKnown = s;
+  applyRemote(G, e, typeof gt === 'number' ? { ...s, ts: gt * 1000 } : s, now);   // drawn on the host's clock (net/interp.js)
 }
 
 // A guest, a few times a second: the hits it landed on enemies and mission
