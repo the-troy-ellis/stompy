@@ -140,9 +140,10 @@ try {
     a1 = await P();
     const rightOk = Math.abs(a1.yaw - a0.yaw) < 0.01 && Math.abs(a1.twist - a0.twist) < 0.01 && a1.pitch === a0.pitch;
     await page.evaluate(() => { window.__stompy.game.player.twist = 1.2; });
-    await touch('touchStart', 200, 150); await touch('touchEnd');
-    await page.waitForTimeout(80);
-    await touch('touchStart', 200, 150); await touch('touchEnd');
+    // The double tap as one burst: the four events queued at once. Awaited one
+    // by one, each dispatch waits for a software-rendered frame, and the two
+    // taps landed 220-335 ms apart, past the 300 ms window about one run in ten.
+    await Promise.all([touch('touchStart', 200, 150), touch('touchEnd'), touch('touchStart', 200, 150), touch('touchEnd')]);
     await page.waitForTimeout(800);
     const centred = Math.abs((await P()).twist) < 0.1;
     console.log(`touch: aim turns the legs ${aimOk}, stick sets throttle and twists ${stickOk}, right side only buttons ${rightOk}, double tap centres ${centred}`);
