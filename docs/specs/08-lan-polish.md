@@ -130,6 +130,25 @@ scoreboard (a phone's one-line rank).
 - Per-IP connection cap of 4 (phones and a laptop behind one NAT in M5c need
   more; make it a flag).
 
+As shipped (#191):
+- **Flags:** `--host`, `--port`, `--mode` (ffa for now), `--limit`, `--gap`,
+  `--per-ip` and `--log`, each defaulting to its environment variable.
+  `server.py <port>` still works.
+- **Logging:** log lines go to stdout and, with `STOMPY_LOG`, are appended
+  timestamped to that file.
+- **The per-address cap:** a socket past the cap gets HTTP 429 before the
+  WebSocket upgrade.
+- **Bad messages:** a malformed message is caught and logged, and only that
+  message is dropped. The fuzz tests found a crash on a chassis sent as a
+  list or dict (`ch in CHASSIS` on an unhashable value); that is fixed in
+  `clean_state` and in `data.py`'s loadout check.
+- **Fuzz tests (acceptance 8):** 1,000 random state messages through
+  `clean_state` come out finite, in range and serialisable without NaN, and a
+  pilot sending 300 junk messages over a real socket stays connected and
+  relayed.
+- **Deployment:** `server/stompy-relay.service` (systemd, an unprivileged
+  dynamic user) and `server/README.md`.
+
 ## Code touchpoints
 
 - `src/net/protocol.js` (version, `sq`, `vote`, `ping`, `token`, `mode`),
