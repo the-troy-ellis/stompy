@@ -250,7 +250,8 @@ try {
       await page.waitForFunction(() => !window.__stompy.game.lobby && window.__stompy.game.player.alive, null, { timeout: 5000 });
       pages.push(page);
     }
-    await pages[0].waitForFunction(() => window.__stompy.game.mechs.some(m => m.remote), null, { timeout: 8000 });
+    // Each must have the other's mech before we look (TWO joined last, so ONE's first state may still be on its way).
+    for (const p of pages) await p.waitForFunction(() => window.__stompy.game.mechs.some(m => m.remote && m.netId), null, { timeout: 8000 });
     const look = await Promise.all(pages.map(p => p.evaluate(() => {
       const G = window.__stompy.game, net = window.__stompy.app.net, r = G.mechs.find(m => m.remote);
       return { z: G.player.z, mine: G.player.partsKey, theirs: r?.partsKey, mate: !!r?.mate, team: r?.team, colors: [...net.Net.info.values()].map(p => p.color).join(',') };
