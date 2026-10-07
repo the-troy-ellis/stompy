@@ -241,6 +241,24 @@ As shipped (#205):
    in-memory fake relay reach the same objective states and enemy hp after a
    scripted fight.
 
+As shipped (#206): `test/fakeRelay.js` is an in-memory co-op room with
+`server.py`'s routing. Pilot 1 is host and builds the mission for the room,
+every pilot's `s` goes to the others at 15 Hz, and it counts the bytes each
+pilot receives. `test/convergence.test.js` uses it twice:
+- **Acceptance 6:** on mission 2, the guest fells a relay and hurts every
+  enemy, and the host hits one too. Afterwards, host and guest agree on every
+  enemy's life and armour, every entity standing, and every objective's state
+  and count.
+- **Acceptance 4:** four pilots play all 150 s of mission 5 (three waves,
+  each with the three extra JACKALs for the extra pilots). Every 10 s window
+  stays under 20 kB/s per pilot.
+  - **Before the fix:** one `es` per enemy per tick ran to 38.6 kB/s per
+    guest at 15 enemies.
+  - **After:** the batched, changes-only `es` (`PROTOCOL` 16; see
+    `docs/architecture.md`) peaks at about 17.9 kB/s per guest and 8.0 kB/s
+    for the host. About 7.6 kB/s of a guest's share is the other three
+    pilots' own state.
+
 ## Performance
 
 Host runs the AI for up to ~10 enemies as single player already does. Guest
