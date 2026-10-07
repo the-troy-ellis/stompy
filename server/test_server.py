@@ -168,8 +168,9 @@ class Session(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         relay.players.clear()
         relay.conns.clear()
+        relay.departed.clear()
         relay.PER_IP = 99   # every test client is 127.0.0.1; the cap has its own test
-        relay.arena.update(seed=5, pal="dusk", over=False, mode="ffa", teams=[0, 0], votes={})
+        relay.arena.update(seed=5, pal="dusk", over=False, mode="ffa", teams=[0, 0], votes={}, round=0)
         relay.sleep = asyncio.sleep
         self.server = await asyncio.start_server(relay.session, "127.0.0.1", 0, limit=16 * 1024)
         self.port = self.server.sockets[0].getsockname()[1]
@@ -539,6 +540,66 @@ class Session(unittest.IsolatedAsyncioTestCase):
         await b.send({"t": "died", "by": 1})
         kill = await a.recv()
         self.assertEqual([(p["kills"], p["best"]) for p in kill["scores"]], [(4, 3), (1, 1)])
+
+    async def rejoin(self, name, token):
+        c = await WSClient.connect(self.port)
+        self.clients.append(c)
+        await c.send({"t": "hello", "v": relay.PROTOCOL, "name": name, "color": 0, "token": token})
+        return c, await c.recv()
+
+    async def drop(self, client, other):
+        """Kill a pilot's socket; `other` hears them leave."""
+        client.close()
+        self.assertEqual((await other.recv())["t"], "leave")
+
+    async def test_a_dropped_pilot_comes_back_with_the_token_to_the_same_id_and_score(self):
+        a, wa = await self.join("A")
+        b, _ = await self.join("B")
+        await a.recv()
+        await a.send({"t": "ready"})
+        await a.recv(); await b.recv()
+        await b.send({"t": "died", "by": 1})
+        await a.recv(); await b.recv()
+        token = wa["token"]
+        self.assertEqual(len(token), 16)
+        await self.drop(a, b)
+        c, _ = await self.join("C")   # someone else joins meanwhile: not on A's id
+        self.assertEqual((await b.recv())["id"], 3)
+        a2, back = await self.rejoin("A", token)
+        self.assertEqual((back["id"], back["resumed"]), (1, 1))
+        me = back["scores"][0]
+        self.assertEqual((me["id"], me["kills"], me["ready"]), (1, 1, 1), "the kill and the READY kept")
+        self.assertNotEqual(back["token"], token, "a new token for the next drop")
+        joined = await b.recv()
+        self.assertEqual((joined["t"], joined["id"]), ("join", 1))
+        _, again = await self.rejoin("A2", token)   # a token is good once
+        self.assertEqual(again["resumed"], 0)
+
+    async def test_a_token_past_its_time_or_unknown_is_a_new_pilot(self):
+        a, wa = await self.join("A")
+        b, _ = await self.join("B")
+        await a.recv()
+        await b.send({"t": "died", "by": 1})
+        await a.recv(); await b.recv()
+        await self.drop(a, b)
+        relay.departed[wa["token"]]["until"] = 0   # 30 s on
+        _, back = await self.rejoin("A", wa["token"])
+        self.assertEqual((back["resumed"], back["scores"][0]["kills"], back["scores"][0]["ready"]), (0, 0, 0))
+        _, junk = await self.rejoin("X", ["not", "a", "token"])
+        self.assertEqual(junk["resumed"], 0)
+
+    async def test_a_drop_across_rounds_keeps_the_id_and_side_but_not_the_old_score(self):
+        relay.arena["mode"] = "tdm"
+        a, _ = await self.join("A")
+        b, wb = await self.join("B")   # RED
+        await a.recv()
+        await a.send({"t": "died", "by": 2})
+        await a.recv(); await b.recv()
+        await self.drop(b, a)
+        relay.arena["round"] += 1   # a new round began while B was away
+        _, back = await self.rejoin("B", wb["token"])
+        me = back["scores"][1]
+        self.assertEqual((me["id"], me["team"], me["color"], me["kills"]), (2, 1, 1, 0))
 
     async def test_ninth_pilot_is_turned_away(self):
         for i in range(8):

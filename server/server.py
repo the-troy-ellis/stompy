@@ -23,6 +23,7 @@ import ipaddress
 import json
 import os
 import random
+import secrets
 import struct
 import time
 from urllib.parse import urlsplit
@@ -39,7 +40,7 @@ PING_EVERY = 10
 DROP_AFTER = 25           # seconds of silence (a phone that went to sleep)
 MAX_BUFFERED = 256 * 1024 # a client this far behind is dropped, not waited for
 PALETTES = ("dusk", "ice", "volcanic")
-PROTOCOL = 11             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
+PROTOCOL = 12             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
 HALF = 96 * 24 / 2        # the map's half width (src/world/terrain.js): positions are clamped to it
 FX_RATE = 40              # weapon effects per second per pilot; more are dropped (a beam flash is per shot, guided updates 15 Hz)
 PER_IP = int(os.environ.get("STOMPY_PER_IP", 4))   # sockets from one address at once (phones and a laptop behind one NAT)
@@ -47,6 +48,7 @@ MODE = os.environ.get("STOMPY_MODE", "ffa")         # the arena's mode: ffa (fre
 MODES = ("ffa", "tdm")
 TEAM_LIMIT = int(os.environ.get("STOMPY_TEAM_LIMIT", 20))   # a team's kills to win a round in tdm
 TEAM_COLORS = (0, 1)      # STEEL and RED (src/data/colors.js MP_COLORS): in tdm a team's colour is forced
+KEEP = 30                 # seconds a departed pilot's id and score wait for a hello with their token (a dropped phone)
 VOTES = ("next", "same", "mode")   # the round-end vote, in order (a tie goes to the first): next map, same map, the other mode
 LOG_FILE = os.environ.get("STOMPY_LOG")             # also log to this file (appended; rotation is logrotate's job)
 _log_out = None
@@ -83,15 +85,17 @@ class Client:
         self.streak = 0       # kills since the last death
         self.best = 0         # the round's best streak
         self.acc = -1         # the round's accuracy in %, as the client reports it at round end (-1: not yet)
+        self.token = ""       # from welcome: a hello carrying it within KEEP seconds of a drop resumes this pilot
         self.last = time.monotonic()
         self.fx_tokens, self.fx_at = float(FX_RATE), time.monotonic()   # the fx rate limit: a bucket that refills at FX_RATE a second
 
 
 players: dict[int, Client] = {}
 conns: dict[str, int] = {}   # open sockets per address, for the PER_IP cap
+departed: dict[str, dict] = {}   # token -> a dropped pilot's id and score, until KEEP runs out
 arena = {"seed": random.randrange(1, 10**6), "pal": random.choice(PALETTES), "over": False,
          "mode": MODE if MODE in MODES else "ffa", "teams": [0, 0],   # teams: each team's kills this round (tdm)
-         "votes": {}}   # pilot id -> VOTES index, between rounds
+         "votes": {}, "round": 0}   # votes: pilot id -> VOTES index, between rounds; round: counts rounds (a score kept from an old one is void)
 sleep = asyncio.sleep     # the gap between rounds waits on this (the tests swap in a fake clock)
 
 
@@ -236,6 +240,30 @@ def vote_result():
     return n.index(max(n))
 
 
+def keep(c, now=None):
+    """A dropped pilot's place, kept under their token for KEEP seconds."""
+    now = time.monotonic() if now is None else now
+    departed[c.token] = {"id": c.id, "until": now + KEEP, "round": arena["round"], "team": c.team, "ready": c.ready,
+                         "kills": c.kills, "deaths": c.deaths, "streak": c.streak, "best": c.best}
+
+
+def resume(token, now=None):
+    """The place kept under `token`, if it is still waiting (and taken off the
+    list); expired places are cleared on the way."""
+    now = time.monotonic() if now is None else now
+    for t in [t for t, d in departed.items() if d["until"] < now]:
+        del departed[t]
+    saved = departed.pop(token, None) if isinstance(token, str) else None
+    return saved if saved and saved["id"] not in players else None
+
+
+def free_id():
+    """The lowest id nobody has, sparing the ones kept for dropped pilots while any other is free."""
+    held = {d["id"] for d in departed.values()}
+    free = [i for i in range(1, MAX_PLAYERS + 1) if i not in players]
+    return next((i for i in free if i not in held), free[0])
+
+
 def smaller_team(skip=None):
     """The team with fewer pilots (STEEL on a tie): where a newcomer starts."""
     n = [0, 0]
@@ -316,7 +344,7 @@ async def end_round(winner):
         arena["mode"] = "tdm" if arena["mode"] == "ffa" else "ffa"
     if VOTES[pick] != "same":
         arena.update(seed=random.randrange(1, 10**6), pal=random.choice(PALETTES))
-    arena.update(over=False, teams=[0, 0], votes={})
+    arena.update(over=False, teams=[0, 0], votes={}, round=arena["round"] + 1)
     for c in players.values():
         c.kills = c.deaths = c.streak = c.best = 0
         c.acc = -1
@@ -446,16 +474,25 @@ async def session(reader, writer):
         if len(players) >= MAX_PLAYERS:
             send(c, {"t": "full", "max": MAX_PLAYERS})
             return
-        c.id = next(i for i in range(1, MAX_PLAYERS + 1) if i not in players)
+        # A dropped pilot back within KEEP seconds: the same id, side and
+        # score (this round's), and straight back in if they were.
+        saved = resume(hello.get("token"))
+        c.id = saved["id"] if saved else free_id()
         c.name = clean_name(hello.get("name"), c.id)
         c.pick = int(num(hello.get("color"), 0, 7))
-        c.team = smaller_team()
+        c.team = saved["team"] if saved else smaller_team()
+        if saved:
+            c.ready = saved["ready"]
+            if saved["round"] == arena["round"]:
+                c.kills, c.deaths, c.streak, c.best = saved["kills"], saved["deaths"], saved["streak"], saved["best"]
         paint(c)
         c.ch = chassis_or_stock(hello.get("ch"))
+        c.token = secrets.token_hex(8)
         players[c.id] = c
-        log(f"join {c.id} {c.name} from {peer[0] if peer else '?'} ({len(players)} playing)")
+        log(f"{'back' if saved else 'join'} {c.id} {c.name} from {peer[0] if peer else '?'} ({len(players)} playing)")
         send(c, {"t": "welcome", "id": c.id, "seed": arena["seed"], "pal": arena["pal"], "mode": arena["mode"],
-                 "limit": limit(), "teams": arena["teams"], "over": arena["over"], "scores": scores()})
+                 "limit": limit(), "teams": arena["teams"], "over": arena["over"], "token": c.token,
+                 "resumed": 1 if saved else 0, "scores": scores()})
         broadcast({"t": "join", "id": c.id, "name": c.name, "color": c.color, "scores": scores()}, skip=c)
 
         while True:
@@ -481,6 +518,7 @@ async def session(reader, writer):
     finally:
         if c and players.get(c.id) is c:
             del players[c.id]
+            keep(c)
             log(f"leave {c.id} {c.name} ({len(players)} playing)")
             broadcast({"t": "leave", "id": c.id, "scores": scores()})
         conns[ip] -= 1

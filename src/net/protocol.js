@@ -4,11 +4,12 @@
 import { HPK } from '../data/chassis.js';
 import { WEAPONS } from '../data/weapons.js';
 
-export const PROTOCOL = 11;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit. 5: hh (heat) on hit. 6: knuckles in lo.sys. 7: lt (headlights) in s. 8: the server enforces the version (version message) and rebuilds s clean. 9: the lobby (ch in hello; ready; ping; ch, ready, ping in scores). 10: team deathmatch (team; team in scores; teams, mode and limit in newround; teams in welcome, kill and roundover). 11: the round-end vote (vote, stats; tally; best and acc in scores; vote in newround)
+export const PROTOCOL = 12;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit. 5: hh (heat) on hit. 6: knuckles in lo.sys. 7: lt (headlights) in s. 8: the server enforces the version (version message) and rebuilds s clean. 9: the lobby (ch in hello; ready; ping; ch, ready, ping in scores). 10: team deathmatch (team; team in scores; teams, mode and limit in newround; teams in welcome, kill and roundover). 11: the round-end vote (vote, stats; tally; best and acc in scores; vote in newround). 12: reconnect (token in hello; token and resumed in welcome)
 export const r2 = v => Math.round(v * 100) / 100;
 const v3 = p => p.map(r2);
 
-export const hello = (name, color, ch) => ({ t: 'hello', v: PROTOCOL, name, color, ch });
+// token: from the last welcome, so a pilot who dropped comes back to their id and score.
+export const hello = (name, color, ch, token) => (token ? { t: 'hello', v: PROTOCOL, name, color, ch, token } : { t: 'hello', v: PROTOCOL, name, color, ch });
 // The lobby: READY spawns you in; a ping every PING_EVERY ms carries the last round trip (ms) to the server.
 export const ready = () => ({ t: 'ready' });
 export const ping = (n, rtt) => ({ t: 'ping', n, rtt: Math.round(rtt || 0) });
