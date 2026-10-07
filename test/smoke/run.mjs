@@ -289,6 +289,62 @@ try {
     if (!(later.mode === 'mp' && !later.lobby && later.id === before.id && later.deaths === 1)) { failed = true; console.error('FAIL: JOIN after a 10 s drop did not bring the score back'); }
     await ctx.close();
   } finally { tdmRelay.kill(); }
+  // Co-op (#205, acceptance 1 of spec 09): ONE hosts mission 2 (three relays to
+  // knock down) and TWO joins by the room code. The host's READY starts it on
+  // both screens: the same enemies (the host's; TWO draws them), each other
+  // as teammates. TWO's hit on a relay lands on the host's; the relays down,
+  // both get the debrief and both saves move on.
+  await new Promise(r => setTimeout(r, 300));
+  const coopRelay = spawn('python3', ['server/server.py', '--port', '8096'], { stdio: 'ignore' });
+  await new Promise(r => setTimeout(r, 600));
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 640 } });
+    await ctx.addInitScript(() => { if (!window.sessionStorage.getItem('seeded')) { localStorage.setItem('stompy.camp.mission', '1'); window.sessionStorage.setItem('seeded', '1'); } });
+    const pages = [];
+    for (const name of ['ONE', 'TWO']) {
+      const page = await ctx.newPage();
+      page.on('pageerror', e => errors.push(`coop ${name}: ${e.message}`));
+      page.on('console', m => { if (m.type() === 'error') errors.push(`coop ${name}: console ${m.text()}`); });
+      await page.goto(URL_);
+      await page.waitForSelector('.mm-title', { timeout: 15000 });
+      await page.click('.feel-panel [data-a="toggle"]');
+      await page.click('[data-sel="mp"]');
+      await page.click('[data-mpk="coop"]');
+      await page.fill('#callsign', name);
+      pages.push(page);
+    }
+    const [one, two] = pages;
+    await one.click('[data-cj="0"]');
+    await one.click('[data-a="go"]');
+    await one.waitForSelector('.lobby-head', { timeout: 5000 });
+    const code = await one.evaluate(() => window.__stompy.app.net.Net.room);
+    await two.click('[data-cj="1"]');
+    await two.fill('#room', code.toLowerCase());
+    await two.click('[data-a="go"]');
+    await two.waitForSelector('.lobby-head', { timeout: 5000 });
+    await two.click('[data-a="ready"]');
+    const waiting = await two.waitForFunction(() => /WAITING FOR HOST/.test(document.querySelector('.lobby-note')?.textContent || ''), null, { timeout: 3000 }).then(() => true).catch(() => false);
+    await one.click('[data-a="ready"]');
+    for (const p of pages) await p.waitForFunction(() => window.__stompy.game.state === 'play' && window.__stompy.game.mode === 'coop', null, { timeout: 8000 });
+    await two.waitForFunction(() => window.__stompy.game.mechs.some(m => m.eid && m.net), null, { timeout: 5000 });
+    const look = await Promise.all(pages.map(p => p.evaluate(() => { const G = window.__stompy.game; return { role: G.role, foes: G.mechs.filter(m => m.eid).map(m => `${m.eid}${m.type}`).join(), mate: G.mechs.some(m => m.netId && m.remote && m.mate && m.team === 0) }; })));
+    console.log(`coop: room ${code}, TWO waiting for host ${waiting}; ONE ${look[0].role} [${look[0].foes}], TWO ${look[1].role} [${look[1].foes}], teammates ${look.map(l => l.mate)}`);
+    if (!(waiting && look[0].role === 'host' && look[1].role === 'guest' && look[0].foes && look[0].foes === look[1].foes && look.every(l => l.mate))) { failed = true; console.error('FAIL: co-op did not start the same mission on both screens'); }
+    await two.evaluate(async () => { const { damageEntity } = await import('/src/sim/entities.js'); const G = window.__stompy.game; damageEntity(G, G.entities.find(e => e.id === 'relay1'), 15, G.player, null); });
+    const landed = await one.waitForFunction(() => window.__stompy.game.entities.find(e => e.id === 'relay1').hp < 40, null, { timeout: 3000 }).then(() => true).catch(() => false);
+    await two.screenshot({ path: 'test-results/smoke-coop.png' });
+    await one.evaluate(async () => { const { destroyEntity } = await import('/src/sim/entities.js'); const G = window.__stompy.game; for (const e of G.entities) if (e.tags.includes('relay')) destroyEntity(G, e, G.player); });
+    const ends = [];
+    for (const p of pages) {   // a tab in the background doesn't run its frames: each to the front in turn
+      await p.bringToFront();
+      ends.push(await p.waitForFunction(() => window.__stompy.game.state === 'debrief', null, { timeout: 10000 })
+        .then(() => p.evaluate(() => ({ won: window.__stompy.game.won, saved: localStorage.getItem('stompy.camp.mission'), crew: document.querySelectorAll('.coop-crew tr').length - 1 })))
+        .catch(() => null));
+    }
+    console.log(`coop: TWO's hit on the relay landed on the host ${landed}; debriefs ${JSON.stringify(ends)}`);
+    if (!(landed && ends.every(e => e && e.won && e.saved === '2' && e.crew === 2))) { failed = true; console.error('FAIL: co-op mission 2 did not end in a shared, saved win'); }
+    await ctx.close();
+  } finally { coopRelay.kill(); }
   await browser.close();
   if (errors.length) { failed = true; console.error('FAIL: page errors:\n  ' + errors.join('\n  ')); }
 } catch (e) {

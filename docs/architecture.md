@@ -181,6 +181,9 @@ Co-op enemies (`src/net/coop.js`, #202): `G.role` is `solo`, `host` or
   source. Enemy fire on a guest is the host's batched `hit`.
 - **Targets:** as host, an enemy fights the nearest pilot alive, and switches
   only for one 30% closer (`preyOf` in `sim/ai.js`).
+- **Modes:** `G.mode` is `mp` in the arena and `coop` in a co-op mission. The
+  client's `mp()` means the arena (its HUD and rounds), and `online()` means
+  either. Co-op's own rules (scaling, respawn) are in `sim/coopRules.js`.
 - **The world (#203):** the host also sends:
   - `ent {list: [[id, hp, x, z, yaw, wp]...]}` twice a second, for mission
     entities that can fall and for vehicles;

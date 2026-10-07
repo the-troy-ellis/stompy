@@ -4,7 +4,7 @@ import { add, dirOf, len, mul, norm, rnd, sub } from '../util/math.js';
 import { WEAPONS } from '../data/weapons.js';
 import { CHASSIS, HPK } from '../data/chassis.js';
 import { MP_COLORS } from '../data/colors.js';
-import { newMech, resetMatch } from '../sim/state.js';
+import { newMech, resetMatch, startMatch } from '../sim/state.js';
 import { placeScenery } from '../sim/entities.js';
 import { eyeOf } from '../sim/geom.js';
 import { initFeet } from '../sim/gait.js';
@@ -17,14 +17,17 @@ import { beamMult } from '../sim/beams.js';
 import { launchPulse } from '../sim/fusion.js';
 import { SEND_HZ } from '../sim/missiles.js';
 import { hit, hello, ping as pingMsg, ready as readyMsg, team as teamMsg, vote as voteMsg, roundStats, stateMessage, PING_EVERY } from './protocol.js';
-import { lobbyHTML, lobbyHead, lobbyRows } from '../ui/lobby.js';
+import { coopNote, lobbyHTML, lobbyHead, lobbyRows } from '../ui/lobby.js';
 import { summaryHTML, summaryRows, voteCount, voteOf } from '../ui/summary.js';
 import { fitOf } from '../ui/mechlab.js';
 import { applyLoadout, stockLoadout } from '../sim/loadout.js';
 import { startSpectate } from './spectate.js';
 import { addKill } from './killfeed.js';
 import { applyRemote } from './remote.js';
-import { applyEHit, becomeHost, enemyByEid, flushEHits, guestApply, hostTick } from './coop.js';
+import { applyEHit, becomeHost, enemyByEid, flushEHits, guestApply, hostTick, startCoop } from './coop.js';
+import { missionDef } from '../data/missions.js';
+import { DIFF } from '../data/ai.js';
+import { coopDef } from '../sim/coopRules.js';
 import { sideOf, spawnPoint, teamName } from './teams.js';
 
 const { atan2, min, max, random, hypot } = Math;
@@ -44,21 +47,25 @@ export function createNet(app) {
   // own death. Other pilots are drawn from their latest state, smoothed and
   // extrapolated, and walk with the same gait. Their shots arrive as effects
   // ("ghosts") that look real but never score -- their shooter scores them.
-  const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10, loSent: '', loN: 0, mode: 'ffa', pal: 'dusk', pingT: 0, pingN: 0, pingAt: new Map(), rtt: 0, feed: [], teams: [0, 0], votes: [0, 0, 0], myVote: -1, token: null, tries: 0, retryTimer: 0, seed: 0 };
-  const mp = () => G.mode === 'mp';
+  const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10, loSent: '', loN: 0, mode: 'ffa', pal: 'dusk', pingT: 0, pingN: 0, pingAt: new Map(), rtt: 0, feed: [], teams: [0, 0], votes: [0, 0, 0], myVote: -1, token: null, tries: 0, retryTimer: 0, seed: 0,
+    kind: 'arena', room: '', host: 0, def: null, joinOpts: {}, readied: false };   // kind 'coop': a co-op room (net/coop.js), its code, host, mission
+  const mp = () => G.mode === 'mp';   // the arena
+  const online = () => G.mode === 'mp' || G.mode === 'coop';   // the arena or a co-op room
   const pilotName = id => Net.info.get(id)?.name || `PILOT ${id}`;
   const pilotCss = id => MP_COLORS[Net.info.get(id)?.color ?? 0]?.css || '#f44';
   const mechById = id => (id === Net.id ? G.player : G.mechs.find(m => m.netId === id));
   // Team deathmatch: your side (0 STEEL, 1 RED), and whether a pilot is on it.
   const tdm = () => Net.mode === 'tdm';
   const myTeam = () => Net.info.get(Net.id)?.team || 0;
-  const mate = id => tdm() && (Net.info.get(id)?.team || 0) === myTeam();
+  const mate = id => Net.kind === 'coop' || (tdm() && (Net.info.get(id)?.team || 0) === myTeam());   // co-op: everyone
   const colorOf = id => Net.info.get(id)?.color ?? (id === Net.id ? prefs.mpColor : 0);
 
   
 
-  function join() {
+  // `opts`: { room } to join a co-op room by its code, { create } to open one; the arena otherwise.
+  function join(opts = {}) {
     if (Net.ws) return;
+    Net.joinOpts = opts;   // the token stays: JOIN after a drop brings the pilot back (the relay checks it against the room)
     prefs.mpName = ($('.callsign', ov)?.value || '').trim().toUpperCase().slice(0, 12);
     store.set('mp.name', prefs.mpName); store.set('mp.color', prefs.mpColor);
     app.audio.Sound.unlock(); app.audio.loadSamples();
@@ -73,7 +80,9 @@ export function createNet(app) {
     try { ws = new WebSocket(app.relay().url); }   // net/relay.js: ?relay=, the RELAY field, or this page's host
     catch { if (retry) reconnect(); else app.ui.setStatus('COULD NOT CONNECT'); return; }
     Net.ws = ws;
-    ws.onopen = () => ws.send(JSON.stringify(hello(prefs.mpName, prefs.mpColor, prefs.chassis, Net.token)));
+    // Back after a drop: the room we were in, by its code; a first join: what the menu asked for.
+    const where = retry && Net.room && Net.kind === 'coop' ? { room: Net.room } : Net.joinOpts;
+    ws.onopen = () => ws.send(JSON.stringify(hello(prefs.mpName, prefs.mpColor, prefs.chassis, Net.token, where)));
     ws.onmessage = e => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.t === 'welcome') welcomed = true;
@@ -82,7 +91,7 @@ export function createNet(app) {
     ws.onclose = () => {
       if (Net.ws !== ws) return;   // we closed it on purpose
       Net.ws = null;
-      if (G.reconnecting || (welcomed && mp())) reconnect();   // dropped mid-match, or a try that didn't take
+      if (G.reconnecting || (welcomed && online())) reconnect();   // dropped mid-match, or a try that didn't take
       else if (!welcomed && G.state === 'menu' && !/FULL|UPDATE|NO ROOM/.test($('.status', ov)?.textContent || '')) app.ui.setStatus('THE ARENA SERVER IS NOT ANSWERING');
     };
   }
@@ -94,21 +103,23 @@ export function createNet(app) {
     if (Net.tries >= RETRIES) { lostConnection(); return; }
     Net.tries++;
     G.reconnecting = true;
-    Net.retryTimer = setTimeout(() => { Net.retryTimer = 0; if (G.reconnecting && mp()) connect(true); }, RETRY_GAP);
+    Net.retryTimer = setTimeout(() => { Net.retryTimer = 0; if (G.reconnecting && online()) connect(true); }, RETRY_GAP);
   }
   function stopRetrying() { clearTimeout(Net.retryTimer); Net.retryTimer = 0; Net.tries = 0; G.reconnecting = false; }
   function netSend(obj) { if (Net.ws && Net.ws.readyState === 1) Net.ws.send(JSON.stringify(obj)); }
   function leaveArena() {
     const ws = Net.ws; Net.ws = null; ws?.close();
     stopRetrying(); Net.token = null;   // left on purpose: nothing to come back to
-    G.mode = 'sp'; G.lobby = false; G.summary = false; Net.info.clear(); Net.pingAt.clear();
+    G.mode = 'sp'; G.role = 'solo'; G.lobby = false; G.summary = false; Net.info.clear(); Net.pingAt.clear(); Net.kind = 'arena'; Net.room = '';
     app.ui.mainMenu('mp');
   }
   function lostConnection() {
     const ws = Net.ws; Net.ws = null; ws?.close();
     stopRetrying();
-    Net.info.clear(); G.lobby = false; G.summary = false; Net.pingAt.clear();
-    app.ui.mainMenu('mp', 'CONNECTION LOST. JOIN WITHIN 30 S TO KEEP YOUR SCORE.');
+    Net.info.clear(); G.lobby = false; G.summary = false; G.role = 'solo'; Net.pingAt.clear();
+    const coop = Net.kind === 'coop';
+    if (coop) Net.joinOpts = { room: Net.room };   // JOIN goes back to the same room
+    app.ui.mainMenu('mp', coop ? `CONNECTION LOST. JOIN ROOM ${Net.room} AGAIN WITHIN 30 S.` : 'CONNECTION LOST. JOIN WITHIN 30 S TO KEEP YOUR SCORE.');
   }
 
   function setScores(list) {
@@ -131,12 +142,16 @@ export function createNet(app) {
   // pilots come, ready up and report their pings.
   function showLobby() {
     if (!G.lobby) return;
-    const o = { pilots: [...Net.info.values()].sort((a, b) => a.id - b.id), me: Net.id, mode: Net.mode, pal: Net.pal, limit: Net.limit };
+    const coop = Net.kind === 'coop';
+    const o = { pilots: [...Net.info.values()].sort((a, b) => a.id - b.id), me: Net.id, mode: coop ? 'coop' : Net.mode, pal: Net.pal, limit: Net.limit,
+      coop: coop ? { room: Net.room, mission: Net.def?.mission | 0, diff: Net.def?.diff, host: Net.host, readied: Net.readied } : null };
     const table = app.ov.hidden ? null : app.ov.querySelector('table.lobby'), head = app.ov.querySelector('.lobby-head');
     const panel = app.ov.querySelector('.panel[data-mode]');
     if (table && head && panel?.dataset.mode === o.mode) {   // in place: READY stays put under a thumb
       table.innerHTML = lobbyRows(o); head.innerHTML = lobbyHead(o);
       for (const b of app.ov.querySelectorAll('[data-team]')) b.classList.toggle('on', +b.dataset.team === myTeam());
+      const note = app.ov.querySelector('.lobby-note');
+      if (note && o.coop) note.textContent = coopNote(o);
     } else app.ui.showOverlay(lobbyHTML(o));
   }
   // The round's end (ui/summary.js): the summary and the vote, over the arena
@@ -167,6 +182,11 @@ export function createNet(app) {
   function pickTeam(t) { if (G.lobby && tdm() && (t === 0 || t === 1)) netSend(teamMsg(t)); }
   function ready() {
     if (!G.lobby) return;
+    if (Net.kind === 'coop') {
+      // Co-op: READY says so; the host's starts the mission for everyone (`ready` with `started`).
+      if (!Net.readied) { Net.readied = true; netSend(readyMsg()); showLobby(); }
+      return;
+    }
     G.lobby = false;
     netSend(readyMsg());
     respawn();
@@ -180,6 +200,8 @@ export function createNet(app) {
       case 'version': app.ui.setStatus(`UPDATE THE GAME TO PLAY (v${m.need})`); break;   // the server runs another version
       case 'noroom': app.ui.setStatus('NO ROOM WITH THAT CODE'); break;   // co-op: a code nobody has open
       case 'welcome': {
+        if (m.kind === 'coop') { coopWelcome(m); break; }
+        Net.kind = 'arena';
         // Back after a drop on the same map: carry on where we are. Back on
         // another (a new round began): that world, straight in. Otherwise the lobby.
         const back = !!m.resumed, inPlace = back && G.reconnecting && mp() && m.seed === Net.seed && m.pal === Net.pal;
@@ -192,7 +214,10 @@ export function createNet(app) {
         G.roundOver = !!m.over;
         break;
       }
-      case 'ready': setScores(m.scores); break;
+      case 'ready':
+        setScores(m.scores);
+        if (Net.kind === 'coop' && m.started && G.lobby) startCoopMission();   // the host is ready: go
+        break;
       case 'team': setScores(m.scores); break;   // a pilot in the lobby changed sides
       case 'tally':   // between rounds: the votes so far and the accuracies reported
         if (Array.isArray(m.votes) && m.votes.length === 3) Net.votes = m.votes.map(n => +n || 0);
@@ -221,7 +246,9 @@ export function createNet(app) {
       case 'es': case 'ent': case 'entx': case 'obj': case 'over': if (G.role === 'guest') guestApply(G, m, performance.now()); break;
       case 'host':   // the co-op host left: the relay picked the next one
         setScores(m.scores);
+        Net.host = m.id;
         if (m.id === Net.id && G.role === 'guest') becomeHost(G);
+        showLobby();
         msg(G, `${pilotName(m.id)} IS NOW HOST`);
         break;
       case 'ehit': if (G.role === 'host') applyEHit(G, m, mechById(m.from) || null); break;
@@ -288,6 +315,37 @@ export function createNet(app) {
         app.audio.say('New round.', true);
         break;
     }
+  }
+
+  // Co-op (docs/specs/09-coop.md): the room's welcome. Back after a drop in
+  // the middle of the mission: carry on in place. A mission already under
+  // way: straight in, as a guest. Otherwise the lobby, until the host's READY.
+  function coopWelcome(m) {
+    const back = !!m.resumed && G.reconnecting && G.mode === 'coop' && G.role !== 'solo';
+    stopRetrying();
+    Object.assign(Net, { id: m.id, kind: 'coop', room: m.room, host: m.host, def: m.def || { mission: 0, diff: 'normal', seed: 7 }, mode: 'coop' });
+    Net.token = typeof m.token === 'string' ? m.token : null;
+    setScores(m.scores);
+    if (back) { G.player.netId = Net.id; sendState(); msg(G, 'RECONNECTED'); return; }
+    if (m.started) { startCoopMission(); return; }
+    G.mode = 'coop'; G.lobby = true; Net.readied = false;
+    app.input.exitLock();
+    showLobby();
+  }
+  // The mission, on every screen at once: the same seed and mission for all;
+  // the host builds it for the pilots in the room (more enemies, sim/coopRules.js)
+  // and runs it, the guests draw it (net/coop.js).
+  function startCoopMission() {
+    const n = Net.def.mission | 0, def = missionDef(n), host = Net.host === Net.id, pilots = Math.max(1, Net.info.size);
+    prefs.mission = n; G.diff = DIFF[Net.def.diff] ? Net.def.diff : 'normal';
+    startMatch(G, host ? coopDef(def, pilots) : def, Net.def.seed ?? def.seed ?? 7 + n * 13, n === 0, prefs.chassis,
+      { loadout: fitOf(prefs.chassis), partsKey: app.R.partsKeyFor(colorOf(Net.id), prefs.chassis) });
+    Object.assign(G, { kind: 'campaign', mode: 'coop', lobby: false, coopKills: {} });
+    G.player.netId = Net.id;
+    startCoop(G, host ? 'host' : 'guest', pilots);
+    app.scene.uploadWorld();
+    app.ui.launch();
+    sendState();
   }
 
   // Each side's kills this round (team deathmatch), as the relay counts them.
@@ -400,12 +458,17 @@ export function createNet(app) {
 
   // The arena's per-frame housekeeping: respawn timer, spawn shield, state cadence.
   function netTick(dt) {
-    if (!mp()) return;
+    if (!online()) return;
+    if (G.lobby && Net.kind === 'coop') {   // the co-op lobby: no mech out yet, only the ping
+      if (G.clock - Net.pingT >= PING_EVERY) { Net.pingT = G.clock; Net.pingAt.set(++Net.pingN, performance.now()); netSend(pingMsg(Net.pingN, Net.rtt)); }
+      return;
+    }
     const P = G.player;
     if (P.spawnT > 0) P.spawnT -= dt;
     if (!P.alive && G.respawnAt && G.clock >= G.respawnAt) respawn();
     // Down and done toppling: watch another pilot until the respawn (net/spectate.js).
-    else if (!P.alive && !P.dying && G.respawnAt && !G.spectate) startSpectate(G, G.killer);
+    else if (!P.alive && !P.dying && (G.respawnAt || G.coopRespawn) && !G.spectate) startSpectate(G, G.killer);
+    else if (P.alive && G.spectate) G.spectate = null;   // co-op: back up (sim/coopRules.js)
     if ((Net.sendT += dt) >= 1 / SEND_HZ && !G.lobby) { Net.sendT = 0; sendState(); flushHits(); if (G.role === 'guest') flushEHits(G, netSend); }   // in the lobby, nobody sees you yet
     if (G.role === 'host' && !G.lobby) hostTick(G, dt, netSend);   // co-op: the enemies, ES_HZ times a second
     if (G.summary && G.banner) {   // the summary's countdown, written when the second changes

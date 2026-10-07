@@ -77,11 +77,15 @@ export function hostTick(G, dt, send) {
     c.objKey = states;
   }
   if (entDue) { c.entT = 0; send(entSnapshot(G)); }
-  if (G.state === 'over' && !c.overSent) { c.overSent = true; send({ t: 'over', won: G.won ? 1 : 0 }); }
+  if (G.state === 'over' && !c.overSent) { c.overSent = true; send({ t: 'over', won: G.won ? 1 : 0, kills: G.coopKills || {} }); }   // kills: per pilot id, for the shared debrief
   if ((c.sendT += dt) < 1 / ES_HZ) return;
   c.sendT = 0;
   const withLo = c.n++ % LO_EVERY === 0;
-  for (const m of G.mechs) if (m.eid && !m.gone) send(enemyState(G, m, withLo));
+  for (const m of G.mechs) {
+    if (!m.eid) continue;
+    if (!m.gone) send(enemyState(G, m, withLo));
+    else if (withLo) send({ t: 'es', eid: m.eid, gone: 1 });   // long down: a late joiner still learns it (every 2 s)
+  }
 }
 
 // A guest, on `ent`: hp and, for vehicles, where they are (between snapshots
@@ -124,6 +128,7 @@ export function applyObj(G, m) {
 export function applyOver(G, m) {
   if (G.state !== 'play') return;
   G.state = 'over'; G.won = !!m.won; G.endT = G.won ? 3.5 : 3.2;
+  if (m.kills && typeof m.kills === 'object') G.coopKills = m.kills;
   voice(G, G.won ? 'complete' : 'failed', {}, true, 600);
 }
 
@@ -160,6 +165,7 @@ export function becomeHost(G) {
 // `now`: the clock net/interp.js reads, in ms.
 export function applyEnemyState(G, s, now) {
   let e = enemyByEid(G, s.eid);
+  if (s.gone) { if (e && !e.gone) Object.assign(e, { alive: false, dying: null, gone: true }); return; }
   if (!e) {
     const type = CHASSIS[s.type] ? s.type : 'kestrel';
     e = newMech(G, type, 1, +s.x || 0, +s.z || 0, +s.yaw || 0);

@@ -4,7 +4,7 @@ import { meleeOf, punchArm } from '../data/melee.js';
 import { center, viewYaw } from './geom.js';
 import { damage } from './combat.js';
 import { knock } from './knock.js';
-import { hitQueue } from './hitqueue.js';
+import { hitQueue, sendFx } from './hitqueue.js';
 import { feel } from './feel.js';
 import { fxPunch } from '../net/protocol.js';
 import { damageEntity, solid, sceneryNear } from './entities.js';
@@ -23,7 +23,7 @@ export function meleePress(G, m) {
   m.melee = { t: 0, phase: 'windup', hit: null };
   if (def.fists) m.melee.arm = m.lastArm = punchArm(m);   // left, right, left: whichever fist is still on
   m.meleeCd = def.cd;
-  if (G.mode === 'mp' && m === G.player) G.fx.netSend(fxPunch());
+  if (m === G.player) sendFx(G, m, fxPunch());   // the arena and co-op: the others see the wind-up at once
   return true;
 }
 

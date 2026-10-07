@@ -7,6 +7,7 @@ import { r2 } from '../net/protocol.js';
 import { knock } from './knock.js';
 import { damageEntity, solid } from './entities.js';
 import { FEEL } from '../data/feel.js';
+import { sendsFx } from './hitqueue.js';
 
 const { atan2, hypot, max } = Math;
 
@@ -55,7 +56,7 @@ export function steerVolley(G, dt) {
     g.nose = ms.reduce((a, s) => (dot(sub(s.p, g.pos), g.dir) > dot(sub(a.p, g.pos), g.dir) ? s : a)).p;
   }
   else if ((g.lost += dt) > 0.6) { endGuide(G, false); return; }   // all hit something: "signal lost", then home
-  if (G.mode === 'mp' && (g.sendT += dt) >= 1 / SEND_HZ && ms.length) { g.sendT = 0; G.fx.netSend({ t: 'fx', k: 'mg', v: g.vid, p: g.pos.map(r2), d: g.dir.map(r2) }); }
+  if (sendsFx(G, G.player) && (g.sendT += dt) >= 1 / SEND_HZ && ms.length) { g.sendT = 0; G.fx.netSend({ t: 'fx', k: 'mg', v: g.vid, p: g.pos.map(r2), d: g.dir.map(r2) }); }
 }
 export function steerBy(G, dx, dy, sens, invertY) {
   const g = G.guide;
@@ -69,7 +70,7 @@ export function endGuide(G, detonate) {
   if (!g) return;
   if (detonate) {
     for (const s of guidedLive(G, g.vid)) { s.life = -1; blast(G, s.p, s.dmg, s.owner, null); explode(G, s.p, false); }
-    if (G.mode === 'mp') G.fx.netSend({ t: 'fx', k: 'md', v: g.vid });
+    if (sendsFx(G, G.player)) G.fx.netSend({ t: 'fx', k: 'md', v: g.vid });
   }
   G.guide = null;
 }

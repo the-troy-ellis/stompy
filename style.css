@@ -156,11 +156,12 @@ html, body {
 /* ---------- arena lobby ---------- */
 
 .lobby-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.callsign {
+.callsign, .room {
   font: bold 16px "Lucida Console", "Courier New", monospace; text-transform: uppercase;
   background: #000; color: #fc3; border: 1px solid #5f5; padding: 6px 8px; width: 13ch;
   -webkit-user-select: text; user-select: text;
 }
+.room { width: 6ch; letter-spacing: 2px; }   /* co-op's four-letter room code */
 .relay {
   font: 13px "Lucida Console", "Courier New", monospace; background: #000; color: #9f9; border: 1px solid #2a7a2a;
   padding: 5px 8px; width: 26ch; max-width: 100%; -webkit-user-select: text; user-select: text;
@@ -347,3 +348,15 @@ html, body {
 .lobby-teams .dot { display: inline-block; width: 10px; height: 10px; margin-right: 8px; vertical-align: -1px; }
 .vote { margin-top: 10px; }
 .vote .go.on { outline: 3px solid #fc3; color: #fc3; }
+.mp-kind .opt.on, .mm-detail .opt.on { color: #fc3; border-color: #fc3; }
+.mp-kind { gap: 6px; margin: 4px 0; }
+.mp-kind i { width: 10px; }
+.coop-picks .mm-pick b { min-width: 0; }
+@media (max-height: 500px) {
+  /* MULTIPLAYER: the blurb goes (the ARENA / CO-OP row says it), and in co-op the mission takes the wider column, so JOIN ARENA and HOST stay on screen. */
+  .mm-detail .mp-blurb { display: none; }
+  .fp-picks.coop-picks { grid-template-columns: 2fr 1fr; }
+  .coop-picks .mm-pick { flex-wrap: nowrap; }
+  .coop-picks .mm-pick span, .mm-detail .relay-at.tight { display: none; }   /* the mission names itself; the relay line is a tap away (JOIN) */
+  .coop-picks .mm-pick b { flex: 1 1 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
