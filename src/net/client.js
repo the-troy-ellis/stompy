@@ -66,7 +66,7 @@ export function createNet(app) {
     ws.onclose = () => {
       if (Net.ws !== ws) return;   // we closed it on purpose
       Net.ws = null;
-      if (!welcomed) { if (G.state === 'menu' && !/FULL/.test($('.status', ov)?.textContent || '')) app.ui.setStatus('THE ARENA SERVER IS NOT ANSWERING'); }
+      if (!welcomed) { if (G.state === 'menu' && !/FULL|UPDATE/.test($('.status', ov)?.textContent || '')) app.ui.setStatus('THE ARENA SERVER IS NOT ANSWERING'); }
       else if (mp()) lostConnection();
     };
   }
@@ -89,6 +89,7 @@ export function createNet(app) {
   function onNet(m) {
     switch (m.t) {
       case 'full': app.ui.setStatus(`THE ARENA IS FULL (${m.max} PILOTS) -- TRY AGAIN LATER`); break;
+      case 'version': app.ui.setStatus(`UPDATE THE GAME TO PLAY (v${m.need})`); break;   // the server runs another version
       case 'welcome':
         Net.id = m.id; Net.limit = m.limit || 10;
         setScores(m.scores);
