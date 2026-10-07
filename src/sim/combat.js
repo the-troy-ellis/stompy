@@ -51,7 +51,7 @@ export function damage(G, m, p, amt, src, beam = false, melee = false) {
     // Another pilot: what the shooter sees counts, and the victim's own
     // client applies it. Hits are batched (a beam deals damage every
     // frame) and flushed a few times a second -- see flushHits.
-    if (G.roundOver) return;
+    if (G.roundOver || m.mate) return;   // a teammate (team deathmatch): friendly fire is off
     if (!beam) hitSparks(G, m, p, sectionHit(m, p), amt);   // the shooter sees the sparks; the damage is the victim's to apply
     const q = G.pendingHits.get(m.netId) || { amt: 0, p };
     q.amt += amt; q.p = p;

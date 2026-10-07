@@ -15,8 +15,9 @@ game's own tables).
 |---|---|---|---|
 | `--host` | `STOMPY_HOST` | `0.0.0.0` | address to listen on |
 | `--port` | `STOMPY_PORT` | `8096` | |
-| `--mode` | `STOMPY_MODE` | `ffa` | free-for-all (team deathmatch comes with M5a's TDM) |
-| `--limit` | `STOMPY_SCORE_LIMIT` | `10` | kills to win a round |
+| `--mode` | `STOMPY_MODE` | `ffa` | `ffa` (free-for-all) or `tdm` (team deathmatch) |
+| `--limit` | `STOMPY_SCORE_LIMIT` | `10` | a pilot's kills to win a free-for-all round |
+| `--team-limit` | `STOMPY_TEAM_LIMIT` | `20` | a side's kills to win a team round |
 | `--gap` | `STOMPY_ROUND_GAP` | `10` | seconds between rounds |
 | `--per-ip` | `STOMPY_PER_IP` | `4` | sockets one address may hold (raise it for a LAN behind one NAT) |
 | `--log` | `STOMPY_LOG` | none | also append the log to this file |

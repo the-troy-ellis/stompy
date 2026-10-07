@@ -167,7 +167,7 @@ export function createUi(app) {
         <div class="mm-pick"><span>TIME</span><button data-fp="time" data-d="-1">◀</button><b>${{ day: 'NORMAL', dawn: 'DAWN', night: 'NIGHT' }[FP_TIMES[prefs.fpTime] || 'day']}</b><button data-fp="time" data-d="1">▶</button></div></div>`;
     }
     if (prefs.menuSel === 'mp') {
-      return `<p>Free-for-all for up to 8 pilots on this network. First to ${app.net.Net.limit} kills wins the round.</p>
+      return `<p>Free-for-all or team deathmatch for up to 8 pilots on this network. First to the limit wins the round.</p>
         <p class="lobby-row"><label for="callsign">CALLSIGN</label>
           <input id="callsign" class="callsign" maxlength="12" value="${esc(prefs.mpName)}" placeholder="PILOT"
             autocomplete="off" spellcheck="false" autocapitalize="characters" enterkeyhint="go"></p>
@@ -336,6 +336,7 @@ export function createUi(app) {
     if (a === 'mp') { mainMenu('mp'); return; }
     if (a === 'leave') { app.net.leaveArena(); return; }
     if (a === 'ready') { app.net.ready(); return; }   // the arena lobby
+    if (a === 'team') { app.net.pickTeam(+e.target.closest('[data-team]').dataset.team); return; }   // team deathmatch: a side
     if (a === 'next') { prefs.mission++; startMission(prefs.mission); launch(); }
     else if (a === 'retry') { startMission(prefs.mission); launch(); }
     else if (a === 'again') { startSkirmish(); launch(); }

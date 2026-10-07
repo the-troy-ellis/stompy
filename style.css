@@ -341,3 +341,7 @@ html, body {
   .strip { gap: 3px; margin: 0 0 4px; flex-wrap: nowrap; }
   .strip .sq { flex-basis: 21px; height: 19px; font-size: 9px; }
 }
+.lobby-teams { margin: 8px 0 2px; }
+.lobby-teams .go { padding: 7px 16px; }
+.lobby-teams .go.on { outline: 3px solid #fc3; color: #fc3; }
+.lobby-teams .dot { display: inline-block; width: 10px; height: 10px; margin-right: 8px; vertical-align: -1px; }

@@ -1,10 +1,9 @@
 import { $, esc } from '../util/dom.js';
 import { store } from '../util/store.js';
-import { add, dirOf, len, mul, norm, rnd, sub, TAU } from '../util/math.js';
+import { add, dirOf, len, mul, norm, rnd, sub } from '../util/math.js';
 import { WEAPONS } from '../data/weapons.js';
 import { CHASSIS, HPK } from '../data/chassis.js';
 import { MP_COLORS } from '../data/colors.js';
-import { BOUND } from '../world/terrain.js';
 import { newMech, resetMatch } from '../sim/state.js';
 import { placeScenery } from '../sim/entities.js';
 import { eyeOf } from '../sim/geom.js';
@@ -17,14 +16,15 @@ import { voice } from '../sim/voice.js';
 import { beamMult } from '../sim/beams.js';
 import { launchPulse } from '../sim/fusion.js';
 import { SEND_HZ } from '../sim/missiles.js';
-import { hit, hello, ping as pingMsg, ready as readyMsg, stateMessage, PING_EVERY } from './protocol.js';
+import { hit, hello, ping as pingMsg, ready as readyMsg, team as teamMsg, stateMessage, PING_EVERY } from './protocol.js';
 import { lobbyHTML, lobbyHead, lobbyRows } from '../ui/lobby.js';
 import { fitOf } from '../ui/mechlab.js';
 import { applyLoadout, stockLoadout, validate } from '../sim/loadout.js';
 import { startSpectate } from './spectate.js';
 import { addKill } from './killfeed.js';
+import { sideOf, spawnPoint, teamName } from './teams.js';
 
-const { sin, cos, atan2, min, max, random, hypot } = Math;
+const { atan2, min, max, random, hypot } = Math;
 const clamp30 = v => max(-30, min(30, +v || 0));
 
 // The arena client: join, the message handler, spawn and respawn, the 15 Hz
@@ -35,17 +35,22 @@ export function createNet(app) {
   const ov = app.ov;
   void ov; void esc; void $;
 
-  // A free-for-all for up to eight pilots via server.py (net/relay.js finds it). Each
+  // A free-for-all or team deathmatch for up to eight pilots via server.py (net/relay.js finds it). Each
   // client is the authority for its own mech: it sends its state ~15 times a
   // second, reports hits it lands, applies hits it takes, and declares its
   // own death. Other pilots are drawn from their latest state, smoothed and
   // extrapolated, and walk with the same gait. Their shots arrive as effects
   // ("ghosts") that look real but never score -- their shooter scores them.
-  const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10, loSent: '', loN: 0, mode: 'ffa', pal: 'dusk', pingT: 0, pingN: 0, pingAt: new Map(), rtt: 0, feed: [] };
+  const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10, loSent: '', loN: 0, mode: 'ffa', pal: 'dusk', pingT: 0, pingN: 0, pingAt: new Map(), rtt: 0, feed: [], teams: [0, 0] };
   const mp = () => G.mode === 'mp';
   const pilotName = id => Net.info.get(id)?.name || `PILOT ${id}`;
   const pilotCss = id => MP_COLORS[Net.info.get(id)?.color ?? 0]?.css || '#f44';
   const mechById = id => (id === Net.id ? G.player : G.mechs.find(m => m.netId === id));
+  // Team deathmatch: your side (0 STEEL, 1 RED), and whether a pilot is on it.
+  const tdm = () => Net.mode === 'tdm';
+  const myTeam = () => Net.info.get(Net.id)?.team || 0;
+  const mate = id => tdm() && (Net.info.get(id)?.team || 0) === myTeam();
+  const colorOf = id => Net.info.get(id)?.color ?? (id === Net.id ? prefs.mpColor : 0);
 
   
 
@@ -86,7 +91,18 @@ export function createNet(app) {
   function setScores(list) {
     if (!Array.isArray(list)) return;
     Net.info = new Map(list.map(p => [p.id, p]));
+    syncTeams();
     showLobby();
+  }
+  // Sides and colours as the relay last said. A teammate is team 0, as you
+  // are: never a hostile to target, lock or hit. Everyone else is their own id.
+  function syncTeams() {
+    for (const m of G.mechs) {
+      if (!m.netId) continue;
+      if (m.remote) { m.mate = mate(m.netId); m.team = m.mate ? 0 : m.netId; }
+      const key = app.R.partsKeyFor(colorOf(m.netId), m.type);
+      if (m.partsKey !== key) m.partsKey = key;   // a team's colour is forced
+    }
   }
   // The lobby (ui/lobby.js): shown from `welcome` until READY, redrawn as
   // pilots come, ready up and report their pings.
@@ -94,9 +110,14 @@ export function createNet(app) {
     if (!G.lobby) return;
     const o = { pilots: [...Net.info.values()].sort((a, b) => a.id - b.id), me: Net.id, mode: Net.mode, pal: Net.pal, limit: Net.limit };
     const table = app.ov.hidden ? null : app.ov.querySelector('table.lobby'), head = app.ov.querySelector('.lobby-head');
-    if (table && head) { table.innerHTML = lobbyRows(o); head.innerHTML = lobbyHead(o); }   // in place: READY stays put under a thumb
-    else app.ui.showOverlay(lobbyHTML(o));
+    const panel = app.ov.querySelector('.panel[data-mode]');
+    if (table && head && panel?.dataset.mode === o.mode) {   // in place: READY stays put under a thumb
+      table.innerHTML = lobbyRows(o); head.innerHTML = lobbyHead(o);
+      for (const b of app.ov.querySelectorAll('[data-team]')) b.classList.toggle('on', +b.dataset.team === myTeam());
+    } else app.ui.showOverlay(lobbyHTML(o));
   }
+  // Team deathmatch: ask for a side from the lobby; the relay's answer moves you.
+  function pickTeam(t) { if (G.lobby && tdm() && (t === 0 || t === 1)) netSend(teamMsg(t)); }
   function ready() {
     if (!G.lobby) return;
     G.lobby = false;
@@ -111,12 +132,13 @@ export function createNet(app) {
       case 'full': app.ui.setStatus(`THE ARENA IS FULL (${m.max} PILOTS) -- TRY AGAIN LATER`); break;
       case 'version': app.ui.setStatus(`UPDATE THE GAME TO PLAY (v${m.need})`); break;   // the server runs another version
       case 'welcome':
-        Net.id = m.id; Net.limit = m.limit || 10; Net.mode = m.mode || 'ffa'; Net.pal = m.pal;
+        Net.id = m.id; Net.limit = m.limit || 10; Net.mode = m.mode === 'tdm' ? 'tdm' : 'ffa'; Net.pal = m.pal; setTeams(m.teams);
         setScores(m.scores);
         startArena(m.seed, m.pal, true);   // into the lobby: READY spawns you
         G.roundOver = !!m.over;
         break;
       case 'ready': setScores(m.scores); break;
+      case 'team': setScores(m.scores); break;   // a pilot in the lobby changed sides
       case 'ping': {
         // The round trip to the relay, and every pilot's last one for the lobby.
         const sent = Net.pingAt.get(m.n);
@@ -167,25 +189,32 @@ export function createNet(app) {
         }
         break;
       case 'kill': {
-        setScores(m.scores);
+        setTeams(m.teams); setScores(m.scores);
         addKill(Net.feed, { killer: m.killer || 0, victim: m.victim, me: !!m.me, at: performance.now() });   // top right, in their colours (net/killfeed.js)
         if (m.killer === Net.id) { G.stats.kills++; voice(G, m.me ? 'killPunch' : 'kill'); }
         break;
       }
-      case 'roundover':
-        setScores(m.scores);
+      case 'roundover': {
+        setTeams(m.teams); setScores(m.scores);
         G.roundOver = true;
-        G.banner = { text: m.winner === Net.id ? 'YOU WIN THE ROUND' : `${m.name} WINS THE ROUND`, until: performance.now() + (m.next || 10) * 1000 };
-        app.audio.say(m.winner === Net.id ? 'Round won.' : 'Round over.', true);
+        // Team deathmatch: the side wins; free-for-all: the pilot.
+        const team = tdm() && (m.team === 0 || m.team === 1), won = team ? m.team === myTeam() : m.winner === Net.id;
+        G.banner = { text: team ? (won ? 'YOUR TEAM WINS THE ROUND' : `${teamName(m.team)} WINS THE ROUND`) : won ? 'YOU WIN THE ROUND' : `${m.name} WINS THE ROUND`,
+          until: performance.now() + (m.next || 10) * 1000 };
+        app.audio.say(won ? 'Round won.' : 'Round over.', true);
         break;
+      }
       case 'newround':
-        Net.pal = m.pal; Net.mode = m.mode || Net.mode;
+        Net.pal = m.pal; Net.mode = m.mode === 'tdm' || m.mode === 'ffa' ? m.mode : Net.mode; Net.limit = m.limit || Net.limit; setTeams(m.teams);
         setScores(m.scores);
         startArena(m.seed, m.pal, G.lobby);   // still in the lobby: stay there
         app.audio.say('New round.', true);
         break;
     }
   }
+
+  // Each side's kills this round (team deathmatch), as the relay counts them.
+  function setTeams(t) { if (Array.isArray(t) && t.length === 2) Net.teams = [+t[0] || 0, +t[1] || 0]; }
 
   // A round's world. `lobby`: the pilot waits in the lobby (not spawned, not
   // sending state) until READY; otherwise straight in, as at a new round.
@@ -196,7 +225,7 @@ export function createNet(app) {
     placeScenery(G, def);
     app.scene.uploadWorld();
     G.banner = null;
-    G.player = newMech(G, prefs.chassis, 0, 0, 0, 0, { partsKey: app.R.partsKeyFor(prefs.mpColor, prefs.chassis), loadout: fitOf(prefs.chassis) });
+    G.player = newMech(G, prefs.chassis, 0, 0, 0, 0, { partsKey: app.R.partsKeyFor(colorOf(Net.id), prefs.chassis), loadout: fitOf(prefs.chassis) });
     G.player.netId = Net.id;
     G.mechs.push(G.player);
     respawn();
@@ -211,18 +240,9 @@ export function createNet(app) {
     app.input.syncWeaponButtons();
   }
 
-  // Somewhere on the map, as far as possible from everyone else.
-  function spawnPoint() {
-    let best = [0, 0], bestD = -1;
-    for (let k = 0; k < 20; k++) {
-      const a = random() * TAU, d = rnd(80, BOUND - 80), x = sin(a) * d, z = cos(a) * d;
-      const near = min(1e9, ...G.mechs.filter(m => m.alive && m !== G.player).map(m => hypot(m.x - x, m.z - z)));
-      if (near > bestD) { bestD = near; best = [x, z]; }
-    }
-    return best;
-  }
   function respawn() {
-    const P = G.player, [x, z] = spawnPoint();
+    // Far from the hostiles; in team deathmatch, on your side's half (net/teams.js).
+    const P = G.player, [x, z] = spawnPoint(G, sideOf(Net.mode, myTeam()));
     Object.assign(P, { x, z, y: G.ter.height(x, z), vy: 0, yaw: atan2(-x, -z), twist: 0, pitch: 0, speed: 0, throttle: 0,
       heat: 0, fuel: 1, shutdown: false, alive: true, air: false, hp: { ...P.max }, spawnT: 2 });
     P.weapons.forEach(w => { w.cd = 0; w.dead = false; w.ammo = w.def.ammo || null; });
@@ -245,8 +265,8 @@ export function createNet(app) {
     let r = G.mechs.find(m => m.netId === s.id);
     if (!r) {
       const ch = CHASSIS[s.ch] ? s.ch : 'kestrel';
-      r = newMech(G, ch, s.id, s.x, s.z, s.yaw, { partsKey: app.R.partsKeyFor(Net.info.get(s.id)?.color ?? 0, ch) });
-      Object.assign(r, { netId: s.id, remote: true, net: null });
+      r = newMech(G, ch, mate(s.id) ? 0 : s.id, s.x, s.z, s.yaw, { partsKey: app.R.partsKeyFor(colorOf(s.id), ch) });
+      Object.assign(r, { netId: s.id, remote: true, net: null, mate: mate(s.id) });
       G.mechs.push(r);
     }
     const first = !r.net;
@@ -316,7 +336,7 @@ export function createNet(app) {
 
   // Beam damage lands every frame; in the arena it's sent a few times a second.
   function flushHits() {
-    for (const [to, q] of G.pendingHits) netSend(hit(to, q.amt, q.p, false, q));
+    for (const [to, q] of G.pendingHits) if (!mate(to)) netSend(hit(to, q.amt, q.p, false, q));   // friendly fire is off (the relay drops it too)
     G.pendingHits.clear();
   }
 
@@ -331,11 +351,11 @@ export function createNet(app) {
     if ((Net.sendT += dt) >= 1 / SEND_HZ && !G.lobby) { Net.sendT = 0; sendState(); flushHits(); }   // in the lobby, nobody sees you yet
     if (G.clock - Net.pingT >= PING_EVERY) { Net.pingT = G.clock; Net.pingAt.set(++Net.pingN, performance.now()); netSend(pingMsg(Net.pingN, Net.rtt)); }
   }
-  const arenaBoard = () => [...Net.info.values()].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+  const arenaBoard = () => [...Net.info.values()].sort((a, b) => (tdm() ? (a.team || 0) - (b.team || 0) : 0) || b.kills - a.kills || a.deaths - b.deaths);
   const boardHTML = () => `<table class="mech-keys scoreboard">${arenaBoard().map((p, i) => `<tr${p.id === Net.id ? ' class="me"' : ''}>
     <td>${i + 1}.</td><td><span class="dot" style="background:${MP_COLORS[p.color]?.css}"></span>${esc(p.name)}</td><td>${p.kills} / ${p.deaths}</td></tr>`).join('')}</table>`;
 
 
-  return { Net, mp, join, send: netSend, leaveArena, lostConnection, setScores, onNet, startArena, spawnPoint, respawn, sendState, netState, netFx,
-    flushHits, tick: netTick, ready, pilotName, pilotCss, mechById, arenaBoard, boardHTML };
+  return { Net, mp, join, send: netSend, leaveArena, lostConnection, setScores, onNet, startArena, respawn, sendState, netState, netFx,
+    flushHits, tick: netTick, ready, pickTeam, tdm, myTeam, mate, pilotName, pilotCss, mechById, arenaBoard, boardHTML };
 }
