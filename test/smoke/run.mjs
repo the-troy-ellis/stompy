@@ -150,7 +150,8 @@ try {
     if (!(aimOk && stickOk && rightOk && centred)) { failed = true; console.error('FAIL: the touch layout did not behave'); }
   });
   // The arena: the real relay, two pilots in one browser, each sees the other walk.
-  const relay = spawn('python3', ['server/server.py', '8096'], { stdio: 'ignore', env: { ...process.env, STOMPY_ROUND_GAP: '1' } });
+  // The limit is 1 so the round's end can be tried at the end (#187).
+  const relay = spawn('python3', ['server/server.py', '8096'], { stdio: 'ignore', env: { ...process.env, STOMPY_ROUND_GAP: '4', STOMPY_SCORE_LIMIT: '1' } });
   await new Promise(r => setTimeout(r, 600));
   try {
     const ctx = await browser.newContext({ viewport: { width: 1024, height: 640 } });
@@ -200,6 +201,20 @@ try {
     console.log(`arena: TWO sees ONE fitted as ${fit}; TWO itself carries ${twoKit}`);
     if (!fit || twoKit !== 'laser,laser,ac,lrm,fusion') { failed = true; console.error('FAIL: the arena did not carry the mechlab loadout'); }
     await pages[0].screenshot({ path: 'test-results/smoke-arena.png' });
+    // The round's end (#187): TWO reports going down to ONE, which reaches the
+    // limit. Both get the summary; both vote SAME MAP; the next round is on
+    // the same map, and the summary closes.
+    const seed0 = await pages[0].evaluate(() => window.__stompy.game.ter.seed);
+    const oneId = await pages[0].evaluate(() => window.__stompy.app.net.Net.id);
+    await pages[1].evaluate(id => window.__stompy.app.net.send({ t: 'died', by: id }), oneId);
+    for (const p of pages) await p.waitForSelector('[data-a="vote"][data-v="1"]', { timeout: 3000 });
+    for (const p of pages) await p.click('[data-a="vote"][data-v="1"]');
+    const counted = await pages[0].waitForFunction(() => document.querySelector('[data-v="1"] .n')?.textContent.includes('2'), null, { timeout: 3000 }).then(() => true).catch(() => false);
+    await pages[0].screenshot({ path: 'test-results/smoke-vote.png' });
+    await pages[0].waitForFunction(() => !window.__stompy.game.summary && !window.__stompy.game.roundOver, null, { timeout: 8000 });
+    const after = await pages[0].evaluate(() => ({ seed: window.__stompy.game.ter.seed, alive: window.__stompy.game.player.alive, shown: !document.querySelector('.mech-overlay').hidden }));
+    console.log(`vote: both voted SAME MAP (counted ${counted}); seed ${seed0} then ${after.seed}, alive ${after.alive}, overlay ${after.shown ? 'still up' : 'closed'}`);
+    if (!(counted && after.seed === seed0 && after.alive && !after.shown)) { failed = true; console.error('FAIL: the round-end vote'); }
     await pages[1].keyboard.press('F2');
     await pages[1].waitForFunction(() => window.__stompy.game.state === 'menu', null, { timeout: 5000 });
     await ctx.close();

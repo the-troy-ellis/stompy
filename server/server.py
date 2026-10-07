@@ -39,7 +39,7 @@ PING_EVERY = 10
 DROP_AFTER = 25           # seconds of silence (a phone that went to sleep)
 MAX_BUFFERED = 256 * 1024 # a client this far behind is dropped, not waited for
 PALETTES = ("dusk", "ice", "volcanic")
-PROTOCOL = 10             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
+PROTOCOL = 11             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
 HALF = 96 * 24 / 2        # the map's half width (src/world/terrain.js): positions are clamped to it
 FX_RATE = 40              # weapon effects per second per pilot; more are dropped (a beam flash is per shot, guided updates 15 Hz)
 PER_IP = int(os.environ.get("STOMPY_PER_IP", 4))   # sockets from one address at once (phones and a laptop behind one NAT)
@@ -47,6 +47,7 @@ MODE = os.environ.get("STOMPY_MODE", "ffa")         # the arena's mode: ffa (fre
 MODES = ("ffa", "tdm")
 TEAM_LIMIT = int(os.environ.get("STOMPY_TEAM_LIMIT", 20))   # a team's kills to win a round in tdm
 TEAM_COLORS = (0, 1)      # STEEL and RED (src/data/colors.js MP_COLORS): in tdm a team's colour is forced
+VOTES = ("next", "same", "mode")   # the round-end vote, in order (a tie goes to the first): next map, same map, the other mode
 LOG_FILE = os.environ.get("STOMPY_LOG")             # also log to this file (appended; rotation is logrotate's job)
 _log_out = None
 
@@ -79,6 +80,9 @@ class Client:
         self.ping = 0         # ms, as the client last measured its round trip
         self.kills = 0
         self.deaths = 0
+        self.streak = 0       # kills since the last death
+        self.best = 0         # the round's best streak
+        self.acc = -1         # the round's accuracy in %, as the client reports it at round end (-1: not yet)
         self.last = time.monotonic()
         self.fx_tokens, self.fx_at = float(FX_RATE), time.monotonic()   # the fx rate limit: a bucket that refills at FX_RATE a second
 
@@ -86,7 +90,9 @@ class Client:
 players: dict[int, Client] = {}
 conns: dict[str, int] = {}   # open sockets per address, for the PER_IP cap
 arena = {"seed": random.randrange(1, 10**6), "pal": random.choice(PALETTES), "over": False,
-         "mode": MODE if MODE in MODES else "ffa", "teams": [0, 0]}   # teams: each team's kills this round (tdm)
+         "mode": MODE if MODE in MODES else "ffa", "teams": [0, 0],   # teams: each team's kills this round (tdm)
+         "votes": {}}   # pilot id -> VOTES index, between rounds
+sleep = asyncio.sleep     # the gap between rounds waits on this (the tests swap in a fake clock)
 
 
 # ---------------------------------------------------------------- WebSocket
@@ -197,7 +203,7 @@ def broadcast(obj, skip=None):
 
 def scores():
     return [{"id": c.id, "name": c.name, "color": c.color, "kills": c.kills, "deaths": c.deaths,
-             "ch": c.ch, "ready": 1 if c.ready else 0, "ping": c.ping, "team": c.team}
+             "ch": c.ch, "ready": 1 if c.ready else 0, "ping": c.ping, "team": c.team, "best": c.best, "acc": c.acc}
             for c in sorted(players.values(), key=lambda c: c.id)]
 
 
@@ -213,6 +219,21 @@ def limit():
 def paint(c):
     """The pilot's colour as everyone sees it: their pick, or their team's in tdm."""
     c.color = TEAM_COLORS[c.team] if tdm() else c.pick
+
+
+def tally():
+    """Each option's votes from the pilots still here, in VOTES order."""
+    n = [0] * len(VOTES)
+    for cid, v in arena["votes"].items():
+        if cid in players:
+            n[v] += 1
+    return n
+
+
+def vote_result():
+    """The option with the most votes; a tie (or no votes) goes to the first."""
+    n = tally()
+    return n.index(max(n))
 
 
 def smaller_team(skip=None):
@@ -278,20 +299,30 @@ def fx_allowed(c, now=None):
 
 
 async def end_round(winner):
-    """`winner`: the pilot who reached the limit; in tdm their team wins."""
+    """`winner`: the pilot who reached the limit; in tdm their team wins.
+    Then ROUND_GAP seconds for the summary and the vote, which picks the next
+    round: a new map, the same map, or the other mode on a new map."""
     arena["over"] = True
+    arena["votes"] = {}
     over = {"t": "roundover", "winner": winner.id, "name": winner.name, "next": ROUND_GAP, "teams": arena["teams"], "scores": scores()}
     if tdm():
         over["team"] = winner.team
     log(f"round over: {'team ' + str(winner.team) if tdm() else winner.name} wins")
     broadcast(over)
-    await asyncio.sleep(ROUND_GAP)
-    arena.update(seed=random.randrange(1, 10**6), pal=random.choice(PALETTES), over=False, teams=[0, 0])
+    await sleep(ROUND_GAP)
+    pick = vote_result()
+    log(f"vote {tally()}: {VOTES[pick]}")
+    if VOTES[pick] == "mode":
+        arena["mode"] = "tdm" if arena["mode"] == "ffa" else "ffa"
+    if VOTES[pick] != "same":
+        arena.update(seed=random.randrange(1, 10**6), pal=random.choice(PALETTES))
+    arena.update(over=False, teams=[0, 0], votes={})
     for c in players.values():
-        c.kills = c.deaths = 0
+        c.kills = c.deaths = c.streak = c.best = 0
+        c.acc = -1
         paint(c)
     broadcast({"t": "newround", "seed": arena["seed"], "pal": arena["pal"], "mode": arena["mode"], "limit": limit(),
-               "teams": arena["teams"], "scores": scores()})
+               "teams": arena["teams"], "vote": VOTES[pick], "scores": scores()})
 
 
 def handle_message(c, msg):
@@ -327,6 +358,17 @@ def handle_message(c, msg):
             c.team = 1 if num(msg.get("team"), 0, 1) >= 0.5 else 0
             paint(c)
             broadcast({"t": "team", "id": c.id, "scores": scores()})
+    elif t == "vote":
+        # Between rounds: next map, same map, or the other mode. The last vote counts.
+        if arena["over"]:
+            mode, choice = msg.get("mode"), msg.get("map")
+            arena["votes"][c.id] = 2 if mode in MODES and mode != arena["mode"] else 1 if choice == "same" else 0
+            broadcast({"t": "tally", "votes": tally(), "scores": scores()})
+    elif t == "stats":
+        # Round end: the pilot's own accuracy for the summary (shots are the client's to count).
+        if arena["over"]:
+            c.acc = int(num(msg.get("acc"), 0, 100))
+            broadcast({"t": "tally", "votes": tally(), "scores": scores()})
     elif t == "ping":
         # The lobby's ping: echoed at once with the server's time and every
         # pilot's last round trip; the client reports its own with the next.
@@ -357,12 +399,15 @@ def handle_message(c, msg):
             send(target, out)
     elif t == "died":
         c.deaths += 1
+        c.streak = 0
         killer = players.get(int(num(msg.get("by"), 0, 99)))
         if killer is c:
             killer = None
         scored = killer and not arena["over"] and not (tdm() and killer.team == c.team)   # a teammate never scores
         if scored:
             killer.kills += 1
+            killer.streak += 1
+            killer.best = max(killer.best, killer.streak)
             if tdm():
                 arena["teams"][killer.team] += 1
         kill = {"t": "kill", "victim": c.id, "killer": killer.id if killer else 0, "teams": arena["teams"], "scores": scores()}

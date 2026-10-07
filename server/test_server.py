@@ -169,7 +169,8 @@ class Session(unittest.IsolatedAsyncioTestCase):
         relay.players.clear()
         relay.conns.clear()
         relay.PER_IP = 99   # every test client is 127.0.0.1; the cap has its own test
-        relay.arena.update(seed=5, pal="dusk", over=False, mode="ffa", teams=[0, 0])
+        relay.arena.update(seed=5, pal="dusk", over=False, mode="ffa", teams=[0, 0], votes={})
+        relay.sleep = asyncio.sleep
         self.server = await asyncio.start_server(relay.session, "127.0.0.1", 0, limit=16 * 1024)
         self.port = self.server.sockets[0].getsockname()[1]
         self.clients = []
@@ -456,6 +457,88 @@ class Session(unittest.IsolatedAsyncioTestCase):
             self.assertEqual([p["team"] for p in new["scores"]], [0, 1, 0], "the sides carry over")
         finally:
             relay.TEAM_LIMIT = old
+
+    async def round_over_with_three(self):
+        """Three pilots and a round won by A's first kill, the gap held open
+        by a fake clock until the test lets it pass. Returns the clients
+        (their join messages read) and the clock's release."""
+        gate = asyncio.Event()
+
+        async def fake_sleep(_):
+            await gate.wait()
+        relay.sleep = fake_sleep
+        old = relay.SCORE_LIMIT
+        relay.SCORE_LIMIT = 1
+        self.addCleanup(setattr, relay, "SCORE_LIMIT", old)
+        a, _ = await self.join("A")
+        b, _ = await self.join("B")
+        c, _ = await self.join("C")
+        await a.recv(); await a.recv(); await b.recv()   # the joins
+        await b.send({"t": "died", "by": 1})
+        for x in (a, b, c):
+            self.assertEqual((await x.recv())["t"], "kill")
+            self.assertEqual((await x.recv())["t"], "roundover")
+        return a, b, c, gate
+
+    async def until(self, client, t):
+        while True:
+            m = await client.recv()
+            if m["t"] == t:
+                return m
+
+    async def test_vote_two_pick_same_map_and_the_next_round_has_the_same_seed(self):
+        a, b, c, gate = await self.round_over_with_three()
+        await a.send({"t": "vote", "map": "same", "mode": "ffa"})
+        tally = await a.recv()
+        self.assertEqual((tally["t"], tally["votes"]), ("tally", [0, 1, 0]))
+        await b.send({"t": "vote", "map": "same", "mode": "ffa"})
+        await c.send({"t": "vote", "map": "next", "mode": "ffa"})
+        await c.send({"t": "stats", "acc": 250})   # clamped
+        tally = await self.until(c, "tally")
+        while tally["votes"] != [1, 2, 0] or tally["scores"][2]["acc"] != 100:
+            tally = await self.until(c, "tally")
+        gate.set()
+        new = await self.until(a, "newround")
+        self.assertEqual((new["seed"], new["pal"], new["vote"], new["mode"]), (5, "dusk", "same", "ffa"))
+        self.assertEqual([(p["kills"], p["best"], p["acc"]) for p in new["scores"]], [(0, 0, -1)] * 3, "a fresh round")
+
+    async def test_vote_a_tie_goes_to_the_next_map_and_a_late_vote_is_ignored(self):
+        a, b, c, gate = await self.round_over_with_three()
+        await a.send({"t": "vote", "map": "next", "mode": "ffa"})
+        await b.send({"t": "vote", "map": "same", "mode": "ffa"})
+        await self.until(c, "tally"); await self.until(c, "tally")
+        gate.set()
+        new = await self.until(a, "newround")
+        self.assertEqual(new["vote"], "next")
+        self.assertNotEqual((new["seed"], new["pal"]), (5, "dusk"), "a new map")
+        await a.send({"t": "vote", "map": "same", "mode": "ffa"})   # the round is on: no vote to cast
+        with self.assertRaises(asyncio.TimeoutError):
+            await a.recv(timeout=0.3)
+        self.assertEqual(relay.arena["votes"], {})
+
+    async def test_vote_the_other_mode_switches_to_teams_and_paints_the_sides(self):
+        a, b, c, gate = await self.round_over_with_three()
+        for x in (a, b):
+            await x.send({"t": "vote", "map": "next", "mode": "tdm"})
+        await a.send({"t": "vote", "map": "same", "mode": "tdm"})   # a vote can change; the other mode still wins
+        await self.until(c, "tally"); await self.until(c, "tally"); await self.until(c, "tally")
+        gate.set()
+        new = await self.until(a, "newround")
+        self.assertEqual((new["vote"], new["mode"], new["limit"]), ("mode", "tdm", relay.TEAM_LIMIT))
+        self.assertEqual([p["color"] for p in new["scores"]], [relay.TEAM_COLORS[p["team"]] for p in new["scores"]])
+
+    async def test_best_streak_counts_kills_between_deaths(self):
+        a, _ = await self.join("A")
+        b, _ = await self.join("B")
+        await a.recv()
+        for _ in range(3):
+            await b.send({"t": "died", "by": 1})
+            await a.recv()
+        await a.send({"t": "died", "by": 2})
+        await a.recv()
+        await b.send({"t": "died", "by": 1})
+        kill = await a.recv()
+        self.assertEqual([(p["kills"], p["best"]) for p in kill["scores"]], [(4, 3), (1, 1)])
 
     async def test_ninth_pilot_is_turned_away(self):
         for i in range(8):

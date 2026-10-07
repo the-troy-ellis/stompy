@@ -16,8 +16,9 @@ import { voice } from '../sim/voice.js';
 import { beamMult } from '../sim/beams.js';
 import { launchPulse } from '../sim/fusion.js';
 import { SEND_HZ } from '../sim/missiles.js';
-import { hit, hello, ping as pingMsg, ready as readyMsg, team as teamMsg, stateMessage, PING_EVERY } from './protocol.js';
+import { hit, hello, ping as pingMsg, ready as readyMsg, team as teamMsg, vote as voteMsg, roundStats, stateMessage, PING_EVERY } from './protocol.js';
 import { lobbyHTML, lobbyHead, lobbyRows } from '../ui/lobby.js';
+import { summaryHTML, summaryRows, voteCount, voteOf } from '../ui/summary.js';
 import { fitOf } from '../ui/mechlab.js';
 import { applyLoadout, stockLoadout, validate } from '../sim/loadout.js';
 import { startSpectate } from './spectate.js';
@@ -41,7 +42,7 @@ export function createNet(app) {
   // own death. Other pilots are drawn from their latest state, smoothed and
   // extrapolated, and walk with the same gait. Their shots arrive as effects
   // ("ghosts") that look real but never score -- their shooter scores them.
-  const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10, loSent: '', loN: 0, mode: 'ffa', pal: 'dusk', pingT: 0, pingN: 0, pingAt: new Map(), rtt: 0, feed: [], teams: [0, 0] };
+  const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10, loSent: '', loN: 0, mode: 'ffa', pal: 'dusk', pingT: 0, pingN: 0, pingAt: new Map(), rtt: 0, feed: [], teams: [0, 0], votes: [0, 0, 0], myVote: -1 };
   const mp = () => G.mode === 'mp';
   const pilotName = id => Net.info.get(id)?.name || `PILOT ${id}`;
   const pilotCss = id => MP_COLORS[Net.info.get(id)?.color ?? 0]?.css || '#f44';
@@ -80,11 +81,11 @@ export function createNet(app) {
   function netSend(obj) { if (Net.ws && Net.ws.readyState === 1) Net.ws.send(JSON.stringify(obj)); }
   function leaveArena() {
     const ws = Net.ws; Net.ws = null; ws?.close();
-    G.mode = 'sp'; G.lobby = false; Net.info.clear(); Net.pingAt.clear();
+    G.mode = 'sp'; G.lobby = false; G.summary = false; Net.info.clear(); Net.pingAt.clear();
     app.ui.mainMenu('mp');
   }
   function lostConnection() {
-    Net.info.clear(); G.lobby = false; Net.pingAt.clear();
+    Net.info.clear(); G.lobby = false; G.summary = false; Net.pingAt.clear();
     app.ui.mainMenu('mp', 'CONNECTION LOST -- A PHONE THAT SLEEPS DROPS OUT. JOIN AGAIN?');
   }
 
@@ -92,7 +93,7 @@ export function createNet(app) {
     if (!Array.isArray(list)) return;
     Net.info = new Map(list.map(p => [p.id, p]));
     syncTeams();
-    showLobby();
+    showLobby(); showSummary();
   }
   // Sides and colours as the relay last said. A teammate is team 0, as you
   // are: never a hostile to target, lock or hit. Everyone else is their own id.
@@ -115,6 +116,30 @@ export function createNet(app) {
       table.innerHTML = lobbyRows(o); head.innerHTML = lobbyHead(o);
       for (const b of app.ov.querySelectorAll('[data-team]')) b.classList.toggle('on', +b.dataset.team === myTeam());
     } else app.ui.showOverlay(lobbyHTML(o));
+  }
+  // The round's end (ui/summary.js): the summary and the vote, over the arena
+  // until `newround`. Opened by `roundover`, then updated in place as votes
+  // and accuracies come in.
+  function showSummary(title) {
+    if (!G.summary) return;
+    const o = { pilots: [...Net.info.values()], me: Net.id, mode: Net.mode, votes: Net.votes, mine: Net.myVote, title, next: Net.next };
+    const table = app.ov.hidden ? null : app.ov.querySelector('table.summary');
+    if (table && !title) {
+      table.innerHTML = summaryRows(o);
+      app.ov.querySelectorAll('[data-v]').forEach(b => {
+        const i = +b.dataset.v;
+        b.classList.toggle('on', i === Net.myVote);
+        const n = b.querySelector('.n');
+        if (n) n.textContent = voteCount(Net.votes[i]);
+      });
+    } else if (title) app.ui.showOverlay(summaryHTML(o));
+  }
+  function castVote(i) {
+    if (!G.summary || !(i >= 0 && i <= 2)) return;
+    Net.myVote = i;
+    const v = voteOf(i, Net.mode);
+    netSend(voteMsg(v.map, v.mode));
+    showSummary();
   }
   // Team deathmatch: ask for a side from the lobby; the relay's answer moves you.
   function pickTeam(t) { if (G.lobby && tdm() && (t === 0 || t === 1)) netSend(teamMsg(t)); }
@@ -139,6 +164,10 @@ export function createNet(app) {
         break;
       case 'ready': setScores(m.scores); break;
       case 'team': setScores(m.scores); break;   // a pilot in the lobby changed sides
+      case 'tally':   // between rounds: the votes so far and the accuracies reported
+        if (Array.isArray(m.votes) && m.votes.length === 3) Net.votes = m.votes.map(n => +n || 0);
+        setScores(m.scores);
+        break;
       case 'ping': {
         // The round trip to the relay, and every pilot's last one for the lobby.
         const sent = Net.pingAt.get(m.n);
@@ -202,9 +231,19 @@ export function createNet(app) {
         G.banner = { text: team ? (won ? 'YOUR TEAM WINS THE ROUND' : `${teamName(m.team)} WINS THE ROUND`) : won ? 'YOU WIN THE ROUND' : `${m.name} WINS THE ROUND`,
           until: performance.now() + (m.next || 10) * 1000 };
         app.audio.say(won ? 'Round won.' : 'Round over.', true);
+        if (!G.lobby) {
+          // The summary and the vote; our accuracy goes up for everyone's table.
+          const s = G.stats;
+          netSend(roundStats(s.shots ? (100 * s.hits) / s.shots : 0));
+          Object.assign(Net, { votes: [0, 0, 0], myVote: -1, next: m.next || 10 });
+          G.summary = true; G.paused = false;
+          app.input.clearHeld(); app.input.exitLock(); app.input.syncTouchUI();
+          showSummary(G.banner.text);
+        }
         break;
       }
       case 'newround':
+        G.summary = false;   // startArena closes it
         Net.pal = m.pal; Net.mode = m.mode === 'tdm' || m.mode === 'ffa' ? m.mode : Net.mode; Net.limit = m.limit || Net.limit; setTeams(m.teams);
         setScores(m.scores);
         startArena(m.seed, m.pal, G.lobby);   // still in the lobby: stay there
@@ -349,6 +388,10 @@ export function createNet(app) {
     // Down and done toppling: watch another pilot until the respawn (net/spectate.js).
     else if (!P.alive && !P.dying && G.respawnAt && !G.spectate) startSpectate(G, G.killer);
     if ((Net.sendT += dt) >= 1 / SEND_HZ && !G.lobby) { Net.sendT = 0; sendState(); flushHits(); }   // in the lobby, nobody sees you yet
+    if (G.summary && G.banner) {   // the summary's countdown, written when the second changes
+      const n = Math.max(0, Math.ceil((G.banner.until - performance.now()) / 1000));
+      if (n !== Net.next) { Net.next = n; const el = app.ov.querySelector('.next-in'); if (el) el.textContent = n; }
+    }
     if (G.clock - Net.pingT >= PING_EVERY) { Net.pingT = G.clock; Net.pingAt.set(++Net.pingN, performance.now()); netSend(pingMsg(Net.pingN, Net.rtt)); }
   }
   const arenaBoard = () => [...Net.info.values()].sort((a, b) => (tdm() ? (a.team || 0) - (b.team || 0) : 0) || b.kills - a.kills || a.deaths - b.deaths);
@@ -357,5 +400,5 @@ export function createNet(app) {
 
 
   return { Net, mp, join, send: netSend, leaveArena, lostConnection, setScores, onNet, startArena, respawn, sendState, netState, netFx,
-    flushHits, tick: netTick, ready, pickTeam, tdm, myTeam, mate, pilotName, pilotCss, mechById, arenaBoard, boardHTML };
+    flushHits, tick: netTick, ready, pickTeam, vote: castVote, tdm, myTeam, mate, pilotName, pilotCss, mechById, arenaBoard, boardHTML };
 }

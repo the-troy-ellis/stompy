@@ -269,7 +269,7 @@ export function createUi(app) {
   }
 
   function pause(on) {
-    if (G.lobby) return;   // the arena lobby is its own overlay; READY or LEAVE
+    if (G.lobby || G.summary) return;   // the arena lobby and the round's summary are their own overlays
     if (G.state !== 'play') return;
     G.paused = on;
     app.input.clearHeld();
@@ -336,6 +336,7 @@ export function createUi(app) {
     if (a === 'mp') { mainMenu('mp'); return; }
     if (a === 'leave') { app.net.leaveArena(); return; }
     if (a === 'ready') { app.net.ready(); return; }   // the arena lobby
+    if (a === 'vote') { app.net.vote(+e.target.closest('[data-v]').dataset.v); return; }   // between arena rounds
     if (a === 'team') { app.net.pickTeam(+e.target.closest('[data-team]').dataset.team); return; }   // team deathmatch: a side
     if (a === 'next') { prefs.mission++; startMission(prefs.mission); launch(); }
     else if (a === 'retry') { startMission(prefs.mission); launch(); }
