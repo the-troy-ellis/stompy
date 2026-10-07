@@ -224,3 +224,17 @@ export function skinMech(parts, legs) {
   for (let i = 0; i < legs; i++) { add(parts.uleg, BONE.leg(i)); add(parts.lleg, BONE.leg(i) + 1); add(parts.foot, BONE.leg(i) + 2); }
   return { d };
 }
+
+// Where a mech's two headlamps sit, in torso space (docs/specs/07 §
+// Headlights): on the torso's front face, a third of the way out to each
+// side and a little above its middle, read off the torso mesh so every body
+// style gets them in the right place.
+export function lampSpots(parts) {
+  const d = parts.torso.d;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z1 = -Infinity;
+  for (let i = 0; i < d.length; i += 9) {
+    x0 = Math.min(x0, d[i]); x1 = Math.max(x1, d[i]); y0 = Math.min(y0, d[i + 1]); y1 = Math.max(y1, d[i + 1]); z1 = Math.max(z1, d[i + 2]);
+  }
+  const x = (x1 - x0) / 6, y = y0 + (y1 - y0) * 0.6, cx = (x0 + x1) / 2;
+  return [[cx + x, y, z1 + 0.05], [cx - x, y, z1 + 0.05]];
+}

@@ -9,6 +9,7 @@ import { meltFrac } from '../sim/beams.js';
 import { FEEL, HEAT, hotFrac } from '../data/feel.js';
 import { meleeOf } from '../data/melee.js';
 import { BARREL_AT, styleOf, BONE, BONE_COUNT } from '../mesh/mechParts.js';
+import { darkness, HEADLIGHTS } from '../data/palettes.js';
 import { fallAngle } from '../sim/entities.js';
 import { propFor } from '../mesh/props.js';
 import { WEAPONS } from '../data/weapons.js';
@@ -97,7 +98,11 @@ export function createScene(app) {
 
   // The HUD canvas is always full resolution; the 3D canvas renders R.look.lines
   // tall (0: full) and the browser scales it up with hard edges (render/look.js).
-  const NO_SHADE = [1, 1, 1];
+  const NO_SHADE = [1, 1, 1], LAMP_COL = [1, 0.95, 0.75];
+  const SPOT = { on: false, pos: [0, 0, 0], dir: [0, 0, 1], col: [0, 0, 0], cone: [Math.cos(HEADLIGHTS.cone[0]), Math.cos(HEADLIGHTS.cone[1])], range: HEADLIGHTS.range };
+  let DARK = 0;   // how dark this frame is (palettes.js darkness)
+  // A point through a matrix into `out`, without allocating.
+  const placeInto = (m, p, out) => { for (let i = 0; i < 3; i++) out[i] = m[i] * p[0] + m[4 + i] * p[1] + m[8 + i] * p[2] + m[12 + i]; };
   const FRAME = {}, LOOK = new Float32Array(7);   // reused every frame: the effects' shared uniforms and one particle's look (mesh/effects.js)
   let W = 0, H = 0, dpr = 1, lines = -1;
   function resize() {
@@ -164,6 +169,7 @@ export function createScene(app) {
     const pose = meleePose(m);
     const fists = parts.fist && meleeOf(m).fists ? fistPose(m) : null;   // with both arms gone it shoves like anyone else
     const TB = chain(B, M.T(0, g.torsoY, 0), M.S(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5), M.RY(m.twist + (fists ? fists.twist : 0)), M.T(0, 0, pose.lunge), M.RX(wp - pose.lean), M.RZ(wr));
+    if (DARK > 0.05 && parts.lamps) { const l = m.lampAt || (m.lampAt = [[0, 0, 0], [0, 0, 0]]); placeInto(TB, parts.lamps[0], l[0]); placeInto(TB, parts.lamps[1], l[1]); }   // the headlamps, drawn after the run
     put(BONE.torso, parts.torso, TB);
     for (const [s, k, side] of [[1, 'LA', 0], [-1, 'RA', 1]]) {
       if (m.hp[k] <= 0) continue;
@@ -184,6 +190,11 @@ export function createScene(app) {
   // Muzzle flash: a hot streak out of the barrel for two frames. After the
   // mechs, so the skinned ones stay one run of draws in their own program.
   function drawFlash(m) {
+    // Headlamps: two glowing blocks on the torso's face, at night, if they are on.
+    if (DARK > 0.05 && m.lights && m.alive && !m.shutdown && m.lampAt) {
+      const k = m.ch.scale * 0.42, c = LAMP_COL;
+      for (const p of m.lampAt) R.draw(R.meshes.cube, chain(M.T(p[0], p[1], p[2]), M.RY(m.yaw + m.twist), M.S(k, k * 0.6, k * 0.4)), c, 1, 1);
+    }
     const fl = m.flash;
     if (!fl || G.frame - fl.frame > 1) return;
     const d = fl.dir, yw = atan2(d[0], d[2]), pt = Math.asin(clampN(d[1], -1, 1)), L = fl.big ? 3.2 : 1.6, w = fl.big ? 0.9 : 0.5;
@@ -388,11 +399,24 @@ export function createScene(app) {
     R.gl.uniformMatrix4fv(R.U.VP, false, VP);
     R.gl.uniform3fv(R.U.light, G.pal.light);
     R.gl.uniform3fv(R.U.shade, ir ? NO_SHADE : G.pal.shade || NO_SHADE);   // the IR camera sees the same at night
+    // Headlights (spec 07): one spot from the player's cockpit along the aim,
+    // dipped a little, as strong as it is dark. Off in the IR camera, when the
+    // player switches them off, and when the reactor is down.
+    DARK = darkness(G.pal);
+    const Pl = G.player;
+    SPOT.on = DARK > 0.01 && !ir && G.state !== 'menu' && !!(Pl && Pl.alive && Pl.lights && !Pl.shutdown && G.eye && G.view);
+    if (SPOT.on) {
+      SPOT.pos[0] = G.eye[0]; SPOT.pos[1] = G.eye[1] - 0.8; SPOT.pos[2] = G.eye[2];
+      const dx = G.view[0], dy = G.view[1] - HEADLIGHTS.dip, dz = G.view[2], n = Math.hypot(dx, dy, dz);
+      SPOT.dir[0] = dx / n; SPOT.dir[1] = dy / n; SPOT.dir[2] = dz / n;
+      for (let i = 0; i < 3; i++) SPOT.col[i] = HEADLIGHTS.col[i] * DARK;
+    }
+    R.setSpot(R.U, SPOT);
     R.gl.uniform3fv(R.U.cam, eye);
     R.gl.uniform2f(R.U.fog, G.pal.fog[0], G.pal.fog[1]);
     R.gl.uniform3fv(R.U.fogCol, hor);
     R.gl.uniform1f(R.U.ir, ir ? 1 : 0);
-    Object.assign(FRAME, { VP, light: G.pal.light, shade: ir ? NO_SHADE : G.pal.shade || NO_SHADE, cam: eye, fog: G.pal.fog, fogCol: hor, ir: ir ? 1 : 0 }); R.frame = FRAME;   // the instanced effects shader's copy
+    Object.assign(FRAME, { VP, spot: SPOT, light: G.pal.light, shade: ir ? NO_SHADE : G.pal.shade || NO_SHADE, cam: eye, fog: G.pal.fog, fogCol: hor, ir: ir ? 1 : 0 }); R.frame = FRAME;   // the instanced effects shader's copy
 
     R.drawHeat = 0;
     R.draw(world, M.id());

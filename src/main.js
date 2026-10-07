@@ -59,6 +59,7 @@ function start(root) {
         <div class="stick" hidden><div class="knob"></div></div>
         <button class="tbtn tpause" data-t="pause" aria-label="Pause">II</button>
         <button class="tbtn tzoom" data-t="zoom">ZOOM</button>
+        <button class="tbtn tlights" data-t="lights" hidden>LIGHTS</button>
         <button class="tbtn tstop" data-t="stop">STOP</button>
         <div class="tcluster">
           <button class="tbtn" data-t="jump">JUMP</button>

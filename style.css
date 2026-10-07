@@ -97,6 +97,12 @@ html, body {
   width: 58px; height: 40px;
 }
 
+.tlights {
+  position: absolute; left: calc(130px + env(safe-area-inset-left)); top: calc(10px + env(safe-area-inset-top));
+  width: 66px; height: 40px; color: #886; border-color: rgba(255, 240, 200, .3);
+}
+.tlights.lit { color: #ffe9b0; border-color: rgba(255, 240, 200, .75); box-shadow: 0 0 8px rgba(255, 230, 170, .35); }
+.tlights[hidden] { display: none; }
 .tpause {
   position: absolute; left: calc(12px + env(safe-area-inset-left)); top: calc(10px + env(safe-area-inset-top));
   width: 44px; height: 40px;

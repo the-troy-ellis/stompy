@@ -137,7 +137,7 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
 
 ### The network protocol (as it is)
 
-`PROTOCOL` is 6 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot).
+`PROTOCOL` is 7 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on).
 
 Client → server: `hello {v, name, color}`, `s {state...}` (15 Hz), `fx {k, ...}`
 (`b` beam flash, `s` shell, `m` missile volley, `fu` fusion discharge, `mg`
@@ -160,7 +160,8 @@ The state message (`stateMessage` in `src/net/protocol.js`) carries chassis
 `ch`, pose, speed `sp`, alive/shutdown flags, per-section hp, beam state
 (`bm`, `be`, `bf`), fusion scan state (`fl`, `sc`, `sq`), and the punch phase
 `pu` (0 none, 1 wind-up, 2 recovery), which `meleeGhost` turns into the
-swing pose on other screens; `fx {k: 'pu'}` starts the wind-up without
+swing pose on other screens, and `lt` (headlights on), which other screens
+show as lamps at night; `fx {k: 'pu'}` starts the wind-up without
 waiting for the next report.
 
 Mechlab loadouts (`docs/specs/02-mechlab.md` § Arena): `s` carries `lo`, the

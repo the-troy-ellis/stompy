@@ -4,6 +4,7 @@ import { msg } from '../sim/effects.js';
 import { clampN } from '../util/math.js';
 import { CATS, CAT_OF } from '../data/weapons.js';
 import { steerBy, alpha, cycleTarget } from '../sim/missiles.js';
+import { darkness } from '../data/palettes.js';
 
 const { abs, hypot } = Math;
 
@@ -72,7 +73,7 @@ export function createInput(app) {
     if (cat && !G.touchUI) held[cat] = false;
   });
 
-  const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX', 'KeyC', 'KeyJ', 'KeyT', 'KeyR', 'KeyF', 'KeyZ', 'KeyP', 'KeyE', 'Space',
+  const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX', 'KeyC', 'KeyJ', 'KeyT', 'KeyR', 'KeyF', 'KeyZ', 'KeyP', 'KeyE', 'KeyL', 'Space',
     'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyG', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
   // Keys are taken at the document: hiding the overlay drops focus to <body>,
   // and pointer lock doesn't move it back.
@@ -108,8 +109,18 @@ export function createInput(app) {
     if (e.code === 'KeyR' && G.aimMech && G.aimMech.team !== 0) { G.target = G.aimMech; app.audio.sfx.beep(); }
     if (e.code === 'KeyF') alpha(G);
     if (e.code === 'KeyZ') G.zoom = !G.zoom;
+    if (e.code === 'KeyL') toggleLights();
   };
   const onKeyUp = e => { keys[e.code] = false; };
+  // Headlights: on is seeing, off is not being seen (spec 07). Flat, like a switch.
+  function toggleLights() {
+    const P = G.player;
+    if (!P?.alive) return;
+    P.lights = !P.lights;
+    msg(G, P.lights ? 'LIGHTS ON' : 'LIGHTS OFF');
+    app.audio.sfx.beep();
+    $('[data-t="lights"]', root)?.classList.toggle('lit', P.lights);
+  }
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('keyup', onKeyUp);
 
@@ -133,6 +144,8 @@ export function createInput(app) {
     tui.hidden = !(G.touchUI && (G.state === 'play' || G.state === 'over') && !G.paused);
     const jump = root.querySelector('[data-t="jump"]');
     if (jump) jump.hidden = G.player?.jets === 0;   // JUMP JETS NONE: no button
+    const lights = root.querySelector('[data-t="lights"]');
+    if (lights) { lights.hidden = !(darkness(G.pal) > 0.3 || G.palRamp); lights.classList.toggle('lit', !!G.player?.lights); }   // only where night falls
     if (tui.hidden) releaseFingers();
   };
   function releaseFingers() {
@@ -148,6 +161,7 @@ export function createInput(app) {
     if (name === 'punch') punchTap = true;
     if (name === 'tgt') cycleTarget(G);
     else if (name === 'zoom') G.zoom = !G.zoom;
+    else if (name === 'lights') toggleLights();
     else if (name === 'stop') G.player.throttle = 0;
     else if (name === 'pause') app.ui.pause(true);
   }

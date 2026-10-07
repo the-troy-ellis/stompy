@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#155 time of day shipped) |
+| Status | in progress (#155 time of day, #156 headlights shipped) |
 | Milestone | M4 |
 | Size | L (split: night + headlights; weather; props; explosions + particles) |
 | Depends on | M0; structures from [03-objectives.md](03-objectives.md) share the prop meshes |
@@ -42,6 +42,17 @@ also uses: at night sight is 250 m, or 600 m toward a mech with lights on.
 A key (L) and touch button (LIGHTS, in the top cluster) toggle them; off is
 stealth, on is seeing. The IR missile camera is unchanged at night (that is
 its moment).
+
+As shipped (#156): the spot is evaluated per fragment in the shared fragment
+shader (per-part, skinned and terrain draws; effects are not lit by it),
+from the cockpit along the aim and dipped 0.16, with a 0.24 rad full cone
+fading out by 0.42 and brightness `1 - (d / 230 m)^2`, scaled by how dark it
+is (`darkness(pal)`, from the time-of-day shade, so a ramp brings it on
+gradually). Headlights default on for every mech and go dark with a
+shut-down reactor; other mechs show two glowing lamps read off their torso's
+front face. Night sight blends the same way: `min(day sight, 250 or 600 m)`.
+The LIGHTS button shows only where night falls. `lt` rides in the state
+message (PROTOCOL 7).
 
 ### Weather
 
