@@ -258,6 +258,34 @@ try {
     console.log(`tdm: ${look.map((l, i) => `${['ONE', 'TWO'][i]} at z ${l.z.toFixed(0)} wears ${l.mine}, sees a teammate ${l.mate} (team ${l.team}), colours ${l.colors}`).join('; ')}`);
     if (!look.every(l => l.z < 0 && l.mate && l.team === 0 && l.colors === '0,0' && l.mine.endsWith(':0'))) { failed = true; console.error('FAIL: team deathmatch sides, colours or spawns'); }
     await pages[0].screenshot({ path: 'test-results/smoke-tdm.png' });
+    // Reconnect (#189): TWO goes down once (a death on the board), then its
+    // socket drops: RECONNECTING, and back in place with the same id and death.
+    // Then 10 s with no network: the tries run out, the menu says so, and
+    // JOIN brings the same pilot back.
+    const two = pages[1], twoNet = () => two.evaluate(() => { const n = window.__stompy.app.net, G = window.__stompy.game; return { id: n.Net.id, deaths: n.Net.info.get(n.Net.id)?.deaths, mode: G.mode, lobby: !!G.lobby, back: !G.reconnecting && G.mode === 'mp' && n.Net.ws?.readyState === 1 }; });
+    await two.evaluate(() => window.__stompy.app.net.send({ t: 'died', by: 0 }));
+    await two.waitForFunction(() => { const n = window.__stompy.app.net; return n.Net.info.get(n.Net.id)?.deaths === 1; }, null, { timeout: 3000 });
+    const before = await twoNet();
+    await two.evaluate(() => window.__stompy.app.net.Net.ws.close());
+    const said = await two.waitForFunction(() => window.__stompy.game.reconnecting, null, { timeout: 2000 }).then(() => true).catch(() => false);
+    await two.waitForFunction(() => !window.__stompy.game.reconnecting && window.__stompy.app.net.Net.ws?.readyState === 1, null, { timeout: 8000 }).catch(() => {});
+    const quick = await twoNet();
+    console.log(`reconnect: dropped (RECONNECTING ${said}), back as ${quick.id} (was ${before.id}) with ${quick.deaths} death, in place ${quick.back && !quick.lobby}`);
+    if (!(said && quick.back && !quick.lobby && quick.id === before.id && quick.deaths === 1)) { failed = true; console.error('FAIL: a dropped socket did not come back in place'); }
+    const t0 = Date.now();
+    await two.evaluate(() => {   // no network for 10 s: every new socket fails
+      const Real = window.WebSocket, until = Date.now() + 10000;
+      window.WebSocket = function (url) { if (Date.now() < until) throw new Error('offline'); return new Real(url); };
+      window.__stompy.app.net.Net.ws.close();
+    });
+    await two.waitForFunction(() => window.__stompy.game.state === 'menu' && /CONNECTION LOST/.test(document.querySelector('.status')?.textContent || ''), null, { timeout: 12000 });
+    const gaveUp = (Date.now() - t0) / 1000;
+    await two.waitForTimeout(Math.max(0, 10500 - (Date.now() - t0)));
+    await two.click('[data-a="go"]');
+    await two.waitForFunction(() => window.__stompy.game.mode === 'mp' && window.__stompy.game.state === 'play' && window.__stompy.app.net.Net.ws?.readyState === 1, null, { timeout: 8000 }).catch(() => {});
+    const later = await twoNet();
+    console.log(`reconnect: 10 s offline, gave up after ${gaveUp.toFixed(1)} s; JOIN at ${((Date.now() - t0) / 1000).toFixed(1)} s back as ${later.id} with ${later.deaths} death, straight in ${!later.lobby}`);
+    if (!(later.mode === 'mp' && !later.lobby && later.id === before.id && later.deaths === 1)) { failed = true; console.error('FAIL: JOIN after a 10 s drop did not bring the score back'); }
     await ctx.close();
   } finally { tdmRelay.kill(); }
   await browser.close();

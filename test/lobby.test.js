@@ -22,3 +22,9 @@ test('hello carries the chassis; ready and ping go out as the relay expects', ()
   assert.deepEqual(P.ping(3, 41.6), { t: 'ping', n: 3, rtt: 42 });
   assert.ok(P.PROTOCOL >= 9);
 });
+
+test('hello carries the token from the last welcome, and only when there is one (#189)', () => {
+  assert.equal(P.hello('A', 2, 'warden', 'abc123').token, 'abc123');
+  assert.ok(!('token' in P.hello('A', 2, 'warden', null)));
+  assert.ok(P.PROTOCOL >= 12);
+});

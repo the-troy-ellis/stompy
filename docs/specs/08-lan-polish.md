@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#183 protocol v2 shipped) |
+| Status | shipped (#183–#191) |
 | Milestone | M5a |
 | Size | M (split: protocol + relay URL; lobby + spectate; TDM + vote; server hardening) |
 | Depends on | M0 stage 5 |
@@ -167,6 +167,29 @@ The server keeps a departed pilot's score for 30 s keyed by a `token` it gave
 in `welcome`; a `hello` with that token resumes the id and score. The client
 stores the token in memory only and retries the socket three times, 2 s
 apart, showing `RECONNECTING`.
+
+As shipped (#189, `PROTOCOL` 12):
+- **The relay:** a pilot who drops (a closed socket, or silence past
+  `DROP_AFTER`) is kept under their token for `KEEP` (30) seconds: id, side,
+  READY, and this round's kills, deaths and streaks.
+  - **Coming back:** a `hello` with the token gets the same id back, and
+    `welcome` says `resumed: 1`. A score from a round that has since ended
+    is dropped, but the id and side are kept.
+  - **Tokens:** each one works once, and every `welcome` brings a fresh one.
+  - **Kept ids:** a new pilot gets a kept id only when no other id is free.
+- **The game:** the token lives in memory only. When the socket drops
+  mid-match, the cockpit says `RECONNECTING...` and the match goes on while
+  the game tries three times, 2 s apart.
+  - **Back on the same map:** the pilot carries on in place, and the others
+    see LEFT then JOINED.
+  - **Back on another map** (a round began meanwhile): straight into that
+    world.
+  - **No luck:** after the third try, the menu says `CONNECTION LOST. JOIN
+    WITHIN 30 S TO KEEP YOUR SCORE.`, and JOIN uses the token. LEAVE drops it.
+- **Acceptance 7:** the smoke run takes one client's network away for 10 s.
+  The tries run out at about 6 s. JOIN at about 11 s brings back the same id
+  and its death, straight in, with no lobby. A short drop comes back in place
+  on its own.
 
 ### Kill feed
 

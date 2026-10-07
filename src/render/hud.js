@@ -219,6 +219,10 @@ export function createHud(app) {
       ctx.font = '13px "Lucida Console", monospace'; ctx.fillStyle = GREEN;
       ctx.fillText(`NEXT ROUND IN ${Math.ceil(max(0, (G.banner.until - performance.now()) / 1000))}`, app.scene.view.W / 2, L.viewBottom * 0.37 + 24);
     }
+    if (G.reconnecting) {   // the socket dropped; net/client.js is trying again
+      ctx.font = 'bold 18px "Lucida Console", monospace'; ctx.fillStyle = AMBER;
+      ctx.fillText(`RECONNECTING${'.'.repeat(1 + (Math.floor(performance.now() / 400) % 3))}`, app.scene.view.W / 2, L.viewBottom * 0.28);
+    }
     ctx.font = '11px "Lucida Console", monospace';
   }
 

@@ -42,7 +42,7 @@ export function createNet(app) {
   // own death. Other pilots are drawn from their latest state, smoothed and
   // extrapolated, and walk with the same gait. Their shots arrive as effects
   // ("ghosts") that look real but never score -- their shooter scores them.
-  const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10, loSent: '', loN: 0, mode: 'ffa', pal: 'dusk', pingT: 0, pingN: 0, pingAt: new Map(), rtt: 0, feed: [], teams: [0, 0], votes: [0, 0, 0], myVote: -1 };
+  const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10, loSent: '', loN: 0, mode: 'ffa', pal: 'dusk', pingT: 0, pingN: 0, pingAt: new Map(), rtt: 0, feed: [], teams: [0, 0], votes: [0, 0, 0], myVote: -1, token: null, tries: 0, retryTimer: 0, seed: 0 };
   const mp = () => G.mode === 'mp';
   const pilotName = id => Net.info.get(id)?.name || `PILOT ${id}`;
   const pilotCss = id => MP_COLORS[Net.info.get(id)?.color ?? 0]?.css || '#f44';
@@ -61,11 +61,17 @@ export function createNet(app) {
     store.set('mp.name', prefs.mpName); store.set('mp.color', prefs.mpColor);
     app.audio.Sound.unlock(); app.audio.loadSamples();
     app.ui.setStatus('CONNECTING...');
+    connect(false);
+  }
+  // A socket to the relay. The hello carries the token from the last welcome
+  // (memory only), so a pilot who dropped comes back to the same id and score
+  // within the relay's 30 s. `retry`: one of the RECONNECTING tries.
+  function connect(retry) {
     let ws, welcomed = false;
     try { ws = new WebSocket(app.relay().url); }   // net/relay.js: ?relay=, the RELAY field, or this page's host
-    catch { app.ui.setStatus('COULD NOT CONNECT'); return; }
+    catch { if (retry) reconnect(); else app.ui.setStatus('COULD NOT CONNECT'); return; }
     Net.ws = ws;
-    ws.onopen = () => ws.send(JSON.stringify(hello(prefs.mpName, prefs.mpColor, prefs.chassis)));
+    ws.onopen = () => ws.send(JSON.stringify(hello(prefs.mpName, prefs.mpColor, prefs.chassis, Net.token)));
     ws.onmessage = e => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.t === 'welcome') welcomed = true;
@@ -74,19 +80,33 @@ export function createNet(app) {
     ws.onclose = () => {
       if (Net.ws !== ws) return;   // we closed it on purpose
       Net.ws = null;
-      if (!welcomed) { if (G.state === 'menu' && !/FULL|UPDATE/.test($('.status', ov)?.textContent || '')) app.ui.setStatus('THE ARENA SERVER IS NOT ANSWERING'); }
-      else if (mp()) lostConnection();
+      if (G.reconnecting || (welcomed && mp())) reconnect();   // dropped mid-match, or a try that didn't take
+      else if (!welcomed && G.state === 'menu' && !/FULL|UPDATE/.test($('.status', ov)?.textContent || '')) app.ui.setStatus('THE ARENA SERVER IS NOT ANSWERING');
     };
   }
+  // Dropped mid-match: RECONNECTING, RETRIES tries RETRY_GAP ms apart, the
+  // match going on meanwhile. Then the menu; JOIN within the relay's 30 s
+  // still brings the score back.
+  const RETRIES = 3, RETRY_GAP = 2000;
+  function reconnect() {
+    if (Net.tries >= RETRIES) { lostConnection(); return; }
+    Net.tries++;
+    G.reconnecting = true;
+    Net.retryTimer = setTimeout(() => { Net.retryTimer = 0; if (G.reconnecting && mp()) connect(true); }, RETRY_GAP);
+  }
+  function stopRetrying() { clearTimeout(Net.retryTimer); Net.retryTimer = 0; Net.tries = 0; G.reconnecting = false; }
   function netSend(obj) { if (Net.ws && Net.ws.readyState === 1) Net.ws.send(JSON.stringify(obj)); }
   function leaveArena() {
     const ws = Net.ws; Net.ws = null; ws?.close();
+    stopRetrying(); Net.token = null;   // left on purpose: nothing to come back to
     G.mode = 'sp'; G.lobby = false; G.summary = false; Net.info.clear(); Net.pingAt.clear();
     app.ui.mainMenu('mp');
   }
   function lostConnection() {
+    const ws = Net.ws; Net.ws = null; ws?.close();
+    stopRetrying();
     Net.info.clear(); G.lobby = false; G.summary = false; Net.pingAt.clear();
-    app.ui.mainMenu('mp', 'CONNECTION LOST -- A PHONE THAT SLEEPS DROPS OUT. JOIN AGAIN?');
+    app.ui.mainMenu('mp', 'CONNECTION LOST. JOIN WITHIN 30 S TO KEEP YOUR SCORE.');
   }
 
   function setScores(list) {
@@ -156,12 +176,19 @@ export function createNet(app) {
     switch (m.t) {
       case 'full': app.ui.setStatus(`THE ARENA IS FULL (${m.max} PILOTS) -- TRY AGAIN LATER`); break;
       case 'version': app.ui.setStatus(`UPDATE THE GAME TO PLAY (v${m.need})`); break;   // the server runs another version
-      case 'welcome':
+      case 'welcome': {
+        // Back after a drop on the same map: carry on where we are. Back on
+        // another (a new round began): that world, straight in. Otherwise the lobby.
+        const back = !!m.resumed, inPlace = back && G.reconnecting && mp() && m.seed === Net.seed && m.pal === Net.pal;
+        stopRetrying();
         Net.id = m.id; Net.limit = m.limit || 10; Net.mode = m.mode === 'tdm' ? 'tdm' : 'ffa'; Net.pal = m.pal; setTeams(m.teams);
+        Net.token = typeof m.token === 'string' ? m.token : null;
         setScores(m.scores);
-        startArena(m.seed, m.pal, true);   // into the lobby: READY spawns you
+        if (inPlace) { G.player.netId = Net.id; sendState(); msg(G, 'RECONNECTED'); }
+        else startArena(m.seed, m.pal, !(back && m.scores?.find(p => p.id === m.id)?.ready));   // into the lobby: READY spawns you
         G.roundOver = !!m.over;
         break;
+      }
       case 'ready': setScores(m.scores); break;
       case 'team': setScores(m.scores); break;   // a pilot in the lobby changed sides
       case 'tally':   // between rounds: the votes so far and the accuracies reported
@@ -258,7 +285,7 @@ export function createNet(app) {
   // A round's world. `lobby`: the pilot waits in the lobby (not spawned, not
   // sending state) until READY; otherwise straight in, as at a new round.
   function startArena(seed, palName, lobby = false) {
-    G.mode = 'mp'; G.spectate = null; Net.feed.length = 0;
+    G.mode = 'mp'; G.spectate = null; Net.feed.length = 0; Net.seed = seed;
     const def = { name: 'Arena', foes: [] };
     resetMatch(G, { def, seed, pal: palName });
     placeScenery(G, def);

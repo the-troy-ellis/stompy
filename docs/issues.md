@@ -181,12 +181,12 @@ Worked after #106 and before #110 (#131–#136, milestone M3). #137–#139 are M
 
 | # | Title | Labels | Size | Spec |
 |---|---|---|---|---|
-| | M5b: rooms on the relay (codes, host, succession, GC, routing) | server | M | 09 §Rooms |
-| | M5b: role in game state; host-authoritative enemies (es, ehit, fx routing) | net, sim | L | 09 §Authority |
-| | M5b: entity and objective sync (ent, entx, obj, over) | net, sim | M | 09 |
-| | M5b: co-op UI: HOST/JOIN, lobby mission info, shared debrief, progress save | ui | M | 09 §UI |
-| | M5b: scaling with pilot count; co-op respawn rules | sim | S | 09 §Scaling, §Death |
-| | M5b: in-memory fake relay and host/guest convergence test | tooling, net | M | 09 §Acceptance 6 |
+| #201 | M5b: rooms on the relay (codes, host, succession, GC, routing) | server | M | 09 §Rooms |
+| #202 | M5b: role in game state; host-authoritative enemies (es, ehit, fx routing) | net, sim | L | 09 §Authority |
+| #203 | M5b: entity and objective sync (ent, entx, obj, over) | net, sim | M | 09 |
+| #205 | M5b: co-op UI: HOST/JOIN, lobby mission info, shared debrief, progress save | ui | M | 09 §UI |
+| #204 | M5b: scaling with pilot count; co-op respawn rules | sim | S | 09 §Scaling, §Death |
+| #206 | M5b: in-memory fake relay and host/guest convergence test | tooling, net | M | 09 §Acceptance 6 |
 
 ## M5c — Internet
 
