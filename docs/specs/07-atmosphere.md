@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#155 time of day, #156 headlights shipped) |
+| Status | in progress (#155 time of day, #156 headlights, #157 weather state shipped) |
 | Milestone | M4 |
 | Size | L (split: night + headlights; weather; props; explosions + particles) |
 | Depends on | M0; structures from [03-objectives.md](03-objectives.md) share the prop meshes |
@@ -82,6 +82,19 @@ below, 1500 for rain, 800 for snow, 2500 for dust at intensity 1, scaled by a
 
 Weather affects the AI (`sight` × radar factor) and the HUD (radar ring
 shrinks; the target box drops at 1.2× the visible range).
+
+As shipped (#157): `src/data/weather.js` holds the table above (plus a wind
+per kind: clear is calm, rain 4 m/s, snow 2.5, dust 9, fog 0.5) and
+`G.weather = { kind, intensity, wind }` comes from a mission's `weather` (the
+wind's direction fixed by the seed). The renderer takes `fogOf(G)` for its
+fog and cull distances; the radar ring reads `800 m × radarOf(G)`; the AI's
+sight is multiplied by the same radar factor (after night's cut); the target
+brackets and enemy chevrons drop past 1.2× the fogged far distance; smoke,
+and so missile trails, drifts toward the wind. Free Play has WEATHER (CLEAR,
+RANDOM: one that suits the map, clear half the time, or any kind by name)
+and TIME (NORMAL, DAWN, NIGHT) pickers, two columns on a phone. Particles
+and sounds for each kind are their own issues (#158–#160, #164); the arena
+stays clear until `welcome` carries `wx` and `tm`.
 
 ### Props
 

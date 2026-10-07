@@ -5,7 +5,7 @@ import { CATS, CAT_OF } from '../data/weapons.js';
 import { CHASSIS, MECH_ORDER, MECH_INFO } from '../data/chassis.js';
 import { NAMES } from '../data/names.js';
 import { PALS, palAt } from '../data/palettes.js';
-import { missionDef, missionFoes, FP_MAPS, FP_MIXES, pickFoes } from '../data/missions.js';
+import { missionDef, missionFoes, FP_MAPS, FP_MIXES, FP_WEATHER, FP_TIMES, fpWeather, pickFoes } from '../data/missions.js';
 import { MP_COLORS } from '../data/colors.js';
 import { makeTerrain } from '../world/terrain.js';
 import { newMech, startMatch, foeType } from '../sim/state.js';
@@ -38,7 +38,8 @@ export function createUi(app) {
     const pk = FP_MAPS[prefs.fpMap] === 'random' ? ['dusk', 'ice', 'volcanic'][floor(random() * 3)] : FP_MAPS[prefs.fpMap];
     const foes = pickFoes(FP_MIXES[prefs.fpMix] || FP_MIXES[0], prefs.fpFoes, random, k => !locked(k));
     G.diff = prefs.diff;
-    startMatch(G, { name: 'Free Play', pal: pk, foes, intel: '' }, 1 + floor(random() * 1e5), false, prefs.chassis, { loadout: fitOf(prefs.chassis) });
+    const weather = fpWeather(FP_WEATHER[prefs.fpWeather] || 'clear', pk, random), time = FP_TIMES[prefs.fpTime] || 'day';
+    startMatch(G, { name: 'Free Play', pal: pk, foes, intel: '', weather, time }, 1 + floor(random() * 1e5), false, prefs.chassis, { loadout: fitOf(prefs.chassis) });
     G.kind = 'free';
     app.scene.uploadWorld();
   }
@@ -155,10 +156,12 @@ export function createUi(app) {
     if (prefs.menuSel === 'free') {
       const mapName = FP_MAPS[prefs.fpMap] === 'random' ? 'RANDOM' : PALS[FP_MAPS[prefs.fpMap]].name.toUpperCase();
       return `<p>One fight. You pick.</p>
-        <div class="mm-pick"><span>MAP</span><button data-fp="map" data-d="-1">◀</button><b>${mapName}</b><button data-fp="map" data-d="1">▶</button></div>
+        <div class="fp-picks"><div class="mm-pick"><span>MAP</span><button data-fp="map" data-d="-1">◀</button><b>${mapName}</b><button data-fp="map" data-d="1">▶</button></div>
         <div class="mm-pick"><span>HOSTILES</span><button data-fp="foes" data-d="-1">◀</button><b>${prefs.fpFoes}</b><button data-fp="foes" data-d="1">▶</button></div>
         <div class="mm-pick"><span>MIX</span><button data-fp="mix" data-d="-1">◀</button><b>${(FP_MIXES[prefs.fpMix] || FP_MIXES[0]).label}</b><button data-fp="mix" data-d="1">▶</button></div>
-        <div class="mm-pick"><span>DIFFICULTY</span><button data-fp="diff" data-d="-1">◀</button><b>${DIFF[prefs.diff].label}</b><button data-fp="diff" data-d="1">▶</button></div>`;
+        <div class="mm-pick"><span>DIFFICULTY</span><button data-fp="diff" data-d="-1">◀</button><b>${DIFF[prefs.diff].label}</b><button data-fp="diff" data-d="1">▶</button></div>
+        <div class="mm-pick"><span>WEATHER</span><button data-fp="weather" data-d="-1">◀</button><b>${(FP_WEATHER[prefs.fpWeather] || 'clear').toUpperCase()}</b><button data-fp="weather" data-d="1">▶</button></div>
+        <div class="mm-pick"><span>TIME</span><button data-fp="time" data-d="-1">◀</button><b>${{ day: 'NORMAL', dawn: 'DAWN', night: 'NIGHT' }[FP_TIMES[prefs.fpTime] || 'day']}</b><button data-fp="time" data-d="1">▶</button></div></div>`;
     }
     if (prefs.menuSel === 'mp') {
       return `<p>Free-for-all for up to 8 pilots on this network. First to ${app.net.Net.limit} kills wins the round.</p>
@@ -305,6 +308,8 @@ export function createUi(app) {
         if (fp.dataset.fp === 'map') prefs.fpMap = (prefs.fpMap + d + FP_MAPS.length) % FP_MAPS.length;
         else if (fp.dataset.fp === 'diff') cycleDiff(d);
         else if (fp.dataset.fp === 'mix') { prefs.fpMix = (prefs.fpMix + d + FP_MIXES.length) % FP_MIXES.length; store.set('fp.mix', prefs.fpMix); }
+        else if (fp.dataset.fp === 'weather') { prefs.fpWeather = (prefs.fpWeather + d + FP_WEATHER.length) % FP_WEATHER.length; store.set('fp.weather', prefs.fpWeather); }
+        else if (fp.dataset.fp === 'time') { prefs.fpTime = (prefs.fpTime + d + FP_TIMES.length) % FP_TIMES.length; store.set('fp.time', prefs.fpTime); }
         else prefs.fpFoes = clampN(prefs.fpFoes + d, 1, 8);
         store.set('fp.map', prefs.fpMap); store.set('fp.foes', prefs.fpFoes);
         renderMenu(); return;

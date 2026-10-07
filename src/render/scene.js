@@ -10,6 +10,7 @@ import { FEEL, HEAT, hotFrac } from '../data/feel.js';
 import { meleeOf } from '../data/melee.js';
 import { BARREL_AT, styleOf, BONE, BONE_COUNT } from '../mesh/mechParts.js';
 import { darkness, HEADLIGHTS } from '../data/palettes.js';
+import { fogOf } from '../data/weather.js';
 import { fallAngle } from '../sim/entities.js';
 import { propFor } from '../mesh/props.js';
 import { WEAPONS } from '../data/weapons.js';
@@ -101,6 +102,7 @@ export function createScene(app) {
   const NO_SHADE = [1, 1, 1], LAMP_COL = [1, 0.95, 0.75];
   const SPOT = { on: false, pos: [0, 0, 0], dir: [0, 0, 1], col: [0, 0, 0], cone: [Math.cos(HEADLIGHTS.cone[0]), Math.cos(HEADLIGHTS.cone[1])], range: HEADLIGHTS.range };
   let DARK = 0;   // how dark this frame is (palettes.js darkness)
+  const FOG = [0, 0];   // this frame's fog distances: the palette's, cut by the weather (data/weather.js)
   // A point through a matrix into `out`, without allocating.
   const placeInto = (m, p, out) => { for (let i = 0; i < 3; i++) out[i] = m[i] * p[0] + m[4 + i] * p[1] + m[8 + i] * p[2] + m[12 + i]; };
   const FRAME = {}, LOOK = new Float32Array(7);   // reused every frame: the effects' shared uniforms and one particle's look (mesh/effects.js)
@@ -231,7 +233,7 @@ export function createScene(app) {
   function drawEntities(eye) {
       // World entities: structures and vehicles (a nav point has no body). Plain
       // boxes until the prop meshes (#98) arrive; past the fog they are skipped.
-      const far = G.pal.fog[1] + 60;
+      const far = FOG[1] + 60;
       for (const e of G.entities) {
         if ((e.kind === 'nav' && !e.mesh) || (!e.alive && !e.wreck)) continue;
         if (Math.hypot(e.x - eye[0], e.z - eye[2]) > far) continue;
@@ -329,6 +331,7 @@ export function createScene(app) {
 
   function render() {
     MA.reset();
+    if (G.pal) fogOf(G, FOG);
     resize();
     R.draws = 0; R.culled = 0;
     if (!G.ter) return;
@@ -413,10 +416,10 @@ export function createScene(app) {
     }
     R.setSpot(R.U, SPOT);
     R.gl.uniform3fv(R.U.cam, eye);
-    R.gl.uniform2f(R.U.fog, G.pal.fog[0], G.pal.fog[1]);
+    R.gl.uniform2f(R.U.fog, FOG[0], FOG[1]);
     R.gl.uniform3fv(R.U.fogCol, hor);
     R.gl.uniform1f(R.U.ir, ir ? 1 : 0);
-    Object.assign(FRAME, { VP, spot: SPOT, light: G.pal.light, shade: ir ? NO_SHADE : G.pal.shade || NO_SHADE, cam: eye, fog: G.pal.fog, fogCol: hor, ir: ir ? 1 : 0 }); R.frame = FRAME;   // the instanced effects shader's copy
+    Object.assign(FRAME, { VP, spot: SPOT, light: G.pal.light, shade: ir ? NO_SHADE : G.pal.shade || NO_SHADE, cam: eye, fog: FOG, fogCol: hor, ir: ir ? 1 : 0 }); R.frame = FRAME;   // the instanced effects shader's copy
 
     R.drawHeat = 0;
     R.draw(world, M.id());

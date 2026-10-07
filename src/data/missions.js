@@ -1,5 +1,6 @@
 import { NAMES } from './names.js';
 import { makeRng } from '../sim/rng.js';
+import { WEATHER } from './weather.js';
 
 // A mission: { key, pal, seed, foes, intel }; its display name comes from
 // NAMES.missions[key]. From M3 also (docs/specs/03-objectives.md; the sim
@@ -179,6 +180,15 @@ export function contractDef(n) {
 }
 // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
 export const FP_MAPS = ['random', 'dusk', 'ice', 'volcanic'];
+// Free Play's WEATHER (RANDOM rolls one that suits the map, clear half the time)
+// and TIME (NORMAL is the map's own light).
+export const FP_WEATHER = ['clear', 'random', 'rain', 'snow', 'dust', 'fog'];
+export const FP_TIMES = ['day', 'dawn', 'night'];
+export function fpWeather(pick, biome, rand) {
+  if (pick !== 'random') return pick;
+  const fits = Object.entries(WEATHER).filter(([k, w]) => k !== 'clear' && w.biomes.includes(biome)).map(([k]) => k);
+  return rand() < 0.5 || !fits.length ? 'clear' : fits[Math.floor(rand() * fits.length)];
+}
 // Free Play's MIX: the chassis the hostiles are drawn from, by weight. MIXED
 // is the old default. Only chassis the player has unlocked turn up (`open`),
 // so the campaign keeps its surprises.
