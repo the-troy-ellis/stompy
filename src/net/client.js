@@ -21,6 +21,7 @@ import { hit, hello, ping as pingMsg, ready as readyMsg, stateMessage, PING_EVER
 import { lobbyHTML, lobbyHead, lobbyRows } from '../ui/lobby.js';
 import { fitOf } from '../ui/mechlab.js';
 import { applyLoadout, stockLoadout, validate } from '../sim/loadout.js';
+import { startSpectate } from './spectate.js';
 import { addKill } from './killfeed.js';
 
 const { sin, cos, atan2, min, max, random, hypot } = Math;
@@ -189,7 +190,7 @@ export function createNet(app) {
   // A round's world. `lobby`: the pilot waits in the lobby (not spawned, not
   // sending state) until READY; otherwise straight in, as at a new round.
   function startArena(seed, palName, lobby = false) {
-    G.mode = 'mp'; Net.feed.length = 0;
+    G.mode = 'mp'; G.spectate = null; Net.feed.length = 0;
     const def = { name: 'Arena', foes: [] };
     resetMatch(G, { def, seed, pal: palName });
     placeScenery(G, def);
@@ -226,7 +227,7 @@ export function createNet(app) {
       heat: 0, fuel: 1, shutdown: false, alive: true, air: false, hp: { ...P.max }, spawnT: 2 });
     P.weapons.forEach(w => { w.cd = 0; w.dead = false; w.ammo = w.def.ammo || null; });
     initFeet(G, P); P.lastYaw = P.yaw;
-    G.respawnAt = 0; G.flash = 0; G.killer = 0;
+    G.respawnAt = 0; G.flash = 0; G.killer = 0; G.spectate = null;   // back in the cockpit
     G.eye = eyeOf(P); G.view = dirOf(P.yaw, 0); G.aim = add(G.eye, mul(G.view, 100));
     sendState();
   }
@@ -325,6 +326,8 @@ export function createNet(app) {
     const P = G.player;
     if (P.spawnT > 0) P.spawnT -= dt;
     if (!P.alive && G.respawnAt && G.clock >= G.respawnAt) respawn();
+    // Down and done toppling: watch another pilot until the respawn (net/spectate.js).
+    else if (!P.alive && !P.dying && G.respawnAt && !G.spectate) startSpectate(G, G.killer);
     if ((Net.sendT += dt) >= 1 / SEND_HZ && !G.lobby) { Net.sendT = 0; sendState(); flushHits(); }   // in the lobby, nobody sees you yet
     if (G.clock - Net.pingT >= PING_EVERY) { Net.pingT = G.clock; Net.pingAt.set(++Net.pingN, performance.now()); netSend(pingMsg(Net.pingN, Net.rtt)); }
   }

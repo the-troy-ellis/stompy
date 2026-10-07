@@ -13,6 +13,7 @@ import { darkness, HEADLIGHTS } from '../data/palettes.js';
 import { fogOf, flashOf, WEATHER } from '../data/weather.js';
 import { makeWeatherBox, stepWeatherBox } from './weatherBox.js';
 import { fallAngle } from '../sim/entities.js';
+import { spectateCamera } from '../net/spectate.js';
 import { WRECK_BURN } from '../sim/combat.js';
 import { SCORCH_MAX } from '../sim/effects.js';
 import { propInto } from '../mesh/props.js';
@@ -453,7 +454,7 @@ export function createScene(app) {
     const hor = ir ? IR_HOR : SKY_H;
     R.gl.clearColor(hor[0], hor[1], hor[2], 1);
     R.gl.clear(R.gl.COLOR_BUFFER_BIT | R.gl.DEPTH_BUFFER_BIT);
-    let fov, yaw, pitch, eye, dir;
+    let fov, yaw, pitch, eye, dir, spec;
     if (G.state === 'menu') {
       // The main menu's mech: camera in front, aimed left of it so the mech
       // stands in the right-hand part of the screen beside the menu panel.
@@ -471,6 +472,10 @@ export function createScene(app) {
       eye = [c[0], c[1], c[2] + R];
       const off = aspect > 1 ? 0.4 * R * tf * aspect : 0, down = Math.atan(mid * tf);
       dir = norm(sub([c[0] - off, c[1] - Math.tan(down) * R, c[2]], eye));
+      yaw = atan2(dir[0], dir[2]); pitch = Math.asin(clampN(dir[1], -1, 1));
+    } else if (G.spectate && (spec = spectateCamera(G))) {
+      // Waiting to respawn in the arena: a chase camera on another pilot (net/spectate.js).
+      fov = (app.prefs?.fov || 62) * Math.PI / 180; eye = spec.eye; dir = norm(sub(spec.at, eye));
       yaw = atan2(dir[0], dir[2]); pitch = Math.asin(clampN(dir[1], -1, 1));
     } else if (gd) {
       // Riding just behind the volley, looking where it's going.

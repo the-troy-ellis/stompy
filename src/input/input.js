@@ -4,6 +4,7 @@ import { msg } from '../sim/effects.js';
 import { clampN } from '../util/math.js';
 import { CATS, CAT_OF } from '../data/weapons.js';
 import { steerBy, alpha, cycleTarget } from '../sim/missiles.js';
+import { nextSpectate, orbitSpectate } from '../net/spectate.js';
 import { darkness } from '../data/palettes.js';
 
 const { abs, hypot } = Math;
@@ -46,8 +47,10 @@ export function createInput(app) {
   document.addEventListener('pointerlockchange', onLockChange);
 
   const onMouseMove = e => {
-    if (G.state !== 'play' || G.paused || !G.player.alive) return;
+    if (G.state !== 'play' || G.paused) return;
     if (!locked()) return;
+    if (G.spectate) { orbitSpectate(G, -e.movementX * 0.004 * prefs.mouseSens, e.movementY * 0.003 * prefs.mouseSens * (prefs.invert ? -1 : 1)); return; }   // waiting to respawn: orbit
+    if (!G.player.alive) return;
     if (G.guide) { steerBy(G, e.movementX, e.movementY, 0.0028 * prefs.mouseSens, prefs.invert); return; }
     const sens = (G.zoom ? 0.0009 : 0.0024) * prefs.mouseSens;
     const P = G.player;
@@ -104,7 +107,7 @@ export function createInput(app) {
     if (e.repeat && keys[e.code]) return;
     keys[e.code] = true;
     if (KEY_FOR.missile.includes(e.code)) missileTap = true;
-    if (e.code === 'KeyT') cycleTarget(G);
+    if (e.code === 'KeyT') { if (G.spectate) nextSpectate(G); else cycleTarget(G); }   // spectating: the next pilot
     if (e.code === 'KeyE') punchTap = true;
     if (e.code === 'KeyR' && G.aimMech && G.aimMech.team !== 0) { G.target = G.aimMech; app.audio.sfx.beep(); }
     if (e.code === 'KeyF') alpha(G);
@@ -159,7 +162,7 @@ export function createInput(app) {
     else if (name === 'jump') keys.KeyJ = down;
     if (!down) return;
     if (name === 'punch') punchTap = true;
-    if (name === 'tgt') cycleTarget(G);
+    if (name === 'tgt') { if (G.spectate) nextSpectate(G); else cycleTarget(G); }
     else if (name === 'zoom') G.zoom = !G.zoom;
     else if (name === 'lights') toggleLights();
     else if (name === 'stop') G.player.throttle = 0;
@@ -211,6 +214,10 @@ export function createInput(app) {
       P.pitch = clampN(P.pitch - (e.clientY - f.ly) * 0.0055 * prefs.touchSens * (prefs.invert ? -1 : 1), -0.4, 0.45);
       f.lx = e.clientX; f.ly = e.clientY;
     } else if (f.kind === 'btn') {
+      f.lx = e.clientX; f.ly = e.clientY;
+    } else if (f.kind === 'aim' && G.spectate) {
+      // Waiting to respawn: the aim drag orbits the spectator camera.
+      orbitSpectate(G, -(e.clientX - f.lx) * 0.008 * prefs.touchSens, (e.clientY - f.ly) * 0.006 * prefs.touchSens * (prefs.invert ? -1 : 1));
       f.lx = e.clientX; f.ly = e.clientY;
     } else if (f.kind === 'aim' && P.alive) {
       // Sideways queues a turn of the legs; up and down pitches, as before.

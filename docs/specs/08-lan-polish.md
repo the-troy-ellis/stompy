@@ -101,6 +101,20 @@ TGT/T through alive pilots; the aim drag or mouse orbits. The HUD shows
 `SPECTATING <NAME>` and the respawn countdown. The camera is a render concern;
 `game.spectate = { id, yaw, pitch }`.
 
+As shipped (#188): `src/net/spectate.js` holds `startSpectate`,
+`nextSpectate`, `orbitSpectate`, `spectated` and `spectateCamera`.
+- **When:** spectating starts once your own topple has played out, on your
+  killer, or the lowest-numbered pilot alive if there is none. It ends at
+  the respawn.
+- **Who:** a watched pilot who dies hands over to the next one alive. With
+  nobody left, the cockpit view stays.
+- **The camera:** 24 m behind the pilot's torso, scaled by chassis, pitched
+  0.28 rad above it and kept 2 m above the ground.
+- **Controls:** the mouse (in pointer lock) or the aim drag orbits; T or TGT
+  moves to the next pilot.
+- **The HUD:** `SPECTATING <NAME>` and `RESPAWN IN n · T: NEXT PILOT`, low
+  in the view and clear of the messages. The crosshair is hidden.
+
 ### Reconnect
 
 The server keeps a departed pilot's score for 30 s keyed by a `token` it gave
