@@ -169,6 +169,8 @@ class Session(unittest.IsolatedAsyncioTestCase):
         relay.players.clear()
         relay.conns.clear()
         relay.departed.clear()
+        for code in [k for k in relay.rooms if k != relay.ARENA]:
+            del relay.rooms[code]
         relay.PER_IP = 99   # every test client is 127.0.0.1; the cap has its own test
         relay.arena.update(seed=5, pal="dusk", over=False, mode="ffa", teams=[0, 0], votes={}, round=0)
         relay.sleep = asyncio.sleep
@@ -600,6 +602,103 @@ class Session(unittest.IsolatedAsyncioTestCase):
         _, back = await self.rejoin("B", wb["token"])
         me = back["scores"][1]
         self.assertEqual((me["id"], me["team"], me["color"], me["kills"]), (2, 1, 1, 0))
+
+    async def hello(self, name, **extra):
+        c = await WSClient.connect(self.port)
+        self.clients.append(c)
+        await c.send({"t": "hello", "v": relay.PROTOCOL, "name": name, "color": 0, **extra})
+        return c, await c.recv()
+
+    async def coop(self, n=2):
+        """A co-op room with n pilots: the host (created it) and guests (joined by code)."""
+        host, w = await self.hello("H", create={"mission": 2, "diff": "hard", "seed": 77, "junk": "x"})
+        code, out = w["room"], [host]
+        for i in range(1, n):
+            g, _ = await self.hello(f"G{i}", room=code.lower())
+            out.append(g)
+            for earlier in out[:-1]:
+                self.assertEqual((await earlier.recv())["t"], "join")
+        return code, w, out
+
+    async def test_a_coop_room_gets_a_code_a_host_and_its_mission(self):
+        code, w, (host, guest) = await self.coop(2)
+        self.assertEqual(len(code), 4)
+        self.assertTrue(all(ch in relay.CODE_LETTERS for ch in code), "no vowels, so no words")
+        self.assertEqual((w["kind"], w["host"], w["id"], w["started"]), ("coop", 1, 1, 0))
+        self.assertEqual(w["def"], {"kind": "coop", "mission": 2, "diff": "hard", "seed": 77}, "the mission kept, cleaned")
+        self.assertNotIn("seed", w, "no arena round in a co-op room")
+        self.assertIn(code, relay.rooms)
+        a, wa = await self.join("ARENA PILOT")   # the arena is its own room
+        self.assertEqual((wa["room"], wa["kind"], wa["id"], len(wa["scores"])), ("ARENA", "arena", 1, 1))
+        await guest.send({"t": "ready"})
+        r = await host.recv()
+        self.assertEqual((r["t"], r["started"]), ("ready", 0), "a guest's READY doesn't start it")
+        await guest.recv()
+        await host.send({"t": "ready"})
+        self.assertEqual((await guest.recv())["started"], 1, "the host's does")
+        with self.assertRaises(asyncio.TimeoutError):
+            await a.recv(timeout=0.3)   # nothing from the co-op room reaches the arena
+
+    async def test_an_unknown_code_is_told_so(self):
+        c, m = await self.hello("X", room="QQQQ")
+        self.assertEqual(m, {"t": "noroom"})
+
+    def test_room_codes_are_unique(self):
+        letters = iter("BBBB" "BBBB" "CCCC")
+        relay.rooms["BBBB"] = relay.Room("BBBB", "coop")
+        try:
+            self.assertEqual(relay.new_code(lambda _: next(letters)), "CCCC")
+        finally:
+            del relay.rooms["BBBB"]
+
+    async def test_coop_routing_host_world_out_guest_hits_in(self):
+        code, _, (host, g1, g2) = await self.coop(3)
+        await host.send({"t": "es", "eid": 4, "x": 1})
+        for g in (g1, g2):
+            self.assertEqual(await g.recv(), {"t": "es", "eid": 4, "x": 1})
+        await g1.send({"t": "obj", "list": []})   # only the host's world counts
+        await g1.send({"t": "ehit", "eid": 4, "amt": 99, "p": [1, 2, 3], "fu": 1, "kb": [50, 0]})
+        eh = await host.recv()
+        self.assertEqual((eh["t"], eh["from"], eh["eid"], eh["amt"], eh["fu"], eh["kb"]), ("ehit", 2, 4, 40, 1, [30, 0]))
+        await g1.send({"t": "hit", "to": 3, "amt": 10, "p": [0, 0, 0]})   # pilots never hit each other
+        await host.send({"t": "ehit", "eid": 4, "amt": 5})                 # the host applies its own
+        with self.assertRaises(asyncio.TimeoutError):
+            await g2.recv(timeout=0.3)
+        with self.assertRaises(asyncio.TimeoutError):
+            await host.recv(timeout=0.3)
+        await host.send({"t": "hit", "to": 3, "amt": 12, "p": [0, 0, 0], "eid": 4})   # enemy fire
+        h = await g2.recv()
+        self.assertEqual((h["t"], h["from"], h["eid"], h["amt"]), ("hit", 0, 4, 12))
+
+    async def test_the_host_leaving_hands_over_and_an_empty_room_is_gone(self):
+        code, _, (host, g1, g2) = await self.coop(3)
+        host.close()
+        for g in (g1, g2):
+            self.assertEqual((await g.recv())["t"], "leave")
+            m = await g.recv()
+            self.assertEqual((m["t"], m["id"]), ("host", 2))
+        await g1.send({"t": "es", "eid": 1})   # the new host's world goes out
+        self.assertEqual((await g2.recv())["t"], "es")
+        g1.close()
+        self.assertEqual((await g2.recv())["t"], "leave")
+        g2.close()
+        await asyncio.sleep(0.15)
+        self.assertNotIn(code, relay.rooms)
+        _, m = await self.hello("LATE", room=code)
+        self.assertEqual(m["t"], "noroom")
+
+    async def test_a_coop_room_holds_four_and_keeps_the_end_for_late_joiners(self):
+        code, _, pilots = await self.coop(4)
+        _, m = await self.hello("FIFTH", room=code)
+        self.assertEqual(m, {"t": "full", "max": 4})
+        pilots[3].close()
+        for p in pilots[:3]:
+            await p.recv()   # leave
+        await pilots[0].send({"t": "over", "won": 1})
+        await pilots[1].recv()
+        late, w = await self.hello("LATE", room=code)
+        self.assertEqual(w["t"], "welcome")
+        self.assertEqual(await late.recv(), {"t": "over", "won": 1})
 
     async def test_ninth_pilot_is_turned_away(self):
         for i in range(8):

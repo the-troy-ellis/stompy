@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Stompy multiplayer relay: one arena for up to eight phones, free-for-all or team deathmatch.
+"""Stompy multiplayer relay: one arena for up to eight phones, free-for-all or team
+deathmatch, and co-op rooms of up to four flying a mission together.
 
 The server does not simulate anything. Each client runs its own mech and
 sends its state ~15 times a second; the server stamps it with the sender's id
@@ -7,6 +8,14 @@ and relays it to everyone else. Hits are decided by the shooter's client (what
 you see is what counts, which feels fair on Wi-Fi) and forwarded to the
 victim, whose client applies the damage and reports its own death. The server
 keeps the only shared state: who is connected, the scores, and the round.
+
+Rooms: the arena is room ARENA, always there. A hello with `create` opens a
+co-op room under a new four-letter code; its first pilot is the host, whose
+client runs the enemies and the objectives (docs/specs/09-coop.md). The
+server does not understand missions: it routes. A guest's `ehit` goes to the
+host only; the host's `es`, `ent`, `entx`, `obj` and `over` go to everyone
+else; only the host's `hit` (enemy fire) reaches a pilot. When the host
+leaves, the lowest id left takes over; an empty co-op room is gone.
 
 Fine among friends on a LAN; trivially cheatable by anyone who edits the JS.
 
@@ -40,7 +49,7 @@ PING_EVERY = 10
 DROP_AFTER = 25           # seconds of silence (a phone that went to sleep)
 MAX_BUFFERED = 256 * 1024 # a client this far behind is dropped, not waited for
 PALETTES = ("dusk", "ice", "volcanic")
-PROTOCOL = 12             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
+PROTOCOL = 13             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
 HALF = 96 * 24 / 2        # the map's half width (src/world/terrain.js): positions are clamped to it
 FX_RATE = 40              # weapon effects per second per pilot; more are dropped (a beam flash is per shot, guided updates 15 Hz)
 PER_IP = int(os.environ.get("STOMPY_PER_IP", 4))   # sockets from one address at once (phones and a laptop behind one NAT)
@@ -48,6 +57,10 @@ MODE = os.environ.get("STOMPY_MODE", "ffa")         # the arena's mode: ffa (fre
 MODES = ("ffa", "tdm")
 TEAM_LIMIT = int(os.environ.get("STOMPY_TEAM_LIMIT", 20))   # a team's kills to win a round in tdm
 TEAM_COLORS = (0, 1)      # STEEL and RED (src/data/colors.js MP_COLORS): in tdm a team's colour is forced
+ARENA = "ARENA"           # the arena's room code: always there
+COOP_MAX = 4              # pilots in a co-op room
+CODE_LETTERS = "BCDFGHJKLMNPQRSTVWXZ"   # room codes: four of these (no vowels, so no words)
+FROM_HOST = ("es", "ent", "entx", "obj", "over")   # co-op: the host's world, relayed to everyone else
 KEEP = 30                 # seconds a departed pilot's id and score wait for a hello with their token (a dropped phone)
 VOTES = ("next", "same", "mode")   # the round-end vote, in order (a tie goes to the first): next map, same map, the other mode
 LOG_FILE = os.environ.get("STOMPY_LOG")             # also log to this file (appended; rotation is logrotate's job)
@@ -86,11 +99,25 @@ class Client:
         self.best = 0         # the round's best streak
         self.acc = -1         # the round's accuracy in %, as the client reports it at round end (-1: not yet)
         self.token = ""       # from welcome: a hello carrying it within KEEP seconds of a drop resumes this pilot
+        self.room = None      # the Room joined (None until the hello)
         self.last = time.monotonic()
         self.fx_tokens, self.fx_at = float(FX_RATE), time.monotonic()   # the fx rate limit: a bucket that refills at FX_RATE a second
 
 
-players: dict[int, Client] = {}
+class Room:
+    """The arena (kind "arena") or a co-op room (kind "coop") and who is in it."""
+    def __init__(self, code, kind, players=None, mission=None):
+        self.code, self.kind = code, kind
+        self.players = {} if players is None else players
+        self.max = MAX_PLAYERS if kind == "arena" else COOP_MAX
+        self.host = 0          # co-op: the pilot id whose client runs the enemies and objectives
+        self.mission = mission  # co-op: the host's `create` (mission, difficulty, seed), passed on as `def`
+        self.started = False   # co-op: the host has pressed READY
+        self.over = None       # co-op: the host's `over`, for anyone who joins after
+
+
+players: dict[int, Client] = {}   # the arena's pilots
+rooms: dict[str, Room] = {ARENA: Room(ARENA, "arena", players)}
 conns: dict[str, int] = {}   # open sockets per address, for the PER_IP cap
 departed: dict[str, dict] = {}   # token -> a dropped pilot's id and score, until KEEP runs out
 arena = {"seed": random.randrange(1, 10**6), "pal": random.choice(PALETTES), "over": False,
@@ -197,18 +224,19 @@ def send(c, obj):
     w.write(frame(OP_TEXT, json.dumps(obj, separators=(",", ":")).encode()))
 
 
-def broadcast(obj, skip=None):
-    for c in list(players.values()):
+def broadcast(obj, skip=None, room=None):
+    """To everyone in the room (the arena unless one is named) but `skip`."""
+    for c in list((room.players if room else players).values()):
         if c is not skip:
             send(c, obj)
 
 
 # ---------------------------------------------------------------- the arena
 
-def scores():
+def scores(room=None):
     return [{"id": c.id, "name": c.name, "color": c.color, "kills": c.kills, "deaths": c.deaths,
              "ch": c.ch, "ready": 1 if c.ready else 0, "ping": c.ping, "team": c.team, "best": c.best, "acc": c.acc}
-            for c in sorted(players.values(), key=lambda c: c.id)]
+            for c in sorted((room.players if room else players).values(), key=lambda c: c.id)]
 
 
 def tdm():
@@ -222,7 +250,8 @@ def limit():
 
 def paint(c):
     """The pilot's colour as everyone sees it: their pick, or their team's in tdm."""
-    c.color = TEAM_COLORS[c.team] if tdm() else c.pick
+    in_arena = c.room is None or c.room.kind == "arena"
+    c.color = TEAM_COLORS[c.team] if in_arena and tdm() else c.pick
 
 
 def tally():
@@ -243,25 +272,65 @@ def vote_result():
 def keep(c, now=None):
     """A dropped pilot's place, kept under their token for KEEP seconds."""
     now = time.monotonic() if now is None else now
-    departed[c.token] = {"id": c.id, "until": now + KEEP, "round": arena["round"], "team": c.team, "ready": c.ready,
+    departed[c.token] = {"id": c.id, "room": c.room.code if c.room else ARENA, "until": now + KEEP, "round": arena["round"], "team": c.team, "ready": c.ready,
                          "kills": c.kills, "deaths": c.deaths, "streak": c.streak, "best": c.best}
 
 
-def resume(token, now=None):
-    """The place kept under `token`, if it is still waiting (and taken off the
-    list); expired places are cleared on the way."""
+def resume(token, room=None, now=None):
+    """The place kept under `token` in this room, if it is still waiting (and
+    taken off the list); expired places are cleared on the way."""
+    room = room or rooms[ARENA]
     now = time.monotonic() if now is None else now
     for t in [t for t, d in departed.items() if d["until"] < now]:
         del departed[t]
     saved = departed.pop(token, None) if isinstance(token, str) else None
-    return saved if saved and saved["id"] not in players else None
+    return saved if saved and saved["room"] == room.code and saved["id"] not in room.players else None
 
 
-def free_id():
-    """The lowest id nobody has, sparing the ones kept for dropped pilots while any other is free."""
-    held = {d["id"] for d in departed.values()}
-    free = [i for i in range(1, MAX_PLAYERS + 1) if i not in players]
+def free_id(room=None):
+    """The lowest id nobody in the room has, sparing the ones kept for dropped pilots while any other is free."""
+    room = room or rooms[ARENA]
+    held = {d["id"] for d in departed.values() if d["room"] == room.code}
+    free = [i for i in range(1, room.max + 1) if i not in room.players]
     return next((i for i in free if i not in held), free[0])
+
+
+def new_code(pick=secrets.choice):
+    """Four letters no room has."""
+    while True:
+        code = "".join(pick(CODE_LETTERS) for _ in range(4))
+        if code not in rooms:
+            return code
+
+
+def clean_mission(create):
+    """A co-op room's mission as the host asked for it: the server only keeps and passes it on."""
+    return {"kind": "coop", "mission": int(num(create.get("mission"), 0, 99)),
+            "diff": "".join(ch for ch in str(create.get("diff") or "normal")[:8] if ch.isalpha()).lower() or "normal",
+            "seed": int(num(create.get("seed"), 0, 10**9))}
+
+
+def clean_hit(msg, sender):
+    """A hit as the victim gets it: from whom, clamped (amt to 40, kb parts to 30, hh to 20)."""
+    p = msg.get("p") if isinstance(msg.get("p"), list) else [0, 0, 0]
+    # fu: a fusion-cannon discharge -- the victim's client treats it as
+    # a kill rather than damage (hit damage is capped at 40).
+    out = {"t": "hit", "from": sender, "amt": num(msg.get("amt"), 0, 40),
+           "p": [num(v, -1e4, 1e4) for v in p[:3]], "fu": 1 if msg.get("fu") else 0}
+    # kb: a shove [vx, vz] the victim adds to its push, clamped; me / st: punch / stomp.
+    kb = msg.get("kb")
+    if isinstance(kb, list) and len(kb) == 2:
+        out["kb"] = [num(v, -30, 30) for v in kb]
+    if msg.get("me"):
+        out["me"] = 1
+    if msg.get("st"):
+        out["st"] = 1
+    if msg.get("zap"):
+        out["zap"] = 1   # a bolt: the victim's HUD scrambles
+    hh = num(msg.get("hh"), 0, 20)
+    if hh > 0:
+        out["hh"] = hh   # heat poured in (TOASTER), clamped
+    return out
 
 
 def smaller_team(skip=None):
@@ -374,12 +443,24 @@ def handle_message(c, msg):
                 out["lo"] = lo
             if rejected:
                 send(c, {"t": "note", "k": "lo"})
-        broadcast(out, skip=c)
+        broadcast(out, skip=c, room=c.room)
     elif t == "ready":
         # Out of the lobby and into the arena: everyone's pilot list says so.
+        # In co-op, the host's READY starts the mission for everyone.
+        room = c.room or rooms[ARENA]
         if not c.ready:
             c.ready = True
-            broadcast({"t": "ready", "id": c.id, "scores": scores()})
+            if room.kind == "coop" and c.id == room.host:
+                room.started = True
+            broadcast({"t": "ready", "id": c.id, "started": 1 if room.started else 0, "scores": scores(room)}, room=room)
+    elif t == "ping":
+        # The lobby's ping: echoed at once with the server's time and every
+        # pilot's last round trip; the client reports its own with the next.
+        c.ping = int(num(msg.get("rtt"), 0, 9999))
+        send(c, {"t": "ping", "n": msg.get("n") if isinstance(msg.get("n"), int) else 0, "ts": int(time.time() * 1000),
+                 "pings": {str(p.id): p.ping for p in (c.room or rooms[ARENA]).players.values()}})
+    elif c.room and c.room.kind == "coop":
+        handle_coop(c, msg, t)
     elif t == "team":
         # tdm: a pilot still in the lobby picks a side; the colour follows.
         if tdm() and not c.ready:
@@ -397,34 +478,10 @@ def handle_message(c, msg):
         if arena["over"]:
             c.acc = int(num(msg.get("acc"), 0, 100))
             broadcast({"t": "tally", "votes": tally(), "scores": scores()})
-    elif t == "ping":
-        # The lobby's ping: echoed at once with the server's time and every
-        # pilot's last round trip; the client reports its own with the next.
-        c.ping = int(num(msg.get("rtt"), 0, 9999))
-        send(c, {"t": "ping", "n": msg.get("n") if isinstance(msg.get("n"), int) else 0, "ts": int(time.time() * 1000),
-                 "pings": {str(p.id): p.ping for p in players.values()}})
     elif t == "hit":
         target = players.get(int(num(msg.get("to"), 0, 99)))
         if target and target is not c and not arena["over"] and not (tdm() and target.team == c.team):   # friendly fire is off
-            p = msg.get("p") if isinstance(msg.get("p"), list) else [0, 0, 0]
-            # fu: a fusion-cannon discharge -- the victim's client treats it as
-            # a kill rather than damage (hit damage is capped at 40).
-            out = {"t": "hit", "from": c.id, "amt": num(msg.get("amt"), 0, 40),
-                   "p": [num(v, -1e4, 1e4) for v in p[:3]], "fu": 1 if msg.get("fu") else 0}
-            # kb: a shove [vx, vz] the victim adds to its push, clamped; me / st: punch / stomp.
-            kb = msg.get("kb")
-            if isinstance(kb, list) and len(kb) == 2:
-                out["kb"] = [num(v, -30, 30) for v in kb]
-            if msg.get("me"):
-                out["me"] = 1
-            if msg.get("st"):
-                out["st"] = 1
-            if msg.get("zap"):
-                out["zap"] = 1   # a bolt: the victim's HUD scrambles
-            hh = num(msg.get("hh"), 0, 20)
-            if hh > 0:
-                out["hh"] = hh   # heat poured in (TOASTER), clamped
-            send(target, out)
+            send(target, clean_hit(msg, c.id))
     elif t == "died":
         c.deaths += 1
         c.streak = 0
@@ -444,6 +501,35 @@ def handle_message(c, msg):
         broadcast(kill)
         if scored and (arena["teams"][killer.team] if tdm() else killer.kills) >= limit():
             asyncio.ensure_future(end_round(killer))
+
+
+def handle_coop(c, msg, t):
+    """A co-op room's own messages, routed by who the host is."""
+    room = c.room
+    host = room.players.get(room.host)
+    if t in FROM_HOST:
+        # The host's world (enemies, entities, objectives, the end): to
+        # everyone else, as sent. `over` is kept for anyone who joins after.
+        if c is host:
+            if t == "over":
+                room.over = msg
+            broadcast(msg, skip=c, room=room)
+    elif t == "ehit":
+        # A guest's hit on an enemy: the host applies it (the shooter decided it landed).
+        if host and c is not host:
+            out = clean_hit(msg, c.id)
+            out.update(t="ehit", eid=int(num(msg.get("eid"), 0, 9999)))
+            send(host, out)
+    elif t == "hit":
+        # Enemy fire, decided by the host's AI: to the pilot it hit. Pilots never hit each other here.
+        target = room.players.get(int(num(msg.get("to"), 0, 99)))
+        if c is host and target and target is not c:
+            out = clean_hit(msg, 0)
+            out["eid"] = int(num(msg.get("eid"), 0, 9999))
+            send(target, out)
+    elif t == "died":
+        c.deaths += 1
+        broadcast({"t": "kill", "victim": c.id, "killer": 0, "scores": scores(room)}, room=room)
 
 
 async def session(reader, writer):
@@ -471,29 +557,49 @@ async def session(reader, writer):
             send(c, {"t": "version", "need": PROTOCOL})
             log(f"turned away v{hello.get('v')} from {peer[0] if peer else '?'} (need v{PROTOCOL})")
             return
-        if len(players) >= MAX_PLAYERS:
-            send(c, {"t": "full", "max": MAX_PLAYERS})
+        # The room: a new co-op one (`create`), one by its code, or the arena.
+        create, want = hello.get("create"), hello.get("room")
+        if isinstance(create, dict):
+            room = Room(new_code(), "coop", mission=clean_mission(create))
+            rooms[room.code] = room
+            log(f"room {room.code} opened: {room.mission}")
+        else:
+            room = rooms.get(want.strip().upper() if isinstance(want, str) else ARENA)
+            if room is None:
+                send(c, {"t": "noroom"})
+                return
+        if len(room.players) >= room.max:
+            send(c, {"t": "full", "max": room.max})
             return
+        c.room = room
         # A dropped pilot back within KEEP seconds: the same id, side and
         # score (this round's), and straight back in if they were.
-        saved = resume(hello.get("token"))
-        c.id = saved["id"] if saved else free_id()
+        saved = resume(hello.get("token"), room)
+        c.id = saved["id"] if saved else free_id(room)
         c.name = clean_name(hello.get("name"), c.id)
         c.pick = int(num(hello.get("color"), 0, 7))
-        c.team = saved["team"] if saved else smaller_team()
+        c.team = saved["team"] if saved else smaller_team() if room.kind == "arena" else 0
         if saved:
             c.ready = saved["ready"]
-            if saved["round"] == arena["round"]:
+            if room.kind == "coop" or saved["round"] == arena["round"]:
                 c.kills, c.deaths, c.streak, c.best = saved["kills"], saved["deaths"], saved["streak"], saved["best"]
         paint(c)
         c.ch = chassis_or_stock(hello.get("ch"))
         c.token = secrets.token_hex(8)
-        players[c.id] = c
-        log(f"{'back' if saved else 'join'} {c.id} {c.name} from {peer[0] if peer else '?'} ({len(players)} playing)")
-        send(c, {"t": "welcome", "id": c.id, "seed": arena["seed"], "pal": arena["pal"], "mode": arena["mode"],
-                 "limit": limit(), "teams": arena["teams"], "over": arena["over"], "token": c.token,
-                 "resumed": 1 if saved else 0, "scores": scores()})
-        broadcast({"t": "join", "id": c.id, "name": c.name, "color": c.color, "scores": scores()}, skip=c)
+        room.players[c.id] = c
+        if room.kind == "coop" and room.host not in room.players:
+            room.host = c.id   # the first pilot in hosts
+        log(f"{'back' if saved else 'join'} {c.id} {c.name} in {room.code} from {peer[0] if peer else '?'} ({len(room.players)} there)")
+        welcome = {"t": "welcome", "id": c.id, "room": room.code, "kind": room.kind, "host": room.host,
+                   "token": c.token, "resumed": 1 if saved else 0, "scores": scores(room)}
+        if room.kind == "arena":
+            welcome.update(seed=arena["seed"], pal=arena["pal"], mode=arena["mode"], limit=limit(), teams=arena["teams"], over=arena["over"])
+        else:
+            welcome.update({"def": room.mission, "started": 1 if room.started else 0})
+        send(c, welcome)
+        if room.over:
+            send(c, room.over)   # the mission already ended: the debrief
+        broadcast({"t": "join", "id": c.id, "name": c.name, "color": c.color, "scores": scores(room)}, skip=c, room=room)
 
         while True:
             op, data = await read_message(reader)
@@ -516,11 +622,21 @@ async def session(reader, writer):
     except (asyncio.IncompleteReadError, ConnectionError, asyncio.TimeoutError, OSError, ValueError):
         pass
     finally:
-        if c and players.get(c.id) is c:
-            del players[c.id]
+        room = c.room if c else None
+        if room and room.players.get(c.id) is c:
+            del room.players[c.id]
             keep(c)
-            log(f"leave {c.id} {c.name} ({len(players)} playing)")
-            broadcast({"t": "leave", "id": c.id, "scores": scores()})
+            log(f"leave {c.id} {c.name} from {room.code} ({len(room.players)} there)")
+            broadcast({"t": "leave", "id": c.id, "scores": scores(room)}, room=room)
+            if room.kind == "coop":
+                if not room.players:
+                    if rooms.get(room.code) is room:
+                        del rooms[room.code]   # nobody left: the room is gone
+                    log(f"room {room.code} closed")
+                elif room.host == c.id:
+                    room.host = min(room.players)   # the lowest id left runs the world now
+                    log(f"room {room.code}: {room.host} is host")
+                    broadcast({"t": "host", "id": room.host, "scores": scores(room)}, room=room)
         conns[ip] -= 1
         if conns[ip] <= 0:
             del conns[ip]
@@ -532,7 +648,7 @@ async def heartbeat():
     while True:
         await asyncio.sleep(PING_EVERY)
         now = time.monotonic()
-        for c in list(players.values()):
+        for c in [c for room in list(rooms.values()) for c in room.players.values()]:
             if now - c.last > DROP_AFTER:
                 log(f"timeout {c.id} {c.name}")
                 c.writer.close()

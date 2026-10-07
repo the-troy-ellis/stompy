@@ -28,3 +28,11 @@ test('hello carries the token from the last welcome, and only when there is one 
   assert.ok(!('token' in P.hello('A', 2, 'warden', null)));
   assert.ok(P.PROTOCOL >= 12);
 });
+
+test('hello names a co-op room by code, or asks for a new one (#201)', () => {
+  assert.equal(P.hello('A', 0, 'kestrel', null, { room: 'BCDF' }).room, 'BCDF');
+  assert.deepEqual(P.hello('A', 0, 'kestrel', null, { create: { mission: 2, diff: 'hard', seed: 9, x: 1 } }).create, { mission: 2, diff: 'hard', seed: 9 });
+  const plain = P.hello('A', 0, 'kestrel');
+  assert.ok(!('room' in plain) && !('create' in plain), 'the arena by default');
+  assert.ok(P.PROTOCOL >= 13);
+});
