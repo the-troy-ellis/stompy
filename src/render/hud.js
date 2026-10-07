@@ -8,6 +8,7 @@ import { MELT_MAX, beamMult } from '../sim/beams.js';
 import { HEAT, hotFrac, FEEL } from '../data/feel.js';
 import { makeSpring, stepSpring } from '../util/spring.js';
 import { liveKills, killWords } from '../net/killfeed.js';
+import { teamCss, teamName } from '../net/teams.js';
 
 const { sin, cos, atan2, min, max, PI, random, hypot, floor } = Math;
 
@@ -173,12 +174,19 @@ export function createHud(app) {
     let y = L.hostiles.y + 14;
     const x = L.hostiles.x;
     ctx.textAlign = 'right';
+    if (app.net.tdm()) {
+      // Team deathmatch: each side's kills in its colour, yours first.
+      const mine = app.net.myTeam(), parts = [mine, 1 - mine].map(t => [`${teamName(t)} ${app.net.Net.teams[t]}`, teamCss(t)]);
+      let px = x;
+      for (let i = parts.length - 1; i >= 0; i--) { ctx.fillStyle = parts[i][1]; ctx.fillText(parts[i][0], px, y); px -= ctx.measureText(parts[i][0]).width + 12; }
+      y += 14;
+    }
     if (G.touchUI) {
       // Phones: one line -- the full board would sit under the fire buttons.
       // (It's in the menu.)
       const rank = board.findIndex(p => p.id === app.net.Net.id) + 1, me = app.net.Net.info.get(app.net.Net.id), lead = board[0];
       ctx.fillStyle = AMBER;
-      ctx.fillText(`#${rank} ${me ? `${me.kills}/${me.deaths}` : ''}${lead && lead.id !== app.net.Net.id ? `  LEAD ${lead.name} ${lead.kills}` : ''}`, x, y);
+      ctx.fillText(app.net.tdm() ? `YOU ${me ? `${me.kills}/${me.deaths}` : ''}` : `#${rank} ${me ? `${me.kills}/${me.deaths}` : ''}${lead && lead.id !== app.net.Net.id ? `  LEAD ${lead.name} ${lead.kills}` : ''}`, x, y);
     } else for (const p of board) {
       ctx.fillStyle = p.id === app.net.Net.id ? AMBER : GREEN;
       ctx.fillText(`${p.name.padEnd(12)} ${String(p.kills).padStart(2)}/${p.deaths}`, x, y);
@@ -628,7 +636,7 @@ export function createHud(app) {
     if (G.zoom) { ctx.font = '11px "Lucida Console", monospace'; ctx.fillStyle = GREEN; ctx.fillText('ZOOM 2.5x', app.scene.view.W / 2, L.viewBottom - (L.frame ? 10 : 24)); }
     const left = G.mechs.filter(m => m.alive && m.team !== 0).length;
     ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'right'; ctx.fillStyle = DIM;
-    ctx.fillText(app.net.mp() ? `PILOTS ${app.net.Net.info.size}  FIRST TO ${app.net.Net.limit}` : `HOSTILES ${left}`, L.hostiles.x, L.hostiles.y);
+    ctx.fillText(app.net.mp() ? `${app.net.tdm() ? '' : `PILOTS ${app.net.Net.info.size}  `}FIRST TO ${app.net.Net.limit}` : `HOSTILES ${left}`, L.hostiles.x, L.hostiles.y);
     if (app.net.mp()) drawArenaHUD(L);
     // Phones held upright get a cramped, stretched view.
     if (G.touchUI && app.scene.view.H > app.scene.view.W) {

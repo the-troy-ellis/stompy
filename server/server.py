@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stompy multiplayer relay: one free-for-all arena for up to eight phones.
+"""Stompy multiplayer relay: one arena for up to eight phones, free-for-all or team deathmatch.
 
 The server does not simulate anything. Each client runs its own mech and
 sends its state ~15 times a second; the server stamps it with the sender's id
@@ -39,11 +39,14 @@ PING_EVERY = 10
 DROP_AFTER = 25           # seconds of silence (a phone that went to sleep)
 MAX_BUFFERED = 256 * 1024 # a client this far behind is dropped, not waited for
 PALETTES = ("dusk", "ice", "volcanic")
-PROTOCOL = 9              # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
+PROTOCOL = 10             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
 HALF = 96 * 24 / 2        # the map's half width (src/world/terrain.js): positions are clamped to it
 FX_RATE = 40              # weapon effects per second per pilot; more are dropped (a beam flash is per shot, guided updates 15 Hz)
 PER_IP = int(os.environ.get("STOMPY_PER_IP", 4))   # sockets from one address at once (phones and a laptop behind one NAT)
-MODE = os.environ.get("STOMPY_MODE", "ffa")         # the arena's mode: free-for-all (team deathmatch comes with TDM)
+MODE = os.environ.get("STOMPY_MODE", "ffa")         # the arena's mode: ffa (free-for-all) or tdm (team deathmatch)
+MODES = ("ffa", "tdm")
+TEAM_LIMIT = int(os.environ.get("STOMPY_TEAM_LIMIT", 20))   # a team's kills to win a round in tdm
+TEAM_COLORS = (0, 1)      # STEEL and RED (src/data/colors.js MP_COLORS): in tdm a team's colour is forced
 LOG_FILE = os.environ.get("STOMPY_LOG")             # also log to this file (appended; rotation is logrotate's job)
 _log_out = None
 
@@ -68,7 +71,9 @@ class Client:
         self.writer = writer
         self.id = 0
         self.name = ""
-        self.color = 0
+        self.color = 0        # as shown: the pick from hello, or the team's colour in tdm
+        self.pick = 0         # the colour the pilot chose (hello)
+        self.team = 0         # tdm: 0 STEEL, 1 RED; picked in the lobby before READY
         self.ch = "kestrel"   # the chassis, for the lobby's pilot list (hello, then each state message)
         self.ready = False    # in the lobby until READY
         self.ping = 0         # ms, as the client last measured its round trip
@@ -80,7 +85,8 @@ class Client:
 
 players: dict[int, Client] = {}
 conns: dict[str, int] = {}   # open sockets per address, for the PER_IP cap
-arena = {"seed": random.randrange(1, 10**6), "pal": random.choice(PALETTES), "over": False}
+arena = {"seed": random.randrange(1, 10**6), "pal": random.choice(PALETTES), "over": False,
+         "mode": MODE if MODE in MODES else "ffa", "teams": [0, 0]}   # teams: each team's kills this round (tdm)
 
 
 # ---------------------------------------------------------------- WebSocket
@@ -191,8 +197,31 @@ def broadcast(obj, skip=None):
 
 def scores():
     return [{"id": c.id, "name": c.name, "color": c.color, "kills": c.kills, "deaths": c.deaths,
-             "ch": c.ch, "ready": 1 if c.ready else 0, "ping": c.ping}
+             "ch": c.ch, "ready": 1 if c.ready else 0, "ping": c.ping, "team": c.team}
             for c in sorted(players.values(), key=lambda c: c.id)]
+
+
+def tdm():
+    return arena["mode"] == "tdm"
+
+
+def limit():
+    """Kills to win the round: a pilot's in ffa, a team's in tdm."""
+    return TEAM_LIMIT if tdm() else SCORE_LIMIT
+
+
+def paint(c):
+    """The pilot's colour as everyone sees it: their pick, or their team's in tdm."""
+    c.color = TEAM_COLORS[c.team] if tdm() else c.pick
+
+
+def smaller_team(skip=None):
+    """The team with fewer pilots (STEEL on a tie): where a newcomer starts."""
+    n = [0, 0]
+    for p in players.values():
+        if p is not skip:
+            n[p.team] += 1
+    return 1 if n[1] < n[0] else 0
 
 
 def clean_name(raw, cid):
@@ -249,14 +278,20 @@ def fx_allowed(c, now=None):
 
 
 async def end_round(winner):
+    """`winner`: the pilot who reached the limit; in tdm their team wins."""
     arena["over"] = True
-    log(f"round over: {winner.name} wins")
-    broadcast({"t": "roundover", "winner": winner.id, "name": winner.name, "next": ROUND_GAP, "scores": scores()})
+    over = {"t": "roundover", "winner": winner.id, "name": winner.name, "next": ROUND_GAP, "teams": arena["teams"], "scores": scores()}
+    if tdm():
+        over["team"] = winner.team
+    log(f"round over: {'team ' + str(winner.team) if tdm() else winner.name} wins")
+    broadcast(over)
     await asyncio.sleep(ROUND_GAP)
-    arena.update(seed=random.randrange(1, 10**6), pal=random.choice(PALETTES), over=False)
+    arena.update(seed=random.randrange(1, 10**6), pal=random.choice(PALETTES), over=False, teams=[0, 0])
     for c in players.values():
         c.kills = c.deaths = 0
-    broadcast({"t": "newround", "seed": arena["seed"], "pal": arena["pal"], "scores": scores()})
+        paint(c)
+    broadcast({"t": "newround", "seed": arena["seed"], "pal": arena["pal"], "mode": arena["mode"], "limit": limit(),
+               "teams": arena["teams"], "scores": scores()})
 
 
 def handle_message(c, msg):
@@ -286,6 +321,12 @@ def handle_message(c, msg):
         if not c.ready:
             c.ready = True
             broadcast({"t": "ready", "id": c.id, "scores": scores()})
+    elif t == "team":
+        # tdm: a pilot still in the lobby picks a side; the colour follows.
+        if tdm() and not c.ready:
+            c.team = 1 if num(msg.get("team"), 0, 1) >= 0.5 else 0
+            paint(c)
+            broadcast({"t": "team", "id": c.id, "scores": scores()})
     elif t == "ping":
         # The lobby's ping: echoed at once with the server's time and every
         # pilot's last round trip; the client reports its own with the next.
@@ -294,7 +335,7 @@ def handle_message(c, msg):
                  "pings": {str(p.id): p.ping for p in players.values()}})
     elif t == "hit":
         target = players.get(int(num(msg.get("to"), 0, 99)))
-        if target and target is not c and not arena["over"]:
+        if target and target is not c and not arena["over"] and not (tdm() and target.team == c.team):   # friendly fire is off
             p = msg.get("p") if isinstance(msg.get("p"), list) else [0, 0, 0]
             # fu: a fusion-cannon discharge -- the victim's client treats it as
             # a kill rather than damage (hit damage is capped at 40).
@@ -319,13 +360,16 @@ def handle_message(c, msg):
         killer = players.get(int(num(msg.get("by"), 0, 99)))
         if killer is c:
             killer = None
-        if killer and not arena["over"]:
+        scored = killer and not arena["over"] and not (tdm() and killer.team == c.team)   # a teammate never scores
+        if scored:
             killer.kills += 1
-        kill = {"t": "kill", "victim": c.id, "killer": killer.id if killer else 0, "scores": scores()}
+            if tdm():
+                arena["teams"][killer.team] += 1
+        kill = {"t": "kill", "victim": c.id, "killer": killer.id if killer else 0, "teams": arena["teams"], "scores": scores()}
         if msg.get("me"):
             kill["me"] = 1   # a punch: the kill feed says so
         broadcast(kill)
-        if killer and killer.kills >= SCORE_LIMIT and not arena["over"]:
+        if scored and (arena["teams"][killer.team] if tdm() else killer.kills) >= limit():
             asyncio.ensure_future(end_round(killer))
 
 
@@ -359,12 +403,14 @@ async def session(reader, writer):
             return
         c.id = next(i for i in range(1, MAX_PLAYERS + 1) if i not in players)
         c.name = clean_name(hello.get("name"), c.id)
-        c.color = int(num(hello.get("color"), 0, 7))
+        c.pick = int(num(hello.get("color"), 0, 7))
+        c.team = smaller_team()
+        paint(c)
         c.ch = chassis_or_stock(hello.get("ch"))
         players[c.id] = c
         log(f"join {c.id} {c.name} from {peer[0] if peer else '?'} ({len(players)} playing)")
-        send(c, {"t": "welcome", "id": c.id, "seed": arena["seed"], "pal": arena["pal"], "mode": "ffa",
-                 "limit": SCORE_LIMIT, "over": arena["over"], "scores": scores()})
+        send(c, {"t": "welcome", "id": c.id, "seed": arena["seed"], "pal": arena["pal"], "mode": arena["mode"],
+                 "limit": limit(), "teams": arena["teams"], "over": arena["over"], "scores": scores()})
         broadcast({"t": "join", "id": c.id, "name": c.name, "color": c.color, "scores": scores()}, skip=c)
 
         while True:
@@ -418,8 +464,9 @@ def parse_args(argv=None):
     p.add_argument("port_arg", nargs="?", type=int, help=argparse.SUPPRESS)
     p.add_argument("--host", default=os.environ.get("STOMPY_HOST", "0.0.0.0"), help="address to listen on (STOMPY_HOST, default 0.0.0.0)")
     p.add_argument("--port", type=int, default=int(os.environ.get("STOMPY_PORT", 8096)), help="port (STOMPY_PORT, default 8096)")
-    p.add_argument("--mode", choices=["ffa"], default=MODE, help="arena mode (STOMPY_MODE, default ffa)")
-    p.add_argument("--limit", type=int, default=SCORE_LIMIT, help=f"kills to win a round (STOMPY_SCORE_LIMIT, default {SCORE_LIMIT})")
+    p.add_argument("--mode", choices=MODES, default=MODE, help="arena mode: ffa or tdm (STOMPY_MODE, default ffa)")
+    p.add_argument("--limit", type=int, default=SCORE_LIMIT, help=f"a pilot's kills to win a free-for-all round (STOMPY_SCORE_LIMIT, default {SCORE_LIMIT})")
+    p.add_argument("--team-limit", type=int, default=TEAM_LIMIT, help=f"a team's kills to win a team round (STOMPY_TEAM_LIMIT, default {TEAM_LIMIT})")
     p.add_argument("--gap", type=int, default=ROUND_GAP, help=f"seconds between rounds (STOMPY_ROUND_GAP, default {ROUND_GAP})")
     p.add_argument("--per-ip", type=int, default=PER_IP, help=f"sockets from one address at once (STOMPY_PER_IP, default {PER_IP})")
     p.add_argument("--log", default=LOG_FILE, help="also log to this file (STOMPY_LOG)")
@@ -430,11 +477,12 @@ def parse_args(argv=None):
 
 
 async def main():
-    global SCORE_LIMIT, ROUND_GAP, PER_IP, MODE, LOG_FILE
+    global SCORE_LIMIT, TEAM_LIMIT, ROUND_GAP, PER_IP, MODE, LOG_FILE
     a = parse_args()
-    SCORE_LIMIT, ROUND_GAP, PER_IP, MODE, LOG_FILE = a.limit, a.gap, a.per_ip, a.mode, a.log
+    SCORE_LIMIT, TEAM_LIMIT, ROUND_GAP, PER_IP, MODE, LOG_FILE = a.limit, a.team_limit, a.gap, a.per_ip, a.mode, a.log
+    arena["mode"] = MODE
     server = await asyncio.start_server(session, a.host, a.port, limit=16 * 1024)
-    log(f"stompy arena on {a.host}:{a.port}/ws ({MODE}, max {MAX_PLAYERS}, first to {SCORE_LIMIT}, {PER_IP} per address)")
+    log(f"stompy arena on {a.host}:{a.port}/ws ({MODE}, max {MAX_PLAYERS}, first to {limit()}, {PER_IP} per address)")
     asyncio.ensure_future(heartbeat())
     async with server:
         await server.serve_forever()

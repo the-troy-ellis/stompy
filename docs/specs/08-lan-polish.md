@@ -76,8 +76,7 @@ As shipped (#185, `PROTOCOL` 9): `src/ui/lobby.js` builds the overlay.
   echo `{n, ts, pings}` carries everyone's, and `?debug=1` shows yours.
 - **A new round** keeps a pilot still in the lobby there.
 - **Not here:** the server does not hold a round until someone readies; the
-  round runs from the server's start, as before. The team picker comes with
-  TDM (#186).
+  round runs from the server's start, as before.
 
 ### Modes
 
@@ -86,6 +85,30 @@ teams, STEEL and RED palettes forced per team (colour choice becomes team
 choice), team score is kills, friendly fire off (`hit` from a teammate is
 dropped by the server), spawn points biased to the team's half (`spawnPoint`
 takes a side). First to 20.
+
+As shipped (#186, `PROTOCOL` 10): the relay's `--mode tdm` (or
+`STOMPY_MODE=tdm`) runs it, first to `--team-limit` (20). `src/net/teams.js`
+holds the sides.
+- **Sides:** a pilot joins on the side with fewer pilots (STEEL on a tie).
+  In the lobby, a STEEL / RED picker sits over READY. A tap sends `team`, and
+  the relay moves the pilot; once in, the side is set until the next lobby.
+- **Colours:** each pilot wears their side's colour, STEEL or RED. Their own
+  pick comes back in a free-for-all.
+- **Friendly fire is off:** a teammate is never a hostile, so it can't be
+  targeted, locked or marked. Hitting one throws no sparks and sends nothing,
+  and the relay drops any `hit` between teammates anyway. A teammate never
+  scores a kill.
+- **Score:** a side's score is its pilots' kills this round, as `teams` on
+  `kill`. The HUD shows both sides in their colours, yours first, over the
+  board grouped by side. A phone shows the two scores and your own
+  kills/deaths. The banner says YOUR TEAM WINS THE ROUND or STEEL / RED
+  WINS THE ROUND.
+- **Spawns:** `spawnPoint(G, side)` keeps STEEL on the south half and RED on
+  the north. A spawn stays at least 25 m off the middle line, as far as it can
+  get from hostiles; teammates don't count.
+- **The vote** (#187) will switch modes between rounds. `newround` already
+  carries `mode` and `limit`, and the relay repaints everyone for the new
+  mode.
 
 ### Vote
 
@@ -208,5 +231,5 @@ None client-side. Server: validation is a few comparisons per message;
 ## Open questions
 
 - Should FFA also force team-free colours or keep the eight-swatch picker?
-  Default: keep the picker in FFA.
-- Score limit for TDM: 20 proposed.
+  Default: keep the picker in FFA (as shipped).
+- Score limit for TDM: 20 (as shipped; `--team-limit` changes it).

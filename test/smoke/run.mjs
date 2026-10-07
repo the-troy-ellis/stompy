@@ -204,6 +204,47 @@ try {
     await pages[1].waitForFunction(() => window.__stompy.game.state === 'menu', null, { timeout: 5000 });
     await ctx.close();
   } finally { relay.kill(); }
+  // Team deathmatch (#186): a relay in tdm; ONE starts on STEEL, TWO on RED and
+  // taps STEEL in the lobby before READY. Both wear STEEL's colour, see each
+  // other as a teammate (nothing to target), and spawn on STEEL's half.
+  await new Promise(r => setTimeout(r, 300));
+  const tdmRelay = spawn('python3', ['server/server.py', '--port', '8096', '--mode', 'tdm'], { stdio: 'ignore' });
+  await new Promise(r => setTimeout(r, 600));
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 640 } });
+    const pages = [];
+    for (const name of ['ONE', 'TWO']) {
+      const page = await ctx.newPage();
+      page.on('pageerror', e => errors.push(`tdm ${name}: ${e.message}`));
+      page.on('console', m => { if (m.type() === 'error') errors.push(`tdm ${name}: console ${m.text()}`); });
+      await page.goto(URL_);
+      await page.waitForSelector('.mm-title', { timeout: 15000 });
+      await page.click('.feel-panel [data-a="toggle"]');
+      await page.click('[data-sel="mp"]');
+      await page.fill('#callsign', name);
+      await page.click('[data-a="go"]');
+      await page.waitForSelector('[data-a="team"]', { timeout: 10000 });
+      if (name === 'TWO') {
+        const start = await page.evaluate(() => window.__stompy.app.net.myTeam());
+        await page.click('[data-a="team"][data-team="0"]');
+        await page.waitForFunction(() => window.__stompy.app.net.myTeam() === 0 && document.querySelector('[data-team="0"]').classList.contains('on'), null, { timeout: 3000 });
+        console.log(`tdm: TWO started on team ${start}, picked STEEL in the lobby`);
+        if (start !== 1) { failed = true; console.error('FAIL: the second pilot did not start on RED'); }
+      }
+      await page.click('[data-a="ready"]');
+      await page.waitForFunction(() => !window.__stompy.game.lobby && window.__stompy.game.player.alive, null, { timeout: 5000 });
+      pages.push(page);
+    }
+    await pages[0].waitForFunction(() => window.__stompy.game.mechs.some(m => m.remote), null, { timeout: 8000 });
+    const look = await Promise.all(pages.map(p => p.evaluate(() => {
+      const G = window.__stompy.game, net = window.__stompy.app.net, r = G.mechs.find(m => m.remote);
+      return { z: G.player.z, mine: G.player.partsKey, theirs: r?.partsKey, mate: !!r?.mate, team: r?.team, colors: [...net.Net.info.values()].map(p => p.color).join(',') };
+    })));
+    console.log(`tdm: ${look.map((l, i) => `${['ONE', 'TWO'][i]} at z ${l.z.toFixed(0)} wears ${l.mine}, sees a teammate ${l.mate} (team ${l.team}), colours ${l.colors}`).join('; ')}`);
+    if (!look.every(l => l.z < 0 && l.mate && l.team === 0 && l.colors === '0,0' && l.mine.endsWith(':0'))) { failed = true; console.error('FAIL: team deathmatch sides, colours or spawns'); }
+    await pages[0].screenshot({ path: 'test-results/smoke-tdm.png' });
+    await ctx.close();
+  } finally { tdmRelay.kill(); }
   await browser.close();
   if (errors.length) { failed = true; console.error('FAIL: page errors:\n  ' + errors.join('\n  ')); }
 } catch (e) {

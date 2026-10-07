@@ -69,6 +69,8 @@ class Helpers(unittest.TestCase):
     def test_flags_and_the_bare_port(self):
         a = relay.parse_args(["--host", "127.0.0.1", "--port", "9000", "--limit", "20", "--per-ip", "8", "--log", "/tmp/x.log"])
         self.assertEqual((a.host, a.port, a.limit, a.per_ip, a.log, a.mode), ("127.0.0.1", 9000, 20, 8, "/tmp/x.log", "ffa"))
+        a = relay.parse_args(["--mode", "tdm", "--team-limit", "30"])
+        self.assertEqual((a.mode, a.team_limit), ("tdm", 30))
         self.assertEqual(relay.parse_args(["8123"]).port, 8123, "server.py <port> as before")
         self.assertEqual(relay.parse_args([]).port, 8096)
 
@@ -167,7 +169,7 @@ class Session(unittest.IsolatedAsyncioTestCase):
         relay.players.clear()
         relay.conns.clear()
         relay.PER_IP = 99   # every test client is 127.0.0.1; the cap has its own test
-        relay.arena.update(seed=5, pal="dusk", over=False)
+        relay.arena.update(seed=5, pal="dusk", over=False, mode="ffa", teams=[0, 0])
         self.server = await asyncio.start_server(relay.session, "127.0.0.1", 0, limit=16 * 1024)
         self.port = self.server.sockets[0].getsockname()[1]
         self.clients = []
@@ -383,6 +385,77 @@ class Session(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(new["scores"][0]["kills"], 0)
         finally:
             relay.SCORE_LIMIT = old
+
+    async def test_tdm_teams_are_picked_in_the_lobby_and_wear_their_colours(self):
+        relay.arena["mode"] = "tdm"
+        a, wa = await self.join("A", color=5)
+        self.assertEqual((wa["mode"], wa["limit"], wa["teams"]), ("tdm", relay.TEAM_LIMIT, [0, 0]))
+        self.assertEqual((wa["scores"][0]["team"], wa["scores"][0]["color"]), (0, 0), "first in: STEEL, in STEEL's colour")
+        b, wb = await self.join("B", color=5)
+        self.assertEqual((wb["scores"][1]["team"], wb["scores"][1]["color"]), (1, 1), "the next one evens it up: RED")
+        await a.recv()  # B joined
+        await b.send({"t": "team", "team": 0})
+        moved = await a.recv()
+        self.assertEqual((moved["t"], moved["id"], moved["scores"][1]["team"], moved["scores"][1]["color"]), ("team", 2, 0, 0))
+        self.assertEqual((await b.recv())["t"], "team", "the pilot moving hears it too")
+        await b.send({"t": "team", "team": "junk"})
+        self.assertEqual((await a.recv())["scores"][1]["team"], 0, "junk is STEEL, not a crash")
+        await b.recv()
+        await b.send({"t": "ready"})
+        await a.recv(); await b.recv()
+        await b.send({"t": "team", "team": 1})   # once in, the side is set
+        with self.assertRaises(asyncio.TimeoutError):
+            await a.recv(timeout=0.3)
+        self.assertEqual(relay.players[2].team, 0)
+
+    async def test_ffa_has_no_teams_to_pick_and_keeps_the_colour(self):
+        a, wa = await self.join("A", color=5)
+        self.assertEqual((wa["mode"], wa["limit"], wa["scores"][0]["color"]), ("ffa", relay.SCORE_LIMIT, 5))
+        await a.send({"t": "team", "team": 1})
+        with self.assertRaises(asyncio.TimeoutError):
+            await a.recv(timeout=0.3)
+
+    async def test_tdm_drops_friendly_hits(self):
+        relay.arena["mode"] = "tdm"
+        a, _ = await self.join("A")       # STEEL
+        b, _ = await self.join("B")       # RED
+        c, _ = await self.join("C")       # STEEL
+        await a.recv(); await a.recv(); await b.recv()   # the joins
+        await a.send({"t": "hit", "to": 3, "amt": 10, "p": [0, 0, 0]})
+        with self.assertRaises(asyncio.TimeoutError):
+            await c.recv(timeout=0.3)
+        await a.send({"t": "hit", "to": 3, "amt": 40, "p": [0, 0, 0], "fu": 1})   # not even a fusion discharge
+        with self.assertRaises(asyncio.TimeoutError):
+            await c.recv(timeout=0.3)
+        await a.send({"t": "hit", "to": 2, "amt": 10, "p": [0, 0, 0]})
+        hit = await b.recv()
+        self.assertEqual((hit["t"], hit["from"], hit["amt"]), ("hit", 1, 10), "the other side still takes it")
+
+    async def test_tdm_team_score_is_kills_and_the_team_limit_ends_the_round(self):
+        relay.arena["mode"] = "tdm"
+        old = relay.TEAM_LIMIT
+        relay.TEAM_LIMIT = 2
+        try:
+            a, _ = await self.join("A")   # STEEL
+            b, _ = await self.join("B")   # RED
+            c, _ = await self.join("C")   # STEEL
+            await a.recv(); await a.recv(); await b.recv()
+            await b.send({"t": "died", "by": 1})
+            kill = await a.recv()
+            self.assertEqual((kill["killer"], kill["teams"]), (1, [1, 0]))
+            await c.send({"t": "died", "by": 1})   # a teammate: a death, and nobody scores
+            kill = await a.recv()
+            self.assertEqual((kill["teams"], kill["scores"][0]["kills"]), ([1, 0], 1))
+            await b.send({"t": "died", "by": 3})
+            kill = await a.recv()
+            self.assertEqual(kill["teams"], [2, 0], "C's kill counts for STEEL too")
+            over = await a.recv()
+            self.assertEqual((over["t"], over["team"], over["teams"]), ("roundover", 0, [2, 0]))
+            new = await a.recv()
+            self.assertEqual((new["t"], new["mode"], new["limit"], new["teams"]), ("newround", "tdm", 2, [0, 0]))
+            self.assertEqual([p["team"] for p in new["scores"]], [0, 1, 0], "the sides carry over")
+        finally:
+            relay.TEAM_LIMIT = old
 
     async def test_ninth_pilot_is_turned_away(self):
         for i in range(8):
