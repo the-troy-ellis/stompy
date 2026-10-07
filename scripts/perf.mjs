@@ -133,6 +133,10 @@ try {
     G.kind = 'free'; G.diff = 'normal';
     app.scene.uploadWorld(); app.ui.launch();
     window.requestAnimationFrame = () => 0;
+    // The sound samples decode once, as they arrive; let that finish before
+    // measuring, or it lands as garbage in whichever scene is running (it
+    // added up to ~50 KB a frame to free-start now and then).
+    await app.audio.loadSamples();
   });
   await scene('free-start', 60, 10);
   // Six mechs 70-145 m ahead, all awake and shooting; the player can't die.
