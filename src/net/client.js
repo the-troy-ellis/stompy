@@ -92,7 +92,7 @@ export function createNet(app) {
       if (Net.ws !== ws) return;   // we closed it on purpose
       Net.ws = null;
       if (G.reconnecting || (welcomed && online())) reconnect();   // dropped mid-match, or a try that didn't take
-      else if (!welcomed && G.state === 'menu' && !/FULL|UPDATE|NO ROOM/.test($('.status', ov)?.textContent || '')) app.ui.setStatus('THE ARENA SERVER IS NOT ANSWERING');
+      else if (!welcomed && G.state === 'menu' && !/FULL|UPDATE|NO ROOM|TOO MANY/.test($('.status', ov)?.textContent || '')) app.ui.setStatus('THE ARENA SERVER IS NOT ANSWERING');
     };
   }
   // Dropped mid-match: RECONNECTING, RETRIES tries RETRY_GAP ms apart, the
@@ -199,6 +199,7 @@ export function createNet(app) {
       case 'full': app.ui.setStatus(`THE ARENA IS FULL (${m.max} PILOTS) -- TRY AGAIN LATER`); break;
       case 'version': app.ui.setStatus(`UPDATE THE GAME TO PLAY (v${m.need})`); break;   // the server runs another version
       case 'noroom': app.ui.setStatus('NO ROOM WITH THAT CODE'); break;   // co-op: a code nobody has open
+      case 'busy': app.ui.setStatus('TOO MANY ROOMS FROM HERE. TRY AGAIN IN A FEW MINUTES.'); break;   // the relay's room limit
       case 'welcome': {
         if (m.kind === 'coop') { coopWelcome(m); break; }
         Net.kind = 'arena';
