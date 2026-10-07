@@ -31,6 +31,21 @@ four letters from a no-vowel alphabet to avoid words. Max 4 per co-op room.
 
 The server does not understand missions; it stores `def` opaquely and relays.
 
+As shipped (#201, `PROTOCOL` 13): `server/server.py` has `Room` and
+`rooms`, and the arena's pilots are room `ARENA`'s.
+- **Opening and joining:** `hello {create: {mission, diff, seed}}` opens a
+  room; `hello {room: code}` joins one, in any case. An unknown code gets
+  `noroom`, and a fifth pilot gets `full {max: 4}`.
+- **`def`:** the host's `create`, cleaned to `{kind, mission, diff, seed}`.
+- **`welcome`:** carries `room`, `kind`, `host` and `def`, plus `started` (set
+  by the host's READY) for anyone joining after.
+- **Routing:** as in the authority table below. Only the host's `es`, `ent`,
+  `entx`, `obj` and `over` are relayed. `ehit` goes to the host only. Only
+  the host's `hit` reaches a pilot, with `from: 0` and the enemy's `eid`.
+- **Leaving:** when the host leaves, the lowest id left gets `host {id}`. A
+  pilot who drops can come back within 30 s with their token (#189), and the
+  room's last pilot leaving closes it.
+
 ### Authority split
 
 | Thing | Owner | How it travels |

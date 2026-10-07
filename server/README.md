@@ -1,7 +1,9 @@
 # The arena relay
 
-`server.py` is the multiplayer relay: one free-for-all arena for up to
-eight pilots. It simulates nothing. Each game sends its own mech about 15
+`server.py` is the multiplayer relay: one arena for up to eight pilots
+(free-for-all or team deathmatch), and co-op rooms of up to four, each
+opened by its host under a four-letter code and gone when empty. It
+simulates nothing. Each game sends its own mech about 15
 times a second and the relay passes it on, keeps the scores and runs the
 rounds. Python 3.9 or later, standard library only (`data.py` reads
 `loadout_tables.json`, which `npm run fixture:loadout` writes from the

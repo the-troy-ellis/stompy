@@ -137,14 +137,14 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
 
 ### The network protocol (as it is)
 
-`PROTOCOL` is 12 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on; 8: M5a, the server enforces the version and rebuilds every state message clean; 9: the lobby, `ch` in `hello`, `ready`, `ping`, and `ch`/`ready`/`ping` in each pilot's scores entry; 10: team deathmatch, `team` from the lobby, `team` in each scores entry, `teams` (each side's kills) in `welcome`, `kill`, `roundover` and `newround`, and `mode`/`limit` in `newround`; 11: the round-end vote, `vote` and `stats` between rounds, the relay's `tally`, `best`/`acc` in each scores entry, and `vote` in `newround`; 12: reconnect, `token` in `hello`, `token` and `resumed` in `welcome`). `server/server.py` keeps its own `PROTOCOL`, and a Node test fails if the two differ.
+`PROTOCOL` is 13 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on; 8: M5a, the server enforces the version and rebuilds every state message clean; 9: the lobby, `ch` in `hello`, `ready`, `ping`, and `ch`/`ready`/`ping` in each pilot's scores entry; 10: team deathmatch, `team` from the lobby, `team` in each scores entry, `teams` (each side's kills) in `welcome`, `kill`, `roundover` and `newround`, and `mode`/`limit` in `newround`; 11: the round-end vote, `vote` and `stats` between rounds, the relay's `tally`, `best`/`acc` in each scores entry, and `vote` in `newround`; 12: reconnect, `token` in `hello`, `token` and `resumed` in `welcome`; 13: M5b rooms, `room`/`create` in `hello`, `room`/`kind`/`host` in `welcome`, and the co-op messages below). `server/server.py` keeps its own `PROTOCOL`, and a Node test fails if the two differ.
 
-Client → server: `hello {v, name, color, ch, token?}` (`token`: from the last `welcome`, to come back after a drop), `ready` (out of the lobby), `team {team}` (team deathmatch: a side from the lobby, before READY), `vote {map, mode}` and `stats {acc}` (between rounds: the next round, and your accuracy in % for the summary), `ping {n, rtt}` (every 2 s), `s {state...}` (15 Hz), `fx {k, ...}`
+Client → server: `hello {v, name, color, ch, token?, room?, create?}` (`token`: from the last `welcome`, to come back after a drop; `room`: a co-op room's code, the arena when absent; `create {mission, diff, seed}`: open a co-op room), `ready` (out of the lobby), `team {team}` (team deathmatch: a side from the lobby, before READY), `vote {map, mode}` and `stats {acc}` (between rounds: the next round, and your accuracy in % for the summary), `ping {n, rtt}` (every 2 s), `s {state...}` (15 Hz), `fx {k, ...}`
 (`b` beam flash, `s` shell, `m` missile volley, `fu` fusion discharge, `mg`
 guided volley update, `md` detonate, `pu` a punch starts), `hit {to, amt, p,
 fu, kb?, me?, st?, zap?, hh?}`, `died {by, me?}`.
 
-Server → client: `welcome {id, seed, pal, mode, limit, teams, over, token, resumed, scores}` (`resumed`: the `hello`'s token brought back a dropped pilot's id, side and score) (`mode`: `ffa` or `tdm`; a scores entry: `id, name, color, kills, deaths, ch, ready, ping, team, best, acc` (`best`: the round's best streak; `acc`: -1 until reported); in `tdm` the `color` is the team's), `full
+Server → client: `welcome {id, room, kind, host, token, resumed, scores, ...}` (`resumed`: the `hello`'s token brought back a dropped pilot's id, side and score): in the arena (`kind: 'arena'`, `host: 0`) also `seed, pal, mode, limit, teams, over`; in a co-op room `def` (the host's `create`, cleaned) and `started`. `noroom` (no room has that code), `host {id, scores}` (the co-op host left; this pilot runs the world now); in the arena's `welcome` (`mode`: `ffa` or `tdm`; a scores entry: `id, name, color, kills, deaths, ch, ready, ping, team, best, acc` (`best`: the round's best streak; `acc`: -1 until reported); in `tdm` the `color` is the team's), `full
 {max}`, `version {need}` (your `hello` had another `v`; the socket closes and the menu says UPDATE THE GAME TO PLAY), `ready {id, scores}`, `team {id, scores}` (a pilot changed sides), `tally {votes, scores}` (between rounds: votes for next map, same map and the other mode, in that order), `ping {n, ts, pings}` (the echo, with every pilot's last round trip), `join`, `leave`, `note {k}` (`k: 'lo'`: your loadout was rejected), `s` and `fx` stamped with `id`, `hit {from, amt, p,
 fu, kb?, me?, st?, zap?, hh?}`, `kill {victim, killer, teams, scores, me?}`, `roundover {winner,
 name, next, teams, scores, team?}` (`team`: the side that won, in `tdm`), `newround {seed, pal, mode, limit, teams, vote, scores}` (`vote`: `next`, `same` or `mode`, what won).
@@ -152,6 +152,16 @@ name, next, teams, scores, team?}` (`team`: the side that won, in `tdm`), `newro
 Team deathmatch on the wire: the server drops a `hit` between teammates (the
 shooter's client doesn't send one either), credits no kill between them, and
 ends the round when a side's kills reach the team limit.
+
+Co-op rooms on the wire (M5b, `docs/specs/09-coop.md`): the relay routes and
+does not understand missions. `s`, `fx`, `ready` and `ping` work as in the
+arena. The host's READY sets `started`. The host's `es`, `ent`, `entx`, `obj`
+and `over` go, as sent, to everyone else, and `over` is kept for late
+joiners. A guest's `ehit {eid, amt, p, fu, ...}` goes to the host only,
+clamped like `hit` and stamped `from`. Only the host's `hit` (enemy fire,
+`from: 0`, `eid`) reaches a pilot, and `died` sends a `kill` with no killer.
+A room holds four and closes when its last pilot leaves. When the host
+leaves, the lowest id left gets `host`.
 
 Melee on the wire (`docs/specs/12-melee.md` § Arena): the shooter-scores rule
 holds. A punch or stomp on another pilot rides the batched `hit` with `me: 1`
