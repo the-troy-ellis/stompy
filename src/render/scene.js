@@ -126,7 +126,7 @@ export function createScene(app) {
     wxTime = G.time;
     const gust = L.gust || 1;
     WX_VEL[0] = w.wind[0] * gust; WX_VEL[1] = -L.fall; WX_VEL[2] = w.wind[1] * gust;   // the wind is [x, z]
-    stepWeatherBox(box, eye, Math.round(L.count * w.intensity * (G.touchUI ? 0.6 : 1)), WX_VEL, dt);
+    stepWeatherBox(box, eye, Math.round(L.count * w.intensity * (G.weatherScale ?? 1)), WX_VEL, dt);
     const g = R.fx[L.shape], wind = Math.hypot(w.wind[0], w.wind[1]);
     g.n = L.lean ? fillDrops(g.data, g.n, box, eye, L, Math.atan2(w.wind[0], w.wind[1]), Math.atan2(wind, L.fall), 0, 0, G.time)
       : fillDrops(g.data, g.n, box, eye, L, 0, 0, 1, L.sway || 0, G.time);

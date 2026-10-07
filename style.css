@@ -210,6 +210,11 @@ html, body {
   .fp-picks .mm-pick { flex-wrap: wrap; gap: 0 6px; margin: 1px 0; }
   .fp-picks .mm-pick span { width: 100%; font-size: 10px; line-height: 1.2; }
   .fp-picks .mm-pick b { min-width: 9ch; }
+  /* Settings' dials likewise: two columns, label above, FULL SCREEN beside. */
+  .mm-detail .opts.dials { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; margin-top: 0; }
+  .mm-detail .opts.dials .mm-pick { flex-wrap: wrap; gap: 0 6px; margin: 1px 0; }
+  .mm-detail .opts.dials .mm-pick span { width: 100%; font-size: 10px; line-height: 1.2; }
+  .mm-detail .opts.dials .opt { justify-self: start; align-self: center; }
 }
 .mm-pick span { width: 9ch; color: #2a9a2a; }
 .mm-pick b { min-width: 16ch; text-align: center; color: #fc3; font-weight: normal; }

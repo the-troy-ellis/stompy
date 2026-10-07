@@ -78,8 +78,8 @@ export function createUi(app) {
     sound: ['SOUND', () => prefs.sound, v => { prefs.sound = v; store.set('sound', v); }],
     voice: ['VOICE', () => prefs.voice, v => { prefs.voice = v; store.set('mech.voice', v); }],
     invert: ['INVERT AIM', () => prefs.invert, v => { prefs.invert = v; store.set('mech.invert', v); }],
-    // Less camera: kick, shake, view wobble and squash at 30%, flashes shorter, no buzz. The mechs still move.
-    motion: ['REDUCED MOTION', () => prefs.reducedMotion, v => { prefs.reducedMotion = v; G.reducedMotion = v; store.set('motion.reduced', v); }],
+    // Less camera: kick, shake, view wobble and squash at 30%, flashes shorter, no buzz, a step fewer particles. The mechs still move.
+    motion: ['REDUCED MOTION', () => prefs.reducedMotion, v => { prefs.reducedMotion = v; G.reducedMotion = v; store.set('motion.reduced', v); app.applyParticles(); }],   // and a step fewer particles
     haptics: ['HAPTICS', () => prefs.haptics, v => { prefs.haptics = v; store.set('haptics', v); }],
     frameTime: ['FRAME TIME', () => prefs.frameTime, v => { prefs.frameTime = v; store.set('debug.frametime', v); }],   // the in-game readout, for playtests on real phones
   };
@@ -290,6 +290,7 @@ export function createUi(app) {
     if (dial) {
       const k = dial.dataset.set;
       prefs[k] = stepSetting(k, prefs[k], +dial.dataset.d); store.set(SETTINGS[k].key, prefs[k]);
+      if (k === 'particles') app.applyParticles();
       dial.parentElement.querySelector('b').textContent = SETTINGS[k].fmt(prefs[k]);
       return;
     }

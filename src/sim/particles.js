@@ -40,15 +40,24 @@ export class Particles {
 
 // Spawn one: position p, velocity v and colour col are copied (the caller's
 // arrays are not kept). The spin takes one roll of the seeded RNG, as before,
-// unless it is given (a shockwave lies flat and still).
+// unless it is given (a shockwave lies flat and still). At a lower PARTICLES
+// setting (G.effectScale) some are not made at all: evenly, by a running
+// count, not by chance, and after the spin's roll, so the RNG runs the same
+// whatever the setting and the fight plays out the same.
 export function spawn(G, p, v, life, size, col, kind, grav = 0, spin = null) {
+  const s = spin ?? G.rng.next() * TAU, keep = G.effectScale ?? 1;
+  if (keep < 1 && spin == null) {
+    G.partAcc = (G.partAcc || 0) + keep;
+    if (G.partAcc < 1) return;
+    G.partAcc -= 1;
+  }
   const P = G.parts, i = P.slot(), i3 = i * 3;
   P.pos[i3] = p[0]; P.pos[i3 + 1] = p[1]; P.pos[i3 + 2] = p[2];
   P.vel[i3] = v[0]; P.vel[i3 + 1] = v[1]; P.vel[i3 + 2] = v[2];
   P.col[i3] = col[0]; P.col[i3 + 1] = col[1]; P.col[i3 + 2] = col[2];
   P.life[i] = life; P.max[i] = life; P.size[i] = size; P.grav[i] = grav;
   P.kind[i] = KIND_ID[kind] ?? 0;
-  P.spin[i] = spin ?? G.rng.next() * TAU;
+  P.spin[i] = s;
 }
 
 // One frame: age, fall, drag (smoke slows and drifts with the wind), move,
