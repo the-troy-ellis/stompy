@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning, #159 snow and fog, #160 dust storm, #161 prop library, #162 prop placement, #163 explosions, #164 ambient audio shipped) |
+| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning, #159 snow and fog, #160 dust storm, #161 prop library, #162 prop placement, #163 explosions, #164 ambient audio, #165 particles setting shipped) |
 | Milestone | M4 |
 | Size | L (split: night + headlights; weather; props; explosions + particles) |
 | Depends on | M0; structures from [03-objectives.md](03-objectives.md) share the prop meshes |
@@ -103,6 +103,20 @@ Weather particles live in a box around the camera (60 m × 30 m × 60 m),
 recycled when they leave it. They are drawn with the instanced particle path
 below, 1500 for rain, 800 for snow, 2500 for dust at intensity 1, scaled by a
 `particles` setting (LOW / MED / HIGH, default MED on touch, HIGH on desktop).
+
+As shipped (#165): PARTICLES is a Settings dial (`data/settings.js`, saved as
+`fx.particles`). Unset, it is MED on touch and HIGH on a desktop.
+- **What a level keeps:** LOW keeps no weather particles and half the
+  gameplay effects; MED 60% and 75%; HIGH all.
+- **REDUCED MOTION** takes it down a step (LOW is the floor).
+- **Where it applies:** the renderer reads `G.weatherScale`, and the sim's
+  `spawn` reads `G.effectScale`. The sim drops particles evenly by a running
+  count, not by chance, and always after the spin's RNG roll, so the RNG runs
+  the same at any setting and a fight plays out identically. The shockwave
+  is never dropped.
+- **Layout:** on a phone held sideways the Settings dials go to two columns,
+  and the column still scrolls with a thumb.
+- **Not here:** #135 owns stepping this down automatically on a slow phone.
 
 Weather affects the AI (`sight` × radar factor) and the HUD (radar ring
 shrinks; the target box drops at 1.2× the visible range).
