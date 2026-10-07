@@ -47,6 +47,7 @@ export function lobbyHTML(o) {
   return `<h1>LOBBY</h1>
     <div class="panel" data-mode="${coop ? 'coop' : tdm ? 'tdm' : 'ffa'}"><div class="k lobby-head">${lobbyHead(o)}</div>
       <table class="mech-keys scoreboard lobby">${lobbyRows(o)}</table>
-      ${coop ? `<p class="dim lobby-note">${coopNote(o)}</p>` : tdm ? `${teamPicker(o)}<p class="dim">Pick a side. Then READY drops you in.</p>` : '<p class="dim">The match is on. READY drops you in.</p>'}</div>
+      ${coop ? `<p class="dim lobby-note">${coopNote(o)}</p>` : tdm ? `${teamPicker(o)}<p class="dim">Pick a side. Then READY drops you in.</p>` : '<p class="dim">The match is on. READY drops you in.</p>'}
+      <p class="dim">If you see it hit, it hit.</p></div>
     <button class="go" data-a="ready">READY</button> <button class="go" data-a="leave">LEAVE</button>`;
 }

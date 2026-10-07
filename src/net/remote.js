@@ -7,9 +7,17 @@ import { applyLoadout, validate } from '../sim/loadout.js';
 // brought up to its latest report `s` (a state message): the report kept for
 // net/interp.js to glide toward, its fit, its armour (a section that just hit
 // zero comes off), and its life. `now`: the clock net/interp.js reads, in ms.
+const OFF_CREEP = 0.5;
 export function applyRemote(G, r, s, now) {
   const first = !r.net;
-  r.net = { ...s, at: now };
+  // The last three reports, for net/interp.js to draw between (a respawn starts
+  // afresh), each on the sender's clock (`ts`; arrival time for a report
+  // without one). netOff is the smallest gap yet between our clock and theirs,
+  // creeping up OFF_CREEP ms a report so a slower path is followed too.
+  const fresh = first || (s.al && !r.alive), ts = typeof s.ts === 'number' ? s.ts : now;
+  r.netOff = fresh || r.netOff == null ? now - ts : Math.min(r.netOff + OFF_CREEP, now - ts);
+  r.netOld = fresh ? null : r.netPrev; r.netPrev = fresh ? null : r.net;
+  r.net = { ...s, at: now, ts };
   // Their mechlab fit: weapons drawn and fired as they carry them, armour to scale.
   if (s.lo) {
     const key = JSON.stringify(s.lo);

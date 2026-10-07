@@ -172,7 +172,7 @@ export function applyEnemyState(G, s, now) {
     Object.assign(e, { eid: s.eid, remote: true, net: null });
     G.mechs.push(e);
   }
-  applyRemote(G, e, s, now);
+  applyRemote(G, e, typeof s.gt === 'number' ? { ...s, ts: s.gt * 1000 } : s, now);   // drawn on the host's clock (net/interp.js)
   if (typeof s.gt === 'number' && Math.abs(G.time - s.gt) > GT_SLACK) G.time = s.gt;
 }
 

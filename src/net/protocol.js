@@ -4,7 +4,7 @@
 import { HPK } from '../data/chassis.js';
 import { WEAPONS } from '../data/weapons.js';
 
-export const PROTOCOL = 15;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit. 5: hh (heat) on hit. 6: knuckles in lo.sys. 7: lt (headlights) in s. 8: the server enforces the version (version message) and rebuilds s clean. 9: the lobby (ch in hello; ready; ping; ch, ready, ping in scores). 10: team deathmatch (team; team in scores; teams, mode and limit in newround; teams in welcome, kill and roundover). 11: the round-end vote (vote, stats; tally; best and acc in scores; vote in newround). 12: reconnect (token in hello; token and resumed in welcome). 13: rooms (room and create in hello; room, kind, host, def, started in welcome; noroom; host; started in ready; the co-op routing of es, ent, entx, obj, over, ehit). 14: co-op enemies (es; ehit; eid on an enemy's fx, te on a volley at one, e2 on a fusion shot at one). 15: co-op world sync (ehit with ent for a mission entity; ent, entx, obj and over from the host)
+export const PROTOCOL = 17;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit. 5: hh (heat) on hit. 6: knuckles in lo.sys. 7: lt (headlights) in s. 8: the server enforces the version (version message) and rebuilds s clean. 9: the lobby (ch in hello; ready; ping; ch, ready, ping in scores). 10: team deathmatch (team; team in scores; teams, mode and limit in newround; teams in welcome, kill and roundover). 11: the round-end vote (vote, stats; tally; best and acc in scores; vote in newround). 12: reconnect (token in hello; token and resumed in welcome). 13: rooms (room and create in hello; room, kind, host, def, started in welcome; noroom; host; started in ready; the co-op routing of es, ent, entx, obj, over, ehit). 14: co-op enemies (es; ehit; eid on an enemy's fx, te on a volley at one, e2 on a fusion shot at one). 15: co-op world sync (ehit with ent for a mission entity; ent, entx, obj and over from the host). 17: ts on s, the sender's clock in ms (net/interp.js draws between reports by it)
 export const r2 = v => Math.round(v * 100) / 100;
 const v3 = p => p.map(r2);
 
@@ -34,8 +34,9 @@ export const roundStats = acc => ({ t: 'stats', acc: Math.round(acc) });
 // ends, sc: who it's on, sq: how far along, 0..1), and the punch phase (pu:
 // 0 none, 1 wind-up, 2 recovery) so the swing animates on every screen, and
 // whether its headlights are on (lt).
-// `lo`: the mechlab loadout, included when asked (see sendState).
-export function stateMessage(P, bf, withLoadout = false) {
+// `lo`: the mechlab loadout, included when asked (see sendState). `ts`: the
+// sender's clock in ms, so others draw it smoothly through jitter (net/interp.js).
+export function stateMessage(P, bf, withLoadout = false, ts = null) {
   const fu = P.fusion;
   return { t: 's', ch: P.type, x: r2(P.x), y: r2(P.y), z: r2(P.z), yaw: r2(P.yaw), tw: r2(P.twist), p: r2(P.pitch), sp: r2(P.speed),
     air: P.air ? 1 : 0, al: P.alive ? 1 : 0, sd: P.shutdown ? 1 : 0, hp: HPK.map(k => r2(P.hp[k])),
@@ -43,7 +44,7 @@ export function stateMessage(P, bf, withLoadout = false) {
     fl: fu?.on && fu.end ? v3(fu.end) : 0, sc: fu?.mech?.netId || 0,
     sq: fu?.mech ? r2(Math.min(1, fu.t / WEAPONS.fusion.scan)) : 0,
     pu: P.melee ? (P.melee.phase === 'windup' ? 1 : 2) : 0, lt: P.lights ? 1 : 0,
-    ...(withLoadout && P.loadout ? { lo: P.loadout } : {}) };
+    ...(withLoadout && P.loadout ? { lo: P.loadout } : {}), ...(ts != null ? { ts: Math.round(ts) } : {}) };
 }
 
 // Weapon effects: drawn by everyone, scored by the shooter.

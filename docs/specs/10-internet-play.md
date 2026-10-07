@@ -70,6 +70,30 @@ Wi-Fi is 5–20 ms; the internet is 40–150 ms with jitter. Changes:
 - HUD: a latency readout (`RTT 84 ms`) in the lobby and, over 200 ms, a small
   amber `LAG` tag on the HUD.
 
+As shipped (#214, `PROTOCOL` 17):
+- **The delay buffer:** `netInterp` draws a remote mech `INTERP_DELAY`
+  (100 ms) in the past, between the two of its last three reports either side
+  of that moment. Past the newest it projects forward for at most 0.25 s, and
+  a jump over 30 m is taken at once.
+- **The sender's clock:** the moment is measured on the sender's clock. `s`
+  carries `ts`, and co-op's enemies use the host's game time. Each client
+  keeps `netOff`, the smallest gap yet between its clock and the sender's,
+  creeping up 0.5 ms a report to follow a slower path.
+  - **Why:** interpolating on arrival times alone was tried first. Jitter of
+    ±40 ms on reports 66 ms apart made the drawn speed swing, and that was
+    no better than the old extrapolation.
+- **Acceptance 2:** `test/interp.test.js` walks a mech at 10 m/s, reported
+  at 15 Hz and arriving 120 ± 40 ms late.
+  - **Before:** the old extrapolate-from-the-newest code moved up to 1.49
+    walking steps in one frame and strayed 0.56 m.
+  - **After:** 1.18 steps and 0.19 m.
+  - **On a LAN:** 1.02 steps.
+- **Rates:** unchanged; the adaptive 20 Hz is left out.
+- **LAG:** the HUD shows an amber LAG beside the compass when the round trip
+  to the relay is over 200 ms, in the arena and in co-op.
+- **The lobby:** it says "If you see it hit, it hit." (the shooter's view
+  counts).
+
 ### Room codes over the internet
 
 Co-op rooms (M5b) already have codes. Add arena rooms too: `ARENA` is the
