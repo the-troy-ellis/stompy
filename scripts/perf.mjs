@@ -38,14 +38,17 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   scenery mesh the biome has (dusk 6; ice and volcanic 8, the vent's glow
 //   included), so where they matter the budgets are the pre-prop number plus
 //   that, not the latest view of a reshuffled field.
+// After #163 (explosions: the scorches are one more draw, each burning wreck
+//   one more for 30 s; garbage unchanged): fight 27/44 · fight-deaths 36/42 ·
+//   wrecks 37/44 · looking-away 18/21
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
   menu:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 26 },
   'free-start':   { meanDraws: 8, peakDraws: 8, tris: 25000, allocKB: 115 },
-  fight:          { meanDraws: 28, peakDraws: 48, tris: 27000, allocKB: 205 },
-  'fight-deaths': { meanDraws: 39, peakDraws: 44, tris: 27000, allocKB: 205 },
-  wrecks:         { meanDraws: 37, peakDraws: 45, tris: 26000, allocKB: 145 },
-  'looking-away': { meanDraws: 19, peakDraws: 22, tris: 27000, allocKB: 135 },
+  fight:          { meanDraws: 31, peakDraws: 50, tris: 27000, allocKB: 205 },
+  'fight-deaths': { meanDraws: 41, peakDraws: 48, tris: 27000, allocKB: 205 },
+  wrecks:         { meanDraws: 42, peakDraws: 50, tris: 26000, allocKB: 145 },
+  'looking-away': { meanDraws: 21, peakDraws: 24, tris: 27000, allocKB: 135 },
   rain:           { meanDraws: 9, peakDraws: 9, tris: 25000, allocKB: 90 },   // free-start in a downpour: one more draw (the rain), no more garbage
   snow:           { meanDraws: 11, peakDraws: 11, tris: 25000, allocKB: 90 },   // and in snow
   dust:           { meanDraws: 11, peakDraws: 11, tris: 25000, allocKB: 90 },   // and in a dust storm (2,500 grains)

@@ -1,5 +1,5 @@
 import { backingSize } from './look.js';
-import { effectLook, SHAPE_BY_KIND } from '../mesh/effects.js';
+import { effectLook, SHAPE_BY_KIND, TUMBLE_BY_KIND } from '../mesh/effects.js';
 import { M as M0, add, makeMatrixArena, frustumPlanes, sphereVisible, clampN, dirOf, mix3, mul, norm, rnd, sub, len, cross, TAU } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { buildTerrainMesh } from '../world/terrainMesh.js';
@@ -13,6 +13,8 @@ import { darkness, HEADLIGHTS } from '../data/palettes.js';
 import { fogOf, flashOf, WEATHER } from '../data/weather.js';
 import { makeWeatherBox, stepWeatherBox } from './weatherBox.js';
 import { fallAngle } from '../sim/entities.js';
+import { WRECK_BURN } from '../sim/combat.js';
+import { SCORCH_MAX } from '../sim/effects.js';
 import { propInto } from '../mesh/props.js';
 import { batchEntities, clearProps, makePropBatches } from './propBatch.js';
 import { WEAPONS } from '../data/weapons.js';
@@ -256,24 +258,73 @@ export function createScene(app) {
       for (const d of G.debris) {
         const parts = R.mechParts[d.partsKey];
         if (!parts || !parts[d.part] || !seen(d.p[0], d.p[1], d.p[2], 5 * d.scale)) continue;
-        const fade = d.t > d.life - 2 ? (d.life - d.t) / 2 : 1;
-        R.draw(parts[d.part], chain(M.T(...d.p), M.RY(d.rot[1]), M.RX(d.rot[0]), M.RZ(d.rot[2]), M.S(d.scale * (0.6 + 0.4 * fade))), [0.6, 0.58, 0.56]);
+        R.draw(parts[d.part], chain(M.T(...d.p), M.RY(d.rot[1]), M.RX(d.rot[0]), M.RZ(d.rot[2]), M.S(d.scale)), [0.6, 0.58, 0.56]);   // at the end it sinks (sim/effects.js)
       }
   }
   // A wreck: the torso, hip and one leg's two halves in a heap; skinned, one
   // draw on the mech's own mesh with the other bones left at zero.
   const WRECK_DARK = [0.3, 0.28, 0.27];
-  function drawWreck(w) {
-    // A fresh wreck rocks and sinks a little before it lies still.
+  // A fresh wreck rocks and sinks a little before it lies still.
+  function wreckBase(w) {
     const st = w.settle ?? 1, rock = (1 - st) * 0.2 * sin(w.t * 11), sink = 0.35 * w.scale * st;
-    const parts = R.mechParts[w.type], B = chain(M.T(w.x, w.y - sink, w.z), M.RY(w.yaw), M.RX(rock), M.S(w.scale));
+    return chain(M.T(w.x, w.y - sink, w.z), M.RY(w.yaw), M.RX(rock), M.S(w.scale));
+  }
+  const wreckTorso = (B, w) => chain(B, M.T(0, 1.3, -1), M.RX(-1.2), M.RZ(w.roll));
+  function drawWreck(w) {
+    const parts = R.mechParts[w.type], B = wreckBase(w);
     if (R.skinned) BONES.fill(0);
     putTint = WRECK_DARK;
-    put(BONE.torso, parts.torso, chain(B, M.T(0, 1.3, -1), M.RX(-1.2), M.RZ(w.roll)));
+    put(BONE.torso, parts.torso, wreckTorso(B, w));
     put(BONE.hip, parts.hip, chain(B, M.T(0.5, 0.6, 1.5), M.RY(0.6)));
     put(BONE.leg(0), parts.uleg, chain(B, M.T(2.5, 0.6, 1), M.RZ(1.5)));
     put(BONE.leg(0) + 1, parts.lleg, chain(B, M.T(-2.6, 0.5, -0.5), M.RZ(-1.5), M.RY(1)));
     if (R.skinned) R.drawSkinned(parts.skin, BONES, WRECK_DARK);
+  }
+  // A burning wreck (spec 07 § Explosions): a glowing shell over its torso
+  // that flickers and dies down over WRECK_BURN seconds. Its own draw, after
+  // the skinned pass, so it works whichever way the wreck was drawn.
+  const EMBER = [1, 0.4, 0.1], BURN_TINT = [0, 0, 0];
+  function drawBurn(w) {
+    const k = 1 - w.t / WRECK_BURN;
+    if (k <= 0) return;
+    const f = clampN(0.6 + 0.4 * sin(w.t * 13 + w.x) * sin(w.t * 7.7 + w.z), 0, 1), g = k * f;
+    for (let i = 0; i < 3; i++) BURN_TINT[i] = WRECK_DARK[i] + (EMBER[i] - WRECK_DARK[i]) * g;
+    R.draw(R.mechParts[w.type].torso, chain(wreckTorso(wreckBase(w), w), M.S(1.04)), BURN_TINT, g, 0.4 + 0.6 * g);
+  }
+  // Scorches (sim/effects.js scorch): one buffer of dark ragged octagons that
+  // hug the ground, a slot per scorch. A new one rewrites only its own slot
+  // (no garbage, however often missiles land); one draw for them all, with a
+  // polygon offset so they sit on the terrain without fighting it.
+  const SC_V = 24, SC_F = SC_V * 9, SC = new Float32Array(SCORCH_MAX * SC_F), SC_IDS = new Int32Array(SCORCH_MAX).fill(-1);
+  const SCORCH_COL = [0.09, 0.08, 0.07], SCORCH_MESH = { buf: null, count: SCORCH_MAX * SC_V };
+  let scorchRev = -1;
+  function writeScorch(s) {
+    const H = G.ter.height, o = s.slot * SC_F, cy = H(s.x, s.z) + 0.05;
+    for (let k = 0; k < 8; k++) for (let v = 0; v < 3; v++) {
+      const q = o + (k * 3 + v) * 9, j = k + v - 1, a = s.yaw + (j / 8) * TAU, r = s.r * (j % 2 ? 0.72 : 1);   // v 0: the middle; 1, 2: the rim
+      const x = v === 0 ? s.x : s.x + sin(a) * r, z = v === 0 ? s.z : s.z + cos(a) * r;
+      SC[q] = x; SC[q + 1] = v === 0 ? cy : H(x, z) + 0.05; SC[q + 2] = z;
+      SC[q + 3] = 0; SC[q + 4] = 1; SC[q + 5] = 0;
+      SC[q + 6] = SCORCH_COL[0]; SC[q + 7] = SCORCH_COL[1]; SC[q + 8] = SCORCH_COL[2];
+    }
+  }
+  function drawScorches() {
+    const gl = R.gl;
+    if (!SCORCH_MESH.buf) { SCORCH_MESH.buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, SCORCH_MESH.buf); gl.bufferData(gl.ARRAY_BUFFER, SC, gl.DYNAMIC_DRAW); R.curMesh = null; }
+    if (scorchRev !== G.scorchRev) {
+      scorchRev = G.scorchRev;
+      gl.bindBuffer(gl.ARRAY_BUFFER, SCORCH_MESH.buf); R.curMesh = null;
+      if (!G.scorches.length && SC_IDS.some(i => i >= 0)) { SC.fill(0); SC_IDS.fill(-1); gl.bufferSubData(gl.ARRAY_BUFFER, 0, SC); }   // a new match
+      for (const s of G.scorches) {
+        if (SC_IDS[s.slot] === s.id) continue;
+        writeScorch(s); SC_IDS[s.slot] = s.id;
+        gl.bufferSubData(gl.ARRAY_BUFFER, s.slot * SC_F * 4, SC.subarray(s.slot * SC_F, (s.slot + 1) * SC_F));
+      }
+    }
+    if (!G.scorches.length) return;
+    gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(-1, -4);
+    R.draw(SCORCH_MESH, M.id(), NO_SHADE, 0, 0);   // empty slots are all zeros: nothing drawn
+    gl.disable(gl.POLYGON_OFFSET_FILL);
   }
   // World entities: structures and vehicles (a nav point has no body). Props
   // go into one instanced draw per mesh (render/propBatch.js); a toppled one,
@@ -372,7 +423,7 @@ export function createScene(app) {
       effectLook(P, i, hor, LOOK);
       const d = g.data, o = g.n++ * R.FX_FLOATS;
       d[o] = P.pos[i3]; d[o + 1] = P.pos[i3 + 1]; d[o + 2] = P.pos[i3 + 2]; d[o + 3] = LOOK[0];
-      d[o + 4] = P.spin[i]; d[o + 5] = P.spin[i] * 0.7;
+      d[o + 4] = P.spin[i]; d[o + 5] = P.spin[i] * TUMBLE_BY_KIND[P.kind[i]];
       d[o + 6] = LOOK[1]; d[o + 7] = LOOK[2]; d[o + 8] = LOOK[3]; d[o + 9] = LOOK[4]; d[o + 10] = LOOK[5]; d[o + 11] = LOOK[6];
     }
   }
@@ -484,6 +535,7 @@ export function createScene(app) {
 
     R.drawHeat = 0;
     R.draw(world, M.id());
+    drawScorches();
     // In the missile camera your own mech is out there too.
     R.drawHeat = 1;
     const shown = m => (m.alive || m.dying) && (m !== P || gd || G.state === 'menu') && seen(m.x, m.y + 6 * m.ch.scale, m.z, (m.dying ? 16 : 10) * m.ch.scale);
@@ -493,6 +545,7 @@ export function createScene(app) {
     for (const w of G.wrecks) if (seen(w.x, w.y + 2 * w.scale, w.z, 9 * w.scale)) drawWreck(w);
     R.drawHeat = 1;
     if (R.skinned) R.endSkinned();
+    for (const w of G.wrecks) if (w.t < WRECK_BURN && seen(w.x, w.y + 2 * w.scale, w.z, 9 * w.scale)) drawBurn(w);
     for (const m of G.mechs) if (shown(m)) drawFlash(m);
     drawRemains();
     drawEntities(eye);
@@ -511,7 +564,7 @@ export function createScene(app) {
       const P = G.parts;
       for (let i = 0; i < P.n; i++) {
         effectLook(P, i, G.pal.hor, LOOK);
-        R.draw(R.meshes.fx[SHAPE_BY_KIND[P.kind[i]]], chain(M.T(P.pos[i * 3], P.pos[i * 3 + 1], P.pos[i * 3 + 2]), M.RY(P.spin[i]), M.RX(P.spin[i] * 0.7), M.S(LOOK[0])), [LOOK[1], LOOK[2], LOOK[3]], LOOK[4], LOOK[5]);
+        R.draw(R.meshes.fx[SHAPE_BY_KIND[P.kind[i]]], chain(M.T(P.pos[i * 3], P.pos[i * 3 + 1], P.pos[i * 3 + 2]), M.RY(P.spin[i]), M.RX(P.spin[i] * TUMBLE_BY_KIND[P.kind[i]]), M.S(LOOK[0])), [LOOK[1], LOOK[2], LOOK[3]], LOOK[4], LOOK[5]);
       }
       [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.disableVertexAttribArray(a));
     }
