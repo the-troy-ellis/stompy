@@ -1,3 +1,4 @@
+import { RADAR_RANGE, radarOf, fogOf } from '../data/weather.js';
 import { TAU, clampN, len, rnd, sub } from '../util/math.js';
 import { WEAPONS, CATS, CAT_OF, CAT_LABEL, CAT_KEY } from '../data/weapons.js';
 import { MP_COLORS } from '../data/colors.js';
@@ -15,6 +16,10 @@ const { sin, cos, atan2, min, max, PI, random, hypot, floor } = Math;
 // short line per objective, never more than 24 characters. Pure, for the tests.
 export const fmtDist = m => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`);
 export const fmtClock = s => `${Math.floor(Math.ceil(s) / 60)}:${String(Math.ceil(s) % 60).padStart(2, '0')}`;
+// The target brackets and enemy chevrons show out to 1.2x what the fog lets
+// you see (spec 07); in clear weather that is past the radar anyway.
+const FOG_TMP = [0, 0];
+export const sightLine = G => (G.pal ? fogOf(G, FOG_TMP)[1] * 1.2 : Infinity);
 export function objectiveLine(o) {
   const d = o.def, fit = (head, tail) => `${head.slice(0, 24 - tail.length)}${tail}`.trim();
   switch (d.type) {
@@ -384,8 +389,8 @@ export function createHud(app) {
     }
 
     // Target brackets (gone while a bolt has the HUD scrambled).
-    const scr = P.scramble > 0, t = scr ? null : G.target;
-    if (t && t.alive) {
+    const scr = P.scramble > 0, t = scr ? null : G.target, sees = sightLine(G);
+    if (t && t.alive && hypot(t.x - P.x, t.z - P.z) < sees) {
       const a = project([t.x, t.y + 8.2 * t.ch.scale, t.z]), b = project([t.x, t.y, t.z]);
       if (a && b) {
         const hgt = max(14, b[1] - a[1]), wdt = hgt * 0.75, x0 = a[0] - wdt / 2, y0 = a[1], k = min(10, wdt / 3);
@@ -412,7 +417,7 @@ export function createHud(app) {
     }
     // Enemy markers in view (small chevrons), so far-off mechs can be found.
     for (const m of G.mechs) {
-      if (!m.alive || m.team === 0 || m === t) continue;
+      if (!m.alive || m.team === 0 || m === t || hypot(m.x - P.x, m.z - P.z) > sees) continue;   // past what the weather lets you see
       const p = project([m.x, m.y + 9 * m.ch.scale, m.z]);
       if (!p || p[1] > L.viewBottom) continue;
       ctx.fillStyle = m.remote ? app.net.pilotCss(m.netId) : RED;
@@ -449,7 +454,7 @@ export function createHud(app) {
     const vy = viewYaw(P), half = (G.zoom ? 0.42 : 1.08) * (app.scene.view.W / max(1, app.scene.view.H)) / 2;
     ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - sin(half) * rr, ry - cos(half) * rr);
     ctx.moveTo(rx, ry); ctx.lineTo(rx + sin(half) * rr, ry - cos(half) * rr); ctx.stroke();
-    const RANGE = 800;
+    const RANGE = Math.round(RADAR_RANGE * radarOf(G) / 10) * 10;   // weather shrinks the radar's reach
     for (const m of G.mechs) {
       if (!m.alive || m === P) continue;
       const dx = m.x - P.x, dz = m.z - P.z, d = hypot(dx, dz);

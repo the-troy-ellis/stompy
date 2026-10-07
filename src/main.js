@@ -41,7 +41,7 @@ function loadPrefs() {
     mission: 0,   // set from the campaign save below
     chassis: MECH_ORDER.includes(store.get('mech.chassis')) ? store.get('mech.chassis') : 'kestrel',
     menuSel: store.get('menu.sel', 'campaign'),
-    fpMap: store.get('fp.map', 0), fpFoes: store.get('fp.foes', 3), fpMix: store.get('fp.mix', 0),
+    fpMap: store.get('fp.map', 0), fpFoes: store.get('fp.foes', 3), fpMix: store.get('fp.mix', 0), fpWeather: store.get('fp.weather', 0), fpTime: store.get('fp.time', 0),
     diff: DIFF[store.get('diff')] ? store.get('diff') : 'normal',
     frameTime: store.get('debug.frametime', false),
     ...Object.fromEntries(SETTING_KEYS.map(k => [k, readSetting(k, store.get(SETTINGS[k].key))])),

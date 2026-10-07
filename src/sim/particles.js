@@ -50,16 +50,19 @@ export function spawn(G, p, v, life, size, col, kind, grav = 0) {
   P.spin[i] = G.rng.next() * TAU;
 }
 
-// One frame: age, fall, drag (smoke slows), move, bounce (debris on the
-// ground), spin; then drop the expired ones.
+// One frame: age, fall, drag (smoke slows and drifts with the wind), move,
+// bounce (debris on the ground), spin; then drop the expired ones.
 const SMOKE = KIND_ID.smoke, DEBRIS = KIND_ID.debris;
 export function stepParticles(G, dt) {
-  const P = G.parts;
+  const P = G.parts, wind = G.weather?.wind, wx = wind ? wind[0] : 0, wz = wind ? wind[1] : 0, windy = wx !== 0 || wz !== 0;
   for (let i = 0; i < P.n; i++) {
     const i3 = i * 3, k = P.kind[i];
     P.life[i] -= dt;
     P.vel[i3 + 1] -= P.grav[i] * dt;
-    if (k === SMOKE) { const d = 1 - dt * 0.6; P.vel[i3] *= d; P.vel[i3 + 1] *= d; P.vel[i3 + 2] *= d; }
+    if (k === SMOKE) {
+      const d = 1 - dt * 0.6; P.vel[i3] *= d; P.vel[i3 + 1] *= d; P.vel[i3 + 2] *= d;
+      if (windy) { P.vel[i3] += (wx - P.vel[i3]) * dt * 0.8; P.vel[i3 + 2] += (wz - P.vel[i3 + 2]) * dt * 0.8; }   // and drifts with the wind
+    }
     P.pos[i3] += P.vel[i3] * dt; P.pos[i3 + 1] += P.vel[i3 + 1] * dt; P.pos[i3 + 2] += P.vel[i3 + 2] * dt;
     if (k === DEBRIS) {
       const g = G.ter.height(P.pos[i3], P.pos[i3 + 2]);

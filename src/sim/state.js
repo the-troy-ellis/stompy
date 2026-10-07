@@ -1,5 +1,6 @@
 import { CHASSIS } from '../data/chassis.js';
 import { palAt } from '../data/palettes.js';
+import { makeWeather } from '../data/weather.js';
 import { makeTerrain, BOUND } from '../world/terrain.js';
 import { makeRng } from './rng.js';
 import { Particles } from './particles.js';
@@ -55,6 +56,7 @@ export function resetMatch(G, { def, seed, pal, terrainOpts }) {
   const biome = pal || def.pal, r = def.ramp;
   G.pal = palAt(biome, r ? r[0] : def.time);
   G.palRamp = r ? { from: palAt(biome, r[0]), to: palAt(biome, r[1]), secs: r[2] } : null;
+  G.weather = makeWeather(def.weather, seed);   // fog, radar and wind (data/weather.js)
   G.ter = makeTerrain(seed, { ...terrainOpts, zones: flatZones(def) });
   G.worldKind = 'match';
   G.mechs = []; G.entities = []; G.waves = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts.clear(); G.debris = []; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear();
