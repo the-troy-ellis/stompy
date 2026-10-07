@@ -203,12 +203,17 @@ def vec3(v, lim=1e4):
     return [num(x, -lim, lim) for x in v[:3]] if isinstance(v, list) and len(v) >= 3 else 0
 
 
+def chassis_or_stock(ch):
+    """A chassis key from the list, else kestrel; whatever was sent (a list, a dict) never raises."""
+    return ch if isinstance(ch, str) and ch in CHASSIS else "kestrel"
+
+
 def clean_state(msg):
     """A state message rebuilt from the fields the game sends, every number
     finite and in range, so nothing malformed reaches the other screens."""
     hp = msg.get("hp")
     hp = [num(v, 0, 200) for v in hp[:5]] if isinstance(hp, list) else []
-    out = {"t": "s", "ch": msg.get("ch") if msg.get("ch") in CHASSIS else "kestrel",
+    out = {"t": "s", "ch": chassis_or_stock(msg.get("ch")),
            "x": num(msg.get("x"), -HALF, HALF), "y": num(msg.get("y"), -100, 2000), "z": num(msg.get("z"), -HALF, HALF),
            "yaw": num(msg.get("yaw"), -1e3, 1e3), "tw": num(msg.get("tw"), -4, 4), "p": num(msg.get("p"), -2, 2),
            "sp": num(msg.get("sp"), -60, 60), "air": flag(msg.get("air")), "al": flag(msg.get("al")), "sd": flag(msg.get("sd")),
@@ -333,7 +338,7 @@ async def session(reader, writer):
         c.id = next(i for i in range(1, MAX_PLAYERS + 1) if i not in players)
         c.name = clean_name(hello.get("name"), c.id)
         c.color = int(num(hello.get("color"), 0, 7))
-        c.ch = hello.get("ch") if hello.get("ch") in CHASSIS else "kestrel"
+        c.ch = chassis_or_stock(hello.get("ch"))
         players[c.id] = c
         log(f"join {c.id} {c.name} from {peer[0] if peer else '?'} ({len(players)} playing)")
         send(c, {"t": "welcome", "id": c.id, "seed": arena["seed"], "pal": arena["pal"], "mode": "ffa",

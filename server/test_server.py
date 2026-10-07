@@ -199,6 +199,11 @@ class Session(unittest.IsolatedAsyncioTestCase):
         await b.send({"t": "ping", "n": "x", "rtt": "NaN"})
         self.assertEqual((await b.recv())["n"], 0, "a junk ping is answered, not trusted")
         await b.send({"t": "hello", "v": relay.PROTOCOL, "name": "X", "ch": "tank"})   # a second hello is ignored
+        c = await WSClient.connect(self.port)
+        self.clients.append(c)
+        await c.send({"t": "hello", "v": relay.PROTOCOL, "name": "C", "ch": ["not", "a", "chassis"]})
+        self.assertEqual((await c.recv())["scores"][2]["ch"], "kestrel", "a junk chassis in hello is stock, not a crash")
+        await a.recv(); await b.recv()  # C joined
         await a.send({"t": "s", "ch": "jackal"})
         self.assertEqual((await b.recv())["ch"], "jackal")
 

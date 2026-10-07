@@ -62,7 +62,7 @@ def validate_loadout(chassis, loadout):
 def check_loadout(chassis, loadout):
     """What the relay passes on: the loadout as sent if it is clean and in
     budget, otherwise stock. Returns (loadout, rejected)."""
-    if chassis not in CHASSIS:
+    if not isinstance(chassis, str) or chassis not in CHASSIS:   # a list or dict sent as the chassis must not raise
         return None, True
     norm, _, ok = validate_loadout(chassis, loadout)
     sent = {"hp": loadout.get("hp"), "sys": loadout.get("sys")} if isinstance(loadout, dict) else None
