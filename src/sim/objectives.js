@@ -93,6 +93,9 @@ const TYPES = {
   },
 };
 export const OBJECTIVE_TYPES = Object.keys(TYPES);
+// A waiting objective starting: its tracking built, as the tick does when the
+// one it waits on is done (a co-op guest calls it when the host says so).
+export function activate(G, o) { Object.assign(o, TYPES[o.def.type].init(G, o.def)); o.state = 'active'; }
 // Where the HUD marker for an objective goes (null: nowhere in particular):
 // the nearest standing target (to knock down or to guard), the convoy's lead,
 // the extraction point.
@@ -135,7 +138,7 @@ const wavesPending = G => (G.waves || []).some(w => !w.spawned && w.due != null)
 export function tickObjectives(G) {
   if (G.state !== 'play' || G.mode === 'mp' || !G.objectives || !G.player.alive) return;
   for (const o of G.objectives) {
-    if (o.state === 'waiting' && G.objectives[o.def.after]?.state === 'done') { Object.assign(o, TYPES[o.def.type].init(G, o.def)); o.state = 'active'; voice(G, 'updated'); }
+    if (o.state === 'waiting' && G.objectives[o.def.after]?.state === 'done') { activate(G, o); voice(G, 'updated'); }
     if (o.state !== 'active') continue;
     const r = TYPES[o.def.type].tick(G, o);
     if (r) o.state = r;

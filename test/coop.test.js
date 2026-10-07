@@ -5,7 +5,7 @@ import { initFeet } from '../src/sim/gait.js';
 import { damage, fire } from '../src/sim/combat.js';
 import { newMech } from '../src/sim/state.js';
 import { preyOf, PREY_SWITCH } from '../src/sim/ai.js';
-import { startCoop, hostTick, applyEnemyState, applyEHit, flushEHits, enemyByEid, ES_HZ, GT_SLACK } from '../src/net/coop.js';
+import { startCoop, hostTick, guestApply, applyEHit, flushEHits, enemyByEid, ES_HZ, GT_SLACK } from '../src/net/coop.js';
 
 // Co-op's host-run enemies (#202, spec 09 § Authority split).
 // A host and a guest of one seed and mission, the enemy parked in front of
@@ -15,7 +15,7 @@ function pair(foe = 'warden') {
   const e = foes(H)[0];
   Object.assign(e, { x: 0, z: 120, yaw: Math.PI }); initFeet(H, e); freeze(e);
   startCoop(H, 'host'); startCoop(Gs, 'guest');
-  const relay = () => hostTick(H, 1 / ES_HZ, m => applyEnemyState(Gs, m, Gs.clock));
+  const relay = () => hostTick(H, 1 / ES_HZ, m => guestApply(Gs, m, Gs.clock));
   relay();
   return { H, Gs, e, ge: enemyByEid(Gs, e.eid), relay };
 }
@@ -28,7 +28,7 @@ test('both ends number the mission enemies alike; the guest draws the host\'s', 
   assert.equal(Gs.mechs.filter(m => m.eid).length, 1, 'no second copy');
   // A wave enemy only the host spawned appears on the guest from its es.
   const w = newMech(H, 'jackal', 1, 50, 50, 0); H.mechs.push(w);
-  hostTick(H, 1 / ES_HZ, m => applyEnemyState(Gs, m, Gs.clock));
+  hostTick(H, 1 / ES_HZ, m => guestApply(Gs, m, Gs.clock));
   assert.equal(w.eid, 2);
   assert.equal(enemyByEid(Gs, 2)?.type, 'jackal');
 });

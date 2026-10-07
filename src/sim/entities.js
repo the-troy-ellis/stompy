@@ -3,6 +3,7 @@ import { explode, particle } from './effects.js';
 import { feel } from './feel.js';
 import { flatZones } from './placement.js';
 import { missionAvoid, scatterProps } from '../world/props.js';
+import { entQueue } from './hitqueue.js';
 
 const { hypot, atan2, sin, cos, min, PI } = Math;
 
@@ -130,6 +131,14 @@ export function damageEntity(G, e, amt, src, p, how = {}) {
   const r = G.rng;
   for (let i = 0; i < 3; i++) particle(G, p || [e.x, e.y + e.height / 2, e.z], [r.range(-4, 4), r.range(1, 6), r.range(-4, 4)], 0.3, 0.3, [1, 0.8, 0.4], 'fire');
   if (!Number.isFinite(e.hp)) return;   // decorative: it sparks, nothing more
+  if (G.role === 'guest') {
+    // Co-op: the host owns the mission's entities; it applies this and says so (docs/specs/09-coop.md).
+    const q = entQueue(G, e, p || [e.x, e.y + e.height / 2, e.z]);
+    q.amt += amt; q.p = p || q.p;
+    if (how.punch) { q.me = 1; q.yaw = how.yaw; }
+    if (src === G.player) { G.stats.dealt += amt; G.hitMark = 0.25; }
+    return;
+  }
   e.hp -= amt;
   e.lastHitBy = src; e.lastHitAt = G.time;
   if (src === G.player) { G.stats.dealt += amt; G.hitMark = 0.25; }
@@ -140,6 +149,7 @@ export function destroyEntity(G, e, src, how = {}) {
   if (!e.alive) return;
   e.alive = false; e.hp = 0; e.wreck = true; e.killedBy = src || null; e.downAt = G.time;
   if (how.punch && e.kind !== 'vehicle') e.fall = { yaw: how.yaw ?? e.yaw, t: 0 };   // over it goes, away from the fist
+  if (G.role === 'host') G.fx.netSend(how.punch ? { t: 'entx', id: e.id, punch: 1, yaw: Math.round((how.yaw ?? e.yaw) * 100) / 100 } : { t: 'entx', id: e.id });   // co-op: down on every screen at once
   const big = e.height >= 6, top = [e.x, e.y + e.height * 0.6, e.z];
   explode(G, top, big);
   G.fx.sfx.boom(top, big);
