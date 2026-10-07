@@ -2,6 +2,8 @@ import { addEntity } from './entities.js';
 import { voice } from './voice.js';
 import { polar } from './placement.js';
 import { spawnWave, waveFoes, WAVE_WARN } from './waves.js';
+import { allDown, coopLives } from './coopRules.js';
+import { pilotsOf } from './hitqueue.js';
 export { polar, flatZones } from './placement.js';
 
 // Mission objectives (docs/specs/03-objectives.md § State machine). A mission
@@ -61,8 +63,10 @@ const TYPES = {
   extract: {
     init: (G, d) => ({ start: G.time, nav: G.entities.find(e => e.id === d.at) }),
     tick(G, o) {
-      const P = G.player, n = o.nav;
-      o.dist = Math.hypot(n.x - P.x, n.z - P.z);
+      // Every pilot still standing must be there (co-op); dist is the furthest one's.
+      const n = o.nav;
+      o.dist = 0;
+      for (const P of pilotsOf(G)) if (P.alive) o.dist = Math.max(o.dist, Math.hypot(n.x - P.x, n.z - P.z));
       if (o.def.within != null) o.left = Math.max(0, o.def.within - (G.time - o.start));
       if (o.dist <= n.trigger) { voice(G, 'extracted'); return 'done'; }
       if (o.left === 0) return 'failed';
@@ -136,7 +140,13 @@ const wavesPending = G => (G.waves || []).some(w => !w.spawned && w.due != null)
 // Once a frame while the match is on. Each active objective updates its
 // progress and may finish or fail; then the mission's own outcome.
 export function tickObjectives(G) {
-  if (G.state !== 'play' || G.mode === 'mp' || !G.objectives || !G.player.alive) return;
+  if (G.state !== 'play' || G.mode === 'mp' || !G.objectives) return;
+  if (!G.player.alive && !coopLives(G)) return;   // solo: the death is the end (combat.js); co-op goes on
+  if (allDown(G)) {   // co-op: everyone down at once
+    G.state = 'over'; G.endT = 3.2; G.won = false;
+    voice(G, 'failed', {}, true, 600);
+    return;
+  }
   for (const o of G.objectives) {
     if (o.state === 'waiting' && G.objectives[o.def.after]?.state === 'done') { activate(G, o); voice(G, 'updated'); }
     if (o.state !== 'active') continue;

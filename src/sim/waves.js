@@ -1,6 +1,7 @@
 import { newMech } from './state.js';
 import { polar } from './placement.js';
 import { BOUND } from '../world/terrain.js';
+import { waveExtra } from './coopRules.js';
 
 const { atan2, sin, cos, max, min, PI } = Math;
 
@@ -11,9 +12,10 @@ export const WAVE_WARN = 3;
 export const WAVE_DIST = 520;   // m from the player for a ring or bearing entry
 
 export function waveFoes(G, foes) {
-  if (G.diff === 'easy' && foes.length > 1) return foes.slice(0, -1);
-  if (G.diff === 'hard') return [...foes, foes[foes.length - 1]];
-  return [...foes];
+  const extra = waveExtra(G);   // co-op: one more light mech per extra pilot (sim/coopRules.js)
+  if (G.diff === 'easy' && foes.length > 1) return [...foes.slice(0, -1), ...extra];
+  if (G.diff === 'hard') return [...foes, foes[foes.length - 1], ...extra];
+  return [...foes, ...extra];
 }
 
 // `from`: 'ring' (spread round the player, the start's maths), a bearing in
