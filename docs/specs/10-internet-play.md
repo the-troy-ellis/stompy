@@ -42,6 +42,18 @@ Everything above is a recommendation; the client never hardcodes a host.
 `?relay=` provides it; the Pages build can bake a default via a build-time
 define (`--define:RELAY_DEFAULT='"wss://relay.example/ws"'`).
 
+As shipped (#217): `RELAY_DEFAULT` lives in `src/net/relay.js`, not
+`client.js`.
+- **Where it sits:** it comes after `?relay=` and the RELAY field, and before
+  the page's own host. The MULTIPLAYER panel's dim line shows whichever
+  address wins.
+- **Baking it in:** `RELAY_DEFAULT=wss://relay.example/ws npm run build`
+  defines it, and the build refuses an entry that isn't a relay address.
+  Without it, nothing is baked in.
+- **The Pages workflow:** it passes the repository variable
+  `STOMPY_RELAY_DEFAULT` (Settings > Secrets and variables > Actions >
+  Variables) when it is set.
+
 ## Design
 
 ### TLS and origins
