@@ -39,8 +39,9 @@ export const BUDGETS = {
   'fight-deaths': { meanDraws: 33, peakDraws: 41, tris: 27000, allocKB: 205 },
   wrecks:         { meanDraws: 30, peakDraws: 38, tris: 26000, allocKB: 145 },
   'looking-away': { meanDraws: 12, peakDraws: 15, tris: 25000, allocKB: 135 },
-  rain:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 115 },   // free-start in a downpour: one more draw, no more garbage
-  snow:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 115 },   // and in snow
+  rain:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 90 },   // free-start in a downpour: one more draw, no more garbage
+  snow:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 90 },   // and in snow
+  dust:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 90 },   // and in a dust storm (2,500 grains)
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;
@@ -139,7 +140,7 @@ try {
   // Weather on its own: the free-start match again, in rain and in snow, to
   // compare with free-start (spec 07: the box of drops is one more draw and
   // no garbage).
-  for (const [name, pal, weather] of [['rain', 'dusk', 'rain'], ['snow', 'ice', 'snow']]) {
+  for (const [name, pal, weather] of [['rain', 'dusk', 'rain'], ['snow', 'ice', 'snow'], ['dust', 'volcanic', 'dust']]) {
     await page.evaluate(async ([pal, weather]) => {
       const { startMatch } = await import('/src/sim/state.js');
       const G = window.__stompy.game, app = window.__stompy.app;

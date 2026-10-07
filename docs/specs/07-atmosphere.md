@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning, #159 snow and fog shipped) |
+| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning, #159 snow and fog, #160 dust storm shipped) |
 | Milestone | M4 |
 | Size | L (split: night + headlights; weather; props; explosions + particles) |
 | Depends on | M0; structures from [03-objectives.md](03-objectives.md) share the prop meshes |
@@ -87,6 +87,13 @@ cockpit; snow whitens the sky and fog colour by 35%. Fog has no particles: its
 fog distances (x0.3) and a haze that greys the zenith into the horizon (80%;
 dust gets 60%) do it. The perf harness has a `snow` scene; rain and snow
 each cost one draw over free-start and no more garbage.
+
+As shipped (#160): dust is 2,500 small flat grains (1,500 on touch) streaming
+sideways at 1.4x the 9 m/s wind, with an orange-tinted horizon and fog
+(halfway to `tint`) on top of its haze. A mech in the air is pushed 0.5 m/s
+with the wind; on the ground nothing. Mission 10's PURPLE PUNCHER now walks
+in out of the dust at about 350 m, which is the set piece spec 04 asked for.
+The perf harness has a `dust` scene.
 
 **Wind** moves smoke and missile trails (`particle` velocities get `wind × dt`)
 and leans rain/snow. Dust storms push the mech by 0.5 m/s laterally when
