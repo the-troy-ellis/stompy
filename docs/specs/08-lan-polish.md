@@ -109,6 +109,17 @@ apart, showing `RECONNECTING`.
 Top-right under the hostile count: the last four `kill` messages, fading
 over 6 s, in the pilot colours. Replaces the centre `msg` for kills.
 
+As shipped (#190): `src/net/killfeed.js` (`addKill`, `liveKills`,
+`killWords`) holds the feed and the words; the HUD draws it under the
+scoreboard (a phone's one-line rank).
+- **The words:** KILLER DESTROYED VICTIM, PUNCHED OUT for a punch, and
+  VICTIM WENT DOWN for a pilot with no killer.
+- **The colours:** each name in its pilot's colour, the verb in amber when
+  you are in it.
+- **Legibility:** a faint dark band behind each line, so a pale name reads
+  against a bright sky.
+- **A new round** clears the feed.
+
 ### Server operations
 
 - `--host`, `--port`, `--mode`, `--limit` flags in addition to the env vars.

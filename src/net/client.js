@@ -21,6 +21,7 @@ import { PROTOCOL, hit, stateMessage } from './protocol.js';
 import { fitOf } from '../ui/mechlab.js';
 import { applyLoadout, stockLoadout, validate } from '../sim/loadout.js';
 import { startSpectate } from './spectate.js';
+import { addKill } from './killfeed.js';
 
 const { sin, cos, atan2, min, max, random, hypot } = Math;
 const clamp30 = v => max(-30, min(30, +v || 0));
@@ -39,7 +40,7 @@ export function createNet(app) {
   // own death. Other pilots are drawn from their latest state, smoothed and
   // extrapolated, and walk with the same gait. Their shots arrive as effects
   // ("ghosts") that look real but never score -- their shooter scores them.
-  const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10, loSent: '', loN: 0 };
+  const Net = { ws: null, id: 0, info: new Map(), sendT: 0, limit: 10, loSent: '', loN: 0, feed: [] };
   const mp = () => G.mode === 'mp';
   const pilotName = id => Net.info.get(id)?.name || `PILOT ${id}`;
   const pilotCss = id => MP_COLORS[Net.info.get(id)?.color ?? 0]?.css || '#f44';
@@ -137,8 +138,7 @@ export function createNet(app) {
         break;
       case 'kill': {
         setScores(m.scores);
-        const mine = m.killer === Net.id || m.victim === Net.id;
-        msg(G, m.killer ? `${pilotName(m.killer)} ${m.me ? 'PUNCHED OUT' : 'DESTROYED'} ${pilotName(m.victim)}` : `${pilotName(m.victim)} WENT DOWN`, mine ? '#fc3' : '#7f7');
+        addKill(Net.feed, { killer: m.killer || 0, victim: m.victim, me: !!m.me, at: performance.now() });   // top right, in their colours (net/killfeed.js)
         if (m.killer === Net.id) { G.stats.kills++; voice(G, m.me ? 'killPunch' : 'kill'); }
         break;
       }
@@ -157,7 +157,7 @@ export function createNet(app) {
   }
 
   function startArena(seed, palName) {
-    G.mode = 'mp'; G.spectate = null;
+    G.mode = 'mp'; G.spectate = null; Net.feed.length = 0;
     const def = { name: 'Arena', foes: [] };
     resetMatch(G, { def, seed, pal: palName });
     placeScenery(G, def);
