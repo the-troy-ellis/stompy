@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestGame, stepFor, input, foes } from './helpers.js';
 import { HPK } from '../src/data/chassis.js';
-import { update } from '../src/sim/update.js';
+import { update, noInput } from '../src/sim/update.js';
 
 const finite = m => ['x', 'y', 'z', 'yaw', 'twist', 'pitch', 'speed', 'heat', 'fuel'].every(k => Number.isFinite(m[k])) && HPK.every(k => Number.isFinite(m.hp[k]));
 
@@ -69,4 +69,22 @@ test('turnBy turns the legs no faster than the chassis can, and reports what it 
   const y = P.yaw;
   update(G, input({ turnBy: 1 }), dt);
   assert.equal(P.yaw, y); assert.equal(G.turnByUsed, 0, 'a shut-down mech turns nowhere');
+});
+
+test('a double tap centres the torso all the way, however slow the frames, unless the pilot twists again', () => {
+  for (const dt of [1 / 60, 0.05]) {   // 0.05: the cap a slow phone's frames hit
+    const G = createTestGame(), P = G.player;
+    P.twist = 1.2;
+    update(G, { ...noInput(), centreTap: true }, dt);
+    for (let i = 0; i < 60; i++) update(G, noInput(), dt);
+    assert.equal(P.twist, 0, `dt ${dt}`);
+    assert.ok(!P.centring, 'and then lets go');
+  }
+  const G = createTestGame(), P = G.player;
+  P.twist = 1.2;
+  update(G, { ...noInput(), centreTap: true }, 1 / 60);
+  update(G, { ...noInput(), twist: -1 }, 1 / 60);
+  const t = P.twist;
+  for (let i = 0; i < 30; i++) update(G, noInput(), 1 / 60);
+  assert.equal(P.twist, t, 'twisting takes the torso back');
 });

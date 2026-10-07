@@ -138,8 +138,8 @@ export function createInput(app) {
   // Every finger is tracked separately.
   const tui = $('.touch-ui', root), stick = $('.stick', tui), knob = $('.knob', tui);
   const fingers = new Map();
-  const STICK_R = 56, LEFT = 0.45, DOUBLE_TAP = 300, CENTRE_FOR = 600, TURN_QUEUE = 1;   // px; share of the width; ms; ms; rad
-  let yawDebt = 0, lastAimTap = -1e9, centreUntil = 0;   // lastAimTap: when a tap (not a drag) on the aim side lifted
+  const STICK_R = 56, LEFT = 0.45, DOUBLE_TAP = 300, TURN_QUEUE = 1;   // px; share of the width; ms; rad
+  let yawDebt = 0, lastAimTap = -1e9, centreTap = false;   // lastAimTap: when a tap (not a drag) on the aim side lifted; centreTap: a double tap not yet sent
   const syncTouchUI = () => {
     tui.hidden = !(G.touchUI && (G.state === 'play' || G.state === 'over') && !G.paused);
     const jump = root.querySelector('[data-t="jump"]');
@@ -183,7 +183,7 @@ export function createInput(app) {
       knob.style.transform = 'translate(-50%, -50%)';
     } else if (y < r.height / 2 && !has('aim')) {
       const now = performance.now();
-      if (now - lastAimTap < DOUBLE_TAP) { centreUntil = now + CENTRE_FOR; lastAimTap = -1e9; }   // double tap: torso over the legs
+      if (now - lastAimTap < DOUBLE_TAP) { centreTap = true; lastAimTap = -1e9; }   // double tap: torso over the legs (the sim sees it through)
       fingers.set(e.pointerId, { kind: 'aim', lx: e.clientX, ly: e.clientY, x0: e.clientX, y0: e.clientY });
     }
   });
@@ -249,10 +249,10 @@ export function createInput(app) {
       thrUp: !!keys.KeyW, thrDown: !!keys.KeyS, stop: !!keys.KeyX,
       turn: (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0), turnBy: yawDebt,
       twist: (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0) + (G.touchTwist || 0), pitch: (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0),
-      centre: !!keys.KeyC || performance.now() < centreUntil, jets: !!keys.KeyJ,
+      centre: !!keys.KeyC, centreTap, jets: !!keys.KeyJ,
       held: Object.fromEntries(CATS.map(c => [c, isHeld(c)])), missileTap, punch: punchTap,
     };
-    missileTap = false; punchTap = false;
+    missileTap = false; punchTap = false; centreTap = false;
     return inp;
   }
 
