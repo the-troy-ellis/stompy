@@ -3,6 +3,7 @@ import { msg } from '../sim/effects.js';
 import { viewYaw } from '../sim/geom.js';
 import { MELT_MAX, beamMult } from '../sim/beams.js';
 import { createThump } from './thump.js';
+import { createAmbience } from './ambience.js';
 import { HEAT, hotFrac } from '../data/feel.js';
 
 const { sin, cos, atan2, min, max, abs, PI, random, hypot, floor } = Math;
@@ -110,6 +111,7 @@ export function createAudio(app) {
   }
 
   const thumper = createThump({ ctx: ac, out, spatial });
+  const ambience = createAmbience({ ac, bus: () => thumper.loopBus() || out(), noise });
 
   // name -> number of takes (files name0..nameN-1, or just name.mp3 for 1).
   const SAMPLES = { step: 5, punch: 3, plate: 2, laser: 5, mlaser: 5, crunch: 5, boom_big: 1, boom_low: 1,
@@ -412,6 +414,7 @@ export function createAudio(app) {
     const twistRate = G.twistRate || 0;
     loopSet('servo_loop', live ? min(0.13, twistRate * 0.07) : 0, 0.75 + min(0.6, twistRate * 0.25));
     beamSound(P.beaming && !G.paused, beamMult(P));
+    ambience.tick(G, !G.paused);   // the biome's bed and the weather's layer (audio/ambience.js)
   }
 
 
@@ -423,5 +426,5 @@ export function createAudio(app) {
     thumper.duck(duck);
     if (haptic > 2 && G.touchUI && prefs.haptics !== false) { try { navigator.vibrate?.(min(100, Math.round(haptic))); } catch { /* unsupported */ } }
   }
-  return { Sound, settings, loadSamples, play, loopSet, loops, sfx, say, beamSound, fusionSound, thump, tick: audioTick };
+  return { Sound, settings, loadSamples, play, loopSet, loops, sfx, say, beamSound, fusionSound, thump, tick: audioTick, ambience };
 }

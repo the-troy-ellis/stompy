@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning, #159 snow and fog, #160 dust storm, #161 prop library, #162 prop placement, #163 explosions shipped) |
+| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning, #159 snow and fog, #160 dust storm, #161 prop library, #162 prop placement, #163 explosions, #164 ambient audio shipped) |
 | Milestone | M4 |
 | Size | L (split: night + headlights; weather; props; explosions + particles) |
 | Depends on | M0; structures from [03-objectives.md](03-objectives.md) share the prop meshes |
@@ -226,6 +226,26 @@ oldest smoke first.
 A per-biome bed (synthesised: filtered noise with slow LFOs, no new clips)
 and a per-weather layer, mixed on the existing `loops` path. Volume follows
 the SFX setting.
+
+As shipped (#164): the table is `data/ambience.js`, and `audio/ambience.js`
+builds it.
+- **Layers:** each layer is the shared white-noise buffer, looping from its
+  own offset, through one filter, with an LFO on the filter frequency and
+  another on the level.
+- **Beds:** dusk is a warm low wind with some air on top; ice is a thin cold
+  wind over a low hush; volcanic is a ground rumble with a high sputter.
+- **Weather:** rain is a hiss and a patter, snow a whistling gusty wind, and
+  dust a resonant howl with grit. Fog has no layer of its own: it closes a
+  500 Hz lowpass over the bed.
+- **Mixing:** everything goes through the loop bus, so impacts duck it like
+  the hum. A change of biome or weather fades the old layers out over 1.5 s
+  and stops them. Pause, the menu and a hidden tab fade it all down.
+- **Sound off or no gesture:** there's no context, so nothing is built.
+  There is no volume slider, so "follows the SFX setting" means the sound
+  on/off pref.
+- **Levels** (rendered offline in Chromium, after the fade-in): the beds are
+  −43 to −45 dBFS RMS, rain −33, dust −36, snow −40, and fog −44 to −51. All
+  sit well under the reactor hum, and each weather is 4–12 dB over its bed.
 
 ## Code touchpoints
 

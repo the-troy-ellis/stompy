@@ -107,7 +107,7 @@ function start(root) {
   // ?debug=1 exposes the state for the smoke test and for poking at in the console.
   if (params.has('debug')) { window.__stompy = { game: G, app, kill: m => destroy(G, m, G.player) }; createFeelPanel(app); }
 
-  const quiet = () => { for (const k of Object.keys(app.audio.loops)) app.audio.loopSet(k, 0); app.audio.beamSound(false, 1); app.audio.fusionSound(false, 0); };
+  const quiet = () => { for (const k of Object.keys(app.audio.loops)) app.audio.loopSet(k, 0); app.audio.beamSound(false, 1); app.audio.fusionSound(false, 0); app.audio.ambience.tick(G, false); };
   let last = 0, lastAudioCheck = 0;
   const loop = ts => {
     requestAnimationFrame(loop);
