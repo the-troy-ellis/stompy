@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning, #159 snow and fog, #160 dust storm shipped) |
+| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning, #159 snow and fog, #160 dust storm, #161 prop library shipped) |
 | Milestone | M4 |
 | Size | L (split: night + headlights; weather; props; explosions + particles) |
 | Depends on | M0; structures from [03-objectives.md](03-objectives.md) share the prop meshes |
@@ -128,6 +128,15 @@ tapered cube), pipe run (a line of cylinders), wall segment, antenna mast
 with dish, truck (the escort vehicle), launcher (mission 9 turret), relay
 (mission 2), crate stacks, dead tree (ice), lava vent (volcanic: emissive
 glow), ice spire.
+
+As shipped (#161): bunker, pipe run, wall segment, antenna mast, crate stack,
+dead tree, lava vent and ice spire join the mission props, 46 to 116
+triangles each (`props.test.js`). Each is built in the same unit space (1
+across the footprint radius, 1 tall), so a long one (pipe run, wall) is a
+strip along z in a round footprint: #162 should chain short segments rather
+than place one long one. The mast is built for a height about seven times
+its radius. The vent's lava is a second mesh, `ventGlow`, drawn glowing, so
+it shows at night. `node scripts/shootProps.mjs` shoots the sheet.
 
 `src/world/props.js` places them by biome rules from the seed: clusters near
 the existing outposts, lines of pylons across the map, scattered singles.
