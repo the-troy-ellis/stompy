@@ -61,7 +61,7 @@ test('smoke and dust dither out over the last third of their life; nothing else 
 });
 
 test('dithering shapes are drawn by the dithering shader, and only dithering kinds use them', () => {
-  assert.deepEqual(DITHER_SHAPES.sort(), ['cube', 'flat']);
+  assert.deepEqual(DITHER_SHAPES.sort(), ['cube', 'flat', 'ring']);
   for (const k of KINDS) assert.equal(DITHER_SHAPES.includes(shapeOf(k)), DITHER_KINDS.includes(k), k);
   const gl = readFileSync('src/render/gl.js', 'utf8');
   assert.match(gl, /#ifdef DITHER[\s\S]*discard/, 'dither skips pixels with discard');

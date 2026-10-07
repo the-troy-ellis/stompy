@@ -8,7 +8,7 @@ import { TAU } from '../util/math.js';
 // approximates replacing the oldest. `length` is `n`, so code that only
 // counted particles still works.
 export const PARTICLE_CAP = 4000;   // room for weather (spec 07: up to 2,500 at once) on top of a fight
-export const KINDS = ['smoke', 'fire', 'flame', 'debris', 'spark', 'dust', 'rain', 'snow'];
+export const KINDS = ['smoke', 'fire', 'flame', 'debris', 'spark', 'dust', 'rain', 'snow', 'shock'];
 const KIND_ID = Object.fromEntries(KINDS.map((k, i) => [k, i]));
 
 export class Particles {
@@ -39,15 +39,16 @@ export class Particles {
 }
 
 // Spawn one: position p, velocity v and colour col are copied (the caller's
-// arrays are not kept). The spin takes one roll of the seeded RNG, as before.
-export function spawn(G, p, v, life, size, col, kind, grav = 0) {
+// arrays are not kept). The spin takes one roll of the seeded RNG, as before,
+// unless it is given (a shockwave lies flat and still).
+export function spawn(G, p, v, life, size, col, kind, grav = 0, spin = null) {
   const P = G.parts, i = P.slot(), i3 = i * 3;
   P.pos[i3] = p[0]; P.pos[i3 + 1] = p[1]; P.pos[i3 + 2] = p[2];
   P.vel[i3] = v[0]; P.vel[i3 + 1] = v[1]; P.vel[i3 + 2] = v[2];
   P.col[i3] = col[0]; P.col[i3 + 1] = col[1]; P.col[i3 + 2] = col[2];
   P.life[i] = life; P.max[i] = life; P.size[i] = size; P.grav[i] = grav;
   P.kind[i] = KIND_ID[kind] ?? 0;
-  P.spin[i] = G.rng.next() * TAU;
+  P.spin[i] = spin ?? G.rng.next() * TAU;
 }
 
 // One frame: age, fall, drag (smoke slows and drifts with the wind), move,

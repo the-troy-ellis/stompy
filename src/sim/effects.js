@@ -1,4 +1,4 @@
-import { add, clampN, len, mul, norm, sub } from '../util/math.js';
+import { add, clampN, len, mul, norm, sub, TAU } from '../util/math.js';
 import { feel } from './feel.js';
 import { spawn } from './particles.js';
 
@@ -7,11 +7,13 @@ export function msg(G, text, col = '#7f7') {
   if (G.msgs.length > 4) G.msgs.shift();
 }
 // One particle into the pool (particles.js), which copies what it needs.
-export function particle(G, p, v, life, size, col, kind, grav = 0) { spawn(G, p, v, life, size, col, kind, grav); }
+export function particle(G, p, v, life, size, col, kind, grav = 0, spin = null) { spawn(G, p, v, life, size, col, kind, grav, spin); }
 // A piece of a mech (an arm, a thigh, a shin, a foot) that fell off: it
 // tumbles, bounces once, and lies there for `life` seconds. Drawn from the
 // mech's own part meshes by the renderer. Capped so a long fight stays cheap.
-export const DEBRIS_MAX = 40, DEBRIS_LIFE = 20;
+// Over its last DEBRIS_SINK seconds a landed piece sinks into the ground
+// (spec 07 § Explosions: plates persist 20 s, then sink).
+export const DEBRIS_MAX = 40, DEBRIS_LIFE = 20, DEBRIS_SINK = 2;
 export function shedPart(G, m, part, p, v) {
   const r = G.rng;
   if (G.debris.length >= DEBRIS_MAX) G.debris.shift();
@@ -31,7 +33,7 @@ export function stepDebris(G, dt) {
         if (!d.bounced && -d.v[1] > 3) { d.bounced = true; d.v = [d.v[0] * 0.5, -d.v[1] * 0.3, d.v[2] * 0.5]; d.spin = mul(d.spin, 0.4); }
         else { d.landed = true; d.v = [0, 0, 0]; d.spin = [0, 0, 0]; }
       }
-    }
+    } else if (d.t > d.life - DEBRIS_SINK) d.p[1] -= dt * 0.9 * d.scale;
   }
   G.debris = G.debris.filter(d => d.t < d.life);
 }
@@ -64,8 +66,31 @@ export function hitSparks(G, m, p, sec, amt) {
   }
 }
 
+// Scorches (spec 07 § Explosions): a dark patch on the ground at each blast
+// near it and under each wreck, { x, z, r, yaw }. At most SCORCH_MAX; the
+// oldest goes. A blast where the ground is already as black adds none, so a
+// missile volley leaves one patch, not ten. Each has an id, and a slot (id
+// mod SCORCH_MAX) that the one it pushed out had, so the renderer rewrites
+// one slot of its buffer, not the lot; G.scorchRev counts changes. The yaw
+// comes from the place, not the RNG, so a scorch changes nothing else.
+export const SCORCH_MAX = 64;
+export function scorch(G, x, z, r) {
+  for (const s of G.scorches) if (s.r >= r * 0.8 && Math.hypot(s.x - x, s.z - z) < s.r * 0.6) return;
+  if (G.scorches.length >= SCORCH_MAX) G.scorches.shift();
+  const id = G.scorchId++;
+  G.scorches.push({ x, z, r, yaw: ((x * 12.9898 + z * 78.233) % TAU + TAU) % TAU, id, slot: id % SCORCH_MAX });
+  G.scorchRev++;
+}
+// The shockwave: a flat ring on the ground that races out and dithers away
+// in SHOCK_LIFE seconds, under any blast within SHOCK_HEIGHT of the ground.
+export const SHOCK_LIFE = 0.4, SHOCK_HEIGHT = 10, SHOCK_SIZE = { big: 26, small: 9 };
 export function explode(G, p, big) {
   const r = G.rng, n = big ? 34 : 10, s = big ? 1.6 : 0.7;
+  const gy = G.ter ? G.ter.height(p[0], p[2]) : -Infinity;
+  if (p[1] - gy < SHOCK_HEIGHT) {
+    particle(G, [p[0], gy + 0.3, p[2]], [0, 0, 0], SHOCK_LIFE, big ? SHOCK_SIZE.big : SHOCK_SIZE.small, [0.95, 0.86, 0.66], 'shock', 0, 0);
+    scorch(G, p[0], p[2], big ? 4.5 : 1.8);
+  }
   for (let i = 0; i < n; i++) {
     const v = mul(norm([r.range(-1, 1), r.range(-0.2, 1), r.range(-1, 1)]), r.range(3, 14) * s);
     particle(G, p, v, r.range(0.35, 0.9), r.range(0.6, 1.6) * s, [1, r.range(0.45, 0.9), 0.1], 'fire');

@@ -6,8 +6,8 @@ import { KINDS } from '../sim/particles.js';
 // effect is a small solid, one shape per kind, drawn instanced (one draw per
 // shape) and coloured per instance, so the shapes are built white. Unit size:
 // about 1 across, centred on the origin. ≤ 16 triangles each.
-export const SHAPE_OF = { smoke: 'cube', dust: 'flat', fire: 'tetra', flame: 'tetra', debris: 'chunk', spark: 'sliver', rain: 'streak', snow: 'octa' };
-export const EFFECT_SHAPES = ['cube', 'tetra', 'chunk', 'sliver', 'octa', 'flat', 'streak'];
+export const SHAPE_OF = { smoke: 'cube', dust: 'flat', fire: 'tetra', flame: 'tetra', debris: 'chunk', spark: 'sliver', rain: 'streak', snow: 'octa', shock: 'ring' };
+export const EFFECT_SHAPES = ['cube', 'tetra', 'chunk', 'sliver', 'octa', 'flat', 'streak', 'ring'];
 export const shapeOf = kind => SHAPE_OF[kind] || 'cube';
 // The same, by the particle pool's kind number (sim/particles.js KINDS).
 export const SHAPE_BY_KIND = KINDS.map(shapeOf);
@@ -15,9 +15,11 @@ export const SHAPE_BY_KIND = KINDS.map(shapeOf);
 // an ordered 4x4 pattern of skipped pixels, never blending. Their shapes are
 // drawn by the dithering shader, after the solid ones, since a shader that can
 // skip pixels can turn off a phone GPU's early depth test.
-export const DITHER_KINDS = ['smoke', 'dust'];
+export const DITHER_KINDS = ['smoke', 'dust', 'shock'];
 export const DITHER_SHAPES = [...new Set(DITHER_KINDS.map(shapeOf))];
 const DITHERS = KINDS.map(k => DITHER_KINDS.includes(k));
+// How much a shape tumbles as it spins (the scene's iRot.y): a shockwave lies flat.
+export const TUMBLE_BY_KIND = new Float32Array(KINDS.map(k => (k === 'shock' ? 0 : 0.7)));
 export const DITHER_FROM = 1 / 3;   // of its life left
 
 const W = [1, 1, 1], O = [0, 0, 0];
@@ -31,6 +33,12 @@ const BUILD = {
   // Fire: a tetrahedron is far less solid than a cube the same width, so it is
   // drawn ~1.4x wider to keep a fireball's weight.
   tetra: b => solid(b, [[0, 0.87, 0], [0.76, -0.43, 0.43], [-0.76, -0.43, 0.43], [0, -0.43, -0.87]], [[0, 1, 2], [0, 2, 3], [0, 3, 1], [1, 3, 2]]),
+  // The shockwave: a flat ring, eight segments, facing up; its outer edge a
+  // little raised (a shallow dish), so it still shows seen edge-on from a cockpit.
+  ring: b => {
+    const at = (r, i) => { const a = (i / 8) * Math.PI * 2; return [Math.sin(a) * r, r > 0.4 ? 0.06 : 0, Math.cos(a) * r]; };
+    for (let i = 0; i < 8; i++) b.quad(at(0.38, i), at(0.5, i), at(0.5, i + 1), at(0.38, i + 1), W, 'up');
+  },
   octa: b => {
     const v = [[0.5, 0, 0], [-0.5, 0, 0], [0, 0.5, 0], [0, -0.5, 0], [0, 0, 0.5], [0, 0, -0.5]];
     solid(b, v, [[2, 0, 4], [2, 4, 1], [2, 1, 5], [2, 5, 0], [3, 4, 0], [3, 1, 4], [3, 5, 1], [3, 0, 5]]);
@@ -46,12 +54,14 @@ export function buildEffectShapes() {
 // array, not an object, so drawing thousands allocates nothing: numbers stored
 // on an object's fields can be boxed one by one. Fire shrinks and reddens, a
 // flamer's puff swells and reddens, smoke grows and fades into the horizon
-// colour `hor`; the rest are plain and unlit. Smoke and dust dither out.
+// colour `hor`; a shockwave races out; the rest are plain and unlit. Smoke,
+// dust and the shockwave dither out.
 export function effectLook(P, i, hor, out) {
   const f = P.life[i] / P.max[i], kind = KINDS[P.kind[i]], c = P.col, c0 = c[i * 3], c1 = c[i * 3 + 1], c2 = c[i * 3 + 2];
   let size = P.size[i], emis = 1, heat = 0.3, r = c0, g = c1, b = c2;
   if (kind === 'fire') { size *= 0.4 + f * 0.8; r = 0.4 + (c0 - 0.4) * f; g = 0.1 + (c1 - 0.1) * f; b = 0.05 + (c2 - 0.05) * f; heat = f; }
   else if (kind === 'flame') { size *= 0.5 + (1 - f) * 3; r = 0.55 + (c0 - 0.55) * f; g = 0.12 + (c1 - 0.12) * f; b = 0.04 + (c2 - 0.04) * f; heat = f; }
+  else if (kind === 'shock') { size *= 0.12 + 0.88 * (1 - f); emis = 0.85; heat = 0.5; }   // races out from the blast
   else if (kind === 'smoke') { size *= 1.6 - f * 0.8; r = hor[0] + (c0 - hor[0]) * f; g = hor[1] + (c1 - hor[1]) * f; b = hor[2] + (c2 - hor[2]) * f; emis = 0.6; heat = 0.15; }
   else emis = 0;
   out[0] = size; out[1] = r; out[2] = g; out[3] = b; out[4] = emis; out[5] = heat;

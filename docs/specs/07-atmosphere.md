@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning, #159 snow and fog, #160 dust storm, #161 prop library, #162 prop placement shipped) |
+| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning, #159 snow and fog, #160 dust storm, #161 prop library, #162 prop placement, #163 explosions shipped) |
 | Milestone | M4 |
 | Size | L (split: night + headlights; weather; props; explosions + particles) |
 | Depends on | M0; structures from [03-objectives.md](03-objectives.md) share the prop meshes |
@@ -190,6 +190,27 @@ they count as culled in `?debug=1`.
   delayed pop at 1–2 s.
 - **Burning wrecks**: the smoke column already exists; add a flickering
   emissive glow on the wreck's torso part for 30 s.
+
+As shipped (#163):
+- **Shockwave:** a new particle kind, `shock`. It is a ring, eight segments
+  with the outer edge raised a little so it shows edge-on from a cockpit. It
+  lies on the ground under any blast within 10 m of it, never tumbles, grows
+  to 26 m (big) or 9 m across in 0.4 s, and dithers out (`DITHER_KINDS`).
+- **Debris:** landed debris sinks into the ground over its last 2 of 20 s
+  instead of shrinking.
+- **Scorches:** `G.scorches`, at most 64, oldest first out. A blast where a
+  scorch at least as big already covers the spot adds none. The yaw comes
+  from the place, so the RNG is untouched. The renderer keeps one buffer with
+  a slot per scorch (id mod 64) and rewrites only a new one's slot, so a
+  missile volley makes no garbage. It is one draw with a polygon offset.
+- **Secondaries:** `makeWreck` sets 2 to 4 pop times in the first 3 s, each
+  pop with a burst of smoke. A mech still carrying ammunition (any weapon
+  with `ammo` left: autocannon, missiles, gauss, machine gun) also gets one
+  big pop between 1 and 2 s. They are all show, with no damage.
+- **Burning wrecks:** a shell over the torso, 4% larger, drawn after the
+  skinned pass. It flickers from ember orange back to the wreck's grey, and
+  its glow dies down over 30 s, when the smoke stops too.
+- **Cost:** one draw per burning wreck plus the scorch draw.
 
 ### Particle system rework
 

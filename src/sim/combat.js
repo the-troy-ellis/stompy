@@ -2,7 +2,7 @@ import { add, mul, norm, sub } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { SECT_NAME } from '../data/chassis.js';
 import { center, muzzle, rayHit, viewYaw } from './geom.js';
-import { explode, hitSparks, msg, particle, shedPart } from './effects.js';
+import { explode, hitSparks, msg, particle, scorch, shedPart } from './effects.js';
 import { M } from '../util/math.js';
 import { geoOf as geo } from '../data/geo.js';
 import { torsoFrame } from './geom.js';
@@ -154,12 +154,24 @@ export function stepDying(G, dt) {
       const u = Math.max(0, Math.min(1, (d.t - DEATH_BEAT - DEATH_BUCKLE) / DEATH_TOPPLE));
       d.angle = b * 0.12 + u * u * (Math.PI / 2 - 0.12) * 0.95;   // a lean during the buckle, then it falls faster as it goes
       if (u >= 1) {
-        G.wrecks.push({ x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.partsKey, scale: m.ch.scale, t: 0, roll: d.roll, pops: 2 + G.rng.int(3), settle: 0 });
+        G.wrecks.push(makeWreck(G, m, d.roll));
+        scorch(G, m.x, m.z, 5 * m.ch.scale);
         G.fx.sfx.boom([m.x, m.y, m.z], false);
         m.dying = null; m.gone = true;
       }
     }
   }
+}
+
+// A wreck (spec 07 § Explosions): 2 to 4 small pops at set times in its first
+// WRECK_POPS seconds, and if the mech still carried ammunition (autocannon,
+// missiles, gauss) one big pop between 1 and 2 seconds. It burns, smoking and
+// its torso glowing, for WRECK_BURN seconds. All show: no damage.
+export const WRECK_POPS = 3, WRECK_BURN = 30;
+export function makeWreck(G, m, roll) {
+  const r = G.rng, n = 2 + r.int(3), ammo = m.weapons.some(w => w.def.ammo && w.ammo > 0 && !w.dead);
+  const pops = Array.from({ length: n }, () => r.range(0.3, WRECK_POPS)).sort((a, b) => a - b);
+  return { x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.partsKey, scale: m.ch.scale, t: 0, roll, pops, bigPop: ammo ? r.range(1, 2) : null, settle: 0 };
 }
 
 export function destroy(G, m, src) {
