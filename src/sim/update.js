@@ -25,7 +25,7 @@ const { sin, abs, min, max, hypot, cos } = Math;
 // The empty input: what the sim sees when nobody is touching anything.
 // `turn` is a rate (-1..1, the keys); `turnBy` is radians the touch aim drag
 // asked for, paid out at the legs' own turn rate (G.turnByUsed says how much).
-export const noInput = () => ({ thrUp: false, thrDown: false, stop: false, turn: 0, turnBy: 0, twist: 0, pitch: 0, centre: false, jets: false,
+export const noInput = () => ({ thrUp: false, thrDown: false, stop: false, turn: 0, turnBy: 0, twist: 0, pitch: 0, centre: false, centreTap: false, jets: false,
   held: { energy: false, ballistic: false, missile: false, fusion: false }, missileTap: false, punch: false });
 
 // One frame of the whole simulation. `input` is a snapshot (see noInput);
@@ -50,7 +50,15 @@ export function update(G, input, dt) {
       P.twist = clampN(P.twist + input.twist * 1.6 * dt, -1.9, 1.9);
       P.pitch = clampN(P.pitch + input.pitch * 0.9 * dt, -0.4, 0.45);
     }
-    if (input.centre) P.twist *= max(0, 1 - 6 * dt);
+    // Centring: C held, or a double tap on the touch aim zone, which sees it
+    // through in game time (a slow phone's frames don't cut it short) until the
+    // torso is over the legs or the pilot twists it again.
+    if (input.centreTap) P.centring = true;
+    if (input.twist) P.centring = false;
+    if (input.centre || P.centring) {
+      P.twist *= max(0, 1 - 6 * dt);
+      if (P.centring && abs(P.twist) < 0.01) { P.twist = 0; P.centring = false; }
+    }
     P.jetting = !!input.jets;
   } else { P.jetting = false; G.turnByUsed = 0; }
 
