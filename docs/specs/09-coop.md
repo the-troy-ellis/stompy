@@ -90,6 +90,33 @@ As shipped (#202, `PROTOCOL` 14):
 - **Not yet:** the client sets `G.role` once co-op has a UI (#205); until
   then nothing outside the tests is host or guest.
 
+As shipped (#203, `PROTOCOL` 15): the rest of the table, in `src/net/coop.js`.
+- **The host** sends:
+  - `ent` twice a second: `[id, hp, x, z, yaw, wp]` for mission entities with
+    hp, and for vehicles;
+  - `entx` at once when one falls, with the punch's direction;
+  - `obj` whenever an objective changes state, and twice a second when its
+    progress (left, done, alive, ...) moved, with which waves have come;
+  - `over {won}` once.
+- **A guest** applies these through `guestApply`.
+  - **Vehicles:** they drive their own path between snapshots, and each
+    snapshot corrects them.
+  - **Lost messages:** an entity the host has down that is still up here
+    goes down (a lost `entx`).
+  - **Waiting objectives:** one the host has started is activated here too.
+- **A guest's hits on entities:** a guest's damage to a mission entity
+  doesn't apply locally. It goes to the host as `ehit {ent: id}`, with the
+  punch direction if it was a punch. The relay checks the id and passes it
+  to the host only.
+- **Host migration (acceptance 2):** on `host`, the new host calls
+  `becomeHost`. Its enemies become its own, picking up from the last report,
+  and later enemies are numbered after the highest eid. From then it runs
+  objectives, turrets and waves, and a wave the old host already sent is not
+  sent again. The headless test plays it out on mission 2. The host drops
+  after two relays and the wave. The guest takes over: the wave enemy keeps
+  walking, the guest knocks the last relay down, and it wins and sends
+  `over`.
+
 ### Determinism needs
 
 Terrain: seeded already. Props (M4): seeded. Spawns: host-only, relayed, so

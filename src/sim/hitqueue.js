@@ -6,7 +6,17 @@
 export function hitQueue(G, m, p) {
   const enemy = !!m.eid && G.role === 'guest', map = enemy ? G.pendingEHits : G.pendingHits, key = enemy ? m.eid : m.netId;
   let q = map.get(key);
-  if (!q && p) { q = { amt: 0, p }; map.set(key, q); }
+  if (!q && p) { q = enemy ? { amt: 0, p, eid: key } : { amt: 0, p }; map.set(key, q); }
+  return q;
+}
+
+// A co-op guest's damage to a mission entity (a structure, a truck), which
+// the host owns as it owns the enemies: it rides the same batch, keyed by the
+// entity's id, and goes to the host as an ehit with `ent`.
+export function entQueue(G, e, p) {
+  const key = `x:${e.id}`;
+  let q = G.pendingEHits.get(key);
+  if (!q) { q = { amt: 0, p, ent: e.id }; G.pendingEHits.set(key, q); }
   return q;
 }
 

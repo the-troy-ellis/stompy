@@ -49,7 +49,7 @@ PING_EVERY = 10
 DROP_AFTER = 25           # seconds of silence (a phone that went to sleep)
 MAX_BUFFERED = 256 * 1024 # a client this far behind is dropped, not waited for
 PALETTES = ("dusk", "ice", "volcanic")
-PROTOCOL = 14             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
+PROTOCOL = 15             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
 HALF = 96 * 24 / 2        # the map's half width (src/world/terrain.js): positions are clamped to it
 FX_RATE = 40              # weapon effects per second per pilot; more are dropped (a beam flash is per shot, guided updates 15 Hz)
 PER_IP = int(os.environ.get("STOMPY_PER_IP", 4))   # sockets from one address at once (phones and a laptop behind one NAT)
@@ -515,10 +515,18 @@ def handle_coop(c, msg, t):
                 room.over = msg
             broadcast(msg, skip=c, room=room)
     elif t == "ehit":
-        # A guest's hit on an enemy: the host applies it (the shooter decided it landed).
+        # A guest's hit on an enemy (eid) or a mission entity (ent, its id): the
+        # host applies it (the shooter decided it landed).
         if host and c is not host:
             out = clean_hit(msg, c.id)
-            out.update(t="ehit", eid=int(num(msg.get("eid"), 0, 9999)))
+            out["t"] = "ehit"
+            ent = msg.get("ent")
+            if isinstance(ent, str) and 0 < len(ent) <= 32 and all(ch.isalnum() or ch in "_-" for ch in ent):
+                out["ent"] = ent
+                if "yaw" in msg:
+                    out["yaw"] = num(msg.get("yaw"), -1e3, 1e3)   # a punch: which way it falls
+            else:
+                out["eid"] = int(num(msg.get("eid"), 0, 9999))
             send(host, out)
     elif t == "hit":
         # Enemy fire, decided by the host's AI: to the pilot it hit. Pilots never hit each other here.

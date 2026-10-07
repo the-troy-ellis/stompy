@@ -24,7 +24,7 @@ import { applyLoadout, stockLoadout } from '../sim/loadout.js';
 import { startSpectate } from './spectate.js';
 import { addKill } from './killfeed.js';
 import { applyRemote } from './remote.js';
-import { applyEHit, applyEnemyState, enemyByEid, flushEHits, hostTick } from './coop.js';
+import { applyEHit, becomeHost, enemyByEid, flushEHits, guestApply, hostTick } from './coop.js';
 import { sideOf, spawnPoint, teamName } from './teams.js';
 
 const { atan2, min, max, random, hypot } = Math;
@@ -218,7 +218,12 @@ export function createNet(app) {
       }
       case 's': netState(m); break;
       // Co-op (net/coop.js): the host's enemies reach a guest; a guest's hits on them reach the host.
-      case 'es': if (G.role === 'guest') applyEnemyState(G, m, performance.now()); break;
+      case 'es': case 'ent': case 'entx': case 'obj': case 'over': if (G.role === 'guest') guestApply(G, m, performance.now()); break;
+      case 'host':   // the co-op host left: the relay picked the next one
+        setScores(m.scores);
+        if (m.id === Net.id && G.role === 'guest') becomeHost(G);
+        msg(G, `${pilotName(m.id)} IS NOW HOST`);
+        break;
       case 'ehit': if (G.role === 'host') applyEHit(G, m, mechById(m.from) || null); break;
       case 'note':
         // The server would not take our loadout (a version mismatch, or a fit

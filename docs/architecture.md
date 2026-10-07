@@ -137,7 +137,7 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
 
 ### The network protocol (as it is)
 
-`PROTOCOL` is 14 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on; 8: M5a, the server enforces the version and rebuilds every state message clean; 9: the lobby, `ch` in `hello`, `ready`, `ping`, and `ch`/`ready`/`ping` in each pilot's scores entry; 10: team deathmatch, `team` from the lobby, `team` in each scores entry, `teams` (each side's kills) in `welcome`, `kill`, `roundover` and `newround`, and `mode`/`limit` in `newround`; 11: the round-end vote, `vote` and `stats` between rounds, the relay's `tally`, `best`/`acc` in each scores entry, and `vote` in `newround`; 12: reconnect, `token` in `hello`, `token` and `resumed` in `welcome`; 13: M5b rooms, `room`/`create` in `hello`, `room`/`kind`/`host` in `welcome`, and the co-op messages below; 14: co-op enemies, `es` and `ehit`, and `eid`/`te`/`e2` on weapon effects). `server/server.py` keeps its own `PROTOCOL`, and a Node test fails if the two differ.
+`PROTOCOL` is 15 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on; 8: M5a, the server enforces the version and rebuilds every state message clean; 9: the lobby, `ch` in `hello`, `ready`, `ping`, and `ch`/`ready`/`ping` in each pilot's scores entry; 10: team deathmatch, `team` from the lobby, `team` in each scores entry, `teams` (each side's kills) in `welcome`, `kill`, `roundover` and `newround`, and `mode`/`limit` in `newround`; 11: the round-end vote, `vote` and `stats` between rounds, the relay's `tally`, `best`/`acc` in each scores entry, and `vote` in `newround`; 12: reconnect, `token` in `hello`, `token` and `resumed` in `welcome`; 13: M5b rooms, `room`/`create` in `hello`, `room`/`kind`/`host` in `welcome`, and the co-op messages below; 14: co-op enemies, `es` and `ehit`, and `eid`/`te`/`e2` on weapon effects; 15: co-op world sync, `ehit {ent}` for a mission entity and the host's `ent`, `entx`, `obj` and `over`). `server/server.py` keeps its own `PROTOCOL`, and a Node test fails if the two differ.
 
 Client → server: `hello {v, name, color, ch, token?, room?, create?}` (`token`: from the last `welcome`, to come back after a drop; `room`: a co-op room's code, the arena when absent; `create {mission, diff, seed}`: open a co-op room), `ready` (out of the lobby), `team {team}` (team deathmatch: a side from the lobby, before READY), `vote {map, mode}` and `stats {acc}` (between rounds: the next round, and your accuracy in % for the summary), `ping {n, rtt}` (every 2 s), `s {state...}` (15 Hz), `fx {k, ...}`
 (`b` beam flash, `s` shell, `m` missile volley, `fu` fusion discharge, `mg`
@@ -181,6 +181,18 @@ Co-op enemies (`src/net/coop.js`, #202): `G.role` is `solo`, `host` or
   source. Enemy fire on a guest is the host's batched `hit`.
 - **Targets:** as host, an enemy fights the nearest pilot alive, and switches
   only for one 30% closer (`preyOf` in `sim/ai.js`).
+- **The world (#203):** the host also sends:
+  - `ent {list: [[id, hp, x, z, yaw, wp]...]}` twice a second, for mission
+    entities that can fall and for vehicles;
+  - `entx {id, punch?, yaw?}` the moment one goes down;
+  - `obj {list: [{state, left?, total?, done?, alive?, home?, dist?, wv?}], wv}`
+    on any state change, and twice a second if progress moved (`wv`: which
+    waves have come);
+  - `over {won}` once.
+- **A guest's hits on entities:** they ride `ehit {ent: id}` (`entQueue`).
+- **A new host:** on `host`, a guest calls `becomeHost`. Its enemies become
+  its own from the last report, and it runs objectives, turrets and waves,
+  skipping waves the old host already sent.
 
 Melee on the wire (`docs/specs/12-melee.md` § Arena): the shooter-scores rule
 holds. A punch or stomp on another pilot rides the batched `hit` with `me: 1`

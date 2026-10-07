@@ -660,6 +660,12 @@ class Session(unittest.IsolatedAsyncioTestCase):
         await g1.send({"t": "ehit", "eid": 4, "amt": 99, "p": [1, 2, 3], "fu": 1, "kb": [50, 0]})
         eh = await host.recv()
         self.assertEqual((eh["t"], eh["from"], eh["eid"], eh["amt"], eh["fu"], eh["kb"]), ("ehit", 2, 4, 40, 1, [30, 0]))
+        await g1.send({"t": "ehit", "ent": "relay2", "amt": 7, "me": 1, "yaw": 1.5, "p": [0, 0, 0]})
+        eh = await host.recv()
+        self.assertEqual((eh["ent"], eh["amt"], eh["yaw"], eh["me"]), ("relay2", 7, 1.5, 1), "a mission entity, by its id")
+        self.assertNotIn("eid", eh)
+        await g1.send({"t": "ehit", "ent": "<bad id>", "eid": 3, "amt": 1})
+        self.assertEqual((await host.recv())["eid"], 3, "a junk id is no entity")
         await g1.send({"t": "hit", "to": 3, "amt": 10, "p": [0, 0, 0]})   # pilots never hit each other
         await host.send({"t": "ehit", "eid": 4, "amt": 5})                 # the host applies its own
         with self.assertRaises(asyncio.TimeoutError):
