@@ -20,6 +20,7 @@ import { SEND_HZ } from '../sim/missiles.js';
 import { PROTOCOL, hit, stateMessage } from './protocol.js';
 import { fitOf } from '../ui/mechlab.js';
 import { applyLoadout, stockLoadout, validate } from '../sim/loadout.js';
+import { startSpectate } from './spectate.js';
 
 const { sin, cos, atan2, min, max, random, hypot } = Math;
 const clamp30 = v => max(-30, min(30, +v || 0));
@@ -156,7 +157,7 @@ export function createNet(app) {
   }
 
   function startArena(seed, palName) {
-    G.mode = 'mp';
+    G.mode = 'mp'; G.spectate = null;
     const def = { name: 'Arena', foes: [] };
     resetMatch(G, { def, seed, pal: palName });
     placeScenery(G, def);
@@ -192,7 +193,7 @@ export function createNet(app) {
       heat: 0, fuel: 1, shutdown: false, alive: true, air: false, hp: { ...P.max }, spawnT: 2 });
     P.weapons.forEach(w => { w.cd = 0; w.dead = false; w.ammo = w.def.ammo || null; });
     initFeet(G, P); P.lastYaw = P.yaw;
-    G.respawnAt = 0; G.flash = 0; G.killer = 0;
+    G.respawnAt = 0; G.flash = 0; G.killer = 0; G.spectate = null;   // back in the cockpit
     G.eye = eyeOf(P); G.view = dirOf(P.yaw, 0); G.aim = add(G.eye, mul(G.view, 100));
     sendState();
   }
@@ -291,6 +292,8 @@ export function createNet(app) {
     const P = G.player;
     if (P.spawnT > 0) P.spawnT -= dt;
     if (!P.alive && G.respawnAt && G.clock >= G.respawnAt) respawn();
+    // Down and done toppling: watch another pilot until the respawn (net/spectate.js).
+    else if (!P.alive && !P.dying && G.respawnAt && !G.spectate) startSpectate(G, G.killer);
     if ((Net.sendT += dt) >= 1 / SEND_HZ) { Net.sendT = 0; sendState(); flushHits(); }
   }
   const arenaBoard = () => [...Net.info.values()].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
