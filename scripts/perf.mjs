@@ -39,6 +39,7 @@ export const BUDGETS = {
   'fight-deaths': { meanDraws: 33, peakDraws: 41, tris: 27000, allocKB: 205 },
   wrecks:         { meanDraws: 30, peakDraws: 38, tris: 26000, allocKB: 145 },
   'looking-away': { meanDraws: 12, peakDraws: 15, tris: 25000, allocKB: 135 },
+  rain:           { meanDraws: 8, peakDraws: 8, tris: 25000, allocKB: 115 },   // #158: 1,500 drops are one more draw and no garbage
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;
@@ -134,6 +135,9 @@ try {
   // the mechs, wrecks and smoke behind.
   await page.evaluate(() => { const P = window.__stompy.game.player; P.yaw += Math.PI; P.twist = 0; });
   await scene('looking-away', 60);
+  // The same field in a downpour: 1,500 drops round the camera (one more draw).
+  await page.evaluate(async () => { const { makeWeather } = await import('/src/data/weather.js'); const G = window.__stompy.game; G.weather = makeWeather('rain', 1234); });
+  await scene('rain', 60, 10);
 
   await browser.close();
   if (errors.length) { failed = true; console.error('page errors:\n' + errors.join('\n')); }

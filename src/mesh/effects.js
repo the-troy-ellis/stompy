@@ -6,8 +6,8 @@ import { KINDS } from '../sim/particles.js';
 // effect is a small solid, one shape per kind, drawn instanced (one draw per
 // shape) and coloured per instance, so the shapes are built white. Unit size:
 // about 1 across, centred on the origin. ≤ 16 triangles each.
-export const SHAPE_OF = { smoke: 'cube', dust: 'flat', fire: 'tetra', flame: 'tetra', debris: 'chunk', spark: 'sliver', rain: 'sliver', snow: 'octa' };
-export const EFFECT_SHAPES = ['cube', 'tetra', 'chunk', 'sliver', 'octa', 'flat'];
+export const SHAPE_OF = { smoke: 'cube', dust: 'flat', fire: 'tetra', flame: 'tetra', debris: 'chunk', spark: 'sliver', rain: 'streak', snow: 'octa' };
+export const EFFECT_SHAPES = ['cube', 'tetra', 'chunk', 'sliver', 'octa', 'flat', 'streak'];
 export const shapeOf = kind => SHAPE_OF[kind] || 'cube';
 // The same, by the particle pool's kind number (sim/particles.js KINDS).
 export const SHAPE_BY_KIND = KINDS.map(shapeOf);
@@ -25,7 +25,8 @@ const solid = (b, verts, faces) => { for (const [a, c, d] of faces) b.tri(verts[
 const BUILD = {
   cube: b => b.cube(M.id(), W),
   chunk: b => b.cube(M.id(), W, 0.55, 0.7),        // a tapered lump of armour
-  sliver: b => b.cube(M.S(0.16, 1, 0.16), W),      // thin: sparks, rain
+  sliver: b => b.cube(M.S(0.16, 1, 0.16), W),      // thin: sparks
+  streak: b => b.cube(M.S(0.05, 1, 0.05), W),      // thinner: rain
   flat: b => b.cube(M.S(1, 0.35, 1), W),           // dust that streams sideways
   // Fire: a tetrahedron is far less solid than a cube the same width, so it is
   // drawn ~1.4x wider to keep a fireball's weight.

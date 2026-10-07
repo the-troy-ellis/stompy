@@ -1,4 +1,5 @@
 import { blendPal } from '../data/palettes.js';
+import { tickWeather } from './weather.js';
 import { add, clampN, dirOf, dot, len, mul, norm, sub } from '../util/math.js';
 import { stepParticles } from './particles.js';
 import { WEAPONS } from '../data/weapons.js';
@@ -34,6 +35,7 @@ export const noInput = () => ({ thrUp: false, thrDown: false, stop: false, turn:
 export function update(G, input, dt) {
   G.time += dt;
   if (G.palRamp) { const r = G.palRamp; blendPal(r.from, r.to, Math.min(1, G.time / r.secs), G.pal); }   // dusk into night
+  tickWeather(G);   // lightning and thunder (weather.js)
   G.cbeams = [];   // continuous beams are redrawn every frame they're on
   G.frame = (G.frame || 0) + 1;
   G.input = input;

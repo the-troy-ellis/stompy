@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (#155 time of day, #156 headlights, #157 weather state shipped) |
+| Status | in progress (#155 time of day, #156 headlights, #157 weather state, #158 rain and lightning shipped) |
 | Milestone | M4 |
 | Size | L (split: night + headlights; weather; props; explosions + particles) |
 | Depends on | M0; structures from [03-objectives.md](03-objectives.md) share the prop meshes |
@@ -70,6 +70,16 @@ message (PROTOCOL 7).
 `light` colour jumps to white, sky brightens, a thunder sample 0.5–3 s later
 scaled by a random distance. In the arena, lightning is seeded from
 `game.time` so everyone sees the same flashes.
+
+As shipped (#158): rain is 1,500 thin streaks (a new `streak` effect shape;
+900 on touch until the PARTICLES setting, #165) in a 60 x 30 x 60 m box round
+the camera (`render/weatherBox.js`, render-side and unseeded: it is only
+looks), falling at 22 m/s with the wind, none within 6 m of the cockpit, one
+instanced draw. Rain dims the light to 80%. Lightning: `strikeAt(seed, k)`
+gives every strike's time (8-20 s apart) and distance from the seed alone;
+`sim/weather.js` flashes the shading and the sky toward white for 120 ms and
+rolls `sfx.thunder` (a slowed boom and a low rumble, quieter when far) 0.5-3
+s later. The perf harness has a `rain` scene.
 
 **Wind** moves smoke and missile trails (`particle` velocities get `wind × dt`)
 and leans rain/snow. Dust storms push the mech by 0.5 m/s laterally when

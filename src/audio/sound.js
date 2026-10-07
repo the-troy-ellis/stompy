@@ -253,6 +253,14 @@ export function createAudio(app) {
       play('boom_low', { ...at, vol: 0.5, rate: 1.6, delay: 0.03 });
       this.osc('sine', 55, 30, 0.6, 0.35, at);
     },
+    // Thunder (spec 07 § Lightning): a slowed boom and a long low rumble,
+    // quieter and duller the further off the strike (`dist`, 0..1).
+    thunder(dist = 0.5) {
+      const v = 1 - 0.7 * dist;
+      play('boom_low', { vol: 0.7 * v, rate: 0.45 - 0.1 * dist, vary: 0.1 });
+      play('boom_big', { vol: 0.35 * v, rate: 0.5, delay: 0.15 });
+      this.noise(2.4 + dist, 0.18 * v, 260 - 120 * dist, 40, 'lowpass');
+    },
     // BIG BONKER: the cannon's thunk an octave down, carrying twice as far,
     // with a ringing crack on top. Clips: punch (half speed), crunch, plate (sped up). Synth: a low sine drop, a triangle ring.
     bonker(p) {

@@ -10,7 +10,8 @@ import { FEEL, HEAT, hotFrac } from '../data/feel.js';
 import { meleeOf } from '../data/melee.js';
 import { BARREL_AT, styleOf, BONE, BONE_COUNT } from '../mesh/mechParts.js';
 import { darkness, HEADLIGHTS } from '../data/palettes.js';
-import { fogOf } from '../data/weather.js';
+import { fogOf, flashOf, WEATHER } from '../data/weather.js';
+import { makeWeatherBox, stepWeatherBox } from './weatherBox.js';
 import { fallAngle } from '../sim/entities.js';
 import { propFor } from '../mesh/props.js';
 import { WEAPONS } from '../data/weapons.js';
@@ -102,7 +103,29 @@ export function createScene(app) {
   const NO_SHADE = [1, 1, 1], LAMP_COL = [1, 0.95, 0.75];
   const SPOT = { on: false, pos: [0, 0, 0], dir: [0, 0, 1], col: [0, 0, 0], cone: [Math.cos(HEADLIGHTS.cone[0]), Math.cos(HEADLIGHTS.cone[1])], range: HEADLIGHTS.range };
   let DARK = 0;   // how dark this frame is (palettes.js darkness)
-  const FOG = [0, 0];   // this frame's fog distances: the palette's, cut by the weather (data/weather.js)
+  const FOG = [0, 0];
+  const SHADE = [1, 1, 1], SKY_Z = [0, 0, 0], SKY_H = [0, 0, 0], FLASH_SHADE = [1.8, 1.8, 2.0], FLASH_SKY = [0.78, 0.8, 0.92];
+  // Rain (spec 07): slivers in a box round the camera, leaning with the wind.
+  const RAIN = { count: 1500, fall: 22, size: 1.8, col: [0.6, 0.66, 0.76], glow: 0.3, clear: 6 };   // clear: m round the cockpit with no drops in it
+  const box = makeWeatherBox(2500), RAIN_VEL = [0, 0, 0];
+  let wxTime = null;
+  function fillWeather(eye) {
+    const w = G.weather;
+    if (!w || w.kind !== 'rain') { box.n = 0; return; }
+    const dt = wxTime == null ? 0 : Math.min(0.1, Math.max(0, G.time - wxTime));
+    wxTime = G.time;
+    RAIN_VEL[0] = w.wind[0]; RAIN_VEL[1] = -RAIN.fall; RAIN_VEL[2] = w.wind[1];   // the wind is [x, z]
+    stepWeatherBox(box, eye, Math.round(RAIN.count * w.intensity * (G.touchUI ? 0.6 : 1)), RAIN_VEL, dt);
+    const g = R.fx.streak, yaw = Math.atan2(w.wind[0], w.wind[1]), lean = Math.atan2(Math.hypot(w.wind[0], w.wind[1]), RAIN.fall);
+    for (let i = 0; i < box.n && g.n < R.FX_CAP; i++) {
+      const i3 = i * 3, dx = box.pos[i3] - eye[0], dz = box.pos[i3 + 2] - eye[2];
+      if (dx * dx + dz * dz < RAIN.clear * RAIN.clear) continue;   // none on the canopy
+      const d = g.data, o = g.n++ * R.FX_FLOATS;
+      d[o] = box.pos[i3]; d[o + 1] = box.pos[i3 + 1]; d[o + 2] = box.pos[i3 + 2]; d[o + 3] = RAIN.size;
+      d[o + 4] = yaw; d[o + 5] = lean;
+      d[o + 6] = RAIN.col[0]; d[o + 7] = RAIN.col[1]; d[o + 8] = RAIN.col[2]; d[o + 9] = RAIN.glow; d[o + 10] = 0; d[o + 11] = 0;
+    }
+  }   // this frame's fog distances: the palette's, cut by the weather (data/weather.js)
   // A point through a matrix into `out`, without allocating.
   const placeInto = (m, p, out) => { for (let i = 0; i < 3; i++) out[i] = m[i] * p[0] + m[4 + i] * p[1] + m[8 + i] * p[2] + m[12 + i]; };
   const FRAME = {}, LOOK = new Float32Array(7);   // reused every frame: the effects' shared uniforms and one particle's look (mesh/effects.js)
@@ -338,7 +361,16 @@ export function createScene(app) {
     R.gl.viewport(0, 0, cv.width, cv.height);
     const P = G.player, gd = G.guide, ir = !!gd;
     const IR_ZEN = [0.03, 0.03, 0.03], IR_HOR = [0.1, 0.1, 0.1];
-    const hor = ir ? IR_HOR : G.pal.hor;
+    // Rain darkens the light; a lightning flash lifts the shading and the sky
+    // toward white for 120 ms (data/weather.js).
+    const wx = G.weather && WEATHER[G.weather.kind], flash = ir ? 0 : flashOf(G);
+    for (let i = 0; i < 3; i++) {
+      const s = (G.pal.shade ? G.pal.shade[i] : 1) * (wx && wx.dim ? wx.dim : 1);
+      SHADE[i] = s + (FLASH_SHADE[i] - s) * flash;
+      SKY_Z[i] = G.pal.zen[i] + (FLASH_SKY[i] - G.pal.zen[i]) * flash * 0.8;
+      SKY_H[i] = G.pal.hor[i] + (FLASH_SKY[i] - G.pal.hor[i]) * flash * 0.6;
+    }
+    const hor = ir ? IR_HOR : SKY_H;
     R.gl.clearColor(hor[0], hor[1], hor[2], 1);
     R.gl.clear(R.gl.COLOR_BUFFER_BIT | R.gl.DEPTH_BUFFER_BIT);
     let fov, yaw, pitch, eye, dir;
@@ -390,7 +422,7 @@ export function createScene(app) {
     const ap = R.gl.getAttribLocation(R.skyProg, 'aP');
     R.gl.enableVertexAttribArray(ap);
     R.gl.vertexAttribPointer(ap, 2, R.gl.FLOAT, false, 0, 0);
-    R.gl.uniform3fv(R.SU.zen, ir ? IR_ZEN : G.pal.zen); R.gl.uniform3fv(R.SU.hor, hor);
+    R.gl.uniform3fv(R.SU.zen, ir ? IR_ZEN : SKY_Z); R.gl.uniform3fv(R.SU.hor, hor);
     R.gl.uniform1f(R.SU.h, 0.5 - 0.5 * Math.tan(pitch) / Math.tan(fov / 2)); R.gl.uniform1f(R.SU.res, cv.height);
     R.gl.drawArrays(R.gl.TRIANGLES, 0, 3);
     R.gl.disableVertexAttribArray(ap);
@@ -401,7 +433,7 @@ export function createScene(app) {
     [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.enableVertexAttribArray(a));
     R.gl.uniformMatrix4fv(R.U.VP, false, VP);
     R.gl.uniform3fv(R.U.light, G.pal.light);
-    R.gl.uniform3fv(R.U.shade, ir ? NO_SHADE : G.pal.shade || NO_SHADE);   // the IR camera sees the same at night
+    R.gl.uniform3fv(R.U.shade, ir ? NO_SHADE : SHADE);   // the IR camera sees the same at night
     // Headlights (spec 07): one spot from the player's cockpit along the aim,
     // dipped a little, as strong as it is dark. Off in the IR camera, when the
     // player switches them off, and when the reactor is down.
@@ -419,7 +451,7 @@ export function createScene(app) {
     R.gl.uniform2f(R.U.fog, FOG[0], FOG[1]);
     R.gl.uniform3fv(R.U.fogCol, hor);
     R.gl.uniform1f(R.U.ir, ir ? 1 : 0);
-    Object.assign(FRAME, { VP, spot: SPOT, light: G.pal.light, shade: ir ? NO_SHADE : G.pal.shade || NO_SHADE, cam: eye, fog: FOG, fogCol: hor, ir: ir ? 1 : 0 }); R.frame = FRAME;   // the instanced effects shader's copy
+    Object.assign(FRAME, { VP, spot: SPOT, light: G.pal.light, shade: ir ? NO_SHADE : SHADE, cam: eye, fog: FOG, fogCol: hor, ir: ir ? 1 : 0 }); R.frame = FRAME;   // the instanced effects shader's copy
 
     R.drawHeat = 0;
     R.draw(world, M.id());
@@ -443,6 +475,7 @@ export function createScene(app) {
     [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.disableVertexAttribArray(a));
     if (R.instanced) {
       fillEffects(G.parts, G.pal.hor);
+      fillWeather(eye);
       R.drawEffects();
     } else {
       [R.A.pos, R.A.nrm, R.A.col].forEach(a => R.gl.enableVertexAttribArray(a));
