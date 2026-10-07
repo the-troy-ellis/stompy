@@ -13,6 +13,17 @@ test('the props #98 asks for exist, each with a wreck', () => {
   for (const k of ['relay', 'tank', 'truck', 'launcher']) assert.ok(PROP_KEYS.includes(`${k}Wreck`), `${k}Wreck`);
 });
 
+test('the scenery library #161 asks for exists', () => {
+  for (const k of ['bunker', 'pipe', 'wall', 'mast', 'crates', 'deadTree', 'vent', 'spire']) assert.ok(PROP_KEYS.includes(k), k);
+});
+
+test('the lava vent has a glowing part, drawn as an extra mesh; nothing else glows', () => {
+  assert.equal(propFor({ mesh: 'vent', alive: true, radius: 9, height: 6 }).glow, 'ventGlow');
+  assert.equal(propFor({ mesh: 'bunker', alive: true, radius: 6, height: 5 }).glow, null);
+  const glow = buildProps().ventGlow, lava = [1, 0.42, 0.08];
+  for (let i = 6; i < glow.d.length; i += 9) assert.deepEqual([glow.d[i], glow.d[i + 1], glow.d[i + 2]].map(v => +v.toFixed(2)), lava);
+});
+
 test('every prop is under 120 triangles and fits its unit footprint', () => {
   for (const [k, b] of Object.entries(buildProps())) {
     const tris = b.d.length / 27;
@@ -26,7 +37,7 @@ test('every prop is under 120 triangles and fits its unit footprint', () => {
 
 test('propFor picks the intact mesh, the wreck, or the toppled mesh', () => {
   const e = { mesh: 'relay', alive: true, radius: 4, height: 20 };
-  assert.deepEqual(propFor(e), { key: 'relay', head: null, sy: 20, tint: 1 });
+  assert.deepEqual(propFor(e), { key: 'relay', head: null, glow: null, sy: 20, tint: 1 });
   assert.equal(propFor({ ...e, alive: false }).key, 'relayWreck');
   const toppled = propFor({ ...e, alive: false, fall: { yaw: 0, t: 1 } });
   assert.equal(toppled.key, 'relay');

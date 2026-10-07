@@ -290,6 +290,7 @@ export function createScene(app) {
           const at = chain(base, tilt, M.RY(e.yaw)), size = M.S(e.radius, prop.sy, e.radius), tint = [prop.tint, prop.tint, prop.tint];
           R.draw(R.meshes.props[prop.key], chain(at, size), tint);
           if (prop.head) R.draw(R.meshes.props[prop.head], chain(at, M.RY(e.headYaw || 0), size), tint);
+          if (prop.glow) R.draw(R.meshes.props[prop.glow], chain(at, size), tint, 1);   // lava keeps its glow at night and in the fog's shade
         } else if (e.kind === 'nav') {
           continue;
         } else if (e.kind === 'vehicle') {
