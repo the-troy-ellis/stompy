@@ -213,7 +213,7 @@ export function createHud(app) {
       ctx.font = '13px "Lucida Console", monospace'; ctx.fillStyle = '#3cf';
       ctx.fillText('SHIELDED', app.scene.view.W / 2, mid + 40);
     }
-    if (G.roundOver && G.banner) {
+    if (G.roundOver && G.banner && !G.summary) {   // the summary overlay (ui/summary.js) says it instead
       ctx.font = 'bold 24px "Arial Black", Arial, sans-serif'; ctx.fillStyle = AMBER;
       ctx.fillText(G.banner.text, app.scene.view.W / 2, L.viewBottom * 0.37);
       ctx.font = '13px "Lucida Console", monospace'; ctx.fillStyle = GREEN;

@@ -345,3 +345,5 @@ html, body {
 .lobby-teams .go { padding: 7px 16px; }
 .lobby-teams .go.on { outline: 3px solid #fc3; color: #fc3; }
 .lobby-teams .dot { display: inline-block; width: 10px; height: 10px; margin-right: 8px; vertical-align: -1px; }
+.vote { margin-top: 10px; }
+.vote .go.on { outline: 3px solid #fc3; color: #fc3; }

@@ -117,6 +117,29 @@ streak per pilot) and three buttons: next map (random), SAME MAP, and the
 other mode. The server tallies for `ROUND_GAP` seconds; plurality wins, ties
 go to the first option. `vote { map, mode }`, result in `newround`.
 
+As shipped (#187, `PROTOCOL` 11): `src/ui/summary.js` builds the overlay.
+- **The summary:** `roundover` opens it over the arena with the round's
+  headline (YOU WIN THE ROUND, YOUR TEAM WINS THE ROUND, ...). It shows each
+  pilot's kills, deaths, accuracy and best streak, most kills first (by side
+  in team deathmatch), and counts down to the next round.
+- **Accuracy:** only each client counts its own shots, so it sends `stats
+  {acc}` at `roundover`. The relay clamps it to 0-100 and passes it on, and
+  the table shows -- until it arrives.
+- **Best streak:** the relay counts kills between deaths.
+- **The vote:** NEXT MAP, SAME MAP, and the other mode's name (TEAM
+  DEATHMATCH or FREE-FOR-ALL, on a new map). A tap sends `vote {map, mode}`;
+  a pilot can change it, and the last vote counts. Every vote and accuracy
+  sends a `tally` with the counts, and the overlay updates in place, as the
+  lobby does.
+- **The result:** after `ROUND_GAP`, the most votes wins. A tie, or no votes,
+  goes to NEXT MAP. Votes from pilots who left don't count. `newround`
+  carries `vote`; SAME MAP keeps the seed and palette, and the other mode
+  switches `mode` and `limit` and repaints the sides.
+- **While it's up:** no pause menu; the cockpit's own round banner is hidden.
+  A pilot still in the lobby doesn't get one.
+- **The fake clock:** the relay's gap waits on `server.sleep`, which the tests
+  swap for an event they release once the votes are in (acceptance 5).
+
 ### Spectate
 
 Dead pilots see a chase camera behind the pilot who killed them, cycling with
