@@ -455,6 +455,8 @@ def clean_state(msg):
            "hp": hp + [0.0] * (5 - len(hp)), "bm": flag(msg.get("bm")), "be": vec3(msg.get("be")), "bf": num(msg.get("bf"), 0, 10),
            "fl": vec3(msg.get("fl")), "sc": int(num(msg.get("sc"), 0, 99)), "sq": num(msg.get("sq"), 0, 1),
            "pu": int(num(msg.get("pu"), 0, 2)), "lt": flag(msg.get("lt"))}
+    if "ts" in msg:
+        out["ts"] = int(num(msg.get("ts"), 0, 1e13))   # the sender's clock, ms: others draw it smoothly through jitter
     return out
 
 
