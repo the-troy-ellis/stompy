@@ -22,3 +22,22 @@ test('the address comes from ?relay=, then the RELAY field, then this page\'s ho
   assert.equal(resolveRelay({ query: 'not a relay', saved: 'http://nope', location }).from, 'page', 'junk falls through');
   assert.equal(resolveRelay({ query: null, saved: '', location: { protocol: 'https:', hostname: 'x.io' } }).url, `wss://x.io:${RELAY_PORT}/ws`);
 });
+
+test('a build\'s RELAY_DEFAULT comes after ?relay= and the RELAY field, before this page\'s host (#217)', () => {
+  const location = { protocol: 'https:', hostname: 'me.github.io' }, fallback = 'wss://relay.example/ws';
+  assert.deepEqual(resolveRelay({ query: null, saved: '', location, fallback }), { url: 'wss://relay.example/ws', from: 'default' });
+  assert.equal(resolveRelay({ query: null, saved: '10.0.0.3', location, fallback }).from, 'saved', 'the field wins');
+  assert.equal(resolveRelay({ query: 'pi.local', saved: '', location, fallback }).from, 'query', 'and ?relay= wins');
+  assert.equal(resolveRelay({ query: null, saved: '', location, fallback: null }).from, 'page', 'no default: the page\'s host, as before');
+  assert.equal(resolveRelay({ query: null, saved: '', location, fallback: 'http://nope' }).from, 'page', 'a junk default falls through');
+});
+
+test('the release build bakes RELAY_DEFAULT in, and refuses one that is not a relay', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const { readFileSync } = await import('node:fs');
+  execFileSync(process.execPath, ['scripts/build.mjs'], { env: { ...process.env, RELAY_DEFAULT: 'wss://relay.example/ws' }, stdio: 'ignore' });
+  assert.ok(readFileSync('dist/stompy.js', 'utf8').includes('wss://relay.example/ws'));
+  assert.throws(() => execFileSync(process.execPath, ['scripts/build.mjs'], { env: { ...process.env, RELAY_DEFAULT: 'http://nope' }, stdio: 'ignore' }));
+  execFileSync(process.execPath, ['scripts/build.mjs'], { env: { ...process.env, RELAY_DEFAULT: '' }, stdio: 'ignore' });
+  assert.ok(!readFileSync('dist/stompy.js', 'utf8').includes('relay.example'), 'without it, nothing baked in');
+});
