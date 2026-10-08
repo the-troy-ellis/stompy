@@ -205,7 +205,7 @@ export function createUi(app) {
     const mpLabel = prefs.mpKind !== 'coop' ? 'JOIN ARENA' : prefs.coopJoin ? 'JOIN' : 'HOST';
     const launchLabel = shut ? 'LOCKED' : heavy ? 'OVERWEIGHT' : { campaign: 'LAUNCH', free: 'LAUNCH', mp: mpLabel }[prefs.menuSel];
     showOverlay(`
-      <div class="mm">
+      <div class="mm">${app.update ? '<button class="mm-update" data-a="update">UPDATED · RELOAD</button>' : ''}
         <div class="mm-left">
           <div class="mm-title">STOMPY</div>
           ${lab ? `<div class="mm-detail mm-lab">${app.mechlab.html()}</div>` : `<nav class="mm-items">${MENU.map(([k, label]) => `<button class="mm-item${k === prefs.menuSel ? ' on' : ''}" data-sel="${k}">${label}</button>`).join('')}</nav>
@@ -317,6 +317,7 @@ export function createUi(app) {
     const opt = e.target.closest('[data-opt]');
     if (opt) { const [, get, set] = OPTS[opt.dataset.opt]; set(!get()); opt.textContent = optLabel(opt.dataset.opt); return; }
     const a = e.target.closest('[data-a]')?.dataset.a;
+    if (a === 'update') { app.update?.(); return; }   // a new version is waiting (ui/pwa.js)
     if (a === 'full') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); return; }
     if (a === 'diff') { cycleDiff(1); e.target.closest('[data-a]').textContent = diffLabel(); return; }
     if (G.state === 'menu' && app.mechlab.click(e)) return;
