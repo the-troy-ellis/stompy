@@ -4,7 +4,7 @@
 // one in Claude cloud containers, PLAYWRIGHT_CHROMIUM, or `chromium` on PATH.
 import { chromium } from 'playwright-core';
 import { spawn, execSync } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 const PORT = 8123, URL_ = `http://localhost:${PORT}/?debug=1`;
 const candidates = [process.env.PLAYWRIGHT_CHROMIUM, '/opt/pw-browsers/chromium', '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].filter(Boolean);
@@ -345,6 +345,58 @@ try {
     if (!(landed && ends.every(e => e && e.won && e.saved === '2' && e.crew === 2))) { failed = true; console.error('FAIL: co-op mission 2 did not end in a shared, saved win'); }
     await ctx.close();
   } finally { coopRelay.kill(); }
+  // Installed and offline (#226): the built game, served on its own port. One
+  // online visit caches it all; offline, the page reloads and mission 1 starts
+  // with its sounds. Then a new sw.js: the menu says UPDATED · RELOAD, and a
+  // tap swaps it in.
+  execSync(`"${process.execPath}" scripts/build.mjs`, { stdio: 'ignore' });
+  const distServer = spawn(process.execPath, ['scripts/serve.mjs', '8124', 'dist'], { stdio: 'ignore' });
+  await new Promise(r => setTimeout(r, 400));
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 640 } });
+    const page = await ctx.newPage();
+    page.on('pageerror', e => errors.push(`pwa: ${e.message}`));
+    page.on('console', m => { if (m.type() === 'error' && !/ERR_INTERNET_DISCONNECTED/.test(m.text())) errors.push(`pwa: console ${m.text()}`); });
+    await page.goto('http://localhost:8124/?debug=1');
+    await page.waitForSelector('.mm-title', { timeout: 15000 });
+    await page.waitForFunction(() => navigator.serviceWorker?.controller, null, { timeout: 10000 });
+    const kit = await page.evaluate(async () => {
+      const m = await (await fetch('manifest.webmanifest')).json();
+      const icons = await Promise.all(m.icons.map(async i => { const b = await createImageBitmap(await (await fetch(i.src)).blob()); return `${b.width}x${b.height}` === i.sizes; }));
+      const cache = await caches.open((await caches.keys()).find(k => k.startsWith('stompy-')));
+      return { name: m.name, display: m.display, orientation: m.orientation, icons: icons.every(Boolean), cached: (await cache.keys()).length };
+    });
+    await ctx.setOffline(true);
+    await page.reload();
+    await page.waitForSelector('.mm-title', { timeout: 10000 });
+    await page.click('.feel-panel [data-a="toggle"]');
+    await page.click('[data-sel="campaign"]');
+    await page.click('[data-a="go"]');
+    const offline = await page.waitForFunction(() => window.__stompy.game.state === 'play', null, { timeout: 8000 }).then(() => true).catch(() => false);
+    const sounds = await page.evaluate(async () => {   // every sound, offline, through the service worker
+      const cache = await caches.open((await caches.keys()).find(k => k.startsWith('stompy-')));
+      const urls = (await cache.keys()).map(r => r.url).filter(u => u.includes('/sounds/'));
+      return (await Promise.all(urls.map(u => fetch(u).then(r => r.ok && r.headers.get('content-type') !== null, () => false)))).filter(Boolean).length;
+    });
+    await page.screenshot({ path: 'test-results/smoke-offline.png' });
+    await ctx.setOffline(false);
+    await page.keyboard.press('F2');
+    await page.waitForFunction(() => window.__stompy.game.state === 'menu', null, { timeout: 5000 });
+    const sw = readFileSync('dist/sw.js', 'utf8');
+    writeFileSync('dist/sw.js', sw.replace(/const VERSION = '[^']*'/, "const VERSION = 'smoketest'"));
+    await page.evaluate(() => navigator.serviceWorker.getRegistration().then(r => r.update()));
+    const shown = await page.waitForSelector('.mm-update', { timeout: 10000 }).then(() => true).catch(() => false);
+    await page.screenshot({ path: 'test-results/smoke-update.png' });
+    if (shown) await Promise.all([page.waitForNavigation({ timeout: 10000 }).catch(() => {}), page.click('.mm-update')]);
+    await page.waitForSelector('.mm-title', { timeout: 10000 });
+    const swapped = await page.evaluate(async () => ({ keys: (await caches.keys()).join(), line: !!document.querySelector('.mm-update') }));
+    writeFileSync('dist/sw.js', sw);
+    console.log(`pwa: manifest ${kit.name} ${kit.display} ${kit.orientation}, icons ${kit.icons}, ${kit.cached} files cached; offline mission 1 ${offline} with ${sounds} sounds; update line ${shown}, then caches ${swapped.keys} (line ${swapped.line ? 'still up' : 'gone'})`);
+    if (!(kit.name === 'STOMPY' && kit.display === 'standalone' && kit.orientation === 'landscape' && kit.icons && kit.cached > 40)) { failed = true; console.error('FAIL: the manifest, icons or cache'); }
+    if (!(offline && sounds > 20)) { failed = true; console.error('FAIL: mission 1 offline'); }
+    if (!(shown && swapped.keys === 'stompy-smoketest' && !swapped.line)) { failed = true; console.error('FAIL: the update did not swap in'); }
+    await ctx.close();
+  } finally { distServer.kill(); }
   await browser.close();
   if (errors.length) { failed = true; console.error('FAIL: page errors:\n  ' + errors.join('\n  ')); }
 } catch (e) {

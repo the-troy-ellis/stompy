@@ -31,6 +31,7 @@ import { DIFF } from './data/ai.js';
 import { SETTINGS, SETTING_KEYS, readSetting, particleScales } from './data/settings.js';
 import { createMechlab } from './ui/mechlab.js';
 import { normalRelay, resolveRelay } from './net/relay.js';
+import { registerServiceWorker } from './ui/pwa.js';
 
 // Settings and progress, from localStorage. Each screen writes back the key
 // it owns (store.set) when the player changes something.
@@ -142,6 +143,8 @@ function start(root) {
   };
 
   app.ui.mainMenu();
+  // Installed and offline (the built game only): a new version waiting shows UPDATED · RELOAD on the menu.
+  registerServiceWorker(apply => { app.update = apply; if (G.state === 'menu' && !G.lobby && document.activeElement?.tagName !== 'INPUT') app.ui.renderMenu(); });
   requestAnimationFrame(loop);
   setTimeout(() => wrap.focus(), 0);
 }

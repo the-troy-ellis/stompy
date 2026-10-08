@@ -183,7 +183,7 @@ html, body {
   padding: 0; display: block; overflow: hidden; touch-action: none;
   background: linear-gradient(90deg, rgba(0, 0, 0, .85) 0%, rgba(0, 0, 0, .6) 32%, rgba(0, 0, 0, 0) 58%);
 }
-.mm { display: grid; grid-template-columns: minmax(300px, 42%) 1fr; height: 100%; margin: 0 !important; }
+.mm { display: grid; grid-template-columns: minmax(300px, 42%) 1fr; height: 100%; margin: 0 !important; position: relative; }
 .mm-left {
   display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: auto; touch-action: pan-y;
   padding: calc(22px + env(safe-area-inset-top)) 28px calc(22px + env(safe-area-inset-bottom)) calc(30px + env(safe-area-inset-left));
@@ -209,6 +209,11 @@ html, body {
 .mm-detail .opts { justify-content: flex-start; margin: 4px 0 10px; }
 .mm-controls { max-height: 40vh; overflow: auto; border: 1px solid #1a4a1a; padding: 6px 8px; background: rgba(0, 10, 0, .5); }
 .mm-pick { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+/* A new version is waiting (ui/pwa.js): one dim line in the top corner, over the scene, so nothing in the menu moves. */
+.mm-update {
+  position: absolute; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); z-index: 2; font: 11px "Lucida Console", monospace;
+  background: none; border: 0; color: #7a7; letter-spacing: 1px; padding: 6px; cursor: pointer;
+}
 /* Free Play's six pickers: on a phone held sideways, two columns with the
    label above each, so LAUNCH stays on screen. */
 @media (max-height: 500px) {
