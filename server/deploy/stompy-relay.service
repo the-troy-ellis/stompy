@@ -1,0 +1,33 @@
+# Stompy's relay as a systemd service, behind Caddy on the same machine
+# (server/deploy/README.md). deploy.sh copies server/ to /opt/stompy/server
+# and installs this; by hand:
+#   sudo cp stompy-relay.service /etc/systemd/system/
+#   sudo systemctl enable --now stompy-relay
+#   journalctl -u stompy-relay -f
+# Settings of your own (STOMPY_ORIGINS, STOMPY_ADMIN, STOMPY_MODE...) go in
+# /etc/stompy/relay.env, one NAME=value a line; they win over these. On a LAN
+# with no Caddy: STOMPY_HOST=0.0.0.0 and STOMPY_PROXY= there.
+[Unit]
+Description=Stompy relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/stompy/server/server.py
+WorkingDirectory=/opt/stompy/server
+Environment=STOMPY_HOST=127.0.0.1
+Environment=STOMPY_PORT=8096
+Environment=STOMPY_PROXY=local
+Environment=STOMPY_LOG=/var/log/stompy/relay.log
+EnvironmentFile=-/etc/stompy/relay.env
+DynamicUser=yes
+LogsDirectory=stompy
+Restart=always
+RestartSec=2
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

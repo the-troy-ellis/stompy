@@ -55,6 +55,7 @@ HALF = 96 * 24 / 2        # the map's half width (src/world/terrain.js): positio
 FX_RATE = 40              # weapon effects per second per pilot; more are dropped (a beam flash is per shot, guided updates 15 Hz)
 PER_IP = int(os.environ.get("STOMPY_PER_IP", 8))   # sockets from one address at once (phones and a laptop behind one NAT)
 ORIGINS = {h.strip().lower() for h in os.environ.get("STOMPY_ORIGINS", "").split(",") if h.strip()}   # hosted pages allowed besides the LAN rule
+PROXY = os.environ.get("STOMPY_PROXY", "")   # behind a proxy: "local" (Caddy on this machine) or "private" (a container host's); see from_proxy
 ADMIN = os.environ.get("STOMPY_ADMIN", "")          # a hello presenting this may kick (no UI: the hook)
 MSG_RATE = 60             # messages a second a pilot may send, on average (a co-op host runs the world: HOST_RATE times that)
 HOST_RATE = 3
@@ -161,7 +162,35 @@ def origin_ok(origin):
         return False
 
 
-async def handshake(reader, writer):
+def client_ip(peer_ip, headers):
+    """The pilot's address. Behind a proxy every socket comes from the proxy,
+    so it's the last X-Forwarded-For entry, the one the proxy wrote;
+    otherwise the socket's own."""
+    if from_proxy(peer_ip):
+        fwd = headers.get("x-forwarded-for", "").split(",")[-1].strip()
+        try:
+            return str(ipaddress.ip_address(fwd))
+        except ValueError:
+            pass
+    return peer_ip
+
+
+def from_proxy(ip):
+    """Whether a socket from `ip` is the proxy's (PROXY): from this machine
+    ("local"), or from any private address ("private", a container host's
+    proxy, which no one on the internet can come from)."""
+    if PROXY not in ("local", "private"):
+        return False
+    try:
+        a = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return a.is_loopback or (PROXY == "private" and a.is_private)
+
+
+async def handshake(reader, writer, admit=lambda headers: True):
+    """The upgrade to a WebSocket; `admit` gets the headers last and may
+    refuse (it writes the answer)."""
     try:
         head = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), 10)
     except (asyncio.IncompleteReadError, asyncio.LimitOverrunError, asyncio.TimeoutError):
@@ -186,6 +215,8 @@ async def handshake(reader, writer):
         return False
     if not origin_ok(headers.get("origin")):
         writer.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        return False
+    if not admit(headers):
         return False
     accept = base64.b64encode(hashlib.sha1(key.encode() + GUID).digest()).decode()
     writer.write(("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
@@ -625,16 +656,35 @@ def handle_coop(c, msg, t):
 async def session(reader, writer):
     peer = writer.get_extra_info("peername")
     ip = peer[0] if peer else "?"
-    if conns.get(ip, 0) >= PER_IP:
+    counted = None
+
+    def take(addr):
         # One address holding too many sockets: refused before the upgrade.
-        writer.write(b"HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
-        log(f"refused {ip}: {PER_IP} sockets already")
+        nonlocal counted
+        if conns.get(addr, 0) >= PER_IP:
+            writer.write(b"HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            log(f"refused {addr}: {PER_IP} sockets already")
+            return False
+        conns[addr] = conns.get(addr, 0) + 1
+        counted = addr
+        return True
+
+    # Behind a proxy the address is in the headers, so it's counted there.
+    proxied = from_proxy(ip)
+    if not proxied and not take(ip):
         writer.close()
         return
-    conns[ip] = conns.get(ip, 0) + 1
+
+    def admit(headers):
+        nonlocal ip
+        if not proxied:
+            return True
+        ip = client_ip(ip, headers)
+        return take(ip)
+
     c = None
     try:
-        if not await handshake(reader, writer):
+        if not await handshake(reader, writer, admit):
             return
         c = Client(writer)
         # The first message must be a hello with a callsign and colour.
@@ -645,7 +695,7 @@ async def session(reader, writer):
         if hello.get("v") != PROTOCOL:
             # Another version of the game: say which one to get, and close.
             send(c, {"t": "version", "need": PROTOCOL})
-            log(f"turned away v{hello.get('v')} from {peer[0] if peer else '?'} (need v{PROTOCOL})")
+            log(f"turned away v{hello.get('v')} from {ip} (need v{PROTOCOL})")
             return
         # The room: a new co-op one (`create`), one by its code, or the arena.
         create, want = hello.get("create"), hello.get("room")
@@ -685,7 +735,7 @@ async def session(reader, writer):
         room.empty_since = None
         if room.kind == "coop" and room.host not in room.players:
             room.host = c.id   # the first pilot in hosts
-        log(f"{'back' if saved else 'join'} {c.id} {c.name} in {room.code} from {peer[0] if peer else '?'} ({len(room.players)} there)")
+        log(f"{'back' if saved else 'join'} {c.id} {c.name} in {room.code} from {ip} ({len(room.players)} there)")
         welcome = {"t": "welcome", "id": c.id, "room": room.code, "kind": room.kind, "host": room.host,
                    "token": c.token, "resumed": 1 if saved else 0, "scores": scores(room)}
         if room.kind == "arena":
@@ -735,9 +785,10 @@ async def session(reader, writer):
                     room.host = min(room.players)   # the lowest id left runs the world now
                     log(f"room {room.code}: {room.host} is host")
                     broadcast({"t": "host", "id": room.host, "scores": scores(room)}, room=room)
-        conns[ip] -= 1
-        if conns[ip] <= 0:
-            del conns[ip]
+        if counted is not None:
+            conns[counted] -= 1
+            if conns[counted] <= 0:
+                del conns[counted]
         writer.close()
 
 
@@ -768,6 +819,8 @@ def parse_args(argv=None):
     p.add_argument("--gap", type=int, default=ROUND_GAP, help=f"seconds between rounds (STOMPY_ROUND_GAP, default {ROUND_GAP})")
     p.add_argument("--per-ip", type=int, default=PER_IP, help=f"sockets from one address at once (STOMPY_PER_IP, default {PER_IP})")
     p.add_argument("--log", default=LOG_FILE, help="also log to this file (STOMPY_LOG)")
+    p.add_argument("--proxy", choices=("", "local", "private"), default=PROXY,
+                   help="behind a proxy, a pilot's address is its X-Forwarded-For: local for one on this machine (Caddy), private for a container host's (STOMPY_PROXY)")
     a = p.parse_args(argv)
     if a.port_arg is not None:
         a.port = a.port_arg
@@ -775,12 +828,12 @@ def parse_args(argv=None):
 
 
 async def main():
-    global SCORE_LIMIT, TEAM_LIMIT, ROUND_GAP, PER_IP, MODE, LOG_FILE
+    global SCORE_LIMIT, TEAM_LIMIT, ROUND_GAP, PER_IP, MODE, LOG_FILE, PROXY
     a = parse_args()
-    SCORE_LIMIT, TEAM_LIMIT, ROUND_GAP, PER_IP, MODE, LOG_FILE = a.limit, a.team_limit, a.gap, a.per_ip, a.mode, a.log
+    SCORE_LIMIT, TEAM_LIMIT, ROUND_GAP, PER_IP, MODE, LOG_FILE, PROXY = a.limit, a.team_limit, a.gap, a.per_ip, a.mode, a.log, a.proxy
     arena["mode"] = MODE
     server = await asyncio.start_server(session, a.host, a.port, limit=16 * 1024)
-    log(f"stompy arena on {a.host}:{a.port}/ws ({MODE}, max {MAX_PLAYERS}, first to {limit()}, {PER_IP} per address)")
+    log(f"stompy arena on {a.host}:{a.port}/ws ({MODE}, max {MAX_PLAYERS}, first to {limit()}, {PER_IP} per address{f', behind a {PROXY} proxy' if PROXY else ''})")
     asyncio.ensure_future(heartbeat())
     async with server:
         await server.serve_forever()
