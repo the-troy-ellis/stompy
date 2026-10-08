@@ -23,12 +23,15 @@ game's own tables).
 | `--gap` | `STOMPY_ROUND_GAP` | `10` | seconds between rounds |
 | `--per-ip` | `STOMPY_PER_IP` | `8` | sockets one address may hold (phones and a laptop behind one NAT) |
 | `--log` | `STOMPY_LOG` | none | also append the log to this file |
+| `--proxy` | `STOMPY_PROXY` | none | behind a proxy, a pilot's address is its `X-Forwarded-For`: `local` for one on this machine (Caddy), `private` for a container host's |
 | | `STOMPY_ORIGINS` | none | hosted pages allowed to connect, comma separated (`me.github.io,stompy.example.com`); the LAN rule (`stompy.*`, an IP, localhost) always holds |
 | | `STOMPY_ADMIN` | none | a token a `hello` may present (`admin`) to send `{t: 'kick', id}`; no UI |
 
 It logs joins, leaves, rounds and refusals to stdout, and to the file if one
-is set; rotating that file is logrotate's job. `stompy-relay.service` is a
-systemd unit for running it on a small machine.
+is set; rotating that file is logrotate's job. `deploy/` puts it on the
+internet behind Caddy, with a systemd unit and a `deploy.sh`; its README goes
+from a clean VPS to a running TLS relay. `Dockerfile` runs it on a container
+host.
 
 What it checks: the `hello` version (`PROTOCOL`, kept equal to the game's
 by a Node test), every state message rebuilt clean, loadouts against the

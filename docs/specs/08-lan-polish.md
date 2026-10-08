@@ -234,7 +234,8 @@ As shipped (#191):
   pilot sending 300 junk messages over a real socket stays connected and
   relayed.
 - **Deployment:** `server/stompy-relay.service` (systemd, an unprivileged
-  dynamic user) and `server/README.md`.
+  dynamic user) and `server/README.md`. Since #218 the unit is in
+  `server/deploy/`, set up for the relay behind Caddy.
 
 ## Code touchpoints
 
