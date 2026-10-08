@@ -394,7 +394,7 @@ export function createNet(app) {
   function sendState() {
     const lo = JSON.stringify(G.player.loadout || null), withLo = lo !== Net.loSent || ++Net.loN >= LOADOUT_EVERY;
     if (withLo) { Net.loSent = lo; Net.loN = 0; }
-    netSend(stateMessage(G.player, beamMult(G.player), withLo));
+    netSend(stateMessage(G.player, beamMult(G.player), withLo, G.clock));
   }
 
   function netState(s) {
