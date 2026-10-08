@@ -49,7 +49,7 @@ PING_EVERY = 10
 DROP_AFTER = 25           # seconds of silence (a phone that went to sleep)
 MAX_BUFFERED = 256 * 1024 # a client this far behind is dropped, not waited for
 PALETTES = ("dusk", "ice", "volcanic")
-PROTOCOL = 16             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
+PROTOCOL = 17             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
 HALF = 96 * 24 / 2        # the map's half width (src/world/terrain.js): positions are clamped to it
 FX_RATE = 40              # weapon effects per second per pilot; more are dropped (a beam flash is per shot, guided updates 15 Hz)
 PER_IP = int(os.environ.get("STOMPY_PER_IP", 4))   # sockets from one address at once (phones and a laptop behind one NAT)
@@ -381,6 +381,8 @@ def clean_state(msg):
            "hp": hp + [0.0] * (5 - len(hp)), "bm": flag(msg.get("bm")), "be": vec3(msg.get("be")), "bf": num(msg.get("bf"), 0, 10),
            "fl": vec3(msg.get("fl")), "sc": int(num(msg.get("sc"), 0, 99)), "sq": num(msg.get("sq"), 0, 1),
            "pu": int(num(msg.get("pu"), 0, 2)), "lt": flag(msg.get("lt"))}
+    if "ts" in msg:
+        out["ts"] = int(num(msg.get("ts"), 0, 1e13))   # the sender's clock, ms: others draw it smoothly through jitter
     return out
 
 

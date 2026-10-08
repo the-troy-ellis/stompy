@@ -10,6 +10,8 @@ import { makeSpring, stepSpring } from '../util/spring.js';
 import { liveKills, killWords } from '../net/killfeed.js';
 import { teamCss, teamName } from '../net/teams.js';
 
+const LAG_MS = 200;   // a round trip to the relay past this shows LAG (docs/specs/10-internet-play.md § Latency)
+
 const { sin, cos, atan2, min, max, PI, random, hypot, floor } = Math;
 
 // The compass tape's label for a heading in degrees: a cardinal letter on
@@ -662,6 +664,11 @@ export function createHud(app) {
     ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'right'; ctx.fillStyle = DIM;
     ctx.fillText(app.net.mp() ? `${app.net.tdm() ? '' : `PILOTS ${app.net.Net.info.size}  `}FIRST TO ${app.net.Net.limit}` : `HOSTILES ${left}`, L.hostiles.x, L.hostiles.y);
     if (app.net.mp()) drawArenaHUD(L);
+    if ((app.net.mp() || G.mode === 'coop') && app.net.Net.rtt > LAG_MS) {   // a slow line to the relay: say so, small
+      const tw = min(340, app.scene.view.W * 0.5);
+      ctx.textAlign = 'left'; ctx.fillStyle = AMBER;
+      ctx.fillText('LAG', app.scene.view.W / 2 + tw / 2 + 8, 28);
+    }
     else if (G.mode === 'coop') drawCoopDown(L);
     // Phones held upright get a cramped, stretched view.
     if (G.touchUI && app.scene.view.H > app.scene.view.W) {
