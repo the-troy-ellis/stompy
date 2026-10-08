@@ -128,11 +128,12 @@ class WSClient:
         self.reader, self.writer = reader, writer
 
     @classmethod
-    async def connect(cls, port, origin="http://localhost:8000"):
+    async def connect(cls, port, origin="http://localhost:8000", forwarded=None):
         reader, writer = await asyncio.open_connection("127.0.0.1", port)
         key = base64.b64encode(os.urandom(16)).decode()
+        fwd = f"X-Forwarded-For: {forwarded}\r\n" if forwarded else ""
         writer.write((f"GET /ws HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
-                      f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\nOrigin: {origin}\r\n\r\n").encode())
+                      f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\nOrigin: {origin}\r\n{fwd}\r\n").encode())
         await writer.drain()
         head = await reader.readuntil(b"\r\n\r\n")
         status = head.split(b" ")[1]
@@ -173,6 +174,7 @@ class Session(unittest.IsolatedAsyncioTestCase):
         relay.DENY = set()
         relay.ADMIN = ""
         relay.MSG_RATE = 60
+        relay.PROXY = ""
         for code in [k for k in relay.rooms if k != relay.ARENA]:
             del relay.rooms[code]
         relay.PER_IP = 99   # every test client is 127.0.0.1; the cap has its own test
@@ -293,6 +295,48 @@ class Session(unittest.IsolatedAsyncioTestCase):
         c = await WSClient.connect(self.port)
         self.assertIsNotNone(c, "one closed, room for another")
         self.clients.append(c)
+
+    async def test_behind_a_proxy_each_forwarded_address_gets_its_own_cap(self):
+        relay.PROXY, relay.PER_IP = "local", 2
+        socks = [await WSClient.connect(self.port, forwarded=ip) for ip in ("203.0.113.5", "203.0.113.5", "203.0.113.5", "203.0.113.6")]
+        self.clients += [c for c in socks if c]
+        self.assertEqual([c is not None for c in socks], [True, True, False, True], "two from .5, the third refused; .6 has its own two")
+        self.assertEqual(relay.conns, {"203.0.113.5": 2, "203.0.113.6": 1})
+        socks[0].close()
+        await asyncio.sleep(0.1)
+        self.assertEqual(relay.conns.get("203.0.113.5"), 1, "a closed socket is given back to its address")
+
+    async def test_rooms_per_address_follow_the_forwarded_address(self):
+        relay.PROXY = "local"
+        for i in range(relay.ROOM_RATE):
+            c = await WSClient.connect(self.port, forwarded="198.51.100.1")
+            self.clients.append(c)
+            await c.send({"t": "hello", "v": relay.PROTOCOL, "name": f"H{i}", "color": 0, "create": {"mission": "m1"}})
+            self.assertEqual((await c.recv())["t"], "welcome")
+        c = await WSClient.connect(self.port, forwarded="198.51.100.1")
+        self.clients.append(c)
+        await c.send({"t": "hello", "v": relay.PROTOCOL, "name": "MORE", "color": 0, "create": {"mission": "m1"}})
+        self.assertEqual((await c.recv())["t"], "busy")
+        c = await WSClient.connect(self.port, forwarded="198.51.100.2")
+        self.clients.append(c)
+        await c.send({"t": "hello", "v": relay.PROTOCOL, "name": "OTHER", "color": 0, "create": {"mission": "m1"}})
+        self.assertEqual((await c.recv())["t"], "welcome", "another address behind the same proxy still may")
+
+    def test_the_forwarded_address_counts_only_from_a_proxy_on_this_machine(self):
+        h = {"x-forwarded-for": "6.6.6.6, 203.0.113.9"}
+        relay.PROXY = ""
+        self.assertEqual(relay.client_ip("127.0.0.1", h), "127.0.0.1", "off: the header is anyone's to write")
+        relay.PROXY = "local"
+        self.assertEqual(relay.client_ip("127.0.0.1", h), "203.0.113.9", "the last entry, the one the proxy wrote")
+        self.assertEqual(relay.client_ip("::1", h), "203.0.113.9")
+        self.assertEqual(relay.client_ip("192.0.2.4", h), "192.0.2.4", "a socket from elsewhere is its own address")
+        self.assertEqual(relay.client_ip("10.1.2.3", h), "10.1.2.3", "local: not even a private one")
+        relay.PROXY = "private"
+        self.assertEqual(relay.client_ip("10.1.2.3", h), "203.0.113.9", "private: a container host's proxy")
+        self.assertEqual(relay.client_ip("fdaa::3", h), "203.0.113.9")
+        self.assertEqual(relay.client_ip("93.184.216.34", h), "93.184.216.34", "a public address is never the proxy")
+        self.assertEqual(relay.client_ip("127.0.0.1", {"x-forwarded-for": "junk"}), "127.0.0.1")
+        self.assertEqual(relay.client_ip("127.0.0.1", {}), "127.0.0.1")
 
     async def test_bad_origin_is_refused(self):
         c = await WSClient.connect(self.port, origin="https://evil.example")

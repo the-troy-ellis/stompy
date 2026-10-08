@@ -66,6 +66,23 @@ As shipped (#217): `RELAY_DEFAULT` lives in `src/net/relay.js`, not
 - Caddyfile, systemd unit and a `deploy.sh` (rsync `server/`, restart) in
   `server/deploy/`. A `Dockerfile` for container hosts.
 
+As shipped (#218): `server/deploy/` has the `Caddyfile`, the unit (moved
+there from `server/`, now `Restart=always`, listening on 127.0.0.1, with
+the owner's settings in `/etc/stompy/relay.env`), `deploy.sh` and a
+`README.md` in six steps. The `Dockerfile` is `server/Dockerfile`, as the
+Hosting section has it, so `docker build server` works.
+- **Added: `--proxy` (`STOMPY_PROXY`).** Behind Caddy every socket comes
+  from 127.0.0.1, so the per-address limits (sockets, rooms) would have
+  counted the whole internet as one address. With `local`, a socket from
+  loopback is counted by the last `X-Forwarded-For` entry, the one Caddy
+  wrote; `private` trusts any private address too, for a container host's
+  proxy. Off, the header is ignored, since anyone can write it.
+- **Checked here:** the image builds, reports healthy and takes a pilot;
+  `caddy validate` passes; through Caddy, `/ws` and `/health` reach the
+  relay, which logs the pilot's own address, and a forged
+  `X-Forwarded-For` doesn't get past Caddy.
+- **The owner's check:** the 15-minute deploy on their VPS and domain.
+
 ### Latency
 
 Wi-Fi is 5–20 ms; the internet is 40–150 ms with jitter. Changes:

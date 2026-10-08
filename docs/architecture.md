@@ -23,10 +23,11 @@ relay and its tests.
 | `src/input/` | ~220 | `input.js` (`createInput`: keyboard, mouse with pointer lock, touch stick/aim/buttons, one per-frame `snapshot()`). |
 | `src/ui/` | ~280 | `screens.js` (`createUi`: main menu with the live mech, briefing detail, settings, pause, debrief, mission and skirmish start, click routing), `debrief.js` (the objective rows and the banner). `campaign.js` (`camp.*` progress: load and migrate, results, unlocks, restart, the strip). `lobby.js` (M5a: the arena lobby's pilot list, updated in place), `summary.js` (M5a: the arena's round-end summary and vote). |
 | `src/net/` | ~330 | `protocol.js` (`PROTOCOL`, message builders, `parse`), `client.js` (`createNet`: join, handler, spawn, 15 Hz state, relayed effects, `tick`), `interp.js` (`netInterp`), `relay.js` (M5a: the relay address from `?relay=`, the RELAY field or the page's host), `spectate.js` (M5a: the arena's spectator camera while you wait to respawn), `remote.js` (a mech another client runs, brought up to its report), `coop.js` (M5b: the host's enemies out as `es`, a guest's hits on them back as `ehit`), `teams.js` (M5a: team deathmatch's sides, colours and `spawnPoint(G, side)`), `killfeed.js` (M5a: the arena's kill feed, drawn by the HUD). |
+| `src/sw.js`, `manifest.webmanifest` | | M6: the service worker (the built game installed and offline; `src/ui/pwa.js` registers it) and the app manifest. |
 | `src/util/` | ~70 | `math.js` (scalars, vec3, `M` matrices, `chain`, cosmetic `rnd`), `store.js`, `dom.js`. |
-| `server/` | 420 + tests | `server.py` the relay (M5a: version check, clean state messages, fx rate limit, flags, per-address cap, file log), `data.py` (loadout tables and checks), `test_server.py` (with fuzz tests), `stompy-relay.service` (systemd), `README.md`. |
+| `server/` | 420 + tests | `server.py` the relay (M5a: version check, clean state messages, fx rate limit, flags, per-address cap, file log), `data.py` (loadout tables and checks), `test_server.py` (with fuzz tests), `README.md`, `Dockerfile`; `deploy/` (M5c: Caddyfile, systemd unit, `deploy.sh` and the VPS steps). |
 | `test/` | | `*.test.js` headless (`helpers.js` builds a flat-ground game with a recording fx), `smoke/run.mjs` (Playwright: desktop mission, touch layout, two-pilot arena against the real relay). |
-| `scripts/` | | `serve.mjs` (static server), `build.mjs` (esbuild), `perf.mjs` (`npm run perf`: the frame-cost harness and its budgets, spec 14). |
+| `scripts/` | | `serve.mjs` (static server), `build.mjs` (esbuild; M6: the manifest, icons and `dist/sw.js`), `icons.mjs` (the app icons from `favicon.svg`, in plain Node), `perf.mjs` (`npm run perf`: the frame-cost harness and its budgets, spec 14). |
 | `.github/workflows/` | | `ci.yml` (lint, test, build, server tests, smoke), `pages.yml` (gated by the `STOMPY_DEPLOY_PAGES` variable). |
 
 ### How the pieces talk
@@ -176,7 +177,9 @@ The relay's limits (M5c, #215):
 - **Origins:** `STOMPY_ORIGINS` names hosted pages allowed besides the LAN
   rule.
 - **Sockets and rooms per address:** 8 sockets from one address. Opening a
-  4th room within 10 minutes gets `busy`.
+  4th room within 10 minutes gets `busy`. Behind a proxy (`STOMPY_PROXY`,
+  #218) the address is the `X-Forwarded-For` the proxy wrote, taken only
+  from a socket that is the proxy's.
 - **Message rate:** a pilot sending more than 60 messages a second on average
   (2 s of burst) is dropped, and the others play on. A co-op host gets 3×,
   since it sends the world.
