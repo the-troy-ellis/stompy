@@ -1,0 +1,3 @@
+# Callsign words the relay turns away: one a line, any case, # for comments.
+# A callsign containing one (letters and digits only, so "B.A.D" counts as
+# "bad") becomes PILOT <n>. The owner fills this in; it ships with none.

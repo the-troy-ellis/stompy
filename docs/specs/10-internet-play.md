@@ -123,6 +123,27 @@ room list; codes are the discovery mechanism, by design.
   presents it in `hello`; no UI, just the hook.
 - Idle rooms GC after 10 minutes with nobody; the public arena never dies.
 
+As shipped (#215, `PROTOCOL` 18): in `server/server.py`, with the flags
+and file in `server/README.md`.
+- **Origins:** `STOMPY_ORIGINS` names allowed hosts beside the LAN rule.
+- **Per-IP sockets:** the cap is now 8 by default.
+- **Room creation:** 3 per 10 minutes per address. The next one gets `busy`,
+  and the menu says TOO MANY ROOMS FROM HERE. TRY AGAIN IN A FEW MINUTES.
+- **Message rate:** a bucket of 60 a second, holding 2 s of them; empty, and
+  the pilot is dropped.
+  - **Changed from the spec:** a co-op host gets 3×, because it sends every
+    enemy's state, fire and hits as well as its own.
+  - **The flood test:** the flooder is dropped while the others play on.
+  - **The fuzz test:** it lifts the cap, since it tests junk, not floods.
+- **Names:** `server/names_deny.txt`, one word a line, matched in letters and
+  digits only. It ships empty for the owner to fill in.
+- **Admin:** `STOMPY_ADMIN`. A `hello` with `admin` set to it may send
+  `kick {id}` for a pilot in the same room. There's no UI.
+- **Idle rooms:** an empty co-op room now waits `ROOM_IDLE` (10 minutes)
+  before it is collected (it was at once before), so a pilot who drops can
+  still come back to it.
+- **Health:** `GET /health` answers `200 {rooms, players, uptime}`.
+
 ### Observability
 
 A `/health` HTTP response on the same port (`GET /health` → `200 {rooms,
