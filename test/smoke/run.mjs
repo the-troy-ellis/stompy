@@ -149,6 +149,53 @@ try {
     console.log(`touch: aim turns the legs ${aimOk}, stick sets throttle and twists ${stickOk}, right side only buttons ${rightOk}, double tap centres ${centred}`);
     if (!(aimOk && stickOk && rightOk && centred)) { failed = true; console.error('FAIL: the touch layout did not behave'); }
   });
+  // A gamepad (#227), faked in the page: the D-pad and A pick FREE PLAY, Start
+  // launches; in play the touch controls step aside, the sticks drive, RT
+  // fires, Start pauses and B resumes; a thumb on the glass brings the touch
+  // controls back.
+  {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 640 }, hasTouch: true });
+    page.on('pageerror', e => errors.push(`gamepad: ${e.message}`));
+    page.on('console', m => { if (m.type() === 'error') errors.push(`gamepad: console ${m.text()}`); });
+    await page.addInitScript(() => {
+      const pad = { id: 'smoke pad', index: 0, connected: true, mapping: 'standard', timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
+      window.__pad = { set: (i, on) => { pad.buttons[i] = { pressed: on, value: on ? 1 : 0 }; }, axis: (i, v) => { pad.axes[i] = v; } };
+      Object.defineProperty(window.navigator, 'getGamepads', { value: () => [pad] });
+    });
+    await page.goto(URL_ + '&touch=1');
+    await page.waitForSelector('.mm-title', { timeout: 15000 });
+    await page.tap('.feel-panel [data-a="toggle"]');
+    const press = async i => { await page.evaluate(i => window.__pad.set(i, true), i); await page.waitForTimeout(120); await page.evaluate(i => window.__pad.set(i, false), i); await page.waitForTimeout(120); };
+    const hold = async (fn, ms) => { await page.evaluate(fn); await page.waitForTimeout(ms); };
+    await press(13); await press(13);   // D-pad down twice: CAMPAIGN, then FREE PLAY
+    const lit = await page.evaluate(() => document.querySelector('.pad-focus')?.textContent);
+    await press(0);   // A
+    const picked = await page.evaluate(() => window.__stompy.app.prefs.menuSel);
+    await press(9);   // Start
+    await page.waitForFunction(() => window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    await page.evaluate(() => { const g = window.__stompy.game; for (const k in g.player.hp) g.player.hp[k] = 1e6; for (const m of g.mechs) if (m.team) m.ai.aware = false; });
+    await page.waitForTimeout(400);
+    const P = () => page.evaluate(() => { const g = window.__stompy.game, p = g.player; return { thr: p.throttle, twist: p.twist, yaw: p.yaw, heat: p.heat, paused: g.paused, tui: !document.querySelector('.touch-ui').hidden }; });
+    const s0 = await P();
+    await hold(() => window.__pad.axis(1, -1), 900);   // left stick up: throttle
+    await hold(() => { window.__pad.axis(1, 0); window.__pad.axis(0, -1); window.__pad.axis(2, 1); }, 500);   // legs left, torso right
+    await page.evaluate(() => { window.__pad.axis(0, 0); window.__pad.axis(2, 0); });
+    const s1 = await P();
+    await hold(() => window.__pad.set(7, true), 700);   // RT: the energy weapons
+    await page.evaluate(() => window.__pad.set(7, false));
+    const s2 = await P();
+    await press(9);
+    const paused = (await P()).paused;
+    await press(1);
+    const resumed = !(await P()).paused;
+    await page.touchscreen.tap(200, 150);
+    await page.waitForTimeout(200);
+    const back = (await P()).tui;
+    console.log(`gamepad: D-pad lit ${lit}, A picked ${picked}; touch controls hidden ${!s0.tui}; stick throttle ${s0.thr.toFixed(2)} -> ${s1.thr.toFixed(2)}, legs ${(s1.yaw - s0.yaw).toFixed(2)}, twist ${(s1.twist - s0.twist).toFixed(2)}; RT heat ${s1.heat.toFixed(0)} -> ${s2.heat.toFixed(0)}; Start paused ${paused}, B resumed ${resumed}; a tap brings touch back ${back}`);
+    if (!(lit === 'FREE PLAY' && picked === 'free' && !s0.tui && s1.thr > s0.thr + 0.5 && s1.yaw - s0.yaw > 0.1 && s1.twist - s0.twist < -0.2 && s2.heat > s1.heat && paused && resumed && back)) { failed = true; console.error('FAIL: the gamepad'); }
+    await page.screenshot({ path: 'test-results/smoke-gamepad.png' });
+    await page.close();
+  }
   // The arena: the real relay, two pilots in one browser, each sees the other walk.
   // The limit is 1 so the round's end can be tried at the end (#187).
   const relay = spawn('python3', ['server/server.py', '8096'], { stdio: 'ignore', env: { ...process.env, STOMPY_ROUND_GAP: '4', STOMPY_SCORE_LIMIT: '1' } });
