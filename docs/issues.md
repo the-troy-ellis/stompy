@@ -192,12 +192,12 @@ Worked after #106 and before #110 (#131–#136, milestone M3). #137–#139 are M
 
 | # | Title | Labels | Size | Spec |
 |---|---|---|---|---|
-| | M5c: origins allow-list, /health, limits, admin kick | server | S | 10 |
-| | M5c: deploy kit: Caddyfile, systemd, deploy.sh, Dockerfile, README | server, docs | S | 10 §Hosting |
-| | M5c: interpolation delay buffer and RTT/LAG readout | net, hud | M | 10 §Latency |
-| | M5c: private arena rooms by code | server, ui | S | 10 §Room codes |
-| | M5c: RELAY_DEFAULT build define and Pages wiring | tooling | S | 10 |
-| | M5c: cross-network playtest report | docs, needs-owner | S | 10 §Acceptance 1 |
+| #215 | M5c: origins allow-list, /health, limits, admin kick | server | S | 10 |
+| #218 | M5c: deploy kit: Caddyfile, systemd, deploy.sh, Dockerfile, README | server, docs | S | 10 §Hosting |
+| #214 | M5c: interpolation delay buffer and RTT/LAG readout | net, hud | M | 10 §Latency |
+| #216 | M5c: private arena rooms by code | server, ui | S | 10 §Room codes |
+| #217 | M5c: RELAY_DEFAULT build define and Pages wiring | tooling | S | 10 |
+| #219 | M5c: cross-network playtest report | docs, needs-owner | S | 10 §Acceptance 1 |
 
 ## M6 — Ship
 
