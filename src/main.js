@@ -131,6 +131,7 @@ function start(root) {
     }
     if (G.state === 'play' && !document.hasFocus() && !G.paused) app.ui.pause(true);
     G.clock = performance.now();
+    app.input.pollPad(dt);   // a gamepad: the snapshot below, or the screen that's up
     if (G.state === 'menu') app.ui.menuTick(dt);
     if ((G.state === 'play' && (!G.paused || app.net.mp())) || G.state === 'over') {
       update(G, app.input.snapshot(), dt);

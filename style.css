@@ -360,3 +360,6 @@ html, body {
   .coop-picks .mm-pick span, .mm-detail .relay-at.tight { display: none; }   /* the mission names itself; the relay line is a tap away (JOIN) */
   .coop-picks .mm-pick b { flex: 1 1 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
+
+/* A gamepad's highlight on a screen's buttons (input.js): D-pad to move, A to press. */
+.mech-overlay .pad-focus { outline: 3px solid #fc3; outline-offset: 2px; }

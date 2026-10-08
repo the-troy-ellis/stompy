@@ -4,6 +4,7 @@
 export const SETTINGS = {
   mouseSens: { label: 'MOUSE', key: 'sens.mouse', min: 0.3, max: 2.5, step: 0.1, def: 1, fmt: v => `${v.toFixed(1)}x` },
   touchSens: { label: 'TOUCH', key: 'sens.touch', min: 0.3, max: 2.5, step: 0.1, def: 1, fmt: v => `${v.toFixed(1)}x` },
+  padSens: { label: 'GAMEPAD', key: 'sens.pad', min: 0.3, max: 2.5, step: 0.1, def: 1, fmt: v => `${v.toFixed(1)}x` },
   fov: { label: 'FOV', key: 'view.fov', min: 50, max: 95, step: 5, def: 62, fmt: v => `${v}\u00b0` },
   voiceVol: { label: 'VOICE VOL', key: 'voice.vol', min: 0, max: 1, step: 0.1, def: 0.9, fmt: v => `${Math.round(v * 100)}%` },
   // How many particles (spec 07): LOW / MED / HIGH. Unset, MED on touch and HIGH on a desktop (main.js).
