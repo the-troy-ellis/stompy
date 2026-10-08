@@ -189,10 +189,10 @@ export function becomeHost(G) {
 // first full report), and the game clock pulled to the host's.
 // `now`: the clock net/interp.js reads, in ms.
 export function applyEnemies(G, m, now) {
-  if (Array.isArray(m.l)) for (const d of m.l) applyEnemyState(G, d, now);
+  if (Array.isArray(m.l)) for (const d of m.l) applyEnemyState(G, d, now, m.gt);
   if (typeof m.gt === 'number' && Math.abs(G.time - m.gt) > GT_SLACK) G.time = m.gt;
 }
-export function applyEnemyState(G, d, now) {
+export function applyEnemyState(G, d, now, gt) {   // gt: the batch's host game time
   if (!d || typeof d.eid !== 'number') return;
   let e = enemyByEid(G, d.eid);
   if (d.gone) { if (e && !e.gone) Object.assign(e, { alive: false, dying: null, gone: true }); return; }
@@ -205,7 +205,7 @@ export function applyEnemyState(G, d, now) {
     G.mechs.push(e);
   }
   e.esKnown = s;
-  applyRemote(G, e, s, now);
+  applyRemote(G, e, typeof gt === 'number' ? { ...s, ts: gt * 1000 } : s, now);   // drawn on the host's clock (net/interp.js)
 }
 
 // A guest, a few times a second: the hits it landed on enemies and mission
