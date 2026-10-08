@@ -8,6 +8,7 @@ import { NAMES } from '../data/names.js';
 import { PALS, palAt } from '../data/palettes.js';
 import { missionDef, missionFoes, FP_MAPS, FP_MIXES, FP_WEATHER, FP_TIMES, fpWeather, pickFoes } from '../data/missions.js';
 import { MP_COLORS } from '../data/colors.js';
+import { MODE_NAMES } from './lobby.js';
 import { makeTerrain } from '../world/terrain.js';
 import { newMech, startMatch, foeType } from '../sim/state.js';
 import { initFeet } from '../sim/gait.js';
@@ -167,25 +168,36 @@ export function createUi(app) {
         <div class="mm-pick"><span>TIME</span><button data-fp="time" data-d="-1">◀</button><b>${{ day: 'NORMAL', dawn: 'DAWN', night: 'NIGHT' }[FP_TIMES[prefs.fpTime] || 'day']}</b><button data-fp="time" data-d="1">▶</button></div></div>`;
     }
     if (prefs.menuSel === 'mp') {
-      const coop = prefs.mpKind === 'coop';
-      // One row: the arena or co-op, and in co-op, host or join; then the host's mission or the room code.
-      const kinds = `<div class="mm-pick mp-kind"><button class="opt${coop ? '' : ' on'}" data-mpk="arena">ARENA</button><button class="opt${coop ? ' on' : ''}" data-mpk="coop">CO-OP</button>
-        ${coop ? `<i></i><button class="opt${prefs.coopJoin ? '' : ' on'}" data-cj="0">HOST</button><button class="opt${prefs.coopJoin ? ' on' : ''}" data-cj="1">JOIN</button>` : ''}</div>`;
-      const coopPicks = !coop ? '' : prefs.coopJoin ? `<p class="lobby-row"><label for="room">ROOM CODE</label>
+      const coop = prefs.mpKind === 'coop', pick = prefs.arenaPick;
+      // One row: the arena or co-op; in the arena, the public one, a private
+      // one or one by its code; in co-op, host or join. Then the private
+      // arena's mode, the host's mission or the room code.
+      const opt = (on, attr, label) => `<button class="opt${on ? ' on' : ''}" ${attr}>${label}</button>`;
+      const kinds = `<div class="mm-pick mp-kind">${opt(!coop, 'data-mpk="arena"', 'ARENA')}${opt(coop, 'data-mpk="coop"', 'CO-OP')}<i></i>${coop
+        ? `${opt(!prefs.coopJoin, 'data-cj="0"', 'HOST')}${opt(prefs.coopJoin, 'data-cj="1"', 'JOIN')}`
+        : `${opt(pick === 0, 'data-ap="0"', 'PUBLIC')}${opt(pick === 1, 'data-ap="1"', 'PRIVATE')}${opt(pick === 2, 'data-ap="2"', 'JOIN')}`}</div>`;
+      const joining = coop ? prefs.coopJoin : pick === 2;
+      const codeRow = joining ? `<p class="lobby-row"><label for="room">ROOM CODE</label>
           <input id="room" class="room" maxlength="4" value="${esc(prefs.roomCode)}" placeholder="BCDF"
-            autocomplete="off" spellcheck="false" autocapitalize="characters" enterkeyhint="go"></p>`
-        : `<div class="fp-picks coop-picks"><div class="mm-pick"><span>MISSION</span><button data-cp="mission" data-d="-1">◀</button><b>${esc(missionTitle(prefs.mission + 1, missionDef(prefs.mission).name))}</b><button data-cp="mission" data-d="1">▶</button></div>
-          <div class="mm-pick"><span>DIFFICULTY</span><button data-fp="diff" data-d="-1">◀</button><b>${DIFF[prefs.diff].label}</b><button data-fp="diff" data-d="1">▶</button></div></div>`;
+            autocomplete="off" spellcheck="false" autocapitalize="characters" enterkeyhint="go"></p>` : '';
+      const picks = joining ? ''
+        : coop ? `<div class="fp-picks coop-picks"><div class="mm-pick"><span>MISSION</span><button data-cp="mission" data-d="-1">◀</button><b>${esc(missionTitle(prefs.mission + 1, missionDef(prefs.mission).name))}</b><button data-cp="mission" data-d="1">▶</button></div>
+          <div class="mm-pick"><span>DIFFICULTY</span><button data-fp="diff" data-d="-1">◀</button><b>${DIFF[prefs.diff].label}</b><button data-fp="diff" data-d="1">▶</button></div></div>`
+        : pick === 1 ? `<div class="mm-pick arena-mode"><span>MODE</span><button data-am="-1">◀</button><b>${MODE_NAMES[prefs.arenaMode]}</b><button data-am="1">▶</button></div>` : '';
+      const blurb = coop ? 'Fly a mission together, up to 4 pilots. The host picks it. The others join with the room code.'
+        : pick === 1 ? 'Your own arena, up to 8 pilots. You pick the mode. Friends join with the room code.'
+        : pick === 2 ? 'Type the code a friend read out.'
+        : 'Free-for-all or team deathmatch for up to 8 pilots. Anyone can drop in. First to the limit wins the round.';
       return `${kinds}
-        <p class="mp-blurb${coop ? ' coop' : ''}">${coop ? 'Fly a mission together, up to 4 pilots. The host picks it. The others join with the room code.' : 'Free-for-all or team deathmatch for up to 8 pilots on this network. First to the limit wins the round.'}</p>
-        ${coopPicks}
-        <p class="lobby-row"><label for="callsign">CALLSIGN</label>
+        <p class="mp-blurb${coop ? ' coop' : ''}">${blurb}</p>
+        ${picks}
+        <div class="mp-ids${joining ? ' two' : ''}">${codeRow}<p class="lobby-row"><label for="callsign">CALLSIGN</label>
           <input id="callsign" class="callsign" maxlength="12" value="${esc(prefs.mpName)}" placeholder="PILOT"
-            autocomplete="off" spellcheck="false" autocapitalize="characters" enterkeyhint="go"></p>
+            autocomplete="off" spellcheck="false" autocapitalize="characters" enterkeyhint="go"></p></div>
         <p class="lobby-row"><label for="relay">RELAY</label>
           <input id="relay" class="relay" maxlength="120" value="${esc(prefs.relay)}" placeholder="THIS PAGE'S HOST"
             autocomplete="off" spellcheck="false" autocapitalize="off" inputmode="url" enterkeyhint="go"></p>
-        <p class="dim relay-at${coop && !prefs.coopJoin ? ' tight' : ''}">${esc(relayLine())}</p>
+        <p class="dim relay-at${!coop && pick === 0 ? '' : ' tight'}">${esc(relayLine())}</p>
         <div class="swatches">${MP_COLORS.map((c, i) => `<button class="swatch${i === prefs.mpColor ? ' on' : ''}" data-col="${i}"
           style="background:${c.css}" aria-label="${c.name}" title="${c.name}"></button>`).join('')}</div>
         <p class="status k">${esc(status)}</p>`;
@@ -202,7 +214,7 @@ export function createUi(app) {
     const maxHp = max(...MECH_ORDER.map(hpSum)), maxSpeed = max(...MECH_ORDER.map(c => CHASSIS[c].speed));
     const bar = (label, f) => `<span>${label}</span><i><b style="width:${Math.round(f * 100)}%"></b></i>`;
     const shut = locked(prefs.chassis), heavy = !shut && !fitOk(prefs.chassis), lab = app.mechlab.fit.open && !shut;
-    const mpLabel = prefs.mpKind !== 'coop' ? 'JOIN ARENA' : prefs.coopJoin ? 'JOIN' : 'HOST';
+    const mpLabel = prefs.mpKind !== 'coop' ? ['JOIN ARENA', 'CREATE', 'JOIN'][prefs.arenaPick] : prefs.coopJoin ? 'JOIN' : 'HOST';
     const launchLabel = shut ? 'LOCKED' : heavy ? 'OVERWEIGHT' : { campaign: 'LAUNCH', free: 'LAUNCH', mp: mpLabel }[prefs.menuSel];
     showOverlay(`
       <div class="mm">
@@ -231,13 +243,15 @@ export function createUi(app) {
     if (prefs.menuSel === 'campaign') { startMission(prefs.mission); launch(); }
     else if (prefs.menuSel === 'free') { startSkirmish(); launch(); }
     else if (prefs.menuSel === 'mp') {
-      // The arena, or co-op: open a room for the picked mission, or join one by its code.
-      if (prefs.mpKind !== 'coop') app.net.join();
-      else if (prefs.coopJoin) {
+      // The public arena, a private one (its mode), co-op (open a room for the
+      // picked mission), or any room by its code.
+      const coop = prefs.mpKind === 'coop';
+      if (coop ? prefs.coopJoin : prefs.arenaPick === 2) {
         prefs.roomCode = ($('.room', ov)?.value || prefs.roomCode).trim().toUpperCase().slice(0, 4);
         if (prefs.roomCode.length !== 4) { setStatus('TYPE THE ROOM CODE: FOUR LETTERS'); return; }
         app.net.join({ room: prefs.roomCode });
-      } else app.net.join({ create: { mission: prefs.mission, diff: prefs.diff, seed: missionDef(prefs.mission).seed ?? 7 + prefs.mission * 13 } });
+      } else if (!coop) app.net.join(prefs.arenaPick === 1 ? { create: { kind: 'arena', mode: prefs.arenaMode } } : {});
+      else app.net.join({ create: { mission: prefs.mission, diff: prefs.diff, seed: missionDef(prefs.mission).seed ?? 7 + prefs.mission * 13 } });
     }
   }
 
@@ -344,11 +358,14 @@ export function createUi(app) {
       if (mis) { const n = +mis.dataset.mis; if (canPlay(camp, n)) { prefs.mission = n; renderMenu(); } return; }
       // MULTIPLAYER: the arena or co-op, host or join, and the host's mission (from the campaign strip).
       const mpk = e.target.closest('[data-mpk]'), cj = e.target.closest('[data-cj]'), cp = e.target.closest('[data-cp]');
-      if (mpk || cj || cp) {
+      const ap = e.target.closest('[data-ap]'), am = e.target.closest('[data-am]');
+      if (mpk || cj || cp || ap || am) {
         prefs.mpName = ($('.callsign', ov)?.value ?? prefs.mpName).trim().toUpperCase().slice(0, 12);   // keep what was typed
         prefs.roomCode = ($('.room', ov)?.value ?? prefs.roomCode).trim().toUpperCase().slice(0, 4);
         if (mpk) { prefs.mpKind = mpk.dataset.mpk; store.set('mp.kind', prefs.mpKind); }
         if (cj) { prefs.coopJoin = cj.dataset.cj === '1'; store.set('coop.join', prefs.coopJoin); }
+        if (ap) { prefs.arenaPick = +ap.dataset.ap; store.set('arena.pick', prefs.arenaPick); }
+        if (am) { prefs.arenaMode = prefs.arenaMode === 'tdm' ? 'ffa' : 'tdm'; store.set('arena.mode', prefs.arenaMode); }   // two modes: either arrow flips it
         if (cp) { const n = prefs.mission + +cp.dataset.d; if (n >= 0 && canPlay(camp, n)) prefs.mission = n; }
         renderMenu(); return;
       }

@@ -50,7 +50,7 @@ PING_EVERY = 10
 DROP_AFTER = 25           # seconds of silence (a phone that went to sleep)
 MAX_BUFFERED = 256 * 1024 # a client this far behind is dropped, not waited for
 PALETTES = ("dusk", "ice", "volcanic")
-PROTOCOL = 18             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
+PROTOCOL = 19             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
 HALF = 96 * 24 / 2        # the map's half width (src/world/terrain.js): positions are clamped to it
 FX_RATE = 40              # weapon effects per second per pilot; more are dropped (a beam flash is per shot, guided updates 15 Hz)
 PER_IP = int(os.environ.get("STOMPY_PER_IP", 8))   # sockets from one address at once (phones and a laptop behind one NAT)
@@ -117,26 +117,33 @@ class Client:
 
 
 class Room:
-    """The arena (kind "arena") or a co-op room (kind "coop") and who is in it."""
-    def __init__(self, code, kind, players=None, mission=None):
+    """An arena (kind "arena": the public ARENA, or a private one by its code)
+    or a co-op room (kind "coop"), and who is in it."""
+    def __init__(self, code, kind, players=None, mission=None, state=None):
         self.code, self.kind = code, kind
+        self.arena = (state or new_arena()) if kind == "arena" else None   # an arena's round: its map, mode, teams, votes
         self.players = {} if players is None else players
         self.max = MAX_PLAYERS if kind == "arena" else COOP_MAX
         self.host = 0          # co-op: the pilot id whose client runs the enemies and objectives
         self.mission = mission  # co-op: the host's `create` (mission, difficulty, seed), passed on as `def`
         self.started = False   # co-op: the host has pressed READY
         self.over = None       # co-op: the host's `over`, for anyone who joins after
-        self.empty_since = None   # co-op: when the last pilot left (ROOM_IDLE later, it is collected)
+        self.empty_since = None   # a coded room: when the last pilot left (ROOM_IDLE later, it is collected)
 
 
-players: dict[int, Client] = {}   # the arena's pilots
-rooms: dict[str, Room] = {ARENA: Room(ARENA, "arena", players)}
+def new_arena(mode=None):
+    """A fresh round's state for an arena room."""
+    return {"seed": random.randrange(1, 10**6), "pal": random.choice(PALETTES), "over": False,
+            "mode": mode if mode in MODES else "ffa", "teams": [0, 0],   # teams: each team's kills this round (tdm)
+            "votes": {}, "round": 0}   # votes: pilot id -> VOTES index, between rounds; round: counts rounds (a score kept from an old one is void)
+
+
+players: dict[int, Client] = {}   # the public arena's pilots
+arena = new_arena(MODE)   # the public arena's round
+rooms: dict[str, Room] = {ARENA: Room(ARENA, "arena", players, state=arena)}
 opened: dict[str, list] = {}   # address -> when it opened rooms, for ROOM_RATE
 conns: dict[str, int] = {}   # open sockets per address, for the PER_IP cap
 departed: dict[str, dict] = {}   # token -> a dropped pilot's id and score, until KEEP runs out
-arena = {"seed": random.randrange(1, 10**6), "pal": random.choice(PALETTES), "over": False,
-         "mode": MODE if MODE in MODES else "ffa", "teams": [0, 0],   # teams: each team's kills this round (tdm)
-         "votes": {}, "round": 0}   # votes: pilot id -> VOTES index, between rounds; round: counts rounds (a score kept from an old one is void)
 sleep = asyncio.sleep     # the gap between rounds waits on this (the tests swap in a fake clock)
 
 
@@ -261,40 +268,51 @@ def scores(room=None):
             for c in sorted((room.players if room else players).values(), key=lambda c: c.id)]
 
 
-def tdm():
-    return arena["mode"] == "tdm"
+def room_of(c):
+    return c.room or rooms[ARENA]
 
 
-def limit():
+def state_of(room=None):
+    """An arena room's round (the public arena's unless one is named)."""
+    return (room or rooms[ARENA]).arena
+
+
+def tdm(room=None):
+    return state_of(room)["mode"] == "tdm"
+
+
+def limit(room=None):
     """Kills to win the round: a pilot's in ffa, a team's in tdm."""
-    return TEAM_LIMIT if tdm() else SCORE_LIMIT
+    return TEAM_LIMIT if tdm(room) else SCORE_LIMIT
 
 
 def paint(c):
     """The pilot's colour as everyone sees it: their pick, or their team's in tdm."""
-    in_arena = c.room is None or c.room.kind == "arena"
-    c.color = TEAM_COLORS[c.team] if in_arena and tdm() else c.pick
+    room = room_of(c)
+    c.color = TEAM_COLORS[c.team] if room.kind == "arena" and tdm(room) else c.pick
 
 
-def tally():
+def tally(room=None):
     """Each option's votes from the pilots still here, in VOTES order."""
+    room = room or rooms[ARENA]
     n = [0] * len(VOTES)
-    for cid, v in arena["votes"].items():
-        if cid in players:
+    for cid, v in room.arena["votes"].items():
+        if cid in room.players:
             n[v] += 1
     return n
 
 
-def vote_result():
+def vote_result(room=None):
     """The option with the most votes; a tie (or no votes) goes to the first."""
-    n = tally()
+    n = tally(room)
     return n.index(max(n))
 
 
 def keep(c, now=None):
     """A dropped pilot's place, kept under their token for KEEP seconds."""
     now = time.monotonic() if now is None else now
-    departed[c.token] = {"id": c.id, "room": c.room.code if c.room else ARENA, "until": now + KEEP, "round": arena["round"], "team": c.team, "ready": c.ready,
+    room = room_of(c)
+    departed[c.token] = {"id": c.id, "room": room.code, "until": now + KEEP, "round": room.arena["round"] if room.arena else 0, "team": c.team, "ready": c.ready,
                          "kills": c.kills, "deaths": c.deaths, "streak": c.streak, "best": c.best}
 
 
@@ -355,10 +373,10 @@ def clean_hit(msg, sender):
     return out
 
 
-def smaller_team(skip=None):
+def smaller_team(skip=None, room=None):
     """The team with fewer pilots (STEEL on a tie): where a newcomer starts."""
     n = [0, 0]
-    for p in players.values():
+    for p in (room or rooms[ARENA]).players.values():
         if p is not skip:
             n[p.team] += 1
     return 1 if n[1] < n[0] else 0
@@ -413,10 +431,10 @@ def may_open_room(ip, now=None):
 
 
 def collect_rooms(now=None):
-    """Co-op rooms empty for ROOM_IDLE seconds are gone. The arena never is."""
+    """Coded rooms empty for ROOM_IDLE seconds are gone. The public arena never is."""
     now = time.monotonic() if now is None else now
     for code, room in list(rooms.items()):
-        if room.kind != "arena" and not room.players and room.empty_since is not None and now - room.empty_since >= ROOM_IDLE:
+        if code != ARENA and not room.players and room.empty_since is not None and now - room.empty_since >= ROOM_IDLE:
             del rooms[code]
             log(f"room {code} closed (empty {ROOM_IDLE} s)")
 
@@ -472,28 +490,31 @@ def fx_allowed(c, now=None):
 async def end_round(winner):
     """`winner`: the pilot who reached the limit; in tdm their team wins.
     Then ROUND_GAP seconds for the summary and the vote, which picks the next
-    round: a new map, the same map, or the other mode on a new map."""
-    arena["over"] = True
-    arena["votes"] = {}
-    over = {"t": "roundover", "winner": winner.id, "name": winner.name, "next": ROUND_GAP, "teams": arena["teams"], "scores": scores()}
-    if tdm():
+    round: a new map, the same map, or the other mode on a new map. Each
+    arena room runs its own."""
+    room = room_of(winner)
+    st = room.arena
+    st["over"] = True
+    st["votes"] = {}
+    over = {"t": "roundover", "winner": winner.id, "name": winner.name, "next": ROUND_GAP, "teams": st["teams"], "scores": scores(room)}
+    if tdm(room):
         over["team"] = winner.team
-    log(f"round over: {'team ' + str(winner.team) if tdm() else winner.name} wins")
-    broadcast(over)
+    log(f"round over in {room.code}: {'team ' + str(winner.team) if tdm(room) else winner.name} wins")
+    broadcast(over, room=room)
     await sleep(ROUND_GAP)
-    pick = vote_result()
-    log(f"vote {tally()}: {VOTES[pick]}")
+    pick = vote_result(room)
+    log(f"vote in {room.code} {tally(room)}: {VOTES[pick]}")
     if VOTES[pick] == "mode":
-        arena["mode"] = "tdm" if arena["mode"] == "ffa" else "ffa"
+        st["mode"] = "tdm" if st["mode"] == "ffa" else "ffa"
     if VOTES[pick] != "same":
-        arena.update(seed=random.randrange(1, 10**6), pal=random.choice(PALETTES))
-    arena.update(over=False, teams=[0, 0], votes={}, round=arena["round"] + 1)
-    for c in players.values():
+        st.update(seed=random.randrange(1, 10**6), pal=random.choice(PALETTES))
+    st.update(over=False, teams=[0, 0], votes={}, round=st["round"] + 1)
+    for c in room.players.values():
         c.kills = c.deaths = c.streak = c.best = 0
         c.acc = -1
         paint(c)
-    broadcast({"t": "newround", "seed": arena["seed"], "pal": arena["pal"], "mode": arena["mode"], "limit": limit(),
-               "teams": arena["teams"], "vote": VOTES[pick], "scores": scores()})
+    broadcast({"t": "newround", "seed": st["seed"], "pal": st["pal"], "mode": st["mode"], "limit": limit(room),
+               "teams": st["teams"], "vote": VOTES[pick], "scores": scores(room)}, room=room)
 
 
 def handle_message(c, msg):
@@ -541,45 +562,53 @@ def handle_message(c, msg):
             target.writer.close()
     elif c.room and c.room.kind == "coop":
         handle_coop(c, msg, t)
-    elif t == "team":
+    else:
+        handle_arena(c, msg, t)
+
+
+def handle_arena(c, msg, t):
+    """An arena room's own messages (the public one's or a private one's)."""
+    room = room_of(c)
+    st = room.arena
+    if t == "team":
         # tdm: a pilot still in the lobby picks a side; the colour follows.
-        if tdm() and not c.ready:
+        if tdm(room) and not c.ready:
             c.team = 1 if num(msg.get("team"), 0, 1) >= 0.5 else 0
             paint(c)
-            broadcast({"t": "team", "id": c.id, "scores": scores()})
+            broadcast({"t": "team", "id": c.id, "scores": scores(room)}, room=room)
     elif t == "vote":
         # Between rounds: next map, same map, or the other mode. The last vote counts.
-        if arena["over"]:
+        if st["over"]:
             mode, choice = msg.get("mode"), msg.get("map")
-            arena["votes"][c.id] = 2 if mode in MODES and mode != arena["mode"] else 1 if choice == "same" else 0
-            broadcast({"t": "tally", "votes": tally(), "scores": scores()})
+            st["votes"][c.id] = 2 if mode in MODES and mode != st["mode"] else 1 if choice == "same" else 0
+            broadcast({"t": "tally", "votes": tally(room), "scores": scores(room)}, room=room)
     elif t == "stats":
         # Round end: the pilot's own accuracy for the summary (shots are the client's to count).
-        if arena["over"]:
+        if st["over"]:
             c.acc = int(num(msg.get("acc"), 0, 100))
-            broadcast({"t": "tally", "votes": tally(), "scores": scores()})
+            broadcast({"t": "tally", "votes": tally(room), "scores": scores(room)}, room=room)
     elif t == "hit":
-        target = players.get(int(num(msg.get("to"), 0, 99)))
-        if target and target is not c and not arena["over"] and not (tdm() and target.team == c.team):   # friendly fire is off
+        target = room.players.get(int(num(msg.get("to"), 0, 99)))
+        if target and target is not c and not st["over"] and not (tdm(room) and target.team == c.team):   # friendly fire is off
             send(target, clean_hit(msg, c.id))
     elif t == "died":
         c.deaths += 1
         c.streak = 0
-        killer = players.get(int(num(msg.get("by"), 0, 99)))
+        killer = room.players.get(int(num(msg.get("by"), 0, 99)))
         if killer is c:
             killer = None
-        scored = killer and not arena["over"] and not (tdm() and killer.team == c.team)   # a teammate never scores
+        scored = killer and not st["over"] and not (tdm(room) and killer.team == c.team)   # a teammate never scores
         if scored:
             killer.kills += 1
             killer.streak += 1
             killer.best = max(killer.best, killer.streak)
-            if tdm():
-                arena["teams"][killer.team] += 1
-        kill = {"t": "kill", "victim": c.id, "killer": killer.id if killer else 0, "teams": arena["teams"], "scores": scores()}
+            if tdm(room):
+                st["teams"][killer.team] += 1
+        kill = {"t": "kill", "victim": c.id, "killer": killer.id if killer else 0, "teams": st["teams"], "scores": scores(room)}
         if msg.get("me"):
             kill["me"] = 1   # a punch: the kill feed says so
-        broadcast(kill)
-        if scored and (arena["teams"][killer.team] if tdm() else killer.kills) >= limit():
+        broadcast(kill, room=room)
+        if scored and (st["teams"][killer.team] if tdm(room) else killer.kills) >= limit(room):
             asyncio.ensure_future(end_round(killer))
 
 
@@ -645,16 +674,21 @@ async def session(reader, writer):
             send(c, {"t": "version", "need": PROTOCOL})
             log(f"turned away v{hello.get('v')} from {peer[0] if peer else '?'} (need v{PROTOCOL})")
             return
-        # The room: a new co-op one (`create`), one by its code, or the arena.
+        # The room: a new one (`create`: a private arena, or co-op), one by
+        # its code, or the public arena.
         create, want = hello.get("create"), hello.get("room")
         if isinstance(create, dict):
             if not may_open_room(ip):
                 send(c, {"t": "busy"})   # too many rooms from here lately
                 log(f"refused a room to {ip}: {ROOM_RATE} in {ROOM_WINDOW} s")
                 return
-            room = Room(new_code(), "coop", mission=clean_mission(create))
+            if create.get("kind") == "arena":
+                room = Room(new_code(), "arena", state=new_arena(create.get("mode")))
+                log(f"room {room.code} opened: a private {room.arena['mode']} arena")
+            else:
+                room = Room(new_code(), "coop", mission=clean_mission(create))
+                log(f"room {room.code} opened: {room.mission}")
             rooms[room.code] = room
-            log(f"room {room.code} opened: {room.mission}")
         else:
             room = rooms.get(want.strip().upper() if isinstance(want, str) else ARENA)
             if room is None:
@@ -670,10 +704,10 @@ async def session(reader, writer):
         c.id = saved["id"] if saved else free_id(room)
         c.name = clean_name(hello.get("name"), c.id)
         c.pick = int(num(hello.get("color"), 0, 7))
-        c.team = saved["team"] if saved else smaller_team() if room.kind == "arena" else 0
+        c.team = saved["team"] if saved else smaller_team(room=room) if room.kind == "arena" else 0
         if saved:
             c.ready = saved["ready"]
-            if room.kind == "coop" or saved["round"] == arena["round"]:
+            if room.kind == "coop" or saved["round"] == room.arena["round"]:
                 c.kills, c.deaths, c.streak, c.best = saved["kills"], saved["deaths"], saved["streak"], saved["best"]
         paint(c)
         c.ch = chassis_or_stock(hello.get("ch"))
@@ -687,7 +721,8 @@ async def session(reader, writer):
         welcome = {"t": "welcome", "id": c.id, "room": room.code, "kind": room.kind, "host": room.host,
                    "token": c.token, "resumed": 1 if saved else 0, "scores": scores(room)}
         if room.kind == "arena":
-            welcome.update(seed=arena["seed"], pal=arena["pal"], mode=arena["mode"], limit=limit(), teams=arena["teams"], over=arena["over"])
+            st = room.arena
+            welcome.update(seed=st["seed"], pal=st["pal"], mode=st["mode"], limit=limit(room), teams=st["teams"], over=st["over"])
         else:
             welcome.update({"def": room.mission, "started": 1 if room.started else 0})
         send(c, welcome)
@@ -725,11 +760,11 @@ async def session(reader, writer):
             keep(c)
             log(f"leave {c.id} {c.name} from {room.code} ({len(room.players)} there)")
             broadcast({"t": "leave", "id": c.id, "scores": scores(room)}, room=room)
-            if room.kind == "coop":
-                if not room.players:
-                    room.empty_since = time.monotonic()   # gone after ROOM_IDLE unless someone comes back (collect_rooms)
-                    log(f"room {room.code} empty")
-                elif room.host == c.id:
+            if room.code != ARENA and not room.players:
+                room.empty_since = time.monotonic()   # gone after ROOM_IDLE unless someone comes back (collect_rooms)
+                log(f"room {room.code} empty")
+            elif room.kind == "coop":
+                if room.host == c.id:
                     room.host = min(room.players)   # the lowest id left runs the world now
                     log(f"room {room.code}: {room.host} is host")
                     broadcast({"t": "host", "id": room.host, "scores": scores(room)}, room=room)

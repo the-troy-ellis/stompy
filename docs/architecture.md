@@ -137,9 +137,9 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
 
 ### The network protocol (as it is)
 
-`PROTOCOL` is 18 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on; 8: M5a, the server enforces the version and rebuilds every state message clean; 9: the lobby, `ch` in `hello`, `ready`, `ping`, and `ch`/`ready`/`ping` in each pilot's scores entry; 10: team deathmatch, `team` from the lobby, `team` in each scores entry, `teams` (each side's kills) in `welcome`, `kill`, `roundover` and `newround`, and `mode`/`limit` in `newround`; 11: the round-end vote, `vote` and `stats` between rounds, the relay's `tally`, `best`/`acc` in each scores entry, and `vote` in `newround`; 12: reconnect, `token` in `hello`, `token` and `resumed` in `welcome`; 13: M5b rooms, `room`/`create` in `hello`, `room`/`kind`/`host` in `welcome`, and the co-op messages below; 14: co-op enemies, `es` and `ehit`, and `eid`/`te`/`e2` on weapon effects; 15: co-op world sync, `ehit {ent}` for a mission entity and the host's `ent`, `entx`, `obj` and `over`; 16: `es` batched, one message a tick with each enemy's changes; 18: the relay's limits, `busy` when an address opens rooms too fast, and `admin` in `hello` with `kick {id}` for the owner). `server/server.py` keeps its own `PROTOCOL`, and a Node test fails if the two differ.
+`PROTOCOL` is 19 (2: M1 melee; 3: M2 mechlab loadouts; 4: `w` on the shell and missile effects so other screens draw the right round, `zap` on a hit so a bolt scrambles the victim; 5: `hh` on a hit, the heat a flamer poured in, which the victim adds, clamped to 20 by the server; 6: `knuckles` in the loadout's systems, PURPLE PUNCHER's KNUCKLES slot; 7: `lt` in the state message, whether that pilot's headlights are on; 8: M5a, the server enforces the version and rebuilds every state message clean; 9: the lobby, `ch` in `hello`, `ready`, `ping`, and `ch`/`ready`/`ping` in each pilot's scores entry; 10: team deathmatch, `team` from the lobby, `team` in each scores entry, `teams` (each side's kills) in `welcome`, `kill`, `roundover` and `newround`, and `mode`/`limit` in `newround`; 11: the round-end vote, `vote` and `stats` between rounds, the relay's `tally`, `best`/`acc` in each scores entry, and `vote` in `newround`; 12: reconnect, `token` in `hello`, `token` and `resumed` in `welcome`; 13: M5b rooms, `room`/`create` in `hello`, `room`/`kind`/`host` in `welcome`, and the co-op messages below; 14: co-op enemies, `es` and `ehit`, and `eid`/`te`/`e2` on weapon effects; 15: co-op world sync, `ehit {ent}` for a mission entity and the host's `ent`, `entx`, `obj` and `over`; 16: `es` batched, one message a tick with each enemy's changes; 18: the relay's limits, `busy` when an address opens rooms too fast, and `admin` in `hello` with `kick {id}` for the owner; 19: private arenas, `create {kind: 'arena', mode}` in `hello`). `server/server.py` keeps its own `PROTOCOL`, and a Node test fails if the two differ.
 
-Client → server: `hello {v, name, color, ch, token?, room?, create?}` (`token`: from the last `welcome`, to come back after a drop; `room`: a co-op room's code, the arena when absent; `create {mission, diff, seed}`: open a co-op room), `ready` (out of the lobby), `team {team}` (team deathmatch: a side from the lobby, before READY), `vote {map, mode}` and `stats {acc}` (between rounds: the next round, and your accuracy in % for the summary), `ping {n, rtt}` (every 2 s), `s {state...}` (15 Hz), `fx {k, ...}`
+Client → server: `hello {v, name, color, ch, token?, room?, create?}` (`token`: from the last `welcome`, to come back after a drop; `room`: a room's code, the public arena when absent; `create {kind: 'arena', mode}`: open a private arena, `create {mission, diff, seed}`: open a co-op room), `ready` (out of the lobby), `team {team}` (team deathmatch: a side from the lobby, before READY), `vote {map, mode}` and `stats {acc}` (between rounds: the next round, and your accuracy in % for the summary), `ping {n, rtt}` (every 2 s), `s {state...}` (15 Hz), `fx {k, ...}`
 (`b` beam flash, `s` shell, `m` missile volley, `fu` fusion discharge, `mg`
 guided volley update, `md` detonate, `pu` a punch starts), `hit {to, amt, p,
 fu, kb?, me?, st?, zap?, hh?}`, `died {by, me?}`.
@@ -163,6 +163,15 @@ clamped like `hit` and stamped `from`. Only the host's `hit` (enemy fire,
 A room holds four and closes when its last pilot leaves. When the host
 leaves, the lowest id left gets `host`.
 
+Private arenas (M5c, #216): `hello` with `create {kind: 'arena', mode}`
+opens an arena room under a four-letter code, in `ffa` or `tdm`. It is the
+arena's logic, per room: each arena `Room` carries its own round (`arena`:
+map, mode, teams, votes, round count), and every arena message (`team`,
+`vote`, `stats`, `hit`, `died`, the round's end) stays in the sender's room.
+The public `ARENA` is one such room that never closes. Others join by the
+code (`room`); there is no room list. `welcome` is the arena's, with `room`
+set to the code, and the lobby shows it large.
+
 The relay's limits (M5c, #215):
 - **Origins:** `STOMPY_ORIGINS` names hosted pages allowed besides the LAN
   rule.
@@ -175,8 +184,8 @@ The relay's limits (M5c, #215):
   PILOT n.
 - **Admin:** a `hello` with `admin` matching `STOMPY_ADMIN` may send
   `kick {id}`.
-- **Empty rooms:** an empty co-op room waits 10 minutes before it is
-  collected. The arena never is.
+- **Empty rooms:** an empty coded room (co-op or a private arena) waits 10
+  minutes before it is collected. The public arena never is.
 - **Health:** `GET /health` on the same port answers
   `{rooms, players, uptime}`.
 

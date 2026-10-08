@@ -48,6 +48,7 @@ function loadPrefs() {
     ...Object.fromEntries(SETTING_KEYS.map(k => [k, readSetting(k, store.get(SETTINGS[k].key))])),
     relay: store.get('net.relay', ''),   // the RELAY field (net/relay.js)
     mpKind: store.get('mp.kind', 'arena'), coopJoin: !!store.get('coop.join', false), roomCode: '',   // MULTIPLAYER: the arena or co-op; host or join
+    arenaPick: [0, 1, 2].includes(store.get('arena.pick', 0)) ? store.get('arena.pick', 0) : 0, arenaMode: store.get('arena.mode', 'ffa') === 'tdm' ? 'tdm' : 'ffa',   // the arena: PUBLIC, PRIVATE (and its mode) or JOIN
     mpName: store.get('mp.name', ''), mpColor: store.get('mp.color', Math.floor(Math.random() * MP_COLORS.length)),
     reducedMotion: store.get('motion.reduced', false), haptics: store.get('haptics', true),
   };

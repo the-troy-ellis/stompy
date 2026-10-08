@@ -1,8 +1,10 @@
 # The arena relay
 
-`server.py` is the multiplayer relay: one arena for up to eight pilots
-(free-for-all or team deathmatch), and co-op rooms of up to four, each
-opened by its host under a four-letter code and gone when empty. It
+`server.py` is the multiplayer relay: the public arena for up to eight
+pilots (free-for-all or team deathmatch), private arenas like it, and co-op
+rooms of up to four. A private arena or co-op room is opened under a
+four-letter code, which is the only way in, and is gone 10 minutes after
+it empties. It
 simulates nothing. Each game sends its own mech about 15
 times a second and the relay passes it on, keeps the scores and runs the
 rounds. Python 3.9 or later, standard library only (`data.py` reads
@@ -40,7 +42,7 @@ On the internet:
 - **Floods:** a pilot sending more than 60 messages a second on average is
   dropped, and the others play on. A co-op host gets three times that,
   since it sends the world.
-- **Rooms:** one address may open 3 co-op rooms in 10 minutes; the next gets
+- **Rooms:** one address may open 3 rooms (co-op or private arenas) in 10 minutes; the next gets
   `busy`. An empty room waits 10 minutes for someone to come back, then it
   is gone. The arena never is.
 - **Callsigns:** one containing a word from `names_deny.txt` (yours to fill

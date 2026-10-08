@@ -77,6 +77,22 @@ public one; `CREATE PRIVATE` makes a coded FFA/TDM room for friends. The
 lobby shows the code large so it can be read over a call. No matchmaking, no
 room list; codes are the discovery mechanism, by design.
 
+As shipped (#216, `PROTOCOL` 19): the MULTIPLAYER panel's ARENA side has
+PUBLIC (JOIN ARENA), PRIVATE (MODE, then CREATE) and JOIN (the code, as in
+co-op).
+- **The relay:** each arena room keeps its own round, scores, vote and
+  teams. A private one counts against the 3 rooms per 10 minutes, and when
+  empty waits 10 minutes like a co-op room. An unknown mode is `ffa`.
+- **The lobby:** ROOM and the code in big letters above the mode line.
+- **Reconnecting:** a dropped pilot comes back to the room by its code, as
+  in co-op.
+- **Phones:** on a phone held sideways, JOIN puts the room code beside the
+  callsign, and the relay line hides when joining or creating. At 360 px
+  tall (most Android phones), a little less space all round. Every
+  MULTIPLAYER launch button now fits at 740×360 and 667×375, including
+  co-op's HOST and JOIN, which overflowed at 360 before. The smoke test
+  checks CREATE, JOIN and the lobby's READY at 740×360.
+
 ### Abuse limits
 
 - Per-IP connections: 8 (flag). Per-IP room creation: 3 per 10 minutes.

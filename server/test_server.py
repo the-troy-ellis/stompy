@@ -681,6 +681,93 @@ class Session(unittest.IsolatedAsyncioTestCase):
         h = await g2.recv()
         self.assertEqual((h["t"], h["from"], h["eid"], h["amt"]), ("hit", 0, 4, 12))
 
+    async def private(self, mode="ffa", n=2):
+        """A private arena with n pilots: the first opened it, the rest joined by its code."""
+        first, w = await self.hello("P1", create={"kind": "arena", "mode": mode})
+        out, ws = [first], [w]
+        for i in range(1, n):
+            c, wc = await self.hello(f"P{i + 1}", room=w["room"].lower())
+            out.append(c)
+            ws.append(wc)
+        for k, c in enumerate(out[:-1]):   # each one's join messages from the later ones
+            for _ in range(n - 1 - k):
+                self.assertEqual((await c.recv())["t"], "join")
+        return out, ws
+
+    async def test_two_meet_in_a_private_arena_and_the_public_one_sees_neither(self):
+        (a, b), (wa, wb) = await self.private()
+        pub, wp = await self.join("PUB")
+        self.assertEqual((wa["kind"], wa["mode"], len(wa["room"])), ("arena", "ffa", 4))
+        self.assertEqual((wb["room"], [p["name"] for p in wb["scores"]]), (wa["room"], ["P1", "P2"]))
+        self.assertEqual((wp["room"], [p["name"] for p in wp["scores"]]), (relay.ARENA, ["PUB"]), "the public arena lists only its own")
+        await a.send({"t": "s", "x": 3, "z": 4})
+        m = await b.recv()
+        self.assertEqual((m["t"], m["id"], m["x"]), ("s", wa["id"], 3))
+        await pub.send({"t": "s", "x": 9, "z": 9})
+        await b.send({"t": "died", "by": wa["id"]})
+        self.assertEqual([p["kills"] for p in (await a.recv())["scores"]], [1, 0], "the kill is the private room's")
+        with self.assertRaises(asyncio.TimeoutError):
+            await pub.recv(timeout=0.3)   # nothing from the private room reaches the public one
+        self.assertEqual((relay.players[1].name, relay.players[1].kills), ("PUB", 0))
+        with self.assertRaises(asyncio.TimeoutError):
+            await a.recv(timeout=0.3)   # nor the other way
+
+    async def test_a_private_team_deathmatch_has_its_own_sides_and_round(self):
+        gate = asyncio.Event()
+
+        async def fake_sleep(_):
+            await gate.wait()
+        relay.sleep = fake_sleep
+        old = relay.TEAM_LIMIT
+        relay.TEAM_LIMIT = 1
+        self.addCleanup(setattr, relay, "TEAM_LIMIT", old)
+        (a, b), (wa, wb) = await self.private("tdm")
+        self.assertEqual((wa["mode"], wa["limit"], wa["teams"]), ("tdm", 1, [0, 0]))
+        self.assertEqual([p["team"] for p in wb["scores"]], [0, 1], "sides fill within the room")
+        pub, wp = await self.join("PUB")
+        self.assertEqual((wp["mode"], wp["scores"][0]["team"]), ("ffa", 0), "the public arena keeps its own mode")
+        await b.send({"t": "died", "by": wa["id"]})
+        for x in (a, b):
+            self.assertEqual((await x.recv())["t"], "kill")
+            over = await x.recv()
+            self.assertEqual((over["t"], over["team"]), ("roundover", 0))
+        self.assertFalse(relay.arena["over"], "only the private room's round is over")
+        await a.send({"t": "vote", "map": "next", "mode": "ffa"})
+        self.assertEqual((await a.recv())["votes"], [0, 0, 1])
+        gate.set()
+        nr = await self.until(b, "newround")
+        self.assertEqual((nr["mode"], [p["kills"] for p in nr["scores"]]), ("ffa", [0, 0]), "its vote picked its next round")
+        self.assertEqual(relay.arena["mode"], "ffa")
+        with self.assertRaises(asyncio.TimeoutError):
+            await pub.recv(timeout=0.3)
+
+    async def test_an_empty_private_arena_waits_then_is_gone(self):
+        (a, b), (wa, _) = await self.private()
+        code = wa["room"]
+        a.close(); b.close()
+        await asyncio.sleep(0.1)
+        self.assertIn(code, relay.rooms)
+        relay.collect_rooms(relay.time.monotonic() + relay.ROOM_IDLE + 1)
+        self.assertNotIn(code, relay.rooms)
+        self.assertIn(relay.ARENA, relay.rooms, "the public arena never goes")
+
+    async def test_a_private_arena_counts_against_the_room_limit_and_odd_modes_are_ffa(self):
+        for i in range(relay.ROOM_RATE):
+            _, w = await self.hello(f"H{i}", create={"kind": "arena", "mode": "chess" if i == 0 else "tdm"})
+            self.assertEqual(w["mode"], "ffa" if i == 0 else "tdm")
+        _, w = await self.hello("MORE", create={"kind": "arena"})
+        self.assertEqual(w["t"], "busy")
+
+    async def test_a_dropped_pilot_comes_back_to_the_private_arena_with_the_score(self):
+        (a, b), (wa, wb) = await self.private()
+        await b.send({"t": "died", "by": wa["id"]})
+        await a.recv(); await b.recv()
+        b.close()
+        await self.until(a, "leave")
+        c, back = await self.hello("P2", room=wa["room"], token=wb["token"])
+        self.assertEqual((back["room"], back["resumed"], back["id"]), (wa["room"], 1, wb["id"]))
+        self.assertEqual([p["deaths"] for p in back["scores"]], [0, 1])
+
     async def test_the_host_leaving_hands_over_and_an_empty_room_is_gone(self):
         code, _, (host, g1, g2) = await self.coop(3)
         host.close()

@@ -345,6 +345,70 @@ try {
     if (!(landed && ends.every(e => e && e.won && e.saved === '2' && e.crew === 2))) { failed = true; console.error('FAIL: co-op mission 2 did not end in a shared, saved win'); }
     await ctx.close();
   } finally { coopRelay.kill(); }
+  // Private arenas (#216): on a phone held sideways, PRIVATE's picks leave
+  // CREATE on screen. ONE opens a private team deathmatch; TWO joins by the
+  // code; PUB, in the public ARENA, sees neither, and they don't see PUB.
+  await new Promise(r => setTimeout(r, 300));
+  const privRelay = spawn('python3', ['server/server.py', '--port', '8096'], { stdio: 'ignore' });
+  await new Promise(r => setTimeout(r, 600));
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 640 } });
+    const open = async name => {
+      const page = await ctx.newPage();
+      page.on('pageerror', e => errors.push(`private ${name}: ${e.message}`));
+      page.on('console', m => { if (m.type() === 'error') errors.push(`private ${name}: console ${m.text()}`); });
+      await page.goto(URL_);
+      await page.waitForSelector('.mm-title', { timeout: 15000 });
+      await page.click('.feel-panel [data-a="toggle"]');
+      await page.click('[data-sel="mp"]');
+      await page.click('[data-mpk="arena"]');
+      await page.fill('#callsign', name);
+      return page;
+    };
+    const intoArena = async page => {
+      await page.waitForSelector('[data-a="ready"]', { timeout: 5000 });
+      await page.click('[data-a="ready"]');
+      await page.waitForFunction(() => !window.__stompy.game.lobby && window.__stompy.game.player.alive, null, { timeout: 5000 });
+    };
+    const one = await open('ONE');
+    await one.setViewportSize({ width: 740, height: 360 });
+    const onScreen = async pick => {
+      await one.click(`[data-ap="${pick}"]`);
+      return one.evaluate(() => { const b = document.querySelector('.mm-launch').getBoundingClientRect(); return b.bottom <= window.innerHeight && b.right <= window.innerWidth ? document.querySelector('.mm-launch').textContent : null; });
+    };
+    const phone = [await onScreen(2), await onScreen(1)];
+    await one.click('[data-am="1"]');   // FREE-FOR-ALL -> TEAM DEATHMATCH
+    phone.push(await one.evaluate(() => { const b = document.querySelector('.mm-launch').getBoundingClientRect(); return b.bottom <= window.innerHeight ? document.querySelector('.arena-mode b').textContent : null; }));
+    await one.screenshot({ path: 'test-results/smoke-private-phone.png' });
+    await one.setViewportSize({ width: 1024, height: 640 });
+    await one.click('[data-a="go"]');
+    await one.waitForSelector('.lobby-code b', { timeout: 5000 });
+    const code = await one.$eval('.lobby-code b', b => b.textContent);
+    await one.screenshot({ path: 'test-results/smoke-private-lobby.png' });
+    await one.setViewportSize({ width: 740, height: 360 });
+    phone.push(await one.evaluate(() => { const b = document.querySelector('[data-a="ready"]').getBoundingClientRect(); return b.bottom <= window.innerHeight ? 'READY' : null; }));
+    await one.screenshot({ path: 'test-results/smoke-private-lobby-phone.png' });
+    await one.setViewportSize({ width: 1024, height: 640 });
+    const pub = await open('PUB');
+    await pub.click('[data-ap="0"]');
+    await pub.click('[data-a="go"]');
+    await intoArena(pub);
+    const two = await open('TWO');
+    await two.click('[data-ap="2"]');
+    await two.fill('#room', code.toLowerCase());
+    await two.click('[data-a="go"]');
+    await intoArena(two);
+    await one.bringToFront();
+    await intoArena(one);
+    for (const p of [one, two]) await p.waitForFunction(() => window.__stompy.game.mechs.some(m => m.remote && m.netId), null, { timeout: 8000 });
+    await pub.waitForTimeout(800);
+    const look = await Promise.all([one, two, pub].map(p => p.evaluate(() => { const n = window.__stompy.app.net.Net, G = window.__stompy.game; return { room: n.room, mode: n.mode, pilots: [...n.info.values()].map(p => p.name).sort().join(), remotes: G.mechs.filter(m => m.remote).length }; })));
+    console.log(`private: on a phone, JOIN shows ${phone[0]} and PRIVATE ${phone[1]} on screen (mode ${phone[2]}), the lobby ${phone[3]}; ${['ONE', 'TWO', 'PUB'].map((n, i) => `${n} in ${look[i].room} (${look[i].mode}) with ${look[i].pilots}, ${look[i].remotes} other mech`).join('; ')}`);
+    if (!(phone[0] === 'JOIN' && phone[1] === 'CREATE' && phone[2] === 'TEAM DEATHMATCH' && phone[3] === 'READY')) { failed = true; console.error('FAIL: the private arena picks pushed the launch button off a phone'); }
+    if (!(look[0].room === code && look[1].room === code && look[0].mode === 'tdm' && look[0].pilots === 'ONE,TWO' && look[1].pilots === 'ONE,TWO' && look[0].remotes === 1 && look[1].remotes === 1
+      && look[2].room === 'ARENA' && look[2].pilots === 'PUB' && look[2].remotes === 0)) { failed = true; console.error('FAIL: the private arena was not private'); }
+    await ctx.close();
+  } finally { privRelay.kill(); }
   await browser.close();
   if (errors.length) { failed = true; console.error('FAIL: page errors:\n  ' + errors.join('\n  ')); }
 } catch (e) {
