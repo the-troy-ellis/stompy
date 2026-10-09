@@ -42,10 +42,13 @@ const teamPicker = ({ pilots, me }) => {
       <span class="dot" style="background:${MP_COLORS[c].css}"></span>${teamName(t)}</button>`).join('')}</div>`;
 };
 
+// A private arena's code, large, to read out over a call.
+const roomCode = room => `<div class="lobby-code">ROOM <b>${esc(room)}</b></div>`;
+
 export function lobbyHTML(o) {
   const tdm = o.mode === 'tdm', coop = o.mode === 'coop' && o.coop;
   return `<h1>LOBBY</h1>
-    <div class="panel" data-mode="${coop ? 'coop' : tdm ? 'tdm' : 'ffa'}"><div class="k lobby-head">${lobbyHead(o)}</div>
+    <div class="panel" data-mode="${coop ? 'coop' : tdm ? 'tdm' : 'ffa'}">${o.room ? roomCode(o.room) : ''}<div class="k lobby-head">${lobbyHead(o)}</div>
       <table class="mech-keys scoreboard lobby">${lobbyRows(o)}</table>
       ${coop ? `<p class="dim lobby-note">${coopNote(o)}</p>` : tdm ? `${teamPicker(o)}<p class="dim">Pick a side. Then READY drops you in.</p>` : '<p class="dim">The match is on. READY drops you in.</p>'}
       <p class="dim">If you see it hit, it hit.</p></div>

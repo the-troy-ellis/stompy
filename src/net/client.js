@@ -62,7 +62,10 @@ export function createNet(app) {
 
   
 
-  // `opts`: { room } to join a co-op room by its code, { create } to open one; the arena otherwise.
+  // In a room by its code (co-op or a private arena), not the public arena.
+  const PUBLIC_ROOM = 'ARENA', coded = () => !!Net.room && Net.room !== PUBLIC_ROOM;
+  // `opts`: { room } to join a room by its code, { create } to open one (a
+  // private arena or co-op); the public arena otherwise.
   function join(opts = {}) {
     if (Net.ws) return;
     Net.joinOpts = opts;   // the token stays: JOIN after a drop brings the pilot back (the relay checks it against the room)
@@ -81,7 +84,7 @@ export function createNet(app) {
     catch { if (retry) reconnect(); else app.ui.setStatus('COULD NOT CONNECT'); return; }
     Net.ws = ws;
     // Back after a drop: the room we were in, by its code; a first join: what the menu asked for.
-    const where = retry && Net.room && Net.kind === 'coop' ? { room: Net.room } : Net.joinOpts;
+    const where = retry && coded() ? { room: Net.room } : Net.joinOpts;
     ws.onopen = () => ws.send(JSON.stringify(hello(prefs.mpName, prefs.mpColor, prefs.chassis, Net.token, where)));
     ws.onmessage = e => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
@@ -117,9 +120,9 @@ export function createNet(app) {
     const ws = Net.ws; Net.ws = null; ws?.close();
     stopRetrying();
     Net.info.clear(); G.lobby = false; G.summary = false; G.role = 'solo'; Net.pingAt.clear();
-    const coop = Net.kind === 'coop';
-    if (coop) Net.joinOpts = { room: Net.room };   // JOIN goes back to the same room
-    app.ui.mainMenu('mp', coop ? `CONNECTION LOST. JOIN ROOM ${Net.room} AGAIN WITHIN 30 S.` : 'CONNECTION LOST. JOIN WITHIN 30 S TO KEEP YOUR SCORE.');
+    const inRoom = coded();
+    if (inRoom) Net.joinOpts = { room: Net.room };   // JOIN goes back to the same room
+    app.ui.mainMenu('mp', inRoom ? `CONNECTION LOST. JOIN ROOM ${Net.room} AGAIN WITHIN 30 S.` : 'CONNECTION LOST. JOIN WITHIN 30 S TO KEEP YOUR SCORE.');
   }
 
   function setScores(list) {
@@ -144,6 +147,7 @@ export function createNet(app) {
     if (!G.lobby) return;
     const coop = Net.kind === 'coop';
     const o = { pilots: [...Net.info.values()].sort((a, b) => a.id - b.id), me: Net.id, mode: coop ? 'coop' : Net.mode, pal: Net.pal, limit: Net.limit,
+      room: !coop && coded() ? Net.room : null,   // a private arena: its code, large
       coop: coop ? { room: Net.room, mission: Net.def?.mission | 0, diff: Net.def?.diff, host: Net.host, readied: Net.readied } : null };
     const table = app.ov.hidden ? null : app.ov.querySelector('table.lobby'), head = app.ov.querySelector('.lobby-head');
     const panel = app.ov.querySelector('.panel[data-mode]');
@@ -202,7 +206,7 @@ export function createNet(app) {
       case 'busy': app.ui.setStatus('TOO MANY ROOMS FROM HERE. TRY AGAIN IN A FEW MINUTES.'); break;   // the relay's room limit
       case 'welcome': {
         if (m.kind === 'coop') { coopWelcome(m); break; }
-        Net.kind = 'arena';
+        Net.kind = 'arena'; Net.room = typeof m.room === 'string' ? m.room : PUBLIC_ROOM;
         // Back after a drop on the same map: carry on where we are. Back on
         // another (a new round began): that world, straight in. Otherwise the lobby.
         const back = !!m.resumed, inPlace = back && G.reconnecting && mp() && m.seed === Net.seed && m.pal === Net.pal;
