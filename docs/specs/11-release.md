@@ -30,6 +30,30 @@ in one command.
 - An "update available" moment: the voice says nothing; the menu shows a dim
   `UPDATED · RELOAD` line that reloads on tap.
 
+As shipped (#226):
+- **Icons:** `scripts/icons.mjs` draws them in plain Node rather than in
+  Chromium. The favicon is a grid of rects, so the drawing is exact, and the
+  Pages build needs no browser. Any other shape in the SVG is an error.
+  - It makes 192 and 512, plus a 512 for Android's masks, on black with the
+    art inside the middle 75%.
+  - The built page links the manifest and an `apple-touch-icon`.
+- **The worker:** `src/sw.js` is written into `dist/` by the build, with the
+  list of files and a version that is a hash of them all.
+  - Only the built game registers it (a `__PWA__` define), so `npm run
+    serve` never caches anything.
+  - It caches `index.html` on install as well. The first visit loaded the
+    page before the worker existed, and offline needs it.
+  - A WebSocket never reaches a service worker, so the relay can't be cached.
+- **The update line:** it sits in the menu's top corner, over the scene, so
+  nothing in the column moves. A tap tells the waiting worker to take over,
+  and the page reloads.
+- **The smoke test:** it serves `dist/` and checks the manifest and icons
+  and that 45 files are cached. Then it goes offline, reloads and starts
+  mission 1, fetching all 37 sounds through the worker. Then it changes
+  `sw.js` and checks that UPDATED · RELOAD appears and a tap swaps the cache.
+- **The owner's check:** installing on Android (Chrome) and an iPhone
+  (Safari), standalone and sideways.
+
 ### Gamepad
 
 Standard mapping, polled each frame in `src/input/gamepad.js` into the input

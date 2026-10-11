@@ -27,6 +27,13 @@ test('every builder survives JSON and parse rejects junk', () => {
   assert.equal(P.hello('A', 0).v, P.PROTOCOL);
 });
 
+test('hello opens a private arena (ffa unless tdm) or a co-op room', () => {
+  assert.deepEqual(P.hello('A', 0, 'kestrel', null, { create: { kind: 'arena', mode: 'tdm' } }).create, { kind: 'arena', mode: 'tdm' });
+  assert.deepEqual(P.hello('A', 0, 'kestrel', null, { create: { kind: 'arena', mode: 'chess' } }).create, { kind: 'arena', mode: 'ffa' });
+  assert.deepEqual(P.hello('A', 0, 'kestrel', null, { create: { mission: 2, diff: 'hard', seed: 9 } }).create, { mission: 2, diff: 'hard', seed: 9 });
+  assert.equal(P.hello('A', 0, 'kestrel', null, { room: 'BCDF' }).room, 'BCDF');
+});
+
 test('a fusion hit is always the capped 40 with the fu flag', () => {
   assert.deepEqual(P.hit(5, 999, [0, 0, 0], true), { t: 'hit', to: 5, amt: 40, p: [0, 0, 0], fu: 1 });
 });

@@ -31,6 +31,7 @@ import { DIFF } from './data/ai.js';
 import { SETTINGS, SETTING_KEYS, readSetting, particleScales } from './data/settings.js';
 import { createMechlab } from './ui/mechlab.js';
 import { normalRelay, resolveRelay } from './net/relay.js';
+import { registerServiceWorker } from './ui/pwa.js';
 
 // Settings and progress, from localStorage. Each screen writes back the key
 // it owns (store.set) when the player changes something.
@@ -48,6 +49,7 @@ function loadPrefs() {
     ...Object.fromEntries(SETTING_KEYS.map(k => [k, readSetting(k, store.get(SETTINGS[k].key))])),
     relay: store.get('net.relay', ''),   // the RELAY field (net/relay.js)
     mpKind: store.get('mp.kind', 'arena'), coopJoin: !!store.get('coop.join', false), roomCode: '',   // MULTIPLAYER: the arena or co-op; host or join
+    arenaPick: [0, 1, 2].includes(store.get('arena.pick', 0)) ? store.get('arena.pick', 0) : 0, arenaMode: store.get('arena.mode', 'ffa') === 'tdm' ? 'tdm' : 'ffa',   // the arena: PUBLIC, PRIVATE (and its mode) or JOIN
     mpName: store.get('mp.name', ''), mpColor: store.get('mp.color', Math.floor(Math.random() * MP_COLORS.length)),
     reducedMotion: store.get('motion.reduced', false), haptics: store.get('haptics', true),
   };
@@ -143,6 +145,8 @@ function start(root) {
   };
 
   app.ui.mainMenu();
+  // Installed and offline (the built game only): a new version waiting shows UPDATED · RELOAD on the menu.
+  registerServiceWorker(apply => { app.update = apply; if (G.state === 'menu' && !G.lobby && document.activeElement?.tagName !== 'INPUT') app.ui.renderMenu(); });
   requestAnimationFrame(loop);
   setTimeout(() => wrap.focus(), 0);
 }

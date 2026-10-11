@@ -1,0 +1,27 @@
+# Caddy in front of the relay (server/deploy/README.md): a TLS certificate
+# for relay.example.com, fetched and renewed by itself, and
+# wss://relay.example.com/ws passed to the relay on 127.0.0.1:8096.
+# Put your relay's name where relay.example.com is, once.
+relay.example.com {
+	handle /ws {
+		reverse_proxy 127.0.0.1:8096 {
+			# Caddy asks every 30 s and says so in its log when the relay doesn't answer.
+			health_uri /health
+			health_interval 30s
+		}
+	}
+	# For an uptime monitor: {"rooms", "players", "uptime"}.
+	handle /health {
+		reverse_proxy 127.0.0.1:8096
+	}
+	handle {
+		respond "Stompy relay. The game is elsewhere." 200
+	}
+}
+
+# The game on the same machine instead of GitHub Pages: put dist/ in
+# /opt/stompy/dist and uncomment.
+#stompy.example.com {
+#	root * /opt/stompy/dist
+#	file_server
+#}

@@ -36,3 +36,10 @@ test('hello names a co-op room by code, or asks for a new one (#201)', () => {
   assert.ok(!('room' in plain) && !('create' in plain), 'the arena by default');
   assert.ok(P.PROTOCOL >= 13);
 });
+
+test('a private arena shows its code large; the public one and co-op do not (#216)', () => {
+  const o = { pilots: [{ id: 1, name: 'A', color: 0, ch: 'kestrel', ready: 0 }], me: 1, mode: 'tdm', pal: 'ice', limit: 20 };
+  assert.match(lobbyHTML({ ...o, room: 'BCDF' }), /class="lobby-code">ROOM <b>BCDF<\/b>/);
+  assert.match(lobbyHTML({ ...o, room: 'BCDF' }), /TEAM DEATHMATCH · GLACIER · FIRST TO 20/);
+  assert.doesNotMatch(lobbyHTML({ ...o, room: null }), /lobby-code/);
+});

@@ -128,11 +128,12 @@ class WSClient:
         self.reader, self.writer = reader, writer
 
     @classmethod
-    async def connect(cls, port, origin="http://localhost:8000"):
+    async def connect(cls, port, origin="http://localhost:8000", forwarded=None):
         reader, writer = await asyncio.open_connection("127.0.0.1", port)
         key = base64.b64encode(os.urandom(16)).decode()
+        fwd = f"X-Forwarded-For: {forwarded}\r\n" if forwarded else ""
         writer.write((f"GET /ws HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
-                      f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\nOrigin: {origin}\r\n\r\n").encode())
+                      f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\nOrigin: {origin}\r\n{fwd}\r\n").encode())
         await writer.drain()
         head = await reader.readuntil(b"\r\n\r\n")
         status = head.split(b" ")[1]
@@ -169,6 +170,11 @@ class Session(unittest.IsolatedAsyncioTestCase):
         relay.players.clear()
         relay.conns.clear()
         relay.departed.clear()
+        relay.opened.clear()
+        relay.DENY = set()
+        relay.ADMIN = ""
+        relay.MSG_RATE = 60
+        relay.PROXY = ""
         for code in [k for k in relay.rooms if k != relay.ARENA]:
             del relay.rooms[code]
         relay.PER_IP = 99   # every test client is 127.0.0.1; the cap has its own test
@@ -260,6 +266,7 @@ class Session(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await b.recv())["ch"], "jackal")
 
     async def test_a_fuzzing_pilot_never_takes_the_relay_down(self):
+        relay.MSG_RATE = 10000   # junk, not a flood: the flood has its own test
         import random as rnd
         r = rnd.Random(9)
         a, _ = await self.join("A")
@@ -288,6 +295,48 @@ class Session(unittest.IsolatedAsyncioTestCase):
         c = await WSClient.connect(self.port)
         self.assertIsNotNone(c, "one closed, room for another")
         self.clients.append(c)
+
+    async def test_behind_a_proxy_each_forwarded_address_gets_its_own_cap(self):
+        relay.PROXY, relay.PER_IP = "local", 2
+        socks = [await WSClient.connect(self.port, forwarded=ip) for ip in ("203.0.113.5", "203.0.113.5", "203.0.113.5", "203.0.113.6")]
+        self.clients += [c for c in socks if c]
+        self.assertEqual([c is not None for c in socks], [True, True, False, True], "two from .5, the third refused; .6 has its own two")
+        self.assertEqual(relay.conns, {"203.0.113.5": 2, "203.0.113.6": 1})
+        socks[0].close()
+        await asyncio.sleep(0.1)
+        self.assertEqual(relay.conns.get("203.0.113.5"), 1, "a closed socket is given back to its address")
+
+    async def test_rooms_per_address_follow_the_forwarded_address(self):
+        relay.PROXY = "local"
+        for i in range(relay.ROOM_RATE):
+            c = await WSClient.connect(self.port, forwarded="198.51.100.1")
+            self.clients.append(c)
+            await c.send({"t": "hello", "v": relay.PROTOCOL, "name": f"H{i}", "color": 0, "create": {"mission": "m1"}})
+            self.assertEqual((await c.recv())["t"], "welcome")
+        c = await WSClient.connect(self.port, forwarded="198.51.100.1")
+        self.clients.append(c)
+        await c.send({"t": "hello", "v": relay.PROTOCOL, "name": "MORE", "color": 0, "create": {"mission": "m1"}})
+        self.assertEqual((await c.recv())["t"], "busy")
+        c = await WSClient.connect(self.port, forwarded="198.51.100.2")
+        self.clients.append(c)
+        await c.send({"t": "hello", "v": relay.PROTOCOL, "name": "OTHER", "color": 0, "create": {"mission": "m1"}})
+        self.assertEqual((await c.recv())["t"], "welcome", "another address behind the same proxy still may")
+
+    def test_the_forwarded_address_counts_only_from_a_proxy_on_this_machine(self):
+        h = {"x-forwarded-for": "6.6.6.6, 203.0.113.9"}
+        relay.PROXY = ""
+        self.assertEqual(relay.client_ip("127.0.0.1", h), "127.0.0.1", "off: the header is anyone's to write")
+        relay.PROXY = "local"
+        self.assertEqual(relay.client_ip("127.0.0.1", h), "203.0.113.9", "the last entry, the one the proxy wrote")
+        self.assertEqual(relay.client_ip("::1", h), "203.0.113.9")
+        self.assertEqual(relay.client_ip("192.0.2.4", h), "192.0.2.4", "a socket from elsewhere is its own address")
+        self.assertEqual(relay.client_ip("10.1.2.3", h), "10.1.2.3", "local: not even a private one")
+        relay.PROXY = "private"
+        self.assertEqual(relay.client_ip("10.1.2.3", h), "203.0.113.9", "private: a container host's proxy")
+        self.assertEqual(relay.client_ip("fdaa::3", h), "203.0.113.9")
+        self.assertEqual(relay.client_ip("93.184.216.34", h), "93.184.216.34", "a public address is never the proxy")
+        self.assertEqual(relay.client_ip("127.0.0.1", {"x-forwarded-for": "junk"}), "127.0.0.1")
+        self.assertEqual(relay.client_ip("127.0.0.1", {}), "127.0.0.1")
 
     async def test_bad_origin_is_refused(self):
         c = await WSClient.connect(self.port, origin="https://evil.example")
@@ -676,6 +725,93 @@ class Session(unittest.IsolatedAsyncioTestCase):
         h = await g2.recv()
         self.assertEqual((h["t"], h["from"], h["eid"], h["amt"]), ("hit", 0, 4, 12))
 
+    async def private(self, mode="ffa", n=2):
+        """A private arena with n pilots: the first opened it, the rest joined by its code."""
+        first, w = await self.hello("P1", create={"kind": "arena", "mode": mode})
+        out, ws = [first], [w]
+        for i in range(1, n):
+            c, wc = await self.hello(f"P{i + 1}", room=w["room"].lower())
+            out.append(c)
+            ws.append(wc)
+        for k, c in enumerate(out[:-1]):   # each one's join messages from the later ones
+            for _ in range(n - 1 - k):
+                self.assertEqual((await c.recv())["t"], "join")
+        return out, ws
+
+    async def test_two_meet_in_a_private_arena_and_the_public_one_sees_neither(self):
+        (a, b), (wa, wb) = await self.private()
+        pub, wp = await self.join("PUB")
+        self.assertEqual((wa["kind"], wa["mode"], len(wa["room"])), ("arena", "ffa", 4))
+        self.assertEqual((wb["room"], [p["name"] for p in wb["scores"]]), (wa["room"], ["P1", "P2"]))
+        self.assertEqual((wp["room"], [p["name"] for p in wp["scores"]]), (relay.ARENA, ["PUB"]), "the public arena lists only its own")
+        await a.send({"t": "s", "x": 3, "z": 4})
+        m = await b.recv()
+        self.assertEqual((m["t"], m["id"], m["x"]), ("s", wa["id"], 3))
+        await pub.send({"t": "s", "x": 9, "z": 9})
+        await b.send({"t": "died", "by": wa["id"]})
+        self.assertEqual([p["kills"] for p in (await a.recv())["scores"]], [1, 0], "the kill is the private room's")
+        with self.assertRaises(asyncio.TimeoutError):
+            await pub.recv(timeout=0.3)   # nothing from the private room reaches the public one
+        self.assertEqual((relay.players[1].name, relay.players[1].kills), ("PUB", 0))
+        with self.assertRaises(asyncio.TimeoutError):
+            await a.recv(timeout=0.3)   # nor the other way
+
+    async def test_a_private_team_deathmatch_has_its_own_sides_and_round(self):
+        gate = asyncio.Event()
+
+        async def fake_sleep(_):
+            await gate.wait()
+        relay.sleep = fake_sleep
+        old = relay.TEAM_LIMIT
+        relay.TEAM_LIMIT = 1
+        self.addCleanup(setattr, relay, "TEAM_LIMIT", old)
+        (a, b), (wa, wb) = await self.private("tdm")
+        self.assertEqual((wa["mode"], wa["limit"], wa["teams"]), ("tdm", 1, [0, 0]))
+        self.assertEqual([p["team"] for p in wb["scores"]], [0, 1], "sides fill within the room")
+        pub, wp = await self.join("PUB")
+        self.assertEqual((wp["mode"], wp["scores"][0]["team"]), ("ffa", 0), "the public arena keeps its own mode")
+        await b.send({"t": "died", "by": wa["id"]})
+        for x in (a, b):
+            self.assertEqual((await x.recv())["t"], "kill")
+            over = await x.recv()
+            self.assertEqual((over["t"], over["team"]), ("roundover", 0))
+        self.assertFalse(relay.arena["over"], "only the private room's round is over")
+        await a.send({"t": "vote", "map": "next", "mode": "ffa"})
+        self.assertEqual((await a.recv())["votes"], [0, 0, 1])
+        gate.set()
+        nr = await self.until(b, "newround")
+        self.assertEqual((nr["mode"], [p["kills"] for p in nr["scores"]]), ("ffa", [0, 0]), "its vote picked its next round")
+        self.assertEqual(relay.arena["mode"], "ffa")
+        with self.assertRaises(asyncio.TimeoutError):
+            await pub.recv(timeout=0.3)
+
+    async def test_an_empty_private_arena_waits_then_is_gone(self):
+        (a, b), (wa, _) = await self.private()
+        code = wa["room"]
+        a.close(); b.close()
+        await asyncio.sleep(0.1)
+        self.assertIn(code, relay.rooms)
+        relay.collect_rooms(relay.time.monotonic() + relay.ROOM_IDLE + 1)
+        self.assertNotIn(code, relay.rooms)
+        self.assertIn(relay.ARENA, relay.rooms, "the public arena never goes")
+
+    async def test_a_private_arena_counts_against_the_room_limit_and_odd_modes_are_ffa(self):
+        for i in range(relay.ROOM_RATE):
+            _, w = await self.hello(f"H{i}", create={"kind": "arena", "mode": "chess" if i == 0 else "tdm"})
+            self.assertEqual(w["mode"], "ffa" if i == 0 else "tdm")
+        _, w = await self.hello("MORE", create={"kind": "arena"})
+        self.assertEqual(w["t"], "busy")
+
+    async def test_a_dropped_pilot_comes_back_to_the_private_arena_with_the_score(self):
+        (a, b), (wa, wb) = await self.private()
+        await b.send({"t": "died", "by": wa["id"]})
+        await a.recv(); await b.recv()
+        b.close()
+        await self.until(a, "leave")
+        c, back = await self.hello("P2", room=wa["room"], token=wb["token"])
+        self.assertEqual((back["room"], back["resumed"], back["id"]), (wa["room"], 1, wb["id"]))
+        self.assertEqual([p["deaths"] for p in back["scores"]], [0, 1])
+
     async def test_the_host_leaving_hands_over_and_an_empty_room_is_gone(self):
         code, _, (host, g1, g2) = await self.coop(3)
         host.close()
@@ -689,7 +825,12 @@ class Session(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await g2.recv())["t"], "leave")
         g2.close()
         await asyncio.sleep(0.15)
-        self.assertNotIn(code, relay.rooms)
+        self.assertIn(code, relay.rooms, "empty, it waits a while for someone to come back")
+        relay.collect_rooms(relay.time.monotonic() + relay.ROOM_IDLE - 5)
+        self.assertIn(code, relay.rooms)
+        relay.collect_rooms(relay.time.monotonic() + relay.ROOM_IDLE + 1)
+        self.assertNotIn(code, relay.rooms, "then it is gone")
+        self.assertIn(relay.ARENA, relay.rooms, "the arena never is")
         _, m = await self.hello("LATE", room=code)
         self.assertEqual(m["t"], "noroom")
 
@@ -705,6 +846,81 @@ class Session(unittest.IsolatedAsyncioTestCase):
         late, w = await self.hello("LATE", room=code)
         self.assertEqual(w["t"], "welcome")
         self.assertEqual(await late.recv(), {"t": "over", "won": 1})
+
+    async def test_health_answers_with_rooms_pilots_and_uptime(self):
+        await self.join("A")
+        reader, writer = await asyncio.open_connection("127.0.0.1", self.port)
+        writer.write(b"GET /health HTTP/1.1\r\nHost: x\r\n\r\n")
+        raw = await reader.read()
+        writer.close()
+        head, body = raw.split(b"\r\n\r\n", 1)
+        self.assertTrue(head.startswith(b"HTTP/1.1 200"))
+        h = json.loads(body)
+        self.assertEqual((h["rooms"], h["players"]), (1, 1))
+        self.assertGreaterEqual(h["uptime"], 0)
+
+    async def test_a_flood_drops_the_offender_and_the_others_play_on(self):
+        relay.MSG_RATE = 20
+        a, _ = await self.join("A")
+        b, _ = await self.join("B")
+        await a.recv()
+        for i in range(200):   # far past 20 a second
+            try:
+                await b.send({"t": "ping", "n": i, "rtt": 1})
+            except (ConnectionError, OSError):
+                break
+        left = await a.recv()
+        while left["t"] != "leave":
+            left = await a.recv()
+        self.assertEqual(left["id"], 2, "the flooder is dropped")
+        c, _ = await self.join("C")
+        await c.send({"t": "s", "x": 3})
+        while (await a.recv())["t"] != "s":
+            pass   # and A still hears the others
+
+    async def test_one_address_opens_at_most_three_rooms_in_ten_minutes(self):
+        for i in range(3):
+            _, w = await self.hello(f"H{i}", create={"mission": 1})
+            self.assertEqual(w["t"], "welcome")
+        _, m = await self.hello("H3", create={"mission": 1})
+        self.assertEqual(m, {"t": "busy"})
+        self.assertTrue(relay.may_open_room("127.0.0.1", relay.time.monotonic() + relay.ROOM_WINDOW + 1), "later it may again")
+
+    def test_origins_the_owner_names_are_allowed_too(self):
+        old = relay.ORIGINS
+        relay.ORIGINS = {"me.github.io"}
+        try:
+            self.assertTrue(relay.origin_ok("https://me.github.io"))
+            self.assertFalse(relay.origin_ok("https://you.github.io"))
+            self.assertTrue(relay.origin_ok("http://192.168.1.4:8000"), "the LAN rule stays")
+        finally:
+            relay.ORIGINS = old
+
+    def test_a_callsign_with_a_denied_word_becomes_a_plain_one(self):
+        relay.DENY = {"bad"}
+        self.assertEqual(relay.clean_name("b.a.d guy", 3), "PILOT 3")
+        self.assertEqual(relay.clean_name("good", 3), "GOOD")
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write("# comment\nWorse  # trailing\n\n")
+        self.assertEqual(relay.load_deny(f.name), {"worse"})
+        os.unlink(f.name)
+        self.assertEqual(relay.load_deny(relay.DENY_FILE), set(), "it ships empty: the owner fills it in")
+
+    async def test_the_admin_token_may_kick_and_nobody_else(self):
+        relay.ADMIN = "letmein"
+        boss, _ = await self.hello("BOSS", admin="letmein")
+        pest, _ = await self.join("PEST")
+        other, _ = await self.join("OTHER")
+        await boss.recv(); await boss.recv(); await pest.recv()
+        await pest.send({"t": "kick", "id": 3})   # not an admin: nothing
+        with self.assertRaises(asyncio.TimeoutError):
+            await other.recv(timeout=0.3)
+        await boss.send({"t": "kick", "id": 2})
+        left = await other.recv()
+        self.assertEqual((left["t"], left["id"]), ("leave", 2))
+        _, w = await self.hello("FAKE", admin="nope")
+        self.assertFalse(relay.players[w["id"]].admin)
 
     async def test_ninth_pilot_is_turned_away(self):
         for i in range(8):

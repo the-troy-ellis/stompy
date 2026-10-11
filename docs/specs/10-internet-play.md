@@ -66,6 +66,23 @@ As shipped (#217): `RELAY_DEFAULT` lives in `src/net/relay.js`, not
 - Caddyfile, systemd unit and a `deploy.sh` (rsync `server/`, restart) in
   `server/deploy/`. A `Dockerfile` for container hosts.
 
+As shipped (#218): `server/deploy/` has the `Caddyfile`, the unit (moved
+there from `server/`, now `Restart=always`, listening on 127.0.0.1, with
+the owner's settings in `/etc/stompy/relay.env`), `deploy.sh` and a
+`README.md` in six steps. The `Dockerfile` is `server/Dockerfile`, as the
+Hosting section has it, so `docker build server` works.
+- **Added: `--proxy` (`STOMPY_PROXY`).** Behind Caddy every socket comes
+  from 127.0.0.1, so the per-address limits (sockets, rooms) would have
+  counted the whole internet as one address. With `local`, a socket from
+  loopback is counted by the last `X-Forwarded-For` entry, the one Caddy
+  wrote; `private` trusts any private address too, for a container host's
+  proxy. Off, the header is ignored, since anyone can write it.
+- **Checked here:** the image builds, reports healthy and takes a pilot;
+  `caddy validate` passes; through Caddy, `/ws` and `/health` reach the
+  relay, which logs the pilot's own address, and a forged
+  `X-Forwarded-For` doesn't get past Caddy.
+- **The owner's check:** the 15-minute deploy on their VPS and domain.
+
 ### Latency
 
 Wi-Fi is 5–20 ms; the internet is 40–150 ms with jitter. Changes:
@@ -113,6 +130,22 @@ public one; `CREATE PRIVATE` makes a coded FFA/TDM room for friends. The
 lobby shows the code large so it can be read over a call. No matchmaking, no
 room list; codes are the discovery mechanism, by design.
 
+As shipped (#216, `PROTOCOL` 19): the MULTIPLAYER panel's ARENA side has
+PUBLIC (JOIN ARENA), PRIVATE (MODE, then CREATE) and JOIN (the code, as in
+co-op).
+- **The relay:** each arena room keeps its own round, scores, vote and
+  teams. A private one counts against the 3 rooms per 10 minutes, and when
+  empty waits 10 minutes like a co-op room. An unknown mode is `ffa`.
+- **The lobby:** ROOM and the code in big letters above the mode line.
+- **Reconnecting:** a dropped pilot comes back to the room by its code, as
+  in co-op.
+- **Phones:** on a phone held sideways, JOIN puts the room code beside the
+  callsign, and the relay line hides when joining or creating. At 360 px
+  tall (most Android phones), a little less space all round. Every
+  MULTIPLAYER launch button now fits at 740×360 and 667×375, including
+  co-op's HOST and JOIN, which overflowed at 360 before. The smoke test
+  checks CREATE, JOIN and the lobby's READY at 740×360.
+
 ### Abuse limits
 
 - Per-IP connections: 8 (flag). Per-IP room creation: 3 per 10 minutes.
@@ -122,6 +155,27 @@ room list; codes are the discovery mechanism, by design.
 - A `STOMPY_ADMIN` token enabling `{ t: 'kick', id }` from a client that
   presents it in `hello`; no UI, just the hook.
 - Idle rooms GC after 10 minutes with nobody; the public arena never dies.
+
+As shipped (#215, `PROTOCOL` 18): in `server/server.py`, with the flags
+and file in `server/README.md`.
+- **Origins:** `STOMPY_ORIGINS` names allowed hosts beside the LAN rule.
+- **Per-IP sockets:** the cap is now 8 by default.
+- **Room creation:** 3 per 10 minutes per address. The next one gets `busy`,
+  and the menu says TOO MANY ROOMS FROM HERE. TRY AGAIN IN A FEW MINUTES.
+- **Message rate:** a bucket of 60 a second, holding 2 s of them; empty, and
+  the pilot is dropped.
+  - **Changed from the spec:** a co-op host gets 3×, because it sends every
+    enemy's state, fire and hits as well as its own.
+  - **The flood test:** the flooder is dropped while the others play on.
+  - **The fuzz test:** it lifts the cap, since it tests junk, not floods.
+- **Names:** `server/names_deny.txt`, one word a line, matched in letters and
+  digits only. It ships empty for the owner to fill in.
+- **Admin:** `STOMPY_ADMIN`. A `hello` with `admin` set to it may send
+  `kick {id}` for a pilot in the same room. There's no UI.
+- **Idle rooms:** an empty co-op room now waits `ROOM_IDLE` (10 minutes)
+  before it is collected (it was at once before), so a pilot who drops can
+  still come back to it.
+- **Health:** `GET /health` answers `200 {rooms, players, uptime}`.
 
 ### Observability
 

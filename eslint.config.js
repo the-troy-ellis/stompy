@@ -17,6 +17,11 @@ export default [
     rules: { 'no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrors: 'none' }], 'no-empty': ['error', { allowEmptyCatch: true }] },
   },
   {
+    // The service worker runs in its own scope, not the page's.
+    files: ['src/sw.js'],
+    languageOptions: { globals: { self: 'readonly', caches: 'readonly', fetch: 'readonly', URL: 'readonly', Promise: 'readonly' } },
+  },
+  {
     // The simulation and its data know nothing about the page: no DOM, no GL,
     // no audio, no UI, no input. This is what keeps them testable headlessly.
     files: ['src/sim/**/*.js', 'src/data/**/*.js', 'src/world/**/*.js', 'src/util/math.js', 'src/mesh/**/*.js', 'src/net/protocol.js', 'src/net/interp.js'],
@@ -29,7 +34,7 @@ export default [
   {
     // The smoke test's page.evaluate callbacks run in the browser.
     files: ['test/smoke/**/*.mjs', 'scripts/shoot.mjs', 'scripts/shootMech.mjs', 'scripts/shootProps.mjs', 'scripts/perf.mjs'],
-    languageOptions: { globals: { window: 'readonly', document: 'readonly', localStorage: 'readonly' } },
+    languageOptions: { globals: { window: 'readonly', document: 'readonly', localStorage: 'readonly', navigator: 'readonly', fetch: 'readonly', caches: 'readonly', createImageBitmap: 'readonly' } },
   },
   {
     files: ['test/**/*.js', 'test/**/*.mjs', 'scripts/**/*.mjs', 'eslint.config.js'],
