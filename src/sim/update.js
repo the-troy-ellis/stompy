@@ -21,6 +21,7 @@ import { pushOutOfEntities, stepEntities } from './entities.js';
 import { tickObjectives } from './objectives.js';
 import { stepTurrets } from './turrets.js';
 import { tickCoopRespawn } from './coopRules.js';
+import { tickTutorial } from './tutorial.js';
 
 const { sin, abs, min, max, hypot, cos } = Math;
 
@@ -64,6 +65,7 @@ export function update(G, input, dt) {
     }
     P.jetting = !!input.jets;
   } else { P.jetting = false; G.turnByUsed = 0; }
+  if (G.tut && !G.paused) tickTutorial(G, input, dt);   // mission 1's prompts (sim/tutorial.js)
 
   G.eye = eyeOf(P);
   G.view = dirOf(viewYaw(P), P.pitch);
