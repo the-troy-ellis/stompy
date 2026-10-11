@@ -5,7 +5,7 @@
 // once its prompt is done; events break in when they happen (sim/tutorial.js).
 export const TUT_STEPS = [
   { id: 'go', at: 'throttle', kb: 'W: GO. S: LESS GO.', touch: 'STICK UP: GO. DOWN: LESS GO.', pad: 'LEFT STICK UP: GO.' },
-  { id: 'legs', at: 'compass', kb: 'A / D: LEGS', touch: 'DRAG UP HERE: LEGS', pad: 'LEFT STICK SIDEWAYS: LEGS' },
+  { id: 'legs', at: 'compass', kb: 'A / D: LEGS', touch: 'DRAG TOP LEFT: LEGS', pad: 'LEFT STICK SIDEWAYS: LEGS' },
   { id: 'torso', at: 'centre', kb: 'MOUSE: TORSO', touch: 'STICK SIDEWAYS: TORSO', pad: 'RIGHT STICK: TORSO' },
   { id: 'melt', at: 'weapons', cat: 'energy', kb: 'HOLD LMB: MELT IT', touch: 'HOLD ENERGY: MELT IT', pad: 'HOLD RT: MELT IT' },
   { id: 'thump', at: 'weapons', cat: 'ballistic', kb: 'RMB: THUMP', touch: 'BALLISTIC: THUMP', pad: 'RB: THUMP' },
@@ -13,7 +13,7 @@ export const TUT_STEPS = [
   { id: 'jump', at: 'centre', jets: true, kb: 'J: UP', touch: 'JUMP: UP', pad: 'A: UP' },
 ];
 export const TUT_EVENTS = [
-  { id: 'punch', at: 'centre', kb: 'E: PUNCH', touch: 'PUNCH: PUNCH', pad: 'RIGHT STICK CLICK: PUNCH' },
+  { id: 'punch', at: 'centre', kb: 'E: PUNCH', touch: 'TAP PUNCH', pad: 'RIGHT STICK CLICK: PUNCH' },
   { id: 'heat', at: 'heat', kb: 'HEAT: TOO MUCH', touch: 'HEAT: TOO MUCH', pad: 'HEAT: TOO MUCH' },
   { id: 'target', at: 'target', kb: 'T: NEXT ONE', touch: 'TGT: NEXT ONE', pad: 'X: NEXT ONE' },
 ];
