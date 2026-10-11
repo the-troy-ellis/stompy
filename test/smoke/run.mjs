@@ -149,6 +149,31 @@ try {
     console.log(`touch: aim turns the legs ${aimOk}, stick sets throttle and twists ${stickOk}, right side only buttons ${rightOk}, double tap centres ${centred}`);
     if (!(aimOk && stickOk && rightOk && centred)) { failed = true; console.error('FAIL: the touch layout did not behave'); }
   });
+  // HUD SCALE and COLOURS (#229): 1.5 in full on a desktop and a tablet, as
+  // much as fits on a phone held sideways (1 at 360 tall); a screenshot of
+  // each colour mode, armour and heat hurt so the states show.
+  {
+    const hudAt = async (name, vp, touch, scale, colours) => {
+      const page = await browser.newPage({ viewport: vp, hasTouch: touch });
+      page.on('pageerror', e => errors.push(`hud ${name}: ${e.message}`));
+      await page.addInitScript(([s, c]) => { localStorage.setItem('stompy.hud.scale', String(s)); localStorage.setItem('stompy.hud.colours', String(c)); }, [scale, colours]);
+      await page.goto(URL_ + (touch ? '&touch=1' : ''));
+      await page.waitForSelector('.mm-title', { timeout: 15000 });
+      await page.evaluate(() => { document.querySelector('.feel-panel [data-a="toggle"]')?.click(); document.querySelector('[data-sel="free"]').click(); document.querySelector('[data-a="go"]').click(); });
+      await page.waitForFunction(() => window.__stompy.game.state === 'play', null, { timeout: 10000 });
+      await page.evaluate(() => { const g = window.__stompy.game, p = g.player; p.hp.LA = p.max.LA * 0.5; p.hp.RA = p.max.RA * 0.2; p.hp.LL = 0.01; p.heat = 70; for (const m of g.mechs) if (m.team) m.ai.aware = false; g.target = g.mechs.find(m => m.team); window.__stompy.app.ui.pause(false); });
+      await page.waitForTimeout(600);
+      const s = await page.evaluate(() => window.__stompy.app.hud.scale());
+      await page.screenshot({ path: `test-results/smoke-hud-${name}.png` });
+      await page.close();
+      return Math.round(s * 100) / 100;
+    };
+    const scales = [await hudAt('desk-15', { width: 1024, height: 640 }, false, 3, 0), await hudAt('tablet-15', { width: 1024, height: 768 }, true, 3, 0),
+      await hudAt('phone-15', { width: 740, height: 360 }, true, 3, 0), await hudAt('iphone-15', { width: 896, height: 414 }, true, 3, 0)];
+    for (const [i, k] of ['deutan', 'protan', 'tritan'].entries()) await hudAt(k, { width: 1024, height: 640 }, false, 1, i + 1);
+    console.log(`hud: HUD SCALE 1.5 is ${scales[0]} on a desktop, ${scales[1]} on a tablet, ${scales[2]} on a 740x360 phone, ${scales[3]} on an 896x414 phone; colour modes in test-results/smoke-hud-*.png`);
+    if (!(scales[0] === 1.5 && scales[1] === 1.5 && scales[2] === 1 && scales[3] > 1 && scales[3] < 1.2)) { failed = true; console.error('FAIL: HUD SCALE'); }
+  }
   // The arena: the real relay, two pilots in one browser, each sees the other walk.
   // The limit is 1 so the round's end can be tried at the end (#187).
   const relay = spawn('python3', ['server/server.py', '8096'], { stdio: 'ignore', env: { ...process.env, STOMPY_ROUND_GAP: '4', STOMPY_SCORE_LIMIT: '1' } });

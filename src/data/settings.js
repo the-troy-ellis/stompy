@@ -8,8 +8,13 @@ export const SETTINGS = {
   voiceVol: { label: 'VOICE VOL', key: 'voice.vol', min: 0, max: 1, step: 0.1, def: 0.9, fmt: v => `${Math.round(v * 100)}%` },
   // How many particles (spec 07): LOW / MED / HIGH. Unset, MED on touch and HIGH on a desktop (main.js).
   particles: { label: 'PARTICLES', key: 'fx.particles', min: 0, max: 2, step: 1, def: 2, fmt: v => PARTICLE_NAMES[v] },
+  // The HUD's size (HUD_SCALES) and its colour set (data/colors.js HUD_PALETTES), spec 11 § Accessibility.
+  hudScale: { label: 'HUD SCALE', key: 'hud.scale', min: 0, max: 3, step: 1, def: 1, fmt: v => `${HUD_SCALES[v]}x` },
+  colourMode: { label: 'COLOURS', key: 'hud.colours', min: 0, max: 3, step: 1, def: 0, fmt: v => COLOUR_NAMES[v] },
 };
 export const PARTICLE_NAMES = ['LOW', 'MED', 'HIGH'];
+export const HUD_SCALES = [0.8, 1, 1.25, 1.5];
+export const COLOUR_NAMES = ['NORMAL', 'DEUTAN', 'PROTAN', 'TRITAN'];
 // What each PARTICLES level keeps: the share of weather particles (LOW: none)
 // and of gameplay effects (sparks, smoke, fire, dust). REDUCED MOTION takes
 // it down a step. The sim and renderer read the result off the game state.

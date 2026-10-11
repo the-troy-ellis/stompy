@@ -1,3 +1,4 @@
+import { hudPalette } from '../data/colors.js';
 import { backingSize } from './look.js';
 import { effectLook, SHAPE_BY_KIND, TUMBLE_BY_KIND } from '../mesh/effects.js';
 import { M as M0, add, makeMatrixArena, frustumPlanes, sphereVisible, clampN, dirOf, mix3, mul, norm, rnd, sub, len, cross, TAU } from '../util/math.js';
@@ -184,9 +185,9 @@ export function createScene(app) {
     // The body frame is frame(m) (sim/geom.js) built from the arena.
     const B = chain(top || M.id(), M.T(0, -sag, 0), M.T(m.x, m.y + (m.bob || 0), m.z), M.RY(m.yaw), M.S(m.ch.scale), M.RZ(m.lean || 0)), parts = R.mechParts[m.partsKey], sc = m.ch.scale;
     const fwd = [sin(m.yaw), 0, cos(m.yaw)];
-    // Armour under a beam glows orange as it melts, and runs hotter in IR.
+    // Armour under a beam glows orange as it melts (another colour in a COLOURS mode), and runs hotter in IR.
     const mf = meltFrac(m), heatWas = R.drawHeat;
-    const tint = mf ? mix3(VPtint || [1, 1, 1], [2.2, 0.8, 0.25], mf * 0.6) : VPtint || [1, 1, 1];
+    const tint = mf ? mix3(VPtint || [1, 1, 1], hudPalette(app.prefs.colourMode).melt, mf * 0.6) : VPtint || [1, 1, 1];   // the glow follows COLOURS
     if (mf) R.drawHeat = min(1, R.drawHeat + mf * 0.3);
     const g = geoOf(m), back = mul(fwd, -1);
     if (R.skinned) BONES.fill(0);   // a part that isn't drawn this frame keeps a zero matrix
