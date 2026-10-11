@@ -19,6 +19,8 @@ import { fitOf, fitOk, kitLine } from './mechlab.js';
 import { objectiveRows, debriefTitle, missionTitle, missionSpoken, verdict } from './debrief.js';
 import { recordResult, saveCampaign, restartCampaign, stripSquares, canPlay } from './campaign.js';
 import { VOICE } from '../data/voice.js';
+/* global __VERSION__ */
+const VERSION = typeof __VERSION__ === 'string' ? __VERSION__ : 'dev';   // the build's package.json version; `dev` unbuilt
 
 const { sin, max, random, floor } = Math;
 
@@ -205,7 +207,7 @@ export function createUi(app) {
     return `${options()}
       <div class="mm-controls">${controls()}</div>
       <p class="credits">Original game, raw WebGL. Sound effects by <a href="https://kenney.nl" target="_blank" rel="noopener">Kenney</a> (CC0).
-        The cockpit voice is your browser's speech engine.</p>`;
+        The cockpit voice is your browser's speech engine. <span class="dim version">v${VERSION}</span></p>`;
   }
 
   function renderMenu(status = '') {

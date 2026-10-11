@@ -1,0 +1,31 @@
+# A GitHub Release for every v* tag (docs/specs/11-release.md § Deploy and
+# release): the build, the itch.io zip attached, and notes from the titles of
+# the PRs merged since the last tag. The tag must match package.json's
+# version (v1.0.0 for "1.0.0"), so bump that first.
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions: { contents: write }
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: The tag matches package.json
+        run: |
+          want="v$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "$want" ]; then echo "tag $GITHUB_REF_NAME, but package.json says $want"; exit 1; fi
+      - run: npm run build
+        env:
+          RELAY_DEFAULT: ${{ vars.STOMPY_RELAY_DEFAULT }}
+      - run: npm run zip
+      - run: node scripts/notes.mjs "$GITHUB_REF_NAME" > notes.md
+      - name: The Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" stompy-*.zip --title "Stompy $GITHUB_REF_NAME" --notes-file notes.md

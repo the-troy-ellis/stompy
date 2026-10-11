@@ -9,13 +9,14 @@ import { iconFiles } from './icons.mjs';
 // RELAY_DEFAULT=wss://relay.example/ws bakes in the relay a hosted site uses
 // (docs/specs/10-internet-play.md); ?relay= and the RELAY field still win.
 const relay = process.env.RELAY_DEFAULT || '';
+const { version } = JSON.parse(await readFile('package.json', 'utf8'));   // shown in the settings footer
 if (relay && !normalRelay(relay, true)) { console.error(`RELAY_DEFAULT is not a relay address: ${relay}`); process.exit(1); }
 
 await rm('dist', { recursive: true, force: true });
 await mkdir('dist', { recursive: true });
 await build({ entryPoints: ['src/main.js'], bundle: true, minify: true, format: 'iife', target: ['es2020'],
   outfile: 'dist/stompy.js', sourcemap: true, legalComments: 'none', logLevel: 'info',
-  define: { __PWA__: 'true', ...(relay ? { __RELAY_DEFAULT__: JSON.stringify(relay) } : {}) } });
+  define: { __PWA__: 'true', __VERSION__: JSON.stringify(version), ...(relay ? { __RELAY_DEFAULT__: JSON.stringify(relay) } : {}) } });
 // The built page: the bundle instead of the modules, and what makes it an app
 // (docs/specs/11-release.md § PWA): the manifest and an icon for iOS.
 const html = (await readFile('index.html', 'utf8'))
@@ -32,8 +33,8 @@ const files = (await readdir('dist', { recursive: true, withFileTypes: true })).
   .map(e => `${e.parentPath ?? e.path}/${e.name}`.replace(/^dist\//, '')).filter(f => f !== 'index.html' && !f.endsWith('.map')).sort();
 const hash = createHash('sha256');
 for (const f of ['index.html', ...files]) hash.update(f).update(await readFile(`dist/${f}`));
-const version = hash.digest('hex').slice(0, 12), sw = await readFile('src/sw.js', 'utf8');
+const cacheKey = hash.digest('hex').slice(0, 12), sw = await readFile('src/sw.js', 'utf8');
 const swLine = "const VERSION = 'dev', FILES = [];";
 if (!sw.includes(swLine)) { console.error(`src/sw.js lost its line: ${swLine}`); process.exit(1); }
-await writeFile('dist/sw.js', sw.replace(swLine, `const VERSION = '${version}', FILES = ${JSON.stringify(files)};`));
-console.log(`built dist/ (${files.length} files cached as ${version})${relay ? ` (relay ${relay})` : ''}`);
+await writeFile('dist/sw.js', sw.replace(swLine, `const VERSION = '${cacheKey}', FILES = ${JSON.stringify(files)};`));
+console.log(`built dist/ v${version} (${files.length} files cached as ${cacheKey})${relay ? ` (relay ${relay})` : ''}`);

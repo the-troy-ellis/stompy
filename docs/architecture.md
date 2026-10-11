@@ -28,7 +28,7 @@ relay and its tests.
 | `server/` | 420 + tests | `server.py` the relay (M5a: version check, clean state messages, fx rate limit, flags, per-address cap, file log), `data.py` (loadout tables and checks), `test_server.py` (with fuzz tests), `README.md`, `Dockerfile`; `deploy/` (M5c: Caddyfile, systemd unit, `deploy.sh` and the VPS steps). |
 | `test/` | | `*.test.js` headless (`helpers.js` builds a flat-ground game with a recording fx), `smoke/run.mjs` (Playwright: desktop mission, touch layout, two-pilot arena against the real relay). |
 | `scripts/` | | `serve.mjs` (static server), `build.mjs` (esbuild; M6: the manifest, icons and `dist/sw.js`), `icons.mjs` (the app icons from `favicon.svg`, in plain Node), `perf.mjs` (`npm run perf`: the frame-cost harness and its budgets, spec 14). |
-| `.github/workflows/` | | `ci.yml` (lint, test, build, server tests, smoke), `pages.yml` (gated by the `STOMPY_DEPLOY_PAGES` variable). |
+| `.github/workflows/` | | `ci.yml` (lint, test, build, zip, server tests, smoke), `pages.yml` (gated by the `STOMPY_DEPLOY_PAGES` variable; `STOMPY_DEPLOY_ON` picks main, tags or both), `release.yml` (M6: a `v*` tag makes a GitHub Release with the zip and notes). |
 
 ### How the pieces talk
 

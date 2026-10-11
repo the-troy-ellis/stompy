@@ -2,16 +2,23 @@
 # variable STOMPY_DEPLOY_PAGES is set to 'true' (Settings > Secrets and
 # variables > Actions > Variables). Inert until then. STOMPY_RELAY_DEFAULT
 # (e.g. wss://relay.example/ws) bakes in the relay the hosted site connects to.
+# STOMPY_DEPLOY_ON picks what deploys: unset or 'main' (every push to main),
+# 'tags' (only a v* release tag) or 'both'. A tag deploy also needs the
+# github-pages environment to allow tags (Settings > Environments).
 name: Pages
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 permissions: { contents: read, pages: write, id-token: write }
 concurrency: { group: pages, cancel-in-progress: true }
 jobs:
   deploy:
-    if: vars.STOMPY_DEPLOY_PAGES == 'true'
+    if: >-
+      vars.STOMPY_DEPLOY_PAGES == 'true' && (github.event_name == 'workflow_dispatch'
+      || (github.ref_type == 'tag' && (vars.STOMPY_DEPLOY_ON == 'tags' || vars.STOMPY_DEPLOY_ON == 'both'))
+      || (github.ref_type != 'tag' && vars.STOMPY_DEPLOY_ON != 'tags'))
     runs-on: ubuntu-latest
     # Block style on purpose: a ${{ }} expression inside a { } flow mapping is
     # a YAML error, which made every push log a failed Pages run.

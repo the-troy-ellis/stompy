@@ -2,3 +2,4 @@ node_modules/
 dist/
 test-results/
 __pycache__/
+stompy-*.zip
