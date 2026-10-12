@@ -206,7 +206,7 @@ Goal: it is a product.
 
 Spec: [specs/11-release.md](specs/11-release.md).
 
-## M7 — Mission editor (proposed)
+## M7 — Mission editor
 
 Goal: missions are laid out on the ground they are played on, not guessed.
 
