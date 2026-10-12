@@ -200,7 +200,7 @@ export function createEditor(app) {
     app.scene.render();
     const VP = camView(E.cam, W / H).VP;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, app.hud.width, app.hud.height);
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const view = { W, H, mpp: mpp(), toScreen: (x, y, z) => groundToScreen(E.cam, { x, y, z }, W, H, VP) };
     drawMap(ctx, view, { map: { bound: BOUND, height: G.ter.height, grid: 100 }, ...E.map, sel: E.sel, box: E.box, pal: hudPalette(app.prefs.colourMode) });
