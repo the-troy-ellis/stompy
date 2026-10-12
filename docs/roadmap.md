@@ -206,6 +206,20 @@ Goal: it is a product.
 
 Spec: [specs/11-release.md](specs/11-release.md).
 
+## M7 — Mission editor (proposed)
+
+Goal: missions are laid out on the ground they are played on, not guessed.
+
+- `?edit=1`: a mission from above on its real terrain; place and move foes,
+  entities, routes, pads and waves; edit objectives; see what a foe can see.
+- Export to the same JS as `missions.js`, round-tripping every mission; PLAY
+  from the editor and back.
+- The overhead camera, picking, gestures and markers are shared modules: the
+  groundwork for a later command view, whose shape is not decided.
+
+Spec: [specs/15-mission-editor.md](specs/15-mission-editor.md). Draft, pending
+the owner's review; not filed as issues yet.
+
 ## What is deliberately not scheduled
 
 See the non-goals in [vision.md](vision.md). Also not scheduled, pending a
