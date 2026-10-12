@@ -132,7 +132,7 @@ function start(root) {
       const c = app.audio.Sound.ctx;
       if (c && prefs.sound && c.state !== 'running' && c.state !== 'closed') { try { c.resume()?.catch?.(() => {}); } catch { /* next tap */ } }
     }
-    if (G.state === 'edit') { app.editor?.draw(); return; }   // the mission editor draws its own frame (ui/editor.js)
+    if (G.state === 'edit') { quiet(); app.editor?.draw(); return; }   // the mission editor draws its own frame (ui/editor.js)
     if (G.state === 'play' && !document.hasFocus() && !G.paused) app.ui.pause(true);
     G.clock = performance.now();
     app.input.pollPad(dt);   // a gamepad: the snapshot below, or the screen that's up

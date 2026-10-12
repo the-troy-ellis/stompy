@@ -182,6 +182,16 @@ try {
     if (one.join() !== 'entities.truck2' || !/TRUCK/.test(panelText)) { failed = true; console.error('FAIL: a tap did not select the truck'); }
     if (boxed.join() !== 'entities.truck1,entities.truck2,entities.truck3,entities.truck4') { failed = true; console.error('FAIL: the box did not select the four trucks'); }
     if (cleared !== 0) { failed = true; console.error('FAIL: tapping empty ground did not clear the selection'); }
+    // #248: dragging a truck and exporting changes that truck's `at` and
+    // nothing else.
+    const exportText = async () => { await page.tap('[data-act="export"]'); const v = await page.inputValue('.ed-io-text'); await page.tap('[data-io="close"]'); return v; };
+    const before = await exportText(), t2 = await at('entities.truck2');
+    await touch('touchStart', t2[0], t2[1]);
+    for (let k = 1; k <= 6; k++) await touch('touchMove', t2[0] - k * 10, t2[1] - k * 8);
+    await touch('touchEnd');
+    const after = await exportText(), changed = after.split('\n').filter((l, i) => l !== before.split('\n')[i]);
+    console.log(`editor: export changed ${changed.length} line(s): ${changed.join(' ').trim().slice(0, 60)}`);
+    if (changed.length !== 1 || !/id: 'truck2', at: \[/.test(changed[0])) { failed = true; console.error('FAIL: moving a truck changed more than its at'); }
     // #247: the palette places a foe where the next tap lands, a drag moves
     // it along the ground, and holding it shades what it sees.
     await page.tap('[data-tool="FOE"]');
@@ -201,6 +211,23 @@ try {
     console.log(`editor: placed ${placed}, moved to ${moved}, it sees ${sees} cells`);
     if (n !== 1 || !/jackal/.test(placed) || moved === placed) { failed = true; console.error('FAIL: placing and moving a foe'); }
     if (!(sees > 0)) { failed = true; console.error('FAIL: holding a foe did not shade what it sees'); }
+    // #248: PLAY starts it, the pause menu's EDITOR comes back with nothing
+    // lost, and so does a reload.
+    const work = await page.evaluate(() => JSON.stringify(window.__stompy.app.editor.E.def));
+    await page.tap('[data-act="play"]');
+    await page.waitForFunction(() => window.__stompy.game.state === 'play', null, { timeout: 5000 });
+    const playing = await page.evaluate(() => ({ kind: window.__stompy.game.kind, foes: window.__stompy.game.mechs.filter(m => m.team !== 0).length }));
+    await page.tap('[data-t="pause"]');
+    await page.tap('.mech-overlay [data-a="menu"]');
+    await page.waitForFunction(() => window.__stompy.game.state === 'edit', null, { timeout: 5000 });
+    const backAgain = await page.evaluate(() => JSON.stringify(window.__stompy.app.editor.E.def));
+    await page.reload();
+    await page.waitForSelector('.ed-panel', { timeout: 15000 });
+    const reloaded = await page.evaluate(() => JSON.stringify(window.__stompy.app.editor.E.def));
+    console.log(`editor: PLAY (${playing.kind}, ${playing.foes} foe), back ${backAgain === work}, reload ${reloaded === work}`);
+    if (playing.kind !== 'edit' || playing.foes !== 1) { failed = true; console.error('FAIL: PLAY did not start the edited mission'); }
+    if (backAgain !== work || reloaded !== work) { failed = true; console.error('FAIL: PLAY and back, or a reload, lost the working copy'); }
+    await page.evaluate(() => localStorage.removeItem('stompy.edit.work'));
     await page.close();
   }
   // HUD SCALE and COLOURS (#229): 1.5 in full on a desktop and a tablet, as

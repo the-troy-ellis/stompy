@@ -115,6 +115,7 @@ export function createUi(app) {
   const MENU = [['campaign', 'CAMPAIGN'], ['free', 'FREE PLAY'], ['mp', 'MULTIPLAYER'], ['settings', 'SETTINGS']];
 
   function mainMenu(sel = prefs.menuSel, status = '') {
+    if (app.editor) { app.editor.back(); return; }   // opened with ?edit=1: the menu is the editor (ui/editor.js)
     if (app.net.Net.ws) { const ws = app.net.Net.ws; app.net.Net.ws = null; ws.close(); }
     G.mode = 'sp'; G.state = 'menu'; G.paused = false; G.guide = null;
     prefs.menuSel = sel; store.set('menu.sel', sel);
@@ -280,7 +281,7 @@ export function createUi(app) {
     app.audio.loadSamples();
     app.input.lockPointer();
     app.input.syncWeaponButtons();
-    app.audio.say(G.kind === 'campaign' ? `${missionSpoken(prefs.mission + 1, G.def.name)} Systems online.` : 'Free play. Systems online.', true);
+    app.audio.say(G.kind === 'campaign' ? `${missionSpoken(prefs.mission + 1, G.def.name)} Systems online.` : G.kind === 'edit' ? 'Systems online.' : 'Free play. Systems online.', true);
   }
 
   function debrief() {
@@ -304,7 +305,7 @@ export function createUi(app) {
     showOverlay(`
       <h1 style="color:${G.won ? '#5f5' : '#f44'}">${debriefTitle(G)}</h1>
       <div class="panel">
-        <div class="k">${isCamp ? esc(missionTitle(prefs.mission + 1, G.def.name)) : 'FREE PLAY'}</div>
+        <div class="k">${isCamp ? esc(missionTitle(prefs.mission + 1, G.def.name)) : G.kind === 'edit' ? `EDITOR · ${esc(G.def.name)}` : 'FREE PLAY'}</div>
         ${rows ? `<div class="objs">${rows}</div>` : ''}
         ${fresh.length ? `<div class="unlock">NEW MECH: ${fresh.map(k => esc(CHASSIS[k].name)).join(', ')}</div>` : ''}
         <div class="verdict ${G.won ? 'ok' : 'no'}">${esc(verdict(G))}</div>
@@ -317,7 +318,7 @@ export function createUi(app) {
         ${coop ? '<button class="go" data-a="leave">LEAVE</button>' : `
         ${isCamp && G.won ? '<button class="go" data-a="next">NEXT MISSION</button>' : ''}
         ${isCamp ? `<button class="go" data-a="retry">${G.won ? 'REPLAY' : 'RETRY'}</button>` : '<button class="go" data-a="again">PLAY AGAIN</button>'}
-        <button class="go" data-a="menu">MAIN MENU</button>`}
+        <button class="go" data-a="menu">${app.editor ? 'EDITOR' : 'MAIN MENU'}</button>`}
       </div>`);
   }
 
@@ -336,7 +337,7 @@ export function createUi(app) {
         ${app.net.mp() ? `<div class="panel"><div class="k">SCORES &mdash; FIRST TO ${app.net.Net.limit}</div>${app.net.boardHTML()}</div>` : ''}
         <div class="panel">${controls()}</div>${options()}
         ${G.tut ? '<button class="go" data-a="skiptut">SKIP TUTORIAL</button>' : ''}
-        ${app.net.mp() ? '<button class="go" data-a="leave">LEAVE MATCH</button>' : '<button class="go" data-a="menu">MAIN MENU</button>'}`);
+        ${app.net.mp() ? '<button class="go" data-a="leave">LEAVE MATCH</button>' : `<button class="go" data-a="menu">${app.editor ? 'EDITOR' : 'MAIN MENU'}</button>`}`);
     } else { hideOverlay(); wrap.focus(); app.input.syncTouchUI(); app.input.lockPointer(); }
   }
 
@@ -412,6 +413,7 @@ export function createUi(app) {
     if (a === 'team') { app.net.pickTeam(+e.target.closest('[data-team]').dataset.team); return; }   // team deathmatch: a side
     if (a === 'next') { prefs.mission++; startMission(prefs.mission); launch(); }
     else if (a === 'retry') { startMission(prefs.mission); launch(); }
+    else if (a === 'again' && G.kind === 'edit') app.editor.play();   // the editor's mission again, as it is now
     else if (a === 'again') { startSkirmish(); launch(); }
     else if (G.state === 'play' && G.paused) pause(false);
   });
