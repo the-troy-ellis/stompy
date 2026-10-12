@@ -118,5 +118,6 @@ export function cycleTarget(G) {
   if (!foes.length) return;
   const i = foes.indexOf(G.target);
   G.target = foes[(i + 1) % foes.length];
+  G.cycles = (G.cycles || 0) + 1;   // T presses, for mission 1's T: NEXT ONE (sim/tutorial.js)
   G.fx.sfx.beep();
 }

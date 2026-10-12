@@ -21,13 +21,15 @@ import { pushOutOfEntities, stepEntities } from './entities.js';
 import { tickObjectives } from './objectives.js';
 import { stepTurrets } from './turrets.js';
 import { tickCoopRespawn } from './coopRules.js';
+import { tickTutorial } from './tutorial.js';
 
 const { sin, abs, min, max, hypot, cos } = Math;
 
 // The empty input: what the sim sees when nobody is touching anything.
 // `turn` is a rate (-1..1, the keys); `turnBy` is radians the touch aim drag
 // asked for, paid out at the legs' own turn rate (G.turnByUsed says how much).
-export const noInput = () => ({ thrUp: false, thrDown: false, stop: false, turn: 0, turnBy: 0, twist: 0, pitch: 0, centre: false, centreTap: false, jets: false,
+// `thr` is a gamepad's stick on the throttle (-1..1): W and S at that share.
+export const noInput = () => ({ thrUp: false, thrDown: false, stop: false, thr: 0, turn: 0, turnBy: 0, twist: 0, pitch: 0, centre: false, centreTap: false, jets: false,
   held: { energy: false, ballistic: false, missile: false, fusion: false }, missileTap: false, punch: false });
 
 // One frame of the whole simulation. `input` is a snapshot (see noInput);
@@ -44,6 +46,7 @@ export function update(G, input, dt) {
   if (P.alive && !P.shutdown && !G.paused) {
     if (input.thrUp) P.throttle = min(1, P.throttle + dt * 0.9);
     if (input.thrDown) P.throttle = max(-0.35, P.throttle - dt * 0.9);
+    if (input.thr) P.throttle = clampN(P.throttle + clampN(input.thr, -1, 1) * dt * 0.9, -0.35, 1);
     if (input.stop) P.throttle = 0;
     const legRate = P.ch.turn * dt * (P.hp.LL > 0 && P.hp.RL > 0 ? 1 : 0.5) * (P.melee ? 0.5 : 1);   // half rate on one leg, and mid-swing
     G.turnByUsed = clampN(input.turnBy || 0, -legRate, legRate);
@@ -64,6 +67,7 @@ export function update(G, input, dt) {
     }
     P.jetting = !!input.jets;
   } else { P.jetting = false; G.turnByUsed = 0; }
+  if (G.tut && !G.paused) tickTutorial(G, input, dt);   // mission 1's prompts (sim/tutorial.js)
 
   G.eye = eyeOf(P);
   G.view = dirOf(viewYaw(P), P.pitch);

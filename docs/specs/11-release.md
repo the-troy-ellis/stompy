@@ -64,6 +64,32 @@ Start pause, Back menu. A `gamepad` sensitivity setting. Works on phones with
 a controller attached (the touch UI hides while a gamepad is active and
 returns on the first touch).
 
+As shipped (#227):
+- **The mapping** is in `src/input/gamepad.js`, a pure `readPad` that is
+  tested headlessly. `input.js` polls the first standard-mapped pad every
+  frame.
+  - The sticks have a round deadzone (0.2).
+  - The right stick has a curve, for fine aim near the centre. At full tilt
+    it turns 1.5× as fast as the arrow keys, times GAMEPAD sensitivity, and
+    0.4× that zoomed.
+- **The throttle:** the left stick moves it at W/S's rate times the tilt,
+  and it stays where it was set. That's a new `thr` in the snapshot (the
+  sim's only change).
+- **Buttons the spec didn't name:** right stick click punches, D-pad up is
+  LIGHTS, D-pad down is STOP.
+- **Back** pauses rather than going straight to the menu, since the menu is
+  one press away on the pause screen. A stray press shouldn't lose a
+  mission.
+- **Screens** (menu, pause, lobby, debrief): the D-pad, or the left stick
+  held, moves a highlight through the buttons. A presses the highlighted
+  one, Start launches or resumes, and B resumes. So a whole mission needs no
+  mouse, keyboard or touch.
+- **Phones:** the touch controls hide while the pad is in use and come back
+  on the first touch.
+- **Sound:** browsers may not count a pad press as the gesture that unlocks
+  audio. A pad-only first launch may start silent until a key, click or tap.
+  The owner's real-pad check will say.
+
 ### Silent tutorial
 
 Mission 1 only, first time only (`store` key `tut.done`), each prompt shown
@@ -74,6 +100,23 @@ MELT IT` · `RMB: THUMP` · `SPACE: MISSILES (HOLD TO FLY)` · `J: UP` · `E:
 PUNCH` (when a JACKAL is in reach) · `HEAT: TOO MUCH` (first over 60) · `T:
 NEXT ONE` (when a second enemy appears). Touch variants name the gesture. Skippable by pausing (the pause
 screen gains `SKIP TUTORIAL`).
+
+As shipped (#228):
+- **Where it lives:** `src/data/tutorial.js` holds the words; `src/sim/tutorial.js` decides
+  which prompt is up and when it's done, headless and tested. The HUD draws
+  it by its instrument (the throttle, the weapon list, the heat bar, the
+  target box, under the compass, under the crosshair), in the words for what
+  the pilot is holding: keys and mouse, the touch controls, or a gamepad.
+- **Order:** steps come one at a time, in the spec's order, a beat apart.
+  Each fades when it's done. A step this mech can't do (no missiles, JUMP
+  JETS NONE) is skipped. One that's ignored for 25 s gives way to the next.
+- **Events:** E: PUNCH (a JACKAL in reach), HEAT: TOO MUCH (heat past 60)
+  and T: NEXT ONE (a second hostile within 300 m) break in once each. A step
+  they interrupt comes back after. T: NEXT ONE counts only a T press, not a
+  target the game picked for you after a hit.
+- **Once:** the first mission 1 runs it. Reaching the debrief, or SKIP
+  TUTORIAL on the pause screen, sets `tut.done`, and it never shows again.
+  Quitting halfway leaves it for next time. Co-op never shows it.
 
 ### Accessibility and settings
 

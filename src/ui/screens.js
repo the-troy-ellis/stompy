@@ -19,6 +19,7 @@ import { fitOf, fitOk, kitLine } from './mechlab.js';
 import { objectiveRows, debriefTitle, missionTitle, missionSpoken, verdict } from './debrief.js';
 import { recordResult, saveCampaign, restartCampaign, stripSquares, canPlay } from './campaign.js';
 import { VOICE } from '../data/voice.js';
+import { newTutorial } from '../sim/tutorial.js';
 /* global __VERSION__ */
 const VERSION = typeof __VERSION__ === 'string' ? __VERSION__ : 'dev';   // the build's package.json version; `dev` unbuilt
 
@@ -35,6 +36,7 @@ export function createUi(app) {
     const def = missionDef(n);
     startMatch(G, def, def.seed ?? 7 + n * 13, n === 0, prefs.chassis, { loadout: fitOf(prefs.chassis) });
     G.kind = 'campaign';
+    if (n === 0 && G.mode !== 'coop' && !store.get('tut.done', false)) G.tut = newTutorial(G);   // the first mission 1 teaches the controls, once
     app.scene.uploadWorld();
   }
   // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
@@ -275,6 +277,7 @@ export function createUi(app) {
   }
 
   function debrief() {
+    if (G.tut) { G.tut = null; store.set('tut.done', true); }   // mission 1 played through once: no prompts next time
     app.input.syncTouchUI();
     app.input.exitLock();
     const s = G.stats, acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
@@ -325,6 +328,7 @@ export function createUi(app) {
         <div class="panel" style="text-align:center">${app.net.mp() ? 'The match keeps going while you are in here. Tap or click to get back in.' : 'Click to resume.'}</div>
         ${app.net.mp() ? `<div class="panel"><div class="k">SCORES &mdash; FIRST TO ${app.net.Net.limit}</div>${app.net.boardHTML()}</div>` : ''}
         <div class="panel">${controls()}</div>${options()}
+        ${G.tut ? '<button class="go" data-a="skiptut">SKIP TUTORIAL</button>' : ''}
         ${app.net.mp() ? '<button class="go" data-a="leave">LEAVE MATCH</button>' : '<button class="go" data-a="menu">MAIN MENU</button>'}`);
     } else { hideOverlay(); wrap.focus(); app.input.syncTouchUI(); app.input.lockPointer(); }
   }
@@ -333,7 +337,8 @@ export function createUi(app) {
     const opt = e.target.closest('[data-opt]');
     if (opt) { const [, get, set] = OPTS[opt.dataset.opt]; set(!get()); opt.textContent = optLabel(opt.dataset.opt); return; }
     const a = e.target.closest('[data-a]')?.dataset.a;
-    if (a === 'update') { app.update?.(); return; }   // a new version is waiting (ui/pwa.js)
+    if (a === 'update') { app.update?.(); return; }
+    if (a === 'skiptut') { G.tut = null; store.set('tut.done', true); e.target.closest('[data-a]').remove(); return; }   // no more prompts, now or later   // a new version is waiting (ui/pwa.js)
     if (a === 'full') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); return; }
     if (a === 'diff') { cycleDiff(1); e.target.closest('[data-a]').textContent = diffLabel(); return; }
     if (G.state === 'menu' && app.mechlab.click(e)) return;
