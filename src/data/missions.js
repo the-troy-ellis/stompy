@@ -8,14 +8,16 @@ import { WEATHER } from './weather.js';
 //   foes        chassis keys, or { type, at: [bearing°, dist], face, aware, profile }
 //   objectives  default ELIMINATE; see sim/objectives.js
 //   entities    structures, vehicles, turrets and nav points placed `at: [bearing°, dist]`
-//               from the start, vehicles with a `path` of the same; `pad: r` flattens under one
+//               from the map's centre, vehicles with a `path` of the same; `pad: r` flattens under one
 //   waves       { at } on the clock or { when: { obj, done } } on progress, with foes and from
 //   flat        [[bearing°, dist, radius]] extra pads
 //   prefer      'convoy': the enemies go for the trucks
 //   start       [bearing°, dist, face°]: the player starts there, not at the centre
 //   weather, time  for M4's atmosphere (docs/specs/07-atmosphere.md); the
 //               plain palette until it lands
-// Bearings: 0 is straight ahead at the start, 90 to the right.
+// Bearings: 0 is straight ahead at the start, 90 to the right. Every `at`,
+// `path`, `flat` and `start` is measured from the map's centre (`start` moves
+// only the player); a wave's bearing `from` is measured from the player.
 const RELAY = { kind: 'structure', mesh: 'relay', height: 18, radius: 3, tags: ['relay'], label: 'RELAY', pad: 9 };
 const TRUCK = { kind: 'vehicle', mesh: 'truck', tags: ['convoy'], label: 'TRUCK', speed: 7 };
 const ROUTE = [[200, 120], [100, 200], [40, 520], [15, 850], [350, 1040]];   // ~1.6 km down the valley
