@@ -10,6 +10,7 @@ import { HEAT, hotFrac, FEEL } from '../data/feel.js';
 import { makeSpring, stepSpring } from '../util/spring.js';
 import { liveKills, killWords } from '../net/killfeed.js';
 import { teamCss, teamName } from '../net/teams.js';
+import { TUT } from '../data/tutorial.js';
 
 const LAG_MS = 200;   // a round trip to the relay past this shows LAG (docs/specs/10-internet-play.md § Latency)
 
@@ -187,6 +188,23 @@ export function createHud(app) {
     }
     ctx.globalAlpha = 1;
     ctx.textAlign = 'right';
+  }
+  // Mission 1's prompt (sim/tutorial.js), by the instrument it's about, in
+  // the words for whatever the pilot is holding: keys, glass or a pad.
+  function drawTutorial(L) {
+    const c = G.tut?.cur;
+    if (!c || !G.player.alive) return;
+    const text = c[G.padActive ? 'pad' : G.touchUI ? 'touch' : 'kb'], W = V.W, vb = L.viewBottom;
+    const at = {
+      throttle: [L.throttle.x, L.throttle.y - (L.frame ? 34 : 16)], weapons: [L.weapons.x + 60, L.weapons.y - (L.frame ? 34 : 14)], heat: [L.bars.x + 40, L.bars.y - (L.frame ? 34 : 14)],
+      target: [L.target.x + 60, L.target.y + 34], compass: [W / 2, vb * 0.3], centre: [W / 2, vb * 0.64],
+    }[c.at] || [W / 2, vb * 0.64];
+    ctx.font = 'bold 15px "Lucida Console", monospace'; ctx.textAlign = 'center';
+    const w = ctx.measureText(text).width, x = clampN(at[0], w / 2 + 10, W - w / 2 - 10), y = clampN(at[1], 20, V.H - 12);
+    ctx.globalAlpha = clampN(min(c.t * 4, 1 - c.fade / TUT.fade), 0, 1);   // in quickly; out as the pilot does it
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(x - w / 2 - 6, y - 12, w + 12, 18);
+    ctx.fillStyle = AMBER; ctx.fillText(text, x, y + 2);
+    ctx.globalAlpha = 1;
   }
   // Co-op, down: who you're watching and when you're back (sim/coopRules.js).
   function drawCoopDown(L) {
@@ -687,6 +705,7 @@ export function createHud(app) {
     ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'right'; ctx.fillStyle = DIM;
     ctx.fillText(app.net.mp() ? `${app.net.tdm() ? '' : `PILOTS ${app.net.Net.info.size}  `}FIRST TO ${app.net.Net.limit}` : `HOSTILES ${left}`, L.hostiles.x, L.hostiles.y);
     if (app.net.mp()) drawArenaHUD(L);
+    drawTutorial(L);
     if ((app.net.mp() || G.mode === 'coop') && app.net.Net.rtt > LAG_MS) {   // a slow line to the relay: say so, small
       const tw = L.compass.w;
       ctx.textAlign = 'left'; ctx.fillStyle = AMBER;
