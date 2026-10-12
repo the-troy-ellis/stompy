@@ -93,3 +93,36 @@ test('a mission made from nothing with the palette checks clean and round-trips'
   assert.deepEqual(check(d), []);
   assert.deepEqual(fromSource(toSource(d)), d);
 });
+
+// Acceptance 3: a mission made in the editor with every objective type,
+// exported and read back as missions.js would hold it, plays and can be won.
+test('a mission with every objective type, made with the editor, exports and is winnable', async () => {
+  const { playPerfectly } = await import('./harness.js');
+  const d = { key: 'm13', pal: 'ice', seed: 77, foes: [], objectives: [], intel: 'Everything at once.' };
+  const at = (b, r) => polar([b, r]);
+  place(d, 'FOE', at(10, 450).x, at(10, 450).z);
+  for (const b of [80, 100]) place(d, 'STRUCTURE', at(b, 300).x, at(b, 300).z);
+  place(d, 'TURRET', at(200, 380).x, at(200, 380).z);
+  const truck = place(d, 'VEHICLE', at(180, 120).x, at(180, 120).z);
+  setRoute(d, truck, [[180, 120], [180, 300]]);
+  place(d, 'PAD', at(180, 320).x, at(180, 320).z);
+  place(d, 'PAD', at(300, 260).x, at(300, 260).z);
+  d.objectives = [
+    { type: 'destroy', targets: ['relay'], label: 'RELAY' },
+    { type: 'eliminate' },
+    { type: 'escort', convoy: 'convoy', to: 'lz1', minAlive: 1, label: 'CONVOY' },
+    { type: 'survive', seconds: 20, waves: [{ at: 5, foes: ['jackal'], from: 90 }] },
+    { type: 'protect', targets: ['battery'], minAlive: 0, label: 'LAUNCHER', secondary: true },
+    { type: 'extract', at: 'lz2', within: 400, after: 0 },
+  ];
+  assert.deepEqual(check(d, { m13: 'X' }), []);
+  const text = toSource(d), back = fromSource(text);
+  assert.deepEqual(back, d);
+  const G = createGame({ seed: 1 });
+  G.diff = 'easy';
+  startMatch(G, { ...back, name: 'X' }, back.seed, false, 'kestrel');
+  G.kind = 'edit';
+  playPerfectly(G, { maxSeconds: 900 });
+  assert.equal(G.state, 'over', `still running: ${G.objectives.map(o => `${o.def.type}:${o.state}`).join(', ')}`);
+  assert.equal(G.won, true, G.objectives.map(o => `${o.def.type}:${o.state}`).join(', '));
+});

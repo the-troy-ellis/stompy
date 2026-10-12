@@ -2,9 +2,10 @@
 // optionally `&mission=m06`: a mission from above on its real terrain, where
 // you place and move its foes, structures, vehicles, routes and pads, turn
 // them, edit their fields, reroll the ground and see what a foe can see.
-// Objectives and waves, problems, export and PLAY come with #248. It is
-// loaded on its own (`import()` in main.js), so normal play never downloads
-// it.
+// Its objectives and waves are lists in the panel, problems show as they
+// appear, EXPORT writes the mission as missions.js's JS, and PLAY tries it
+// and comes back. The working copy is kept in local storage. It is loaded on
+// its own (`import()` in main.js), so normal play never downloads it.
 //
 // The camera, gestures, picking, markers and line of sight are shared modules
 // that know nothing about missions (render/topCamera.js, input/pointer.js,
@@ -16,9 +17,10 @@ import { MECH_ORDER } from '../data/chassis.js';
 import { PALS } from '../data/palettes.js';
 import { WEATHER } from '../data/weather.js';
 import { diffOf } from '../data/ai.js';
-import { toSource, fromSource } from '../data/missionIO.js';
+import { toSource, fromSource, check } from '../data/missionIO.js';
 import { hudPalette } from '../data/colors.js';
 import { startMatch } from '../sim/state.js';
+import { fitOf } from './mechlab.js';
 import { polar, toPolar, roundPolar } from '../sim/placement.js';
 import { eyeOf } from '../sim/geom.js';
 import { PROFILES } from '../sim/ai/profiles.js';
@@ -169,16 +171,32 @@ export function createEditor(app) {
     <div class="ed-surface"></div>
     <div class="ed-panel">
       <div class="ed-title">EDITOR</div>
-      <select class="ed-mission" aria-label="Mission">${MISSIONS.map(m => `<option value="${m.key}">${m.key.toUpperCase()}${m.name ? ` · ${esc(m.name)}` : ''}</option>`).join('')}</select>
+      <div class="ed-acts"><button data-act="play">PLAY</button><button data-act="export">EXPORT</button><button data-act="import">IMPORT</button></div>
+      <select class="ed-mission" aria-label="Mission">${MISSIONS.map(m => `<option value="${m.key}">${m.key.toUpperCase()}${m.name ? ` · ${esc(m.name)}` : ''}</option>`).join('')}<option value="new">NEW MISSION</option></select>
       <div class="ed-sel"></div>
       <div class="ed-mis"></div>
+      <div class="ed-objs"></div>
+      <div class="ed-waves"></div>
+    </div>
+    <div class="ed-problems"></div>
+    <div class="ed-io" hidden>
+      <p class="ed-head ed-io-title"></p>
+      <textarea class="ed-io-text" spellcheck="false" aria-label="Mission source"></textarea>
+      <p class="ed-io-msg"></p>
+      <div class="ed-row"><button data-io="copy">COPY</button><button data-io="import">IMPORT</button><button data-io="close">CLOSE</button></div>
     </div>
     <div class="ed-tools">${TOOLS.map(t => `<button class="ed-tool" data-tool="${t}">${t}</button>`).join('')}<button class="ed-tool ed-del" data-act="delete">DELETE</button></div>`;
   wrap.appendChild(root);
   const surface = root.querySelector('.ed-surface'), selBox = root.querySelector('.ed-sel'), misBox = root.querySelector('.ed-mis'), pick = root.querySelector('.ed-mission');
-  const toolBar = root.querySelector('.ed-tools');
-  pick.value = E.key;
+  const toolBar = root.querySelector('.ed-tools'), objBox = root.querySelector('.ed-objs'), waveBox = root.querySelector('.ed-waves');
+  const probBox = root.querySelector('.ed-problems'), io = root.querySelector('.ed-io'), ioText = io.querySelector('.ed-io-text'), ioMsg = io.querySelector('.ed-io-msg');
   pick.addEventListener('change', () => load(pick.value));
+  root.querySelector('.ed-acts').addEventListener('click', e => {
+    const a = e.target.closest('[data-act]')?.dataset.act;
+    if (a === 'play') play();
+    else if (a === 'export') openIO('export');
+    else if (a === 'import') openIO('import');
+  });
   toolBar.addEventListener('click', e => {
     const b = e.target.closest('button');
     if (!b) return;
@@ -189,12 +207,29 @@ export function createEditor(app) {
     showSel();
   });
 
+  // A mission from missions.js, or a new one, as the working copy.
   function load(key) {
-    E.key = key; store.set('edit.key', key);
-    E.def = fresh(MISSIONS.find(m => m.key === key));
+    useDef(key === 'new' ? blankMission() : fresh(MISSIONS.find(m => m.key === key)));
+  }
+  function useDef(def) {
+    E.def = def; E.key = def.key || 'new';
+    store.set('edit.key', E.key);
+    pick.value = missionKeys.includes(E.key) ? E.key : 'new';
     E.sel.clear(); E.tool = null; E.sight = null; E.note = '';
-    rebuild();
-    frame();
+    save(); rebuild(); frame();
+  }
+  // A new mission: the next free key, a random seed, one foe to stomp.
+  function blankMission() {
+    let n = MISSIONS.length + 1;
+    while (missionKeys.includes(`m${n}`)) n++;
+    return { key: `m${n}`, pal: 'dusk', seed: 1 + Math.floor(Math.random() * 99999), foes: [{ type: 'jackal', at: [0, 500] }], objectives: [{ type: 'eliminate' }], intel: '' };
+  }
+  // The working copy survives a reload (and PLAY): kept as its export text.
+  const save = () => store.set('edit.work', { key: E.def.key, src: toSource(E.def) });
+  function restore() {
+    const w = store.get('edit.work', null), want = params.get('mission');
+    if (!w?.src || (want && want !== w.key)) return null;
+    try { return fromSource(w.src); } catch { return null; }
   }
   // The world from the working copy: the game's own start, in daylight and
   // clear weather so everything can be seen, and the sim never stepped.
@@ -207,10 +242,10 @@ export function createEditor(app) {
     app.scene.uploadWorld();
     E.map = mapThings(E.def, G);
     for (const id of [...E.sel]) if (!E.map.things.some(t => t.id === id)) E.sel.delete(id);
-    showSel(); showMission();
+    showSel(); showMission(); showLists(); showProblems();
   }
   // After an edit: the world again, keeping the camera where it is.
-  const edited = () => { E.sight = null; rebuild(); };
+  const edited = () => { E.sight = null; save(); rebuild(); };
 
   // Fit the mission on the screen: every thing and route point in the part
   // of it the panel and the palette leave free, found by halving the distance.
@@ -443,6 +478,7 @@ export function createEditor(app) {
   function showMission() {
     const d = E.def, sel = (k, opts, v) => `<select data-m="${k}">${opts.map(([o, l]) => `<option value="${o}"${o === (v ?? '') ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
     misBox.innerHTML = `<p class="ed-head">MISSION</p>
+      <label><span>KEY</span><input data-m="key" value="${esc(d.key || '')}"></label>
       <label><span>SEED</span><span class="ed-row"><input data-m="seed" inputmode="numeric" value="${esc(d.seed ?? '')}"><button data-m="reroll">REROLL</button></span></label>
       <label><span>MAP</span>${sel('pal', PAL_KEYS.map(k => [k, k.toUpperCase()]), d.pal)}</label>
       <label><span>WEATHER</span>${sel('weather', WX.map(k => [k, k ? k.toUpperCase() : 'CLEAR']), d.weather)}</label>
@@ -456,6 +492,7 @@ export function createEditor(app) {
     if (!f || f.tagName === 'BUTTON') return;
     const d = E.def, v = f.value.trim(), k = f.dataset.m;
     if (k === 'seed') { if (Number.isFinite(+v) && v !== '') d.seed = Math.round(+v); }
+    else if (k === 'key') { if (/^[a-z0-9_]+$/i.test(v)) d.key = v; }
     else if (k === 'rampTo' || k === 'rampSecs') {
       const to = k === 'rampTo' ? v : d.ramp?.[1], secs = k === 'rampSecs' ? +v : d.ramp?.[2] ?? 240;
       if (to) d.ramp = [d.ramp?.[0] || d.time || 'dusk', to, Number.isFinite(secs) && secs > 0 ? secs : 240]; else delete d.ramp;
@@ -467,6 +504,169 @@ export function createEditor(app) {
     E.def.seed = 1 + Math.floor(Math.random() * 99999);
     edited();
   });
+  // ---- Objectives and waves: ordered lists, each item its own fields ----
+
+  // A field by its path in the mission ('objectives.1.waves.0.from'), with
+  // how to read the text back: [key, label, kind, options].
+  const OBJ_TYPES = ['eliminate', 'destroy', 'protect', 'survive', 'extract', 'escort'];
+  const ids = () => (E.def.entities || []).filter(e => e.id != null).map(e => [e.id, e.id]);
+  const objFields = o => [
+    ['type', 'TYPE', 'sel', OBJ_TYPES.map(t => [t, t.toUpperCase()])],
+    ['label', 'LABEL', 'text'],
+    ...(o.type === 'destroy' || o.type === 'protect' ? [['targets', 'TAGS', 'list']] : []),
+    ...(o.type === 'protect' || o.type === 'escort' ? [['minAlive', 'KEEP', 'num']] : []),
+    ...(o.type === 'survive' ? [['seconds', 'SECONDS', 'num']] : []),
+    ...(o.type === 'extract' ? [['at', 'PAD', 'sel', [['', '-'], ...ids()]], ['within', 'IN (S)', 'num']] : []),
+    ...(o.type === 'escort' ? [['convoy', 'CONVOY TAG', 'text'], ['to', 'TO', 'sel', [['', '-'], ...ids()]]] : []),
+    ['after', 'AFTER OBJ', 'obj'],
+    ['secondary', 'OPTIONAL', 'sel', [['', 'NO'], ['true', 'YES']]],
+  ];
+  const WAVE_FIELDS = [['at', 'AT (S)', 'num'], ['when', 'AFTER OBJ', 'when'], ['done', 'WHEN DONE', 'done'], ['foes', 'MECHS', 'list'], ['from', 'FROM', 'from'], ['dist', 'DIST', 'num'], ['reveal', 'REVEAL', 'num']];
+  // What a field shows: objective numbers count from 1 on the screen.
+  function shown(item, [k, , kind]) {
+    if (kind === 'obj') return item.after == null ? '' : item.after + 1;
+    if (kind === 'when') return item.when ? item.when.obj + 1 : '';
+    if (kind === 'done') return item.when?.done ?? '';
+    return item[k];
+  }
+  function row(path, item, f) {
+    const [k, label, kind, opts] = f, v = shown(item, f), val = v == null ? '' : Array.isArray(v) ? v.join(', ') : String(v);
+    const input = kind === 'sel'
+      ? `<select data-p="${path}" data-k="${k}" data-kind="sel">${opts.map(([o, l]) => `<option value="${esc(o)}"${String(o) === val ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`
+      : `<input data-p="${path}" data-k="${k}" data-kind="${kind}" value="${esc(val)}"${kind === 'text' || kind === 'list' || kind === 'from' ? '' : ' inputmode="decimal"'}>`;
+    return `<label><span>${label}</span>${input}</label>`;
+  }
+  const itemBar = (path, n, len) => `<span class="ed-item-bar"><button data-move="${path}" data-d="-1"${n ? '' : ' disabled'} aria-label="Up">▲</button><button data-move="${path}" data-d="1"${n < len - 1 ? '' : ' disabled'} aria-label="Down">▼</button><button data-drop="${path}" aria-label="Remove">✕</button></span>`;
+  const waveBlock = (w, path, n, len) => `<div class="ed-item" data-anchor="${path}"><p>WAVE ${n + 1}${itemBar(path, n, len)}</p><div class="ed-fields">${WAVE_FIELDS.map(f => row(path, w, f)).join('')}</div></div>`;
+  function showLists() {
+    const objs = E.def.objectives || [], waves = E.def.waves || [];
+    objBox.innerHTML = `<p class="ed-head">OBJECTIVES</p>${objs.map((o, n) => {
+      const path = `objectives.${n}`, inner = o.type === 'survive' ? (o.waves || []).map((w, k) => waveBlock(w, `${path}.waves.${k}`, k, o.waves.length)).join('') + `<button class="ed-add" data-add="${path}.waves">ADD A WAVE</button>` : '';
+      return `<div class="ed-item" data-anchor="${path}"><p>${n + 1}. ${esc(o.type.toUpperCase())}${itemBar(path, n, objs.length)}</p><div class="ed-fields">${objFields(o).map(f => row(path, o, f)).join('')}</div>${inner}</div>`;
+    }).join('')}<button class="ed-add" data-add="objectives">ADD AN OBJECTIVE</button>`;
+    waveBox.innerHTML = `<p class="ed-head">WAVES</p>${waves.map((w, k) => waveBlock(w, `waves.${k}`, k, waves.length)).join('')}<button class="ed-add" data-add="waves">ADD A WAVE</button>`;
+  }
+  // The list a path names, and the index in it: 'objectives.0.waves.2' → [the waves, 2].
+  function listAt(path) {
+    const parts = path.split('.'), last = +parts.pop();
+    let o = E.def;
+    for (const p of parts) o = o?.[p];
+    return [o, last];
+  }
+  function itemAt(path) { const [list, i] = listAt(path); return list?.[i]; }
+  // A field's text back into an objective or a wave: blank removes it.
+  function setPath(item, k, kind, text) {
+    const t = text.trim();
+    if (kind === 'when' || kind === 'done') {
+      const obj = kind === 'when' ? +t - 1 : item.when?.obj ?? 0, done = kind === 'done' ? +t : item.when?.done ?? 1;
+      if (kind === 'when' && t === '') delete item.when;
+      else if (Number.isFinite(obj) && Number.isFinite(done)) { item.when = { obj, done }; delete item.at; }
+      return;
+    }
+    if (t === '') { delete item[k]; return; }
+    if (kind === 'obj') { if (Number.isFinite(+t) && +t >= 1) item.after = +t - 1; }
+    else if (kind === 'list') item[k] = t.split(/[,\s]+/).filter(Boolean);
+    else if (kind === 'from') item.from = Number.isFinite(+t) ? +t : t;
+    else if (kind === 'num') { if (Number.isFinite(+t)) { item[k] = +t; if (k === 'at') delete item.when; } }
+    else if (k === 'secondary') item.secondary = true;
+    else item[k] = t;
+  }
+  for (const box of [objBox, waveBox]) {
+    box.addEventListener('change', e => {
+      const f = e.target.closest('[data-p]');
+      if (!f) return;
+      const item = itemAt(f.dataset.p);
+      if (!item) return;
+      setPath(item, f.dataset.k, f.dataset.kind, f.value);
+      edited();
+    });
+    box.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.dataset.add) {
+        const parts = b.dataset.add.split('.'), key = parts.pop();
+        let o = E.def;
+        for (const p of parts) o = o[p];
+        o[key] = o[key] || [];
+        o[key].push(key === 'objectives' ? { type: 'eliminate' } : { at: 30, foes: ['jackal'], from: 0 });
+      } else if (b.dataset.move) {
+        const [list, i] = listAt(b.dataset.move), j = i + +b.dataset.d;
+        if (!list || j < 0 || j >= list.length) return;
+        [list[i], list[j]] = [list[j], list[i]];
+      } else if (b.dataset.drop) {
+        const [list, i] = listAt(b.dataset.drop);
+        list?.splice(i, 1);
+      } else return;
+      edited();
+    });
+  }
+
+  // ---- Problems: in plain words, as they appear; a tap shows what it is about ----
+  function showProblems() {
+    const ps = check(E.def);
+    probBox.hidden = !ps.length;
+    probBox.innerHTML = ps.length ? `<p class="ed-head">PROBLEMS</p>${ps.map(p => `<button data-pid="${esc(p.id)}">${esc(p.text)}</button>`).join('')}` : '';
+  }
+  probBox.addEventListener('click', e => {
+    const id = e.target.closest('[data-pid]')?.dataset.pid;
+    if (!id) return;
+    if (id === 'start' || id.startsWith('foes.') || id.startsWith('entities.')) { E.sel = new Set([id]); showSel(); return; }
+    const el = id === 'key' ? misBox.querySelector('[data-m="key"]') : root.querySelector(`[data-anchor="${id}"]`) || root.querySelector(`[data-anchor="${id.split('.').slice(0, 2).join('.')}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center' });
+    el.classList.add('ed-flash');
+    setTimeout(() => el.classList.remove('ed-flash'), 900);
+    if (el.tagName === 'INPUT') el.focus();
+  });
+
+  // ---- Export and import: missions.js's own JS, in a box for phones with no clipboard ----
+  function openIO(mode) {
+    io.hidden = false; io.dataset.mode = mode;
+    io.querySelector('.ed-io-title').textContent = mode === 'export' ? 'EXPORT' : 'IMPORT';
+    io.querySelector('[data-io="copy"]').hidden = mode !== 'export';
+    io.querySelector('[data-io="import"]').hidden = mode !== 'import';
+    ioMsg.textContent = '';
+    if (mode === 'export') {
+      ioText.value = toSource(E.def);
+      const ps = check(E.def);
+      ioMsg.textContent = ps.length ? `${ps.length === 1 ? 'ONE PROBLEM' : `${ps.length} PROBLEMS`}. IT STILL EXPORTS.` : 'PASTE IT INTO MISSIONS.JS.';
+      copy();
+    } else { ioText.value = ''; ioText.focus(); }
+  }
+  function copy() {
+    ioText.select();
+    navigator.clipboard?.writeText(ioText.value).then(() => { ioMsg.textContent = `COPIED. ${ioMsg.textContent}`; }, () => {});
+  }
+  io.addEventListener('click', e => {
+    const a = e.target.closest('[data-io]')?.dataset.io;
+    if (a === 'close') io.hidden = true;
+    else if (a === 'copy') copy();
+    else if (a === 'import') {
+      try { useDef(fromSource(ioText.value)); io.hidden = true; } catch (err) { ioMsg.textContent = err.message.toUpperCase(); }
+    }
+  });
+
+  // ---- PLAY and back: the mission as the campaign would start it, in single player ----
+  function play() {
+    save();
+    const def = { ...fresh(E.def), name: NAMES.missions[E.def.key] || String(E.def.key || 'NEW').toUpperCase() };
+    G.diff = app.prefs.diff;
+    startMatch(G, def, def.seed ?? 7, false, app.prefs.chassis, { loadout: fitOf(app.prefs.chassis) });
+    G.kind = 'edit'; G.mode = 'sp';
+    app.scene.uploadWorld();
+    root.hidden = true; io.hidden = true;
+    app.ui.launch();
+  }
+  // From the pause menu, the debrief or F2: the editor as it was.
+  function back() {
+    app.input.exitLock();
+    app.ov.hidden = true;
+    G.paused = false; G.guide = null; G.tut = null;
+    root.hidden = false;
+    rebuild();
+    app.input.syncTouchUI();
+  }
+
   const titleOf = id => E.map.things.find(t => t.id === id)?.label || id;
 
   // A frame: the 3D world from above, then the markers over it.
@@ -492,6 +692,7 @@ export function createEditor(app) {
   // What the renderer asks for in the editor: the overhead camera.
   app.topView = () => { const { W, H } = size(), v = camView(E.cam, W / H); return { eye: v.eye, dir: v.dir, fov: v.fov, near: v.near, far: v.far }; };
 
-  load(E.key);
-  return { E, draw, load, frame, toScreen, handle, selectIds: ids => { E.sel = new Set(ids); showSel(); } };
+  const kept = restore();
+  if (kept) useDef(kept); else load(E.key);
+  return { E, draw, load, frame, toScreen, handle, play, back, selectIds: ids => { E.sel = new Set(ids); showSel(); } };
 }
