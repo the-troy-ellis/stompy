@@ -6,15 +6,16 @@ import { CATS, CAT_OF } from '../data/weapons.js';
 import { steerBy, alpha, cycleTarget } from '../sim/missiles.js';
 import { nextSpectate, orbitSpectate } from '../net/spectate.js';
 import { darkness } from '../data/palettes.js';
+import { readPad, firstPad } from './gamepad.js';
 
 const { abs, hypot } = Math;
 
-// Keyboard, mouse (with pointer lock) and touch (an aim drag and a throttle
-// stick on the left, hold-to-fire buttons on the right, one finger each) all
-// feed one per-frame snapshot
-// that the sim reads. Menu navigation keys are routed to the screens.
+// Keyboard, mouse (with pointer lock), touch (an aim drag and a throttle
+// stick on the left, hold-to-fire buttons on the right, one finger each) and
+// a gamepad (input/gamepad.js) all feed one per-frame snapshot that the sim
+// reads. Menu navigation keys are routed to the screens.
 export function createInput(app) {
-  const G = app.G, prefs = app.prefs, root = app.root, wrap = app.wrap, cv = app.cv;
+  const G = app.G, prefs = app.prefs, root = app.root, wrap = app.wrap, cv = app.cv, ov = app.ov;
   const self = {};
   const keys = {};
   // Which fire controls are held: by touch button, mouse button or key.
@@ -144,7 +145,7 @@ export function createInput(app) {
   const STICK_R = 56, LEFT = 0.45, DOUBLE_TAP = 300, TURN_QUEUE = 1;   // px; share of the width; ms; rad
   let yawDebt = 0, lastAimTap = -1e9, centreTap = false;   // lastAimTap: when a tap (not a drag) on the aim side lifted; centreTap: a double tap not yet sent
   const syncTouchUI = () => {
-    tui.hidden = !(G.touchUI && (G.state === 'play' || G.state === 'over') && !G.paused);
+    tui.hidden = !(G.touchUI && !G.padActive && (G.state === 'play' || G.state === 'over') && !G.paused);   // a gamepad in use: out of the way
     const jump = root.querySelector('[data-t="jump"]');
     if (jump) jump.hidden = G.player?.jets === 0;   // JUMP JETS NONE: no button
     const lights = root.querySelector('[data-t="lights"]');
@@ -241,29 +242,75 @@ export function createInput(app) {
   // A touchscreen laptop can switch either way: follow whatever was used last.
   document.addEventListener('pointerdown', e => {
     const touch = e.pointerType === 'touch';
+    if (touch && G.padActive) { G.padActive = false; syncTouchUI(); }   // a thumb on the glass: the touch controls come back
     if (touch === G.touchUI || e.pointerType === 'pen') return;
     G.touchUI = touch;
     if (touch) exitLock();
     syncTouchUI();
   }, true);
 
-  // What the sim sees this frame, from the keyboard, the mouse buttons and the touch controls.
+  /* ---------- gamepad ---------- */
+
+  // Polled every frame (main.js). In play it feeds the snapshot below and
+  // takes the one-press buttons; over a screen (menu, pause, lobby, debrief)
+  // the D-pad or left stick moves a highlight through its buttons, A presses
+  // the highlighted one, Start launches or resumes, B resumes.
+  const PAD_AIM = 1.5, NAV_REPEAT = 0.22;   // the right stick at full tilt: 1.5x the arrow keys' turn; s between steps while the left stick is held
+  let padHeld = [], pad = null, padIdx = -1, navT = 0;
+  function pollPad(dt) {
+    const gp = firstPad(navigator.getGamepads?.());
+    if (!gp) { pad = null; return; }
+    pad = readPad(gp, padHeld); padHeld = pad.held;
+    if (!pad.active) return;
+    if (!G.padActive) { G.padActive = true; syncTouchUI(); }
+    const p = pad.pressed, P = G.player;
+    if (G.state === 'play' && !G.paused && !G.lobby && !G.summary) {
+      for (const b of ov.querySelectorAll('.pad-focus')) b.classList.remove('pad-focus');
+      if (p.start || p.back) { app.ui.pause(true); return; }
+      if (G.spectate) orbitSpectate(G, pad.axes.twist * 2.5 * dt, -pad.axes.pitch * 2 * dt * (prefs.invert ? -1 : 1));   // waiting to respawn: look around
+      if (p.missile) missileTap = true;
+      if (p.punch) punchTap = true;
+      if (p.target) { if (G.spectate) nextSpectate(G); else cycleTarget(G); }
+      if (p.zoom) G.zoom = !G.zoom;
+      if (p.lights) toggleLights();
+      if (p.stop && P?.alive) P.throttle = 0;
+      return;
+    }
+    // A screen is up: move the highlight, press it.
+    const btns = [...ov.querySelectorAll('button')].filter(b => !b.disabled && b.offsetParent !== null);
+    if (!btns.length) return;
+    const tilt = abs(pad.axes.thr) > 0.6 ? -Math.sign(pad.axes.thr) : abs(pad.axes.turn) > 0.6 ? -Math.sign(pad.axes.turn) : 0;
+    navT = tilt ? navT - dt : 0;
+    let step = p.up || p.left ? -1 : p.down || p.right ? 1 : 0;
+    if (!step && tilt && navT <= 0) { step = tilt; navT = NAV_REPEAT; }
+    if (step) padIdx = padIdx < 0 ? (step > 0 ? 0 : btns.length - 1) : (padIdx + step + btns.length) % btns.length;
+    padIdx = Math.min(padIdx, btns.length - 1);
+    const on = btns[padIdx];
+    if (on && !on.classList.contains('pad-focus')) { for (const b of ov.querySelectorAll('.pad-focus')) b.classList.remove('pad-focus'); on.classList.add('pad-focus'); on.scrollIntoView?.({ block: 'nearest' }); }
+    if (p.a) { if (on) on.click(); else if (G.state === 'menu') app.ui.go(); }
+    else if (p.start) { if (G.paused) app.ui.pause(false); else if (G.state === 'menu' && !G.lobby) app.ui.go(); }
+    else if (p.b && G.paused) app.ui.pause(false);
+  }
+
+  // What the sim sees this frame, from the keyboard, the mouse buttons, the touch controls and a gamepad.
   function snapshotInput() {
     // The touch turn still queued: less what the legs managed last frame.
     yawDebt -= G.turnByUsed || 0; G.turnByUsed = 0;
     if (!G.player?.alive || G.player.shutdown || abs(yawDebt) < 1e-4) yawDebt = 0;   // no banking turns through a shutdown
+    const gp = pad && !G.spectate ? pad : null, aim = gp ? prefs.padSens * PAD_AIM * (G.zoom ? 0.4 : 1) : 0;
     const inp = {
-      thrUp: !!keys.KeyW, thrDown: !!keys.KeyS, stop: !!keys.KeyX,
-      turn: (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0), turnBy: yawDebt,
-      twist: (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0) + (G.touchTwist || 0), pitch: (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0),
-      centre: !!keys.KeyC, centreTap, jets: !!keys.KeyJ,
-      held: Object.fromEntries(CATS.map(c => [c, isHeld(c)])), missileTap, punch: punchTap,
+      thrUp: !!keys.KeyW, thrDown: !!keys.KeyS, stop: !!keys.KeyX, thr: gp ? gp.axes.thr : 0,
+      turn: (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0) + (gp ? gp.axes.turn : 0), turnBy: yawDebt,
+      twist: (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0) + (G.touchTwist || 0) + (gp ? gp.axes.twist * aim : 0),
+      pitch: (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0) + (gp ? gp.axes.pitch * aim * (prefs.invert ? -1 : 1) : 0),
+      centre: !!keys.KeyC || !!gp?.hold.centre, centreTap, jets: !!keys.KeyJ || !!gp?.hold.jets,
+      held: Object.fromEntries(CATS.map(c => [c, isHeld(c) || !!gp?.hold[c]])), missileTap, punch: punchTap,
     };
     missileTap = false; punchTap = false; centreTap = false;
     return inp;
   }
 
-  Object.assign(self, { keys, held, clearHeld, isHeld, snapshot: snapshotInput, lockPointer, exitLock, locked, syncTouchUI, releaseFingers, syncWeaponButtons,
+  Object.assign(self, { keys, held, clearHeld, isHeld, snapshot: snapshotInput, pollPad, lockPointer, exitLock, locked, syncTouchUI, releaseFingers, syncWeaponButtons,
     get missileTap() { return missileTap; }, set missileTap(v) { missileTap = v; } });
   return self;
 }

@@ -383,3 +383,6 @@ html, body {
   .mm-item { padding-top: 2px; padding-bottom: 2px; }
   .swatch { width: 26px; height: 26px; }
 }
+
+/* A gamepad's highlight on a screen's buttons (input.js): D-pad to move, A to press. */
+.mech-overlay .pad-focus { outline: 3px solid #fc3; outline-offset: 2px; }
