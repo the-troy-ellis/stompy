@@ -182,6 +182,25 @@ try {
     if (one.join() !== 'entities.truck2' || !/TRUCK/.test(panelText)) { failed = true; console.error('FAIL: a tap did not select the truck'); }
     if (boxed.join() !== 'entities.truck1,entities.truck2,entities.truck3,entities.truck4') { failed = true; console.error('FAIL: the box did not select the four trucks'); }
     if (cleared !== 0) { failed = true; console.error('FAIL: tapping empty ground did not clear the selection'); }
+    // #247: the palette places a foe where the next tap lands, a drag moves
+    // it along the ground, and holding it shades what it sees.
+    await page.tap('[data-tool="FOE"]');
+    await page.touchscreen.tap(300, 200);
+    const n = await page.evaluate(() => window.__stompy.app.editor.E.def.foes.length);
+    const placed = await page.evaluate(i => JSON.stringify(window.__stompy.app.editor.E.def.foes[i]), n - 1);
+    const nf = await at(`foes.${n - 1}`);
+    await touch('touchStart', nf[0], nf[1]);
+    for (let k = 1; k <= 6; k++) await touch('touchMove', nf[0] + k * 15, nf[1] + k * 6);
+    await touch('touchEnd');
+    const moved = await page.evaluate(i => JSON.stringify(window.__stompy.app.editor.E.def.foes[i]), n - 1);
+    const mf = await at(`foes.${n - 1}`);
+    await touch('touchStart', mf[0], mf[1]);
+    await page.waitForTimeout(700);
+    const sees = await page.evaluate(() => window.__stompy.app.editor.E.sight?.cells.filter(c => c.seen).length || 0);
+    await touch('touchEnd');
+    console.log(`editor: placed ${placed}, moved to ${moved}, it sees ${sees} cells`);
+    if (n !== 1 || !/jackal/.test(placed) || moved === placed) { failed = true; console.error('FAIL: placing and moving a foe'); }
+    if (!(sees > 0)) { failed = true; console.error('FAIL: holding a foe did not shade what it sees'); }
     await page.close();
   }
   // HUD SCALE and COLOURS (#229): 1.5 in full on a desktop and a tablet, as

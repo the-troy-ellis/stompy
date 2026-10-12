@@ -143,7 +143,10 @@ npm run zip         # dist/ as stompy-<version>.zip
 as `window.__stompy`. `?touch=1` forces the touch layout. `?edit=1` (with
 `&mission=m06`, say) opens the mission editor: the mission from above on its
 own ground. Two fingers (or the right mouse button) move the map, a pinch or
-the wheel zooms, Q and E turn it, a tap selects and a drag boxes.
+the wheel zooms, Q and E turn it. A tap selects, dragging a thing moves it
+and dragging the ground boxes many. The buttons along the bottom place
+foes, structures, vehicles, nav points and pads, and ROUTE edits a
+vehicle's route. Holding a foe shades what it can see.
 
 **The plan of record is in `docs/`.** Start with `docs/README.md`:
 - the vision and tone guide;

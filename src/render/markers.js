@@ -9,10 +9,11 @@
 //   things [{ id, kind: 'foe'|'start'|'structure'|'turret'|'vehicle'|'nav'|'pad', x, y, z, r, face (bearing°), asleep, label }]
 //   routes [{ id, pts: [{ x, y, z }], start }] · waves [{ id, kind: 'bearing'|'nav'|'ring', from: {x, y, z}, to: {x, y, z}, r, label }]
 //   sel    a Set of ids · box [x0, y0, x1, y1] or null · pal: a HUD palette (data/colors.js)
+//   sight  what one thing sees (sim/sight.js's grid), or null
 const FONT = 'bold 11px "Lucida Console", monospace';
 const D2R = Math.PI / 180;
 
-export function drawMap(ctx, view, { map, things = [], routes = [], waves = [], sel = new Set(), box = null, pal, centre = { x: 0, z: 0 } }) {
+export function drawMap(ctx, view, { map, things = [], routes = [], waves = [], sel = new Set(), box = null, pal, centre = { x: 0, z: 0 }, sight = null }) {
   const S = (x, z, y = map.height(x, z)) => view.toScreen(x, y, z);
   ctx.save();
   ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.font = FONT; ctx.textBaseline = 'middle';
@@ -29,6 +30,21 @@ export function drawMap(ctx, view, { map, things = [], routes = [], waves = [], 
   // The map's centre, where every `at` is measured from.
   const c = S(centre.x, centre.z);
   if (c) { ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(c[0] - 7, c[1]); ctx.lineTo(c[0] + 7, c[1]); ctx.moveTo(c[0], c[1] - 7); ctx.lineTo(c[0], c[1] + 7); ctx.stroke(); }
+
+  // What one thing can see: a tint on each cell it sees, the rest darkened,
+  // and its range. `sight`: { from: {x, z}, range, cell, cells: [{ x, z, seen }] }.
+  if (sight) {
+    const half = sight.cell / 2;
+    for (const cl of sight.cells) {
+      const q = [S(cl.x - half, cl.z - half), S(cl.x + half, cl.z - half), S(cl.x + half, cl.z + half), S(cl.x - half, cl.z + half)];
+      if (q.some(v => !v)) continue;
+      ctx.fillStyle = cl.seen ? 'rgba(255,90,70,0.22)' : 'rgba(0,0,0,0.3)';
+      ctx.beginPath(); ctx.moveTo(q[0][0], q[0][1]); for (let i = 1; i < 4; i++) ctx.lineTo(q[i][0], q[i][1]); ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle = pal.bad; ctx.lineWidth = 1.5; ctx.setLineDash([6, 6]); ctx.beginPath();
+    for (let a = 0; a <= 360; a += 6) { const p = S(sight.from.x - Math.sin(a * D2R) * sight.range, sight.from.z + Math.cos(a * D2R) * sight.range); if (p) (a ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
 
   // Routes: a line through numbered points.
   for (const r of routes) {

@@ -1,20 +1,29 @@
 // The mission editor (docs/specs/15-mission-editor.md), `?edit=1` and
-// optionally `&mission=m06`: a mission from above on its real terrain. This
-// part shows it and selects in it; placing, the fields, problems, export and
-// PLAY come with the next parts (#247, #248). It is loaded on its own
-// (`import()` in main.js), so normal play never downloads it.
+// optionally `&mission=m06`: a mission from above on its real terrain, where
+// you place and move its foes, structures, vehicles, routes and pads, turn
+// them, edit their fields, reroll the ground and see what a foe can see.
+// Objectives and waves, problems, export and PLAY come with #248. It is
+// loaded on its own (`import()` in main.js), so normal play never downloads
+// it.
 //
-// The camera, gestures, picking and markers are shared modules that know
-// nothing about missions (render/topCamera.js, input/pointer.js,
-// sim/pick.js, render/markers.js); this file is what turns a mission into
-// things to draw and pick.
-import { MISSIONS } from '../data/missions.js';
+// The camera, gestures, picking, markers and line of sight are shared modules
+// that know nothing about missions (render/topCamera.js, input/pointer.js,
+// sim/pick.js, render/markers.js, sim/sight.js); this file is what turns a
+// mission into things to draw and pick, and edits back into the mission.
+import { MISSIONS, SHAPES } from '../data/missions.js';
 import { NAMES } from '../data/names.js';
+import { MECH_ORDER } from '../data/chassis.js';
+import { PALS } from '../data/palettes.js';
+import { WEATHER } from '../data/weather.js';
+import { diffOf } from '../data/ai.js';
 import { toSource, fromSource } from '../data/missionIO.js';
 import { hudPalette } from '../data/colors.js';
 import { startMatch } from '../sim/state.js';
-import { polar } from '../sim/placement.js';
+import { polar, toPolar, roundPolar } from '../sim/placement.js';
+import { eyeOf } from '../sim/geom.js';
+import { PROFILES } from '../sim/ai/profiles.js';
 import { pickNearest, pickInside } from '../sim/pick.js';
+import { sightGrid } from '../sim/sight.js';
 import { BOUND } from '../world/terrain.js';
 import { createTopCamera, camView, groundToScreen, screenToGround, panBy, zoomAt, rotateAbout, settle, metresPerPixel } from '../render/topCamera.js';
 import { drawMap, drawCompass } from '../render/markers.js';
@@ -22,9 +31,15 @@ import { bindPointer } from '../input/pointer.js';
 import { store } from '../util/store.js';
 import { esc } from '../util/dom.js';
 
-const MECH_R = 6, FINGER = 22;   // m: a mech, for picking · px: how far a tap reaches
-const WAVE_DIST = 520;           // sim/waves.js: a wave's default distance
+const MECH_R = 6, FINGER = 22, HANDLE = 34;   // m: a mech, for picking · px: how far a tap reaches · px: the facing handle from its thing
+const WAVE_DIST = 520;                        // sim/waves.js: a wave's default distance
 const fresh = def => fromSource(toSource(def));   // a deep copy that is exactly what export and import give
+const D2R = Math.PI / 180;
+
+// The palette: what the next tap places. ROUTE stays on until it is tapped again.
+const TOOLS = ['FOE', 'STRUCTURE', 'TURRET', 'VEHICLE', 'NAV', 'PAD', 'ROUTE'];
+const NEW_ID = { structure: 'relay', turret: 'launcher', vehicle: 'truck', nav: 'nav', pad: 'lz' };
+const MESHES = [...new Set(Object.values(SHAPES).map(s => s.mesh))];
 
 // Where things are and what they look like, from the mission (and, for a
 // foe placed on the ring, from where the game put it).
@@ -37,22 +52,20 @@ export function mapThings(def, G) {
   (def.foes || []).forEach((f, i) => {
     const s = typeof f === 'string' ? { type: f } : f, m = foeMechs[i];
     const p = s.at ? polar(s.at) : m ? { x: m.x, z: m.z } : { x: 0, z: 0 };
-    const face = s.face ?? (m ? -m.yaw * 180 / Math.PI : null);
+    const face = s.face ?? (m ? -m.yaw / D2R : null);
     things.push({ id: `foes.${i}`, kind: 'foe', ...p, y: h(p.x, p.z), r: MECH_R, face, asleep: s.aware === false, label: NAMES.chassis[s.type] || s.type });
   });
-  const ents = def.entities || [], pathsDrawn = new Map();
+  const ents = def.entities || [], pathsDrawn = new Set();
   ents.forEach((e, i) => {
     if (!e.at) return;
-    const p = polar(e.at), kind = e.kind === 'nav' ? (e.mesh === 'pad' ? 'pad' : 'nav') : e.kind || 'structure';
+    const p = polar(e.at), kind = entityKind(e);
     const r = kind === 'nav' || kind === 'pad' ? e.radius ?? 14 : e.radius ?? (kind === 'vehicle' ? 2.2 : 3);
     things.push({ id: entityId(e, i), kind, ...p, y: h(p.x, p.z), r, hp: e.hp, label: e.label || e.id || '' });
     if (e.kind === 'vehicle' && Array.isArray(e.path) && e.path.length) {
       const key = JSON.stringify(e.path);
-      if (!pathsDrawn.has(key)) {
-        const pts = e.path.map(q => { const w = polar(q); return { ...w, y: h(w.x, w.z) }; });
-        pathsDrawn.set(key, true);
-        routes.push({ id: `route.${entityId(e, i)}`, pts });
-      }
+      if (pathsDrawn.has(key)) return;
+      pathsDrawn.add(key);
+      routes.push({ id: `route.${entityId(e, i)}`, owner: entityId(e, i), pts: e.path.map(q => { const w = polar(q); return { ...w, y: h(w.x, w.z) }; }) });
     }
   });
   const allWaves = [...(def.waves || []).map((w, k) => [w, `waves.${k}`]),
@@ -70,15 +83,86 @@ export function mapThings(def, G) {
   return { things, routes, waves };
 }
 const entityId = (e, i) => `entities.${e.id ?? i}`;
+const entityKind = e => (e.kind === 'nav' ? (e.mesh === 'pad' ? 'pad' : 'nav') : e.kind || 'structure');
+
+// ---- Edits on the mission itself: plain functions on the definition, so
+// they are tested headlessly (test/editorEdits.test.js). `id`s are the ones
+// mapThings gives. ----
+
+// The mission's object behind an id: { list, index, item } (start: the array).
+export function findSource(def, id) {
+  if (id === 'start') return { list: 'start', item: def.start || null };
+  const [list, k] = id.split('.');
+  if (list === 'foes') { const i = +k; return def.foes?.[i] != null ? { list, index: i, item: def.foes[i] } : null; }
+  if (list === 'entities') {
+    const i = (def.entities || []).findIndex((e, j) => String(e.id ?? j) === k);
+    return i < 0 ? null : { list, index: i, item: def.entities[i] };
+  }
+  return null;
+}
+// Put a thing at (x, z) on the ground, rounded as the spec says a moved thing is.
+export function moveTo(def, id, x, z) {
+  const at = roundPolar(toPolar(x, z));
+  if (id === 'start') { def.start = [at[0], at[1], def.start?.[2] ?? 0]; return; }
+  const s = findSource(def, id);
+  if (!s) return;
+  if (s.list === 'foes' && typeof s.item === 'string') def.foes[s.index] = { type: s.item, at };
+  else s.item.at = at;
+}
+// Point a foe or the start at a bearing, in 5° steps.
+export function faceTo(def, id, bearing) {
+  const f = ((Math.round(bearing / 5) * 5) % 360 + 360) % 360;
+  if (id === 'start') { def.start = [...(def.start || [0, 0]).slice(0, 2), f]; return; }
+  const s = findSource(def, id);
+  if (s?.list !== 'foes') return;
+  if (typeof s.item === 'string') def.foes[s.index] = { type: s.item, face: f };
+  else s.item.face = f;
+}
+// A new thing at (x, z): what the palette's button makes. Returns its id.
+export function place(def, tool, x, z) {
+  const at = roundPolar(toPolar(x, z));
+  def.foes = def.foes || [];
+  if (tool === 'FOE') { def.foes.push({ type: 'jackal', at }); return `foes.${def.foes.length - 1}`; }
+  const kind = { STRUCTURE: 'structure', TURRET: 'turret', VEHICLE: 'vehicle', NAV: 'nav', PAD: 'pad' }[tool];
+  if (!kind) return null;
+  const ents = def.entities = def.entities || [], base = NEW_ID[kind];
+  let n = 1;
+  while (ents.some(e => e.id === `${base}${n}`)) n++;
+  const id = `${base}${n}`;
+  const shape = { structure: SHAPES.RELAY, turret: SHAPES.LAUNCHER, vehicle: SHAPES.TRUCK, pad: SHAPES.PAD, nav: { kind: 'nav' } }[kind];
+  const e = { ...JSON.parse(JSON.stringify(shape)), id, at };   // the shapes it uses have no Infinity in them
+  if (kind === 'vehicle') e.path = [[...at], [at[0], at[1] + 200]];
+  ents.push(e);
+  return `entities.${id}`;
+}
+// Take things out. The start goes back to the map's centre.
+export function remove(def, ids) {
+  const foes = ids.filter(id => id.startsWith('foes.')).map(id => +id.split('.')[1]).sort((a, b) => b - a);
+  for (const i of foes) def.foes.splice(i, 1);
+  const gone = new Set(ids.filter(id => id.startsWith('entities.')).map(id => findSource(def, id)?.item).filter(Boolean));
+  if (def.entities) def.entities = def.entities.filter(e => !gone.has(e));
+  if (ids.includes('start')) delete def.start;
+}
+// A vehicle's route, and every vehicle that drives the same one (a convoy).
+export function routeOf(def, id) {
+  const s = findSource(def, id);
+  if (s?.item?.kind !== 'vehicle' || !Array.isArray(s.item.path)) return null;
+  const key = JSON.stringify(s.item.path);
+  return { path: s.item.path, vehicles: def.entities.filter(e => e.kind === 'vehicle' && JSON.stringify(e.path) === key) };
+}
+export function setRoute(def, id, path) {
+  const r = routeOf(def, id);
+  if (r) for (const v of r.vehicles) v.path = path.map(p => [...p]);
+}
 
 export function createEditor(app) {
   const G = app.G, wrap = app.wrap, params = app.params;
   const missionKeys = MISSIONS.map(m => m.key);
   const key0 = params.get('mission') || store.get('edit.key', 'm01');
-  const E = { key: missionKeys.includes(key0) ? key0 : 'm01', def: null, cam: createTopCamera(), sel: new Set(), box: null, map: null };
+  const E = { key: missionKeys.includes(key0) ? key0 : 'm01', def: null, cam: createTopCamera(), sel: new Set(), box: null, map: null, tool: null, drag: null, sight: null, note: '' };
   app.ov.hidden = true;
 
-  // The page: a surface for the gestures and a panel on the right.
+  // The page: a surface for the gestures, the panel on the right and the palette along the bottom.
   const root = document.createElement('div');
   root.className = 'ed';
   root.innerHTML = `
@@ -87,16 +171,28 @@ export function createEditor(app) {
       <div class="ed-title">EDITOR</div>
       <select class="ed-mission" aria-label="Mission">${MISSIONS.map(m => `<option value="${m.key}">${m.key.toUpperCase()}${m.name ? ` · ${esc(m.name)}` : ''}</option>`).join('')}</select>
       <div class="ed-sel"></div>
-    </div>`;
+      <div class="ed-mis"></div>
+    </div>
+    <div class="ed-tools">${TOOLS.map(t => `<button class="ed-tool" data-tool="${t}">${t}</button>`).join('')}<button class="ed-tool ed-del" data-act="delete">DELETE</button></div>`;
   wrap.appendChild(root);
-  const surface = root.querySelector('.ed-surface'), panel = root.querySelector('.ed-sel'), pick = root.querySelector('.ed-mission');
+  const surface = root.querySelector('.ed-surface'), selBox = root.querySelector('.ed-sel'), misBox = root.querySelector('.ed-mis'), pick = root.querySelector('.ed-mission');
+  const toolBar = root.querySelector('.ed-tools');
   pick.value = E.key;
   pick.addEventListener('change', () => load(pick.value));
+  toolBar.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.act === 'delete') { deleteSel(); return; }
+    E.tool = E.tool === b.dataset.tool ? null : b.dataset.tool;
+    if (E.tool === 'ROUTE' && !selectedRoute()) { E.tool = null; E.note = 'SELECT A VEHICLE FIRST.'; }
+    else E.note = '';
+    showSel();
+  });
 
   function load(key) {
     E.key = key; store.set('edit.key', key);
     E.def = fresh(MISSIONS.find(m => m.key === key));
-    E.sel.clear();
+    E.sel.clear(); E.tool = null; E.sight = null; E.note = '';
     rebuild();
     frame();
   }
@@ -105,14 +201,19 @@ export function createEditor(app) {
   function rebuild() {
     const view = { ...E.def, time: 'day' };
     delete view.ramp; delete view.weather;
+    G.diff = app.prefs.diff;
     startMatch(G, view, E.def.seed ?? 7, false, app.prefs.chassis);
     G.state = 'edit'; G.kind = 'edit';
     app.scene.uploadWorld();
     E.map = mapThings(E.def, G);
-    showSel();
+    for (const id of [...E.sel]) if (!E.map.things.some(t => t.id === id)) E.sel.delete(id);
+    showSel(); showMission();
   }
+  // After an edit: the world again, keeping the camera where it is.
+  const edited = () => { E.sight = null; rebuild(); };
+
   // Fit the mission on the screen: every thing and route point in the part
-  // of it the panel leaves free, found by halving the distance in or out.
+  // of it the panel and the palette leave free, found by halving the distance.
   function frame() {
     const pts = [...E.map.things, ...E.map.routes.flatMap(r => r.pts)];
     const xs = pts.map(p => p.x), zs = pts.map(p => p.z);
@@ -131,37 +232,109 @@ export function createEditor(app) {
     for (let k = 0; k < 18; k++) { const d = (lo + hi) / 2; at(d); if (fits()) hi = d; else lo = d; }
     at(hi);
   }
-  // The screen less the panel and a margin.
+  // The screen less the panel, the palette and a margin.
   function freeArea(W, H) {
-    const r = root.querySelector('.ed-panel').getBoundingClientRect(), wr = wrap.getBoundingClientRect(), m = 28;
+    const wr = wrap.getBoundingClientRect(), r = root.querySelector('.ed-panel').getBoundingClientRect(), tb = toolBar.getBoundingClientRect(), m = 28;
     const x1 = r.width && r.left - wr.left > W / 2 ? r.left - wr.left - m : W - m;
-    return { x0: m, x1, y0: m, y1: H - m - 16 };   // room for a label under the lowest thing
+    const y1 = tb.height ? tb.top - wr.top - m : H - m - 16;
+    return { x0: m, x1, y0: m, y1 };
   }
 
   const size = () => ({ W: Math.max(1, wrap.clientWidth), H: Math.max(1, wrap.clientHeight) });
   const ground = (sx, sy) => { const { W, H } = size(); return screenToGround(E.cam, sx, sy, W, H, G.ter.height); };
   const mpp = () => metresPerPixel(E.cam, size().H);
+  const toScreen = t => { const { W, H } = size(); return groundToScreen(E.cam, { x: t.x, y: t.y ?? G.ter.height(t.x, t.z), z: t.z }, W, H); };
   const pickables = () => E.map.things.map(t => ({ id: t.id, x: t.x, z: t.z, r: t.r }));
+  const thingAt = (x, y) => { const g = ground(x, y); return g && pickNearest(pickables(), g.x, g.z, FINGER * mpp()); };
   const after = () => { settle(E.cam, BOUND, G.ter.height); };
+  const one = () => (E.sel.size === 1 ? E.map.things.find(t => t.id === [...E.sel][0]) : null);
+  // The selected vehicle's route on the map, if a vehicle is selected.
+  function selectedRoute() {
+    const t = one(), mine = t?.kind === 'vehicle' && routeOf(E.def, t.id);
+    return mine ? E.map.routes.find(r => JSON.stringify(routeOf(E.def, r.owner)?.path) === JSON.stringify(mine.path)) : null;
+  }
+  // The facing handle of the selected foe or start, on the screen.
+  function handle() {
+    const t = one();
+    if (!t || (t.kind !== 'foe' && t.kind !== 'start') || t.face == null) return null;
+    const a = toScreen(t), b = toScreen({ x: t.x - Math.sin(t.face * D2R) * 10, z: t.z + Math.cos(t.face * D2R) * 10 });
+    if (!a || !b) return null;
+    const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    return { t, at: a, x: a[0] + Math.cos(ang) * HANDLE, y: a[1] + Math.sin(ang) * HANDLE };
+  }
+  const routePointAt = (r, x, y) => r.pts.findIndex(p => { const s = toScreen(p); return s && Math.hypot(s[0] - x, s[1] - y) < FINGER; });
 
   bindPointer(surface, {
     tap(x, y) {
-      const g = ground(x, y), hit = g && pickNearest(pickables(), g.x, g.z, FINGER * mpp());
+      const g = ground(x, y);
+      if (!g) return;
+      if (E.tool === 'ROUTE') {
+        const r = selectedRoute();
+        if (!r) { E.tool = null; showSel(); return; }
+        const path = routeOf(E.def, r.owner).path.map(p => [...p]), k = routePointAt(r, x, y);
+        if (k >= 0) { if (path.length > 1) path.splice(k, 1); }
+        else path.push(roundPolar(toPolar(g.x, g.z)));
+        setRoute(E.def, r.owner, path);
+        edited();
+        return;
+      }
+      if (E.tool) {
+        const id = place(E.def, E.tool, g.x, g.z);
+        E.tool = null;
+        E.sel = new Set(id ? [id] : []);
+        edited();
+        return;
+      }
+      const hit = thingAt(x, y);
       E.sel = new Set(hit ? [hit.id] : []);
+      E.note = '';
       showSel();
     },
-    dragStart(x, y) { E.box = [x, y, x, y]; },
-    drag(x, y) { if (E.box) { E.box[2] = x; E.box[3] = y; } },
+    dragStart(x, y) {
+      const hd = handle();
+      if (hd && Math.hypot(hd.x - x, hd.y - y) < FINGER) { E.drag = { kind: 'face', id: hd.t.id }; return; }
+      const r = E.tool === 'ROUTE' && selectedRoute(), k = r ? routePointAt(r, x, y) : -1;
+      if (k >= 0) { E.drag = { kind: 'point', route: r, k }; return; }
+      const hit = thingAt(x, y), g = ground(x, y);
+      if (hit && g) {
+        if (!E.sel.has(hit.id)) { E.sel = new Set([hit.id]); showSel(); }
+        const moving = E.map.things.filter(t => E.sel.has(t.id));
+        E.drag = { kind: 'move', from: g, orig: moving.map(t => ({ t, x: t.x, z: t.z })) };
+        return;
+      }
+      E.box = [x, y, x, y];
+    },
+    drag(x, y) {
+      const d = E.drag, g = ground(x, y);
+      if (E.box) { E.box[2] = x; E.box[3] = y; return; }
+      if (!d || !g) return;
+      if (d.kind === 'move') for (const o of d.orig) { o.t.x = o.x + g.x - d.from.x; o.t.z = o.z + g.z - d.from.z; o.t.y = G.ter.height(o.t.x, o.t.z); }
+      else if (d.kind === 'face') { const t = E.map.things.find(q => q.id === d.id); t.face = toPolar(g.x - t.x, g.z - t.z)[0]; }
+      else if (d.kind === 'point') Object.assign(d.route.pts[d.k], { x: g.x, z: g.z, y: G.ter.height(g.x, g.z) });
+    },
     dragEnd() {
-      const b = E.box;
-      E.box = null;
-      if (!b) return;
-      const corners = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].map(([x, y]) => ground(x, y));
-      if (corners.some(c => !c)) return;
-      E.sel = new Set(pickInside(pickables(), corners.map(c => [c.x, c.z])).map(t => t.id));
-      showSel();
+      const b = E.box, d = E.drag;
+      E.box = null; E.drag = null;
+      if (b) {
+        const corners = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].map(([x, y]) => ground(x, y));
+        if (corners.some(c => !c)) return;
+        E.sel = new Set(pickInside(pickables(), corners.map(c => [c.x, c.z])).map(t => t.id));
+        showSel();
+        return;
+      }
+      if (!d) return;
+      if (d.kind === 'move') for (const o of d.orig) moveTo(E.def, o.t.id, o.t.x, o.t.z);
+      else if (d.kind === 'face') { const t = E.map.things.find(q => q.id === d.id); faceTo(E.def, d.id, t.face); }
+      else if (d.kind === 'point') {
+        const path = routeOf(E.def, d.route.owner).path.map(p => [...p]), p = d.route.pts[d.k];
+        path[d.k] = roundPolar(toPolar(p.x, p.z));
+        setRoute(E.def, d.route.owner, path);
+      }
+      edited();
     },
-    dragCancel() { E.box = null; },
+    dragCancel() { E.box = null; if (E.drag) { E.drag = null; E.map = mapThings(E.def, G); } },
+    longPress(x, y) { const hit = thingAt(x, y); if (hit?.id.startsWith('foes.')) { E.sel = new Set([hit.id]); showSel(); showSight(hit.id); } },
+    longEnd() { E.sight = null; },
     pan(dx, dy) { panBy(E.cam, dx, dy, size().H); after(); },
     pinch(f, x, y) { zoomAt(E.cam, f, ground(x, y)); after(); },
     twist(a, x, y) { rotateAbout(E.cam, a, ground(x, y)); after(); },   // fingers turned clockwise turn the map clockwise
@@ -172,47 +345,153 @@ export function createEditor(app) {
     if (turn) rotateAbout(E.cam, turn);
     else if (move) panBy(E.cam, move[0], move[1], size().H);
     else if (e.code === 'KeyF') frame();
+    else if (e.code === 'KeyL') { const t = one(); if (E.sight) E.sight = null; else if (t?.kind === 'foe') showSight(t.id); }
+    else if (e.code === 'Delete' || e.code === 'Backspace') deleteSel();
+    else if (e.code === 'Escape') { E.tool = null; E.sel.clear(); E.sight = null; showSel(); }
     else return;
     e.preventDefault(); after();
   });
 
-  // The panel: what is selected, plainly.
+  // What a foe sees from where it stands: the AI's own test, out to its sight
+  // range at this difficulty, in daylight.
+  function showSight(id) {
+    const i = +id.split('.')[1], m = G.mechs.filter(x => x.team !== 0)[i];
+    if (!m) return;
+    const range = diffOf(G).sight, cell = 30;
+    E.sight = { id, range, cell, from: { x: m.x, z: m.z }, cells: sightGrid(G, eyeOf(m), range, { cell }) };
+  }
+  function deleteSel() {
+    if (!E.sel.size) return;
+    remove(E.def, [...E.sel]);
+    E.sel.clear();
+    edited();
+  }
+
+  // ---- The panel ----
+
+  // A field: [key, label, kind ('text', 'num', 'sel'), options]. Setting one
+  // edits the mission and rebuilds the world.
+  const FOE_FIELDS = [
+    ['type', 'MECH', 'sel', MECH_ORDER.map(k => [k, NAMES.chassis[k]])],
+    ['profile', 'STYLE', 'sel', [['', 'ITS OWN'], ...Object.keys(PROFILES).map(k => [k, k.toUpperCase()])]],
+    ['aware', 'AWAKE', 'sel', [['', 'MAYBE'], ['true', 'YES'], ['false', 'NO']]],
+    ['face', 'FACING °', 'num'],
+  ];
+  const ENTITY_FIELDS = [
+    ['id', 'ID', 'text'], ['label', 'LABEL', 'text'], ['tags', 'TAGS', 'text'],
+    ['kind', 'KIND', 'sel', [['structure', 'STRUCTURE'], ['turret', 'TURRET'], ['vehicle', 'VEHICLE'], ['nav', 'NAV']]],
+    ['mesh', 'LOOK', 'sel', [['', 'NONE'], ...MESHES.map(m => [m, m.toUpperCase()])]],
+    ['height', 'HEIGHT', 'num'], ['radius', 'RADIUS', 'num'], ['hp', 'HP', 'text'], ['pad', 'FLAT PAD', 'num'],
+  ];
+  const VEHICLE_FIELDS = [['speed', 'SPEED', 'num']];
+  const START_FIELDS = [['face', 'FACING °', 'num']];
+  function fieldRow([k, label, kind, opts], v) {
+    const val = v == null ? '' : Array.isArray(v) ? v.join(', ') : v === Infinity ? 'Infinity' : String(v);
+    const input = kind === 'sel'
+      ? `<select data-f="${k}">${opts.map(([o, l]) => `<option value="${esc(o)}"${o === val ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`
+      : `<input data-f="${k}" ${kind === 'num' ? 'inputmode="decimal"' : ''} value="${esc(val)}">`;
+    return `<label><span>${label}</span>${input}</label>`;
+  }
+  // A field's text back into the mission: blank removes it.
+  function setField(item, k, kind, text) {
+    const t = text.trim();
+    if (t === '') { delete item[k]; return; }
+    if (k === 'tags') item.tags = t.split(/[,\s]+/).filter(Boolean);
+    else if (k === 'aware') item.aware = t === 'true';
+    else if (k === 'hp') { const v = /^inf/i.test(t) ? Infinity : +t; if (!Number.isNaN(v)) item.hp = v; }
+    else if (kind === 'num') { if (Number.isFinite(+t)) item[k] = +t; }
+    else item[k] = t;
+  }
   function showSel() {
+    for (const b of toolBar.querySelectorAll('[data-tool]')) b.classList.toggle('on', b.dataset.tool === E.tool);
+    toolBar.querySelector('.ed-del').disabled = !E.sel.size;
     const ids = [...E.sel];
-    if (!ids.length) { panel.innerHTML = '<p class="ed-hint">TAP A THING. DRAG TO BOX MANY. TWO FINGERS MOVE THE MAP.</p>'; return; }
-    if (ids.length > 1) { panel.innerHTML = `<p>${ids.length} THINGS</p><ul>${ids.map(id => `<li>${esc(titleOf(id))}</li>`).join('')}</ul>`; return; }
-    const id = ids[0], src = sourceOf(id);
-    panel.innerHTML = `<p>${esc(titleOf(id))}</p>${src ? `<dl>${Object.entries(src).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(fieldText(v))}</dd>`).join('')}</dl>` : ''}`;
+    let html = E.note ? `<p class="ed-note">${esc(E.note)}</p>` : '';
+    if (E.tool === 'ROUTE') html += '<p class="ed-hint">TAP TO ADD A POINT. TAP A POINT TO TAKE IT AWAY. DRAG A POINT TO MOVE IT.</p>';
+    else if (E.tool) html += `<p class="ed-hint">TAP THE GROUND. A NEW ${E.tool} GOES THERE.</p>`;
+    if (!ids.length) { selBox.innerHTML = html + (E.tool ? '' : '<p class="ed-hint">TAP A THING. DRAG IT TO MOVE IT. DRAG THE GROUND TO BOX MANY. TWO FINGERS MOVE THE MAP. HOLD A FOE TO SEE WHAT IT SEES.</p>'); return; }
+    if (ids.length > 1) { selBox.innerHTML = html + `<p>${ids.length} THINGS</p><ul>${ids.map(id => `<li>${esc(titleOf(id))}</li>`).join('')}</ul>`; return; }
+    const id = ids[0], src = findSource(E.def, id), t = one();
+    let fields = [];
+    if (id === 'start') fields = START_FIELDS;
+    else if (src?.list === 'foes') fields = FOE_FIELDS;
+    else if (src?.list === 'entities') fields = [...ENTITY_FIELDS, ...(src.item.kind === 'vehicle' ? VEHICLE_FIELDS : [])];
+    const item = id === 'start' ? { face: E.def.start?.[2] } : typeof src?.item === 'string' ? { type: src.item } : src?.item || {};
+    const at = id === 'start' ? E.def.start : item.at;
+    html += `<p>${esc(titleOf(id))}${at ? ` <span class="ed-at">${at[0]}° ${at[1]} m</span>` : ''}</p><div class="ed-fields" data-for="${esc(id)}">${fields.map(f => fieldRow(f, item[f[0]])).join('')}</div>`;
+    if (t?.kind === 'vehicle') html += `<p class="ed-hint">ITS ROUTE HAS ${routeOf(E.def, id)?.path.length || 0} POINTS. ROUTE CHANGES IT.</p>`;
+    if (t?.kind === 'foe') html += '<p class="ed-hint">HOLD IT (OR L) TO SEE WHAT IT SEES.</p>';
+    selBox.innerHTML = html;
   }
+  selBox.addEventListener('change', e => {
+    const f = e.target.closest('[data-f]'), box = e.target.closest('[data-for]');
+    if (!f || !box) return;
+    const id = box.dataset.for, k = f.dataset.f, spec = [...FOE_FIELDS, ...ENTITY_FIELDS, ...VEHICLE_FIELDS].find(x => x[0] === k);
+    if (id === 'start') { if (k === 'face') faceTo(E.def, 'start', +f.value || 0); }
+    else {
+      const s = findSource(E.def, id);
+      if (!s) return;
+      if (s.list === 'foes' && typeof s.item === 'string') { E.def.foes[s.index] = { type: s.item }; s.item = E.def.foes[s.index]; }
+      setField(s.item, k, spec?.[2] || 'text', f.value);
+      if (k === 'id' && s.list === 'entities') E.sel = new Set([entityId(s.item, s.index)]);
+    }
+    edited();
+  });
+
+  // The mission's own fields: the ground, the look and the words.
+  const PAL_KEYS = Object.keys(PALS), WX = ['', ...Object.keys(WEATHER).filter(k => k !== 'clear')], TIMES = [['', 'ITS OWN'], ['night', 'NIGHT'], ['dawn', 'DAWN']];
+  function showMission() {
+    const d = E.def, sel = (k, opts, v) => `<select data-m="${k}">${opts.map(([o, l]) => `<option value="${o}"${o === (v ?? '') ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+    misBox.innerHTML = `<p class="ed-head">MISSION</p>
+      <label><span>SEED</span><span class="ed-row"><input data-m="seed" inputmode="numeric" value="${esc(d.seed ?? '')}"><button data-m="reroll">REROLL</button></span></label>
+      <label><span>MAP</span>${sel('pal', PAL_KEYS.map(k => [k, k.toUpperCase()]), d.pal)}</label>
+      <label><span>WEATHER</span>${sel('weather', WX.map(k => [k, k ? k.toUpperCase() : 'CLEAR']), d.weather)}</label>
+      <label><span>TIME</span>${sel('time', TIMES, d.time)}</label>
+      <label><span>GETS DARK</span>${sel('rampTo', [['', 'NO'], ['night', 'TO NIGHT'], ['dawn', 'TO DAWN']], d.ramp?.[1])}</label>
+      <label><span>OVER (S)</span><input data-m="rampSecs" inputmode="numeric" value="${esc(d.ramp?.[2] ?? '')}"></label>
+      <label><span>INTEL</span><textarea data-m="intel" rows="3">${esc(d.intel || '')}</textarea></label>`;
+  }
+  misBox.addEventListener('change', e => {
+    const f = e.target.closest('[data-m]');
+    if (!f || f.tagName === 'BUTTON') return;
+    const d = E.def, v = f.value.trim(), k = f.dataset.m;
+    if (k === 'seed') { if (Number.isFinite(+v) && v !== '') d.seed = Math.round(+v); }
+    else if (k === 'rampTo' || k === 'rampSecs') {
+      const to = k === 'rampTo' ? v : d.ramp?.[1], secs = k === 'rampSecs' ? +v : d.ramp?.[2] ?? 240;
+      if (to) d.ramp = [d.ramp?.[0] || d.time || 'dusk', to, Number.isFinite(secs) && secs > 0 ? secs : 240]; else delete d.ramp;
+    } else if (v) d[k] = v; else delete d[k];
+    edited();
+  });
+  misBox.addEventListener('click', e => {
+    if (e.target.dataset?.m !== 'reroll') return;
+    E.def.seed = 1 + Math.floor(Math.random() * 99999);
+    edited();
+  });
   const titleOf = id => E.map.things.find(t => t.id === id)?.label || id;
-  function sourceOf(id) {
-    if (id === 'start') return { start: E.def.start || [0, 0, 0] };
-    const [list, k] = id.split('.');
-    if (list === 'foes') { const f = E.def.foes[+k]; return typeof f === 'string' ? { type: f } : f; }
-    if (list === 'entities') return (E.def.entities || []).find((e, i) => (e.id ?? String(i)) === k) || null;
-    return null;
-  }
-  const fieldText = v => (typeof v === 'string' ? v : Array.isArray(v) && v.length > 6 ? `${v.length} points` : JSON.stringify(v).replace(/null/g, 'Infinity'));
 
   // A frame: the 3D world from above, then the markers over it.
   function draw() {
-    const { W, H } = size(), dpr = app.scene.view.dpr || 1, ctx = app.ctx;
+    const { W, H } = size(), dpr = app.scene.view.dpr || 1, ctx = app.ctx, pal = hudPalette(app.prefs.colourMode);
     app.scene.render();
     const VP = camView(E.cam, W / H).VP;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const view = { W, H, mpp: mpp(), toScreen: (x, y, z) => groundToScreen(E.cam, { x, y, z }, W, H, VP) };
-    drawMap(ctx, view, { map: { bound: BOUND, height: G.ter.height, grid: 100 }, ...E.map, sel: E.sel, box: E.box, pal: hudPalette(app.prefs.colourMode) });
-    drawCompass(ctx, 34, H - 34, E.cam.yaw, hudPalette(app.prefs.colourMode));
+    const sel = new Set(E.sel), r = E.tool === 'ROUTE' && selectedRoute();
+    if (r) sel.add(r.id);
+    drawMap(ctx, view, { map: { bound: BOUND, height: G.ter.height, grid: 100 }, ...E.map, sel, box: E.box, pal, sight: E.sight });
+    const hd = handle();
+    if (hd) {
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(hd.at[0], hd.at[1]); ctx.lineTo(hd.x, hd.y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(hd.x, hd.y, 6, 0, 7); ctx.fill();
+    }
+    drawCompass(ctx, 34, freeArea(W, H).y1 - 6, E.cam.yaw, pal);
   }
   // What the renderer asks for in the editor: the overhead camera.
   app.topView = () => { const { W, H } = size(), v = camView(E.cam, W / H); return { eye: v.eye, dir: v.dir, fov: v.fov, near: v.near, far: v.far }; };
 
   load(E.key);
-  frame();
-  // Where a thing is on the screen, for the smoke test (CSS pixels).
-  const toScreen = t => { const { W, H } = size(); return groundToScreen(E.cam, t, W, H); };
-  const self = { E, draw, load, frame, toScreen, selectIds: ids => { E.sel = new Set(ids); showSel(); } };
-  return self;
+  return { E, draw, load, frame, toScreen, handle, selectIds: ids => { E.sel = new Set(ids); showSel(); } };
 }
