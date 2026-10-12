@@ -140,7 +140,17 @@ npm run zip         # dist/ as stompy-<version>.zip
 ```
 
 `?debug=1` shows frame time, draw calls and the seed, and exposes the state
-as `window.__stompy`. `?touch=1` forces the touch layout.
+as `window.__stompy`. `?touch=1` forces the touch layout. `?edit=1` (with
+`&mission=m06`, say) opens the mission editor: the mission from above on its
+own ground. Two fingers (or the right mouse button) move the map, a pinch or
+the wheel zooms, Q and E turn it. A tap selects, dragging a thing moves it
+and dragging the ground boxes many. The buttons along the bottom place
+foes, structures, vehicles, nav points and pads, and ROUTE edits a
+vehicle's route. Holding a foe shades what it can see. The panel edits
+the selection, the mission, its objectives and its waves, and lists any
+problems. EXPORT gives the mission as the JS that `src/data/missions.js`
+holds, ready to paste in; IMPORT reads one back. PLAY tries it, and the
+pause menu's EDITOR (or F2) comes back. The work is kept across a reload.
 
 **The plan of record is in `docs/`.** Start with `docs/README.md`:
 - the vision and tone guide;

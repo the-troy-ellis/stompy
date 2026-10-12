@@ -32,6 +32,13 @@ export default [
     },
   },
   {
+    // The overhead view's shared parts (docs/specs/15-mission-editor.md): the
+    // mission editor uses them now and a command view will later, so they
+    // know nothing about the editor or any other screen.
+    files: ['src/render/topCamera.js', 'src/render/markers.js', 'src/input/pointer.js'],
+    rules: { 'no-restricted-imports': ['error', { patterns: ['**/ui/*'] }] },
+  },
+  {
     // The smoke test's page.evaluate callbacks run in the browser.
     files: ['test/smoke/**/*.mjs', 'scripts/shoot.mjs', 'scripts/shootMech.mjs', 'scripts/shootProps.mjs', 'scripts/perf.mjs'],
     languageOptions: { globals: { window: 'readonly', document: 'readonly', localStorage: 'readonly', navigator: 'readonly', fetch: 'readonly', caches: 'readonly', createImageBitmap: 'readonly' } },

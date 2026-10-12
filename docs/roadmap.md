@@ -206,7 +206,7 @@ Goal: it is a product.
 
 Spec: [specs/11-release.md](specs/11-release.md).
 
-## M7 — Mission editor (proposed)
+## M7 — Mission editor
 
 Goal: missions are laid out on the ground they are played on, not guessed.
 
@@ -220,7 +220,8 @@ Goal: missions are laid out on the ground they are played on, not guessed.
 Spec: [specs/15-mission-editor.md](specs/15-mission-editor.md). Issues, in
 order: #245 mission IO (export, import, problems), #246 the overhead view,
 gestures, markers and picking, #247 placing, the panel and line of sight,
-#248 objectives and waves, export, PLAY and back.
+#248 objectives and waves, export, PLAY and back. All four are built (#250 to
+#253); a real phone check by the owner is what is left.
 
 ## What is deliberately not scheduled
 

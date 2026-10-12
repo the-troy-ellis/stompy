@@ -152,6 +152,84 @@ try {
     console.log(`touch: the lower stick keeps turning the legs while held ${aimOk}, the upper stick sets throttle and twists ${stickOk}, right side only buttons ${rightOk}, double tap centres ${centred}`);
     if (!(aimOk && stickOk && rightOk && centred)) { failed = true; console.error('FAIL: the touch layout did not behave'); }
   });
+  // The mission editor (#246): ?edit=1 shows a mission from above; a tap on a
+  // truck selects it, a box round the four trucks selects them all, and
+  // tapping empty ground clears it. On a touch screen, with no keyboard.
+  {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 640 }, hasTouch: true });
+    page.on('pageerror', e => errors.push(`editor: ${e.message}`));
+    page.on('console', m => { if (m.type() === 'error') errors.push(`editor: console ${m.text()}`); });
+    await page.goto(`http://localhost:${PORT}/?debug=1&edit=1&mission=m03`);
+    await page.waitForSelector('.ed-panel', { timeout: 15000 });
+    await page.evaluate(() => document.querySelector('.feel-panel [data-a="toggle"]')?.click());
+    const at = id => page.evaluate(i => { const ed = window.__stompy.app.editor; return ed.toScreen(ed.E.map.things.find(x => x.id === i)); }, id);
+    const truck = await at('entities.truck2');
+    await page.touchscreen.tap(truck[0], truck[1]);
+    const one = await page.evaluate(() => [...window.__stompy.app.editor.E.sel]);
+    const panelText = await page.textContent('.ed-sel');
+    const ends = await Promise.all(['entities.truck1', 'entities.truck4'].map(at));
+    const [x0, y0, x1, y1] = [Math.min(ends[0][0], ends[1][0]) - 30, Math.min(ends[0][1], ends[1][1]) - 30, Math.max(ends[0][0], ends[1][0]) + 30, Math.max(ends[0][1], ends[1][1]) + 30];
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+    await touch('touchStart', x0, y0);
+    for (let k = 1; k <= 8; k++) await touch('touchMove', x0 + (x1 - x0) * k / 8, y0 + (y1 - y0) * k / 8);
+    await touch('touchEnd');
+    const boxed = await page.evaluate(() => [...window.__stompy.app.editor.E.sel].sort());
+    await page.screenshot({ path: 'test-results/smoke-editor.png' });
+    await page.touchscreen.tap(60, 60);
+    const cleared = await page.evaluate(() => window.__stompy.app.editor.E.sel.size);
+    console.log(`editor: tap ${one.join()} (${panelText.slice(0, 24)}), box ${boxed.join()}, cleared ${cleared === 0}`);
+    if (one.join() !== 'entities.truck2' || !/TRUCK/.test(panelText)) { failed = true; console.error('FAIL: a tap did not select the truck'); }
+    if (boxed.join() !== 'entities.truck1,entities.truck2,entities.truck3,entities.truck4') { failed = true; console.error('FAIL: the box did not select the four trucks'); }
+    if (cleared !== 0) { failed = true; console.error('FAIL: tapping empty ground did not clear the selection'); }
+    // #248: dragging a truck and exporting changes that truck's `at` and
+    // nothing else.
+    const exportText = async () => { await page.tap('[data-act="export"]'); const v = await page.inputValue('.ed-io-text'); await page.tap('[data-io="close"]'); return v; };
+    const before = await exportText(), t2 = await at('entities.truck2');
+    await touch('touchStart', t2[0], t2[1]);
+    for (let k = 1; k <= 6; k++) await touch('touchMove', t2[0] - k * 10, t2[1] - k * 8);
+    await touch('touchEnd');
+    const after = await exportText(), changed = after.split('\n').filter((l, i) => l !== before.split('\n')[i]);
+    console.log(`editor: export changed ${changed.length} line(s): ${changed.join(' ').trim().slice(0, 60)}`);
+    if (changed.length !== 1 || !/id: 'truck2', at: \[/.test(changed[0])) { failed = true; console.error('FAIL: moving a truck changed more than its at'); }
+    // #247: the palette places a foe where the next tap lands, a drag moves
+    // it along the ground, and holding it shades what it sees.
+    await page.tap('[data-tool="FOE"]');
+    await page.touchscreen.tap(300, 200);
+    const n = await page.evaluate(() => window.__stompy.app.editor.E.def.foes.length);
+    const placed = await page.evaluate(i => JSON.stringify(window.__stompy.app.editor.E.def.foes[i]), n - 1);
+    const nf = await at(`foes.${n - 1}`);
+    await touch('touchStart', nf[0], nf[1]);
+    for (let k = 1; k <= 6; k++) await touch('touchMove', nf[0] + k * 15, nf[1] + k * 6);
+    await touch('touchEnd');
+    const moved = await page.evaluate(i => JSON.stringify(window.__stompy.app.editor.E.def.foes[i]), n - 1);
+    const mf = await at(`foes.${n - 1}`);
+    await touch('touchStart', mf[0], mf[1]);
+    await page.waitForTimeout(700);
+    const sees = await page.evaluate(() => window.__stompy.app.editor.E.sight?.cells.filter(c => c.seen).length || 0);
+    await touch('touchEnd');
+    console.log(`editor: placed ${placed}, moved to ${moved}, it sees ${sees} cells`);
+    if (n !== 1 || !/jackal/.test(placed) || moved === placed) { failed = true; console.error('FAIL: placing and moving a foe'); }
+    if (!(sees > 0)) { failed = true; console.error('FAIL: holding a foe did not shade what it sees'); }
+    // #248: PLAY starts it, the pause menu's EDITOR comes back with nothing
+    // lost, and so does a reload.
+    const work = await page.evaluate(() => JSON.stringify(window.__stompy.app.editor.E.def));
+    await page.tap('[data-act="play"]');
+    await page.waitForFunction(() => window.__stompy.game.state === 'play', null, { timeout: 5000 });
+    const playing = await page.evaluate(() => ({ kind: window.__stompy.game.kind, foes: window.__stompy.game.mechs.filter(m => m.team !== 0).length }));
+    await page.tap('[data-t="pause"]');
+    await page.tap('.mech-overlay [data-a="menu"]');
+    await page.waitForFunction(() => window.__stompy.game.state === 'edit', null, { timeout: 5000 });
+    const backAgain = await page.evaluate(() => JSON.stringify(window.__stompy.app.editor.E.def));
+    await page.reload();
+    await page.waitForSelector('.ed-panel', { timeout: 15000 });
+    const reloaded = await page.evaluate(() => JSON.stringify(window.__stompy.app.editor.E.def));
+    console.log(`editor: PLAY (${playing.kind}, ${playing.foes} foe), back ${backAgain === work}, reload ${reloaded === work}`);
+    if (playing.kind !== 'edit' || playing.foes !== 1) { failed = true; console.error('FAIL: PLAY did not start the edited mission'); }
+    if (backAgain !== work || reloaded !== work) { failed = true; console.error('FAIL: PLAY and back, or a reload, lost the working copy'); }
+    await page.evaluate(() => localStorage.removeItem('stompy.edit.work'));
+    await page.close();
+  }
   // HUD SCALE and COLOURS (#229): 1.5 in full on a desktop and a tablet, as
   // much as fits on a phone held sideways (1 at 360 tall); a screenshot of
   // each colour mode, armour and heat hurt so the states show.
@@ -553,6 +631,13 @@ try {
       return (await Promise.all(urls.map(u => fetch(u).then(r => r.ok && r.headers.get('content-type') !== null, () => false)))).filter(Boolean).length;
     });
     await page.screenshot({ path: 'test-results/smoke-offline.png' });
+    // The editor is its own chunk (#246): cached too, so it opens offline.
+    const ed = await ctx.newPage();
+    ed.on('pageerror', e => errors.push(`pwa editor: ${e.message}`));
+    await ed.goto('http://localhost:8124/?edit=1&mission=m06');
+    const edOffline = await ed.waitForSelector('.ed-panel', { timeout: 10000 }).then(() => true).catch(() => false);
+    await ed.close();
+    if (!edOffline) { failed = true; console.error('FAIL: the editor did not open offline from the built game'); }
     await ctx.setOffline(false);
     await page.keyboard.press('F2');
     await page.waitForFunction(() => window.__stompy.game.state === 'menu', null, { timeout: 5000 });
