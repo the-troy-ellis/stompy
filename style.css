@@ -432,3 +432,29 @@ html, body {
 .ed-head { margin: 6px 0 2px; color: #5f5; letter-spacing: 2px; }
 .ed-at { color: #2a7a2a; }
 .ed-note { color: #fc3; }
+.ed-acts { display: flex; gap: 4px; }
+.ed-acts button { flex: 1; }
+.ed-acts [data-act="play"] { color: #000; background: #5f5; border-color: #5f5; }
+.ed-objs, .ed-waves { display: flex; flex-direction: column; gap: 6px; }
+.ed-item { border: 1px solid #1d4d1d; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.ed-item .ed-item { margin-left: 6px; }
+.ed-item > p { margin: 0; display: flex; align-items: center; gap: 6px; }
+.ed-item-bar { margin-left: auto; display: flex; gap: 4px; }
+.ed-panel .ed-item-bar button { width: 32px; padding: 0; }
+.ed-flash { outline: 2px solid #fc3; }
+.ed-problems {
+  position: absolute; top: 8px; left: 8px; max-width: min(320px, 40vw); max-height: 40%; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 4px; padding: 8px; background: rgba(0, 0, 0, .72); border: 1px solid #7a6a1a;
+}
+.ed-problems[hidden] { display: none; }
+.ed-problems .ed-head { color: #fc3; margin: 0; }
+.ed-problems button { font: inherit; text-align: left; color: #fc3; background: none; border: 0; padding: 4px 0; min-height: 32px; cursor: pointer; }
+.ed-io {
+  position: absolute; inset: 24px; z-index: 4; display: flex; flex-direction: column; gap: 8px; padding: 12px;
+  background: rgba(0, 0, 0, .92); border: 1px solid #2a7a2a;
+}
+.ed-io[hidden] { display: none; }
+.ed-io-text { flex: 1; font: 12px "Lucida Console", monospace; color: #7f7; background: #000; border: 1px solid #2a7a2a; padding: 8px; resize: none; white-space: pre; }
+.ed-io-msg { margin: 0; color: #fc3; min-height: 1em; }
+.ed-io button { font: inherit; color: #7f7; background: #000; border: 1px solid #2a7a2a; min-height: 40px; padding: 0 14px; }
+.ed[hidden] { display: none; }
