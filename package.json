@@ -12,6 +12,7 @@
     "perf": "node scripts/perf.mjs",
     "lint": "eslint src test scripts",
     "build": "node scripts/build.mjs",
+    "zip": "node scripts/zip.mjs",
     "fixture:loadout": "node scripts/loadout-fixture.mjs"
   },
   "devDependencies": {

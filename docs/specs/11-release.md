@@ -157,6 +157,26 @@ first frame; the bundle is minified by esbuild already.
 - Version shown in the settings footer, from `package.json` via a build
   define.
 
+As shipped (#232):
+- **The zip:** `npm run zip` (`scripts/zip.mjs`) writes
+  `stompy-<version>.zip` of `dist/` in plain Node, with `index.html` first at
+  the root. There's no source map, and the same `dist/` gives the same bytes.
+  CI builds it on every push.
+- **The Release:** `.github/workflows/release.yml` runs on a `v*` tag. It
+  builds (with the hosted relay, if set), zips, and creates the Release with
+  the zip attached. The notes are the titles of the PRs merged into main
+  since the last tag (`scripts/notes.mjs`, from git's merge commits).
+  - It refuses a tag that doesn't match `package.json`. Bump the version, then
+    tag `v<version>`.
+- **Pages on a tag:** `pages.yml` also runs on `v*` tags. The repository
+  variable `STOMPY_DEPLOY_ON` chooses `main` (unset: as now), `tags` or
+  `both`. A tag deploy also needs the `github-pages` environment to allow
+  tags.
+- **Version:** the settings footer shows `v<version>` from `package.json`
+  (a build define). The unbuilt page shows `vdev`.
+- **The owner's step:** bump `package.json` to 1.0.0, push the tag `v1.0.0`,
+  and check the Release and the deploy (acceptance 7).
+
 ### README and credits
 
 README rewritten for players first (what it is, how to play, controls), then

@@ -166,6 +166,7 @@ npm run test:server # the relay's tests
 npm run test:smoke  # plays a mission, and an arena round, in headless Chromium
 npm run lint
 npm run build       # one minified file plus the static assets, in dist/
+npm run zip         # dist/ as stompy-<version>.zip for itch.io (after a build)
 ```
 
 `?debug=1` on the URL shows frame time, draw calls and the seed, and exposes

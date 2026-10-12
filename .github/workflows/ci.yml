@@ -16,6 +16,7 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - run: npm run zip   # the itch.io zip (scripts/zip.mjs) still builds
       - run: python3 -m unittest discover server
       - name: Install Chromium for the smoke test
         run: npx playwright-core install --with-deps chromium
