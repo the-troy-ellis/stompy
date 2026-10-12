@@ -217,8 +217,10 @@ Goal: missions are laid out on the ground they are played on, not guessed.
 - The overhead camera, picking, gestures and markers are shared modules: the
   groundwork for a later command view, whose shape is not decided.
 
-Spec: [specs/15-mission-editor.md](specs/15-mission-editor.md). Draft, pending
-the owner's review; not filed as issues yet.
+Spec: [specs/15-mission-editor.md](specs/15-mission-editor.md). Issues, in
+order: #245 mission IO (export, import, problems), #246 the overhead view,
+gestures, markers and picking, #247 placing, the panel and line of sight,
+#248 objectives and waves, export, PLAY and back.
 
 ## What is deliberately not scheduled
 
