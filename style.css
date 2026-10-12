@@ -391,3 +391,21 @@ html, body {
 .set-group { margin: 2px 0 8px; }
 .set-head { color: #fc3; font-size: 11px; letter-spacing: 2px; margin: 4px 0 2px; border-bottom: 1px solid #1a4a1a; }
 @media (max-height: 500px) { .set-group { margin: 0 0 4px; } .set-head { margin: 2px 0 1px; } }
+
+/* ---------- the mission editor (?edit=1; ui/editor.js) ---------- */
+
+.ed { position: absolute; inset: 0; z-index: 2; font: bold 12px "Lucida Console", monospace; color: #7f7; }
+.ed-surface { position: absolute; inset: 0; touch-action: none; cursor: crosshair; }
+.ed-panel {
+  position: absolute; top: 8px; right: 8px; max-height: calc(100% - 16px); width: min(240px, 34vw); overflow-y: auto; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 8px; padding: 10px;
+  background: rgba(0, 0, 0, .72); border: 1px solid #2a7a2a; pointer-events: auto;
+}
+.ed-title { letter-spacing: 2px; color: #5f5; }
+.ed-mission { font: inherit; color: #7f7; background: #000; border: 1px solid #2a7a2a; padding: 6px; min-height: 36px; }
+.ed-sel p { margin: 0 0 6px; }
+.ed-sel ul { margin: 0; padding-left: 16px; }
+.ed-sel dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 0; }
+.ed-sel dt { color: #2a7a2a; }
+.ed-sel dd { margin: 0; overflow-wrap: anywhere; }
+.ed-hint { color: #2a7a2a; line-height: 1.5; }

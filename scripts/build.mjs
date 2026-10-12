@@ -1,4 +1,4 @@
-// Release build: one minified bundle plus the static files, in dist/.
+// Release build: one minified bundle (and the editor's chunk) plus the static files, in dist/.
 // Development needs none of this; index.html loads src/main.js directly.
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
@@ -14,13 +14,15 @@ if (relay && !normalRelay(relay, true)) { console.error(`RELAY_DEFAULT is not a 
 
 await rm('dist', { recursive: true, force: true });
 await mkdir('dist', { recursive: true });
-await build({ entryPoints: ['src/main.js'], bundle: true, minify: true, format: 'iife', target: ['es2020'],
-  outfile: 'dist/stompy.js', sourcemap: true, legalComments: 'none', logLevel: 'info',
+// An ES module with code splitting: the mission editor (`?edit=1`) is its own
+// chunk, loaded by import() only when asked for (docs/specs/15-mission-editor.md).
+await build({ entryPoints: { stompy: 'src/main.js' }, bundle: true, minify: true, format: 'esm', splitting: true, target: ['es2020'],
+  outdir: 'dist', chunkNames: 'chunks/[name]-[hash]', sourcemap: true, legalComments: 'none', logLevel: 'info',
   define: { __PWA__: 'true', __VERSION__: JSON.stringify(version), ...(relay ? { __RELAY_DEFAULT__: JSON.stringify(relay) } : {}) } });
 // The built page: the bundle instead of the modules, and what makes it an app
 // (docs/specs/11-release.md § PWA): the manifest and an icon for iOS.
 const html = (await readFile('index.html', 'utf8'))
-  .replace('<script type="module" src="src/main.js"></script>', '<script src="stompy.js"></script>')
+  .replace('<script type="module" src="src/main.js"></script>', '<script type="module" src="stompy.js"></script>')
   .replace('</head>', '<link rel="manifest" href="manifest.webmanifest">\n<link rel="apple-touch-icon" href="icons/icon-192.png">\n</head>');
 await writeFile('dist/index.html', html);
 for (const f of ['style.css', 'favicon.svg', 'manifest.webmanifest']) await cp(f, `dist/${f}`);

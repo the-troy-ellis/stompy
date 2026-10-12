@@ -132,6 +132,7 @@ function start(root) {
       const c = app.audio.Sound.ctx;
       if (c && prefs.sound && c.state !== 'running' && c.state !== 'closed') { try { c.resume()?.catch?.(() => {}); } catch { /* next tap */ } }
     }
+    if (G.state === 'edit') { app.editor?.draw(); return; }   // the mission editor draws its own frame (ui/editor.js)
     if (G.state === 'play' && !document.hasFocus() && !G.paused) app.ui.pause(true);
     G.clock = performance.now();
     app.input.pollPad(dt);   // a gamepad: the snapshot below, or the screen that's up
@@ -145,7 +146,10 @@ function start(root) {
     app.hud.draw();
   };
 
-  app.ui.mainMenu();
+  // ?edit=1: the mission editor instead of the menu, in its own chunk so
+  // normal play never downloads it (docs/specs/15-mission-editor.md).
+  if (params.has('edit')) { G.state = 'edit'; ov.hidden = true; import('./ui/editor.js').then(m => { app.editor = m.createEditor(app); }); }
+  else app.ui.mainMenu();
   // Installed and offline (the built game only): a new version waiting shows UPDATED · RELOAD on the menu.
   registerServiceWorker(apply => { app.update = apply; if (G.state === 'menu' && !G.lobby && document.activeElement?.tagName !== 'INPUT') app.ui.renderMenu(); });
   requestAnimationFrame(loop);
