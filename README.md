@@ -38,8 +38,8 @@ Mission 1 teaches the controls the first time, one prompt at a time.
   mech is gone. It also hurts you, and shuts you down.
 - **Punch** whoever is in reach. Land on a mech from a jump and you stomp
   it.
-- **Damage** is per section: arms, legs, torso. Lose a leg and you limp.
-  The cockpit voice tells you the bad news.
+- **Damage** is per section: arms, legs, torso. Lose a leg and you lean and
+  turn slowly. The cockpit voice tells you the bad news.
 
 ### Controls
 
