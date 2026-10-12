@@ -64,6 +64,32 @@ Start pause, Back menu. A `gamepad` sensitivity setting. Works on phones with
 a controller attached (the touch UI hides while a gamepad is active and
 returns on the first touch).
 
+As shipped (#227):
+- **The mapping** is in `src/input/gamepad.js`, a pure `readPad` that is
+  tested headlessly. `input.js` polls the first standard-mapped pad every
+  frame.
+  - The sticks have a round deadzone (0.2).
+  - The right stick has a curve, for fine aim near the centre. At full tilt
+    it turns 1.5× as fast as the arrow keys, times GAMEPAD sensitivity, and
+    0.4× that zoomed.
+- **The throttle:** the left stick moves it at W/S's rate times the tilt,
+  and it stays where it was set. That's a new `thr` in the snapshot (the
+  sim's only change).
+- **Buttons the spec didn't name:** right stick click punches, D-pad up is
+  LIGHTS, D-pad down is STOP.
+- **Back** pauses rather than going straight to the menu, since the menu is
+  one press away on the pause screen. A stray press shouldn't lose a
+  mission.
+- **Screens** (menu, pause, lobby, debrief): the D-pad, or the left stick
+  held, moves a highlight through the buttons. A presses the highlighted
+  one, Start launches or resumes, and B resumes. So a whole mission needs no
+  mouse, keyboard or touch.
+- **Phones:** the touch controls hide while the pad is in use and come back
+  on the first touch.
+- **Sound:** browsers may not count a pad press as the gesture that unlocks
+  audio. A pad-only first launch may start silent until a key, click or tap.
+  The owner's real-pad check will say.
+
 ### Silent tutorial
 
 Mission 1 only, first time only (`store` key `tut.done`), each prompt shown
