@@ -409,3 +409,26 @@ html, body {
 .ed-sel dt { color: #2a7a2a; }
 .ed-sel dd { margin: 0; overflow-wrap: anywhere; }
 .ed-hint { color: #2a7a2a; line-height: 1.5; }
+.ed-tools {
+  position: absolute; left: 8px; bottom: 8px; right: calc(min(240px, 34vw) + 16px);
+  display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none;
+}
+.ed-tool {
+  pointer-events: auto; font: inherit; color: #7f7; background: rgba(0, 0, 0, .75); border: 1px solid #2a7a2a;
+  min-height: 40px; padding: 0 10px; letter-spacing: 1px;
+}
+.ed-tool.on { background: #2a7a2a; color: #000; }
+.ed-tool:disabled { opacity: .35; }
+.ed-del { margin-left: auto; color: #f66; border-color: #7a2a2a; }
+.ed-fields, .ed-mis { display: flex; flex-direction: column; gap: 4px; }
+.ed-fields label, .ed-mis label { display: grid; grid-template-columns: 74px 1fr; align-items: center; gap: 6px; }
+.ed-fields span, .ed-mis label > span:first-child { color: #2a7a2a; font-size: 11px; }
+.ed-panel input, .ed-panel select, .ed-panel textarea, .ed-panel button {
+  font: inherit; color: #7f7; background: #000; border: 1px solid #2a7a2a; padding: 4px; min-height: 32px; min-width: 0; box-sizing: border-box; width: 100%;
+}
+.ed-panel textarea { resize: vertical; min-height: 54px; }
+.ed-row { display: flex; gap: 4px; }
+.ed-row button { width: auto; }
+.ed-head { margin: 6px 0 2px; color: #5f5; letter-spacing: 2px; }
+.ed-at { color: #2a7a2a; }
+.ed-note { color: #fc3; }

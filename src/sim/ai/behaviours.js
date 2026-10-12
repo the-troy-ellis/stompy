@@ -1,7 +1,8 @@
-import { clampN, norm, sub, len, wrapA } from '../../util/math.js';
+import { clampN, wrapA } from '../../util/math.js';
 import { BOUND } from '../../world/terrain.js';
 import { geoOf } from '../../data/geo.js';
-import { center, rayTerrain } from '../geom.js';
+import { center } from '../geom.js';
+import { eyeAt, blocked } from '../sight.js';
 import { BEHAVIOUR as B } from '../../data/ai.js';
 
 const { sin, cos, atan2, abs, hypot, min, PI } = Math;
@@ -15,8 +16,6 @@ const { sin, cos, atan2, abs, hypot, min, PI } = Math;
 // ctx: { P, tx, tz, dist, toYaw, seen } from think(): the target's believed
 // position and the bearing and distance to it.
 
-const eyeAt = (G, e, x, z) => [x, G.ter.height(x, z) + geoOf(e).eye[1] + geoOf(e).torsoY * e.ch.scale, z];
-const blocked = (G, from, to) => { const d = sub(to, from), L = len(d); return rayTerrain(G, from, norm(d), L) != null; };
 const towards = (e, x, z) => atan2(x - e.x, z - e.z);
 const inMap = v => clampN(v, -BOUND + 40, BOUND - 40);
 

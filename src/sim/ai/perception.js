@@ -1,5 +1,6 @@
-import { center, eyeOf, rayTerrain } from '../geom.js';
-import { norm, sub, len } from '../../util/math.js';
+import { center, eyeOf } from '../geom.js';
+import { blocked } from '../sight.js';
+import { sub, len } from '../../util/math.js';
 import { diffOf, PERCEPTION as K } from '../../data/ai.js';
 import { darkness, NIGHT_SIGHT } from '../../data/palettes.js';
 import { radarOf } from '../../data/weather.js';
@@ -28,9 +29,9 @@ export function sightOf(G, P) {
 }
 export function canSee(G, e, P) {
   if (!P.alive) return false;
-  const o = eyeOf(e), t = center(P), d = sub(t, o), L = len(d);
-  if (L > sightOf(G, P)) return false;
-  return rayTerrain(G, o, norm(d), L) == null;
+  const o = eyeOf(e), t = center(P);
+  if (len(sub(t, o)) > sightOf(G, P)) return false;
+  return !blocked(G, o, t);
 }
 
 // A fresh fix on the player: where they are and how they are moving.
