@@ -134,6 +134,34 @@ As shipped (#228):
 - The settings screen is grouped (SOUND, CONTROLS, DISPLAY, GAME) and
   scrollable on phones.
 
+As shipped (#229), HUD SCALE and COLOURS (the rest of this section is #230):
+- **HUD SCALE** (0.8, 1, 1.25, 1.5) is one canvas scale over the whole HUD,
+  laid out in the screen's size over the scale. Every instrument, font and
+  gap grows together, and the dashboard still keeps to its share of the
+  screen.
+  - On a desktop the weapon list now keeps clear of the throttle gauge.
+  - The compass narrows on a phone so it never runs into the target box.
+- **Phones:** the touch HUD sits around the thumbs' controls, which don't
+  grow. So a phone gets as much of the scale as it has room for: its HUD
+  stays at least 640 × 360, and never below 1.
+  - A 360-tall phone stays at 1, an 896 × 414 phone gets 1.15, and a tablet
+    or desktop gets the full 1.5.
+  - That is how acceptance 5 is met. A real 1.5 on a small phone would mean
+    moving the touch controls: the owner's call, and a follow-up if wanted.
+- **COLOURS:** NORMAL, DEUTAN, PROTAN and TRITAN, from `HUD_PALETTES` in
+  `src/data/colors.js`. Each mode swaps the HUD's fine, warning and bad
+  colours, the dim line work, the armour shades and the melt glow.
+  - DEUTAN and PROTAN share the Okabe-Ito sky blue, yellow and vermillion.
+    TRITAN uses cyan, pink and red.
+  - Radar blips have shapes as well as colours: a hostile is a triangle, the
+    target a ringed square, a pilot a dot. Objectives stay hollow diamonds.
+- **Acceptance 4:** `test/hudColours.test.js` simulates each colour
+  blindness (Machado et al. 2009, full severity). It requires each mode's
+  fine, warning, bad and gone colours, and its armour shades, to be at least
+  25 apart in CIELAB. The normal set fails that for red-green eyes (about
+  10), which is why the modes exist. The smoke test saves a screenshot of
+  each mode.
+
 ### Performance pass
 
 Against the budget in [../architecture.md](../architecture.md), on the two

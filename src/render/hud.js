@@ -1,7 +1,8 @@
 import { RADAR_RANGE, radarOf, fogOf } from '../data/weather.js';
 import { TAU, clampN, len, rnd, sub } from '../util/math.js';
 import { WEAPONS, CATS, CAT_OF, CAT_LABEL, CAT_KEY } from '../data/weapons.js';
-import { MP_COLORS } from '../data/colors.js';
+import { MP_COLORS, hudPalette } from '../data/colors.js';
+import { HUD_SCALES } from '../data/settings.js';
 import { center, leadPoint, viewYaw } from '../sim/geom.js';
 import { objectivePoint } from '../sim/objectives.js';
 import { MELT_MAX, beamMult } from '../sim/beams.js';
@@ -88,10 +89,26 @@ export function createHud(app) {
     const v = G.VP, x = v[0] * p[0] + v[4] * p[1] + v[8] * p[2] + v[12], y = v[1] * p[0] + v[5] * p[1] + v[9] * p[2] + v[13];
     const w = v[3] * p[0] + v[7] * p[1] + v[11] * p[2] + v[15];
     if (w <= 0.1) return null;
-    return [(x / w * 0.5 + 0.5) * app.scene.view.W, (1 - (y / w * 0.5 + 0.5)) * app.scene.view.H];
+    return [(x / w * 0.5 + 0.5) * V.W, (1 - (y / w * 0.5 + 0.5)) * V.H];
   };
-  const GREEN = '#5f5', DIM = '#2a7a2a', AMBER = '#fc3', RED = '#f44';
-  const hpCol = f => (f <= 0 ? '#222' : f > 0.66 ? '#3c3' : f > 0.33 ? '#dd3' : '#e33');
+  // The colour set (COLOURS) and the size (HUD SCALE), read every frame. The
+  // HUD is drawn in V's units: the screen over the scale, so one canvas scale
+  // grows every instrument, font and gap together.
+  let GREEN, DIM, AMBER, RED, HP;
+  const V = { W: 0, H: 0, s: 1 };
+  const setLook = () => {
+    const pal = hudPalette(app.prefs.colourMode);
+    ({ good: GREEN, dim: DIM, warn: AMBER, bad: RED, hp: HP } = pal);
+    // On touch the instruments sit around the thumbs' controls, which don't
+    // grow: a phone gets as much of the scale as it has room for (its HUD at
+    // least 640 x 360, so a 360-tall phone stays at 1), never less than 1. A
+    // tablet gets all of it.
+    const want = HUD_SCALES[app.prefs.hudScale] || 1, room = min(app.scene.view.W / 640, app.scene.view.H / 360);
+    V.s = G.touchUI ? min(want, max(1, room)) : want;
+    V.W = app.scene.view.W / V.s; V.H = app.scene.view.H / V.s;
+  };
+  setLook();
+  const hpCol = f => (f <= 0 ? HP[3] : f > 0.66 ? HP[0] : f > 0.33 ? HP[1] : HP[2]);
 
   function mechDiagram(m, x, y, u) {
     const box = (k, rx, ry, rw, rh) => {
@@ -106,7 +123,7 @@ export function createHud(app) {
   // An objective marker: a diamond with the distance under it; off-screen (or
   // behind), held at the edge of the view with an arrow pointing the way.
   function drawMarker(L, p, col) {
-    const P = G.player, W = app.scene.view.W, top = 72, bottom = L.viewBottom - 16, m = 18;
+    const P = G.player, W = V.W, top = 72, bottom = L.viewBottom - 16, m = 18;
     const dist = hypot(p[0] - P.x, p[2] - P.z), s = project(p);
     ctx.strokeStyle = col; ctx.fillStyle = col; ctx.textAlign = 'center';
     if (s && s[0] > m && s[0] < W - m && s[1] > top && s[1] < bottom) {
@@ -128,28 +145,30 @@ export function createHud(app) {
   // controls -- so instruments move to the top corners.
   function hudLayout() {
     if (!G.touchUI) {
-      const dash = min(150, app.scene.view.H * 0.27), top = app.scene.view.H - dash + 8, u = min(7, dash / 12);
+      const dash = min(150, V.H * 0.27), top = V.H - dash + 8, u = min(7, dash / 12);
       return {
-        frame: true, dash, viewBottom: app.scene.view.H - dash,
-        radar: { x: app.scene.view.W / 2, y: app.scene.view.H - dash / 2 + 4, r: dash * 0.4 },
-        bars: { x: app.scene.view.W * 0.1 + 6, y: top, h: dash - 30 },
-        diag: { x: app.scene.view.W * 0.1 + 34 + 3.2 * u, y: top + 6, u },
-        weapons: { x: app.scene.view.W * 0.62, y: top + 4 },
-        throttle: { x: app.scene.view.W * 0.9 - 26, y: top, h: dash - 30 },
-        target: { x: app.scene.view.W * 0.1 + 8, y: 48 },
-        hostiles: { x: app.scene.view.W * 0.965 - 10, y: 20 },
+        frame: true, dash, viewBottom: V.H - dash,
+        radar: { x: V.W / 2, y: V.H - dash / 2 + 4, r: dash * 0.4 },
+        bars: { x: V.W * 0.1 + 6, y: top, h: dash - 30 },
+        diag: { x: V.W * 0.1 + 34 + 3.2 * u, y: top + 6, u },
+        weapons: { x: min(V.W * 0.62, V.W * 0.9 - 26 - 200), y: top + 4 },   // the list is 190 wide: never into the throttle (HUD SCALE)
+        throttle: { x: V.W * 0.9 - 26, y: top, h: dash - 30 },
+        target: { x: V.W * 0.1 + 8, y: 48 },
+        hostiles: { x: V.W * 0.965 - 10, y: 20 },
+        compass: { w: min(340, V.W * 0.5) },
       };
     }
-    const r = clampN(app.scene.view.H * 0.12, 30, 46), u = 5;
+    const r = clampN(V.H * 0.12, 30, 46), u = 5, tgtX = 132 / V.s;   // the target box keeps right of the pause and zoom buttons, which don't scale
     return {
-      frame: false, dash: 0, viewBottom: app.scene.view.H,
-      radar: { x: app.scene.view.W - r - 14, y: r + 12, r },
+      frame: false, dash: 0, viewBottom: V.H,
+      radar: { x: V.W - r - 14, y: r + 12, r },
       bars: { x: 64, y: 112, h: 70 },
       diag: { x: 100 + 3.2 * u, y: 116, u },
-      weapons: { x: app.scene.view.W - 205, y: 2 * r + 34 },
-      throttle: { x: 14, y: app.scene.view.H - 196, h: 120 },
-      target: { x: 132, y: 10 },   // right of the pause and zoom buttons
-      hostiles: { x: app.scene.view.W - 14, y: 2 * r + 34 + 56 },   // under the weapon list, clear of the compass
+      weapons: { x: V.W - 205, y: 2 * r + 34 },
+      throttle: { x: 14, y: V.H - 196, h: 120 },
+      target: { x: tgtX, y: 10 },   // right of the pause and zoom buttons
+      hostiles: { x: V.W - 14, y: 2 * r + 34 + 56 },   // under the weapon list, clear of the compass
+      compass: { w: max(120, min(340, V.W * 0.5, V.W - 2 * (tgtX + 150 + 8))) },   // narrower on a phone: clear of the target box
     };
   }
 
@@ -175,13 +194,13 @@ export function createHud(app) {
   function drawTutorial(L) {
     const c = G.tut?.cur;
     if (!c || !G.player.alive) return;
-    const text = c[G.padActive ? 'pad' : G.touchUI ? 'touch' : 'kb'], W = app.scene.view.W, vb = L.viewBottom;
+    const text = c[G.padActive ? 'pad' : G.touchUI ? 'touch' : 'kb'], W = V.W, vb = L.viewBottom;
     const at = {
       throttle: [L.throttle.x, L.throttle.y - (L.frame ? 34 : 16)], weapons: [L.weapons.x + 60, L.weapons.y - (L.frame ? 34 : 14)], heat: [L.bars.x + 40, L.bars.y - (L.frame ? 34 : 14)],
       target: [L.target.x + 60, L.target.y + 34], compass: [W / 2, vb * 0.3], centre: [W / 2, vb * 0.64],
     }[c.at] || [W / 2, vb * 0.64];
     ctx.font = 'bold 15px "Lucida Console", monospace'; ctx.textAlign = 'center';
-    const w = ctx.measureText(text).width, x = clampN(at[0], w / 2 + 10, W - w / 2 - 10), y = clampN(at[1], 20, app.scene.view.H - 12);
+    const w = ctx.measureText(text).width, x = clampN(at[0], w / 2 + 10, W - w / 2 - 10), y = clampN(at[1], 20, V.H - 12);
     ctx.globalAlpha = clampN(min(c.t * 4, 1 - c.fade / TUT.fade), 0, 1);   // in quickly; out as the pilot does it
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(x - w / 2 - 6, y - 12, w + 12, 18);
     ctx.fillStyle = AMBER; ctx.fillText(text, x, y + 2);
@@ -191,7 +210,7 @@ export function createHud(app) {
   function drawCoopDown(L) {
     const P = G.player, r = G.coopRespawn;
     if (P.alive || !r) return;
-    const n = Math.ceil(max(0, r.at - G.time)), W2 = app.scene.view.W / 2;
+    const n = Math.ceil(max(0, r.at - G.time)), W2 = V.W / 2;
     ctx.textAlign = 'center';
     if (G.spectate) {
       const top = L.viewBottom - (L.frame ? 46 : 64);
@@ -241,27 +260,27 @@ export function createHud(app) {
       // Watching another pilot until the respawn (net/spectate.js): low in the view, clear of the messages.
       const top = L.viewBottom - (L.frame ? 46 : 64), who = G.spectate.id;
       ctx.font = 'bold 14px "Lucida Console", monospace'; ctx.fillStyle = AMBER;
-      ctx.fillText(`SPECTATING ${app.net.pilotName(who)}`, app.scene.view.W / 2, top);
+      ctx.fillText(`SPECTATING ${app.net.pilotName(who)}`, V.W / 2, top);
       ctx.font = '12px "Lucida Console", monospace'; ctx.fillStyle = GREEN;
-      ctx.fillText(`RESPAWN IN ${Math.ceil(max(0, (G.respawnAt - G.clock) / 1000))}  ·  ${G.touchUI ? 'TGT' : 'T'}: NEXT PILOT`, app.scene.view.W / 2, top + 18);
+      ctx.fillText(`RESPAWN IN ${Math.ceil(max(0, (G.respawnAt - G.clock) / 1000))}  ·  ${G.touchUI ? 'TGT' : 'T'}: NEXT PILOT`, V.W / 2, top + 18);
     } else if (!P.alive) {
       ctx.font = 'bold 22px "Lucida Console", monospace'; ctx.fillStyle = RED;
-      ctx.fillText(G.killer ? `DESTROYED BY ${app.net.pilotName(G.killer)}` : 'MECH DESTROYED', app.scene.view.W / 2, mid);
+      ctx.fillText(G.killer ? `DESTROYED BY ${app.net.pilotName(G.killer)}` : 'MECH DESTROYED', V.W / 2, mid);
       ctx.font = '14px "Lucida Console", monospace'; ctx.fillStyle = AMBER;
-      ctx.fillText(`RESPAWN IN ${Math.ceil(max(0, (G.respawnAt - G.clock) / 1000))}`, app.scene.view.W / 2, mid + 26);
+      ctx.fillText(`RESPAWN IN ${Math.ceil(max(0, (G.respawnAt - G.clock) / 1000))}`, V.W / 2, mid + 26);
     } else if (P.spawnT > 0) {
       ctx.font = '13px "Lucida Console", monospace'; ctx.fillStyle = '#3cf';
-      ctx.fillText('SHIELDED', app.scene.view.W / 2, mid + 40);
+      ctx.fillText('SHIELDED', V.W / 2, mid + 40);
     }
     if (G.roundOver && G.banner && !G.summary) {   // the summary overlay (ui/summary.js) says it instead
       ctx.font = 'bold 24px "Arial Black", Arial, sans-serif'; ctx.fillStyle = AMBER;
-      ctx.fillText(G.banner.text, app.scene.view.W / 2, L.viewBottom * 0.37);
+      ctx.fillText(G.banner.text, V.W / 2, L.viewBottom * 0.37);
       ctx.font = '13px "Lucida Console", monospace'; ctx.fillStyle = GREEN;
-      ctx.fillText(`NEXT ROUND IN ${Math.ceil(max(0, (G.banner.until - performance.now()) / 1000))}`, app.scene.view.W / 2, L.viewBottom * 0.37 + 24);
+      ctx.fillText(`NEXT ROUND IN ${Math.ceil(max(0, (G.banner.until - performance.now()) / 1000))}`, V.W / 2, L.viewBottom * 0.37 + 24);
     }
     if (G.reconnecting) {   // the socket dropped; net/client.js is trying again
       ctx.font = 'bold 18px "Lucida Console", monospace'; ctx.fillStyle = AMBER;
-      ctx.fillText(`RECONNECTING${'.'.repeat(1 + (Math.floor(performance.now() / 400) % 3))}`, app.scene.view.W / 2, L.viewBottom * 0.28);
+      ctx.fillText(`RECONNECTING${'.'.repeat(1 + (Math.floor(performance.now() / 400) % 3))}`, V.W / 2, L.viewBottom * 0.28);
     }
     ctx.font = '11px "Lucida Console", monospace';
   }
@@ -271,16 +290,16 @@ export function createHud(app) {
   function drawGuideHUD() {
     const g = G.guide, WHITE = 'rgba(255,255,255,0.9)';
     ctx.fillStyle = 'rgba(0,0,0,0.22)';
-    for (let y = 0; y < app.scene.view.H; y += 3) ctx.fillRect(0, y, app.scene.view.W, 1);
+    for (let y = 0; y < V.H; y += 3) ctx.fillRect(0, y, V.W, 1);
     ctx.fillStyle = 'rgba(255,255,255,0.09)';
-    for (let i = 0; i < 180; i++) ctx.fillRect(random() * app.scene.view.W, random() * app.scene.view.H, 1 + random() * 2, 1);
-    const band = (G.time * 90) % (app.scene.view.H + 60) - 30;   // a slow rolling interference band
-    ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(0, band, app.scene.view.W, 18);
-    const vg = ctx.createRadialGradient(app.scene.view.W / 2, app.scene.view.H / 2, min(app.scene.view.W, app.scene.view.H) * 0.25, app.scene.view.W / 2, app.scene.view.H / 2, max(app.scene.view.W, app.scene.view.H) * 0.7);
+    for (let i = 0; i < 180; i++) ctx.fillRect(random() * V.W, random() * V.H, 1 + random() * 2, 1);
+    const band = (G.time * 90) % (V.H + 60) - 30;   // a slow rolling interference band
+    ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(0, band, V.W, 18);
+    const vg = ctx.createRadialGradient(V.W / 2, V.H / 2, min(V.W, V.H) * 0.25, V.W / 2, V.H / 2, max(V.W, V.H) * 0.7);
     vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.8)');
-    ctx.fillStyle = vg; ctx.fillRect(0, 0, app.scene.view.W, app.scene.view.H);
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, V.W, V.H);
 
-    const cx = app.scene.view.W / 2, cy = app.scene.view.H / 2;
+    const cx = V.W / 2, cy = V.H / 2;
     ctx.strokeStyle = WHITE; ctx.lineWidth = 1.5;
     ctx.beginPath();
     for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
@@ -298,7 +317,7 @@ export function createHud(app) {
       const r = len(sub(center(m), g.pos));
       nearest = min(nearest, r);
       const q = project(center(m));
-      if (!q || q[0] < 0 || q[0] > app.scene.view.W || q[1] < 0 || q[1] > app.scene.view.H) continue;
+      if (!q || q[0] < 0 || q[0] > V.W || q[1] < 0 || q[1] > V.H) continue;
       const k = clampN(900 / max(r, 1), 8, 40);
       ctx.strokeStyle = WHITE; ctx.strokeRect(q[0] - k, q[1] - k * 1.3, k * 2, k * 2.6);
       ctx.fillStyle = WHITE; ctx.textAlign = 'center';
@@ -310,7 +329,7 @@ export function createHud(app) {
     ctx.fillText('MSL CAM   IR / WHT-HOT', lx, 22);
     ctx.fillText(`LRM ${g.n}/${WEAPONS.lrm.count}`, lx, 38);
     ctx.textAlign = 'right';
-    const rx = G.touchUI ? app.scene.view.W - 120 : app.scene.view.W - 20;
+    const rx = G.touchUI ? V.W - 120 : V.W - 20;
     ctx.fillText(`ALT ${Math.round(g.pos[1] - G.ter.height(g.pos[0], g.pos[2]))}m`, rx, 22);
     ctx.fillText(nearest < Infinity ? `TGT ${Math.round(nearest)}m` : 'TGT ---', rx, 38);
     ctx.fillText(`FUEL ${max(0, g.fuel || 0).toFixed(1)}s`, rx, 54);
@@ -318,7 +337,7 @@ export function createHud(app) {
     if (g.lost > 0 || !g.n) {
       ctx.font = 'bold 20px "Lucida Console", monospace'; ctx.fillText('SIGNAL LOST', cx, cy - 60);
     } else {
-      ctx.fillText(G.touchUI ? 'DRAG TO STEER  ·  LIFT TO DETONATE' : 'STEER WITH THE MOUSE  ·  RELEASE TO DETONATE', cx, G.touchUI ? 66 : app.scene.view.H - 24);
+      ctx.fillText(G.touchUI ? 'DRAG TO STEER  ·  LIFT TO DETONATE' : 'STEER WITH THE MOUSE  ·  RELEASE TO DETONATE', cx, G.touchUI ? 66 : V.H - 24);
     }
   }
 
@@ -337,7 +356,7 @@ export function createHud(app) {
     const full = app.params.has('debug');
     const lines = [`FRAME ${q(0.5).toFixed(1)} ms  P95 ${q(0.95).toFixed(1)} ms`, `DRAWS ${app.R.draws}  CULLED ${app.R.culled || 0}  PARTICLES ${G.parts.length}  MECHS ${G.mechs.length}`];
     if (full) lines.push(`SEED ${G.ter?.seed ?? '-'}  T ${G.time.toFixed(1)}  STATE ${G.state}${app.net.mp() ? `  PING ${app.net.Net.rtt} ms` : ''}`);
-    lines.forEach((l, i) => ctx.fillText(l, 12, app.scene.view.H * 0.5 + i * 13));
+    lines.forEach((l, i) => ctx.fillText(l, 12, V.H * 0.5 + i * 13));
     if (full) drawAIDebug();
   }
   // The enemies' minds (docs/specs/05-ai.md § Debug view): the label over each
@@ -367,8 +386,9 @@ export function createHud(app) {
   const sway = makeSway();
   let lastSwayAt = 0;
   function drawHUD() {
-    ctx.setTransform(app.scene.view.dpr, 0, 0, app.scene.view.dpr, 0, 0);
-    ctx.clearRect(0, 0, app.scene.view.W, app.scene.view.H);
+    setLook();
+    ctx.setTransform(app.scene.view.dpr * V.s, 0, 0, app.scene.view.dpr * V.s, 0, 0);
+    ctx.clearRect(0, 0, V.W, V.H);
     if (app.params.has('debug') || app.prefs.frameTime) drawDebug();
     if (G.state === 'menu' || G.lobby) return;   // the arena lobby: no cockpit yet
     if (G.guide) { drawGuideHUD(); return; }
@@ -378,7 +398,7 @@ export function createHud(app) {
     // HUD floats and settles. Without a dashboard (touch) the instruments float too.
     const now = performance.now(), sw = stepSway(sway, G.kick + (G.bob ? G.bob.x : 0), lastSwayAt ? min(0.05, (now - lastSwayAt) / 1000) : 0);
     lastSwayAt = now;
-    const dpr = app.scene.view.dpr, layer = name => ctx.setTransform(dpr, 0, 0, dpr, 0, (name ? sw[name] : 0) * dpr);
+    const dpr = app.scene.view.dpr * V.s, layer = name => ctx.setTransform(dpr, 0, 0, dpr, 0, (name ? sw[name] : 0) * dpr);
     const instruments = L.frame ? 'cockpit' : 'hud';
     layer('cockpit');
     ctx.font = '11px "Lucida Console", "Courier New", monospace';
@@ -388,22 +408,22 @@ export function createHud(app) {
     // Cockpit frame: side struts and the dashboard.
     if (L.frame) {
     ctx.fillStyle = '#121416';
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(app.scene.view.W * 0.035, 0); ctx.lineTo(app.scene.view.W * 0.1, app.scene.view.H - dash); ctx.lineTo(0, app.scene.view.H - dash * 0.6); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(app.scene.view.W, 0); ctx.lineTo(app.scene.view.W * 0.965, 0); ctx.lineTo(app.scene.view.W * 0.9, app.scene.view.H - dash); ctx.lineTo(app.scene.view.W, app.scene.view.H - dash * 0.6); ctx.fill();
-    const g = ctx.createLinearGradient(0, app.scene.view.H - dash, 0, app.scene.view.H);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(V.W * 0.035, 0); ctx.lineTo(V.W * 0.1, V.H - dash); ctx.lineTo(0, V.H - dash * 0.6); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(V.W, 0); ctx.lineTo(V.W * 0.965, 0); ctx.lineTo(V.W * 0.9, V.H - dash); ctx.lineTo(V.W, V.H - dash * 0.6); ctx.fill();
+    const g = ctx.createLinearGradient(0, V.H - dash, 0, V.H);
     g.addColorStop(0, '#2a2d30'); g.addColorStop(0.08, '#1a1c1e'); g.addColorStop(1, '#0b0c0d');
     ctx.fillStyle = g;
-    ctx.beginPath(); ctx.moveTo(0, app.scene.view.H); ctx.lineTo(0, app.scene.view.H - dash * 0.6); ctx.lineTo(app.scene.view.W * 0.1, app.scene.view.H - dash); ctx.lineTo(app.scene.view.W * 0.9, app.scene.view.H - dash); ctx.lineTo(app.scene.view.W, app.scene.view.H - dash * 0.6); ctx.lineTo(app.scene.view.W, app.scene.view.H); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(0, V.H); ctx.lineTo(0, V.H - dash * 0.6); ctx.lineTo(V.W * 0.1, V.H - dash); ctx.lineTo(V.W * 0.9, V.H - dash); ctx.lineTo(V.W, V.H - dash * 0.6); ctx.lineTo(V.W, V.H); ctx.fill();
     }
 
     layer(null);   // full-screen washes stay put
     // Damage flash.
-    if (G.flash > 0) { ctx.fillStyle = `rgba(255,40,20,${G.flash * 0.4})`; ctx.fillRect(0, 0, app.scene.view.W, app.scene.view.H); }
-    if (G.whiteFlash > 0) { ctx.fillStyle = `rgba(235,215,255,${G.whiteFlash * 0.85})`; ctx.fillRect(0, 0, app.scene.view.W, app.scene.view.H); }
+    if (G.flash > 0) { ctx.fillStyle = `rgba(255,40,20,${G.flash * 0.4})`; ctx.fillRect(0, 0, V.W, V.H); }
+    if (G.whiteFlash > 0) { ctx.fillStyle = `rgba(235,215,255,${G.whiteFlash * 0.85})`; ctx.fillRect(0, 0, V.W, V.H); }
 
     layer('hud');
     // Crosshair.
-    let ch = project(G.aim) || [app.scene.view.W / 2, app.scene.view.H / 2];
+    let ch = project(G.aim) || [V.W / 2, V.H / 2];
     // Hit-stop: the crosshair holds where it was for a beat when your shot lands.
     if (G.hitStop > 0) { if (!stopAt) stopAt = ch; ch = stopAt; } else stopAt = null;
     if (!G.spectate) {   // watching another pilot: nothing to aim at
@@ -447,7 +467,7 @@ export function createHud(app) {
     }
     if (G.scanWarn && performance.now() - G.scanWarn.at < 300 && floor(performance.now() / 150) % 2) {
       ctx.font = 'bold 15px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.fillStyle = RED;
-      ctx.fillText(`RESONANCE SCAN -- ${app.net.pilotName(G.scanWarn.by)} ${Math.floor(G.scanWarn.p * 100)}%`, app.scene.view.W / 2, L.viewBottom * 0.22);
+      ctx.fillText(`RESONANCE SCAN -- ${app.net.pilotName(G.scanWarn.by)} ${Math.floor(G.scanWarn.p * 100)}%`, V.W / 2, L.viewBottom * 0.22);
       ctx.font = '11px "Lucida Console", "Courier New", monospace';
     }
     // Laser: a ring that fills as the armour under the beam melts (the
@@ -506,7 +526,7 @@ export function createHud(app) {
     }
 
     // Compass tape: torso heading, with a mark for where the legs point.
-    const tw = min(340, app.scene.view.W * 0.5), tx = app.scene.view.W / 2 - tw / 2, ty = 10;
+    const tw = L.compass.w, tx = V.W / 2 - tw / 2, ty = 10;
     ctx.fillStyle = 'rgba(0,20,0,.55)'; ctx.fillRect(tx, ty, tw, 26);
     ctx.strokeStyle = DIM; ctx.strokeRect(tx + 0.5, ty + 0.5, tw - 1, 25);
     const hdg = ((-viewYaw(P) * 180 / PI) % 360 + 360) % 360;
@@ -514,14 +534,14 @@ export function createHud(app) {
     ctx.textAlign = 'center'; ctx.fillStyle = GREEN; ctx.strokeStyle = GREEN;
     const pxPerDeg = tw / 120;
     for (let dgr = floor((hdg - 70) / 10) * 10; dgr <= hdg + 70; dgr += 10) {
-      const x = app.scene.view.W / 2 + (dgr - hdg) * pxPerDeg, d = ((dgr % 360) + 360) % 360;
+      const x = V.W / 2 + (dgr - hdg) * pxPerDeg, d = ((dgr % 360) + 360) % 360;
       ctx.beginPath(); ctx.moveTo(x, ty + 18); ctx.lineTo(x, ty + (d % 30 ? 22 : 15)); ctx.stroke();
       if (d % 30 === 0) ctx.fillText(compassLabel(d), x, ty + 8);
     }
     ctx.restore();
     ctx.fillStyle = AMBER;
-    ctx.beginPath(); ctx.moveTo(app.scene.view.W / 2, ty + 26); ctx.lineTo(app.scene.view.W / 2 - 5, ty + 32); ctx.lineTo(app.scene.view.W / 2 + 5, ty + 32); ctx.fill();
-    const legX = app.scene.view.W / 2 + clampN(P.twist * 180 / PI, -60, 60) * pxPerDeg;
+    ctx.beginPath(); ctx.moveTo(V.W / 2, ty + 26); ctx.lineTo(V.W / 2 - 5, ty + 32); ctx.lineTo(V.W / 2 + 5, ty + 32); ctx.fill();
+    const legX = V.W / 2 + clampN(P.twist * 180 / PI, -60, 60) * pxPerDeg;
     ctx.fillStyle = GREEN; ctx.fillRect(legX - 6, ty + 34, 12, 3);
     ctx.fillStyle = DIM; ctx.textAlign = 'left'; ctx.fillText('LEGS', legX + 9, ty + 36);
 
@@ -531,7 +551,7 @@ export function createHud(app) {
     ctx.fillStyle = '#031203'; ctx.beginPath(); ctx.arc(rx, ry, rr, 0, TAU); ctx.fill();
     ctx.strokeStyle = DIM; ctx.beginPath(); ctx.arc(rx, ry, rr, 0, TAU); ctx.stroke();
     ctx.beginPath(); ctx.arc(rx, ry, rr / 2, 0, TAU); ctx.stroke();
-    const vy = viewYaw(P), half = (G.zoom ? 0.42 : 1.08) * (app.scene.view.W / max(1, app.scene.view.H)) / 2;
+    const vy = viewYaw(P), half = (G.zoom ? 0.42 : 1.08) * (V.W / max(1, V.H)) / 2;
     ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - sin(half) * rr, ry - cos(half) * rr);
     ctx.moveTo(rx, ry); ctx.lineTo(rx + sin(half) * rr, ry - cos(half) * rr); ctx.stroke();
     const RANGE = Math.round(RADAR_RANGE * radarOf(G) / 10) * 10;   // weather shrinks the radar's reach
@@ -543,8 +563,11 @@ export function createHud(app) {
       if (scr && random() < 0.4) continue;   // scrambled: blips drop out...
       const jit = scr ? rr * 0.15 : 0;      // ...and jump about
       const px = rx - sin(ang) * (d / RANGE) * rr + (random() - 0.5) * jit, py = ry - cos(ang) * (d / RANGE) * rr + (random() - 0.5) * jit;
+      // Shapes as well as colours: a pilot is a dot, a hostile a triangle, the target a ringed square.
       ctx.fillStyle = m === t ? AMBER : m.remote ? app.net.pilotCss(m.netId) : RED;
-      ctx.fillRect(px - 2, py - 2, m === t ? 5 : 4, m === t ? 5 : 4);
+      if (m === t) { ctx.fillRect(px - 2, py - 2, 5, 5); ctx.strokeStyle = AMBER; ctx.strokeRect(px - 4.5, py - 4.5, 9, 9); }
+      else if (m.remote) { ctx.beginPath(); ctx.arc(px, py, 2.5, 0, TAU); ctx.fill(); }
+      else { ctx.beginPath(); ctx.moveTo(px, py - 3.5); ctx.lineTo(px + 3, py + 2.5); ctx.lineTo(px - 3, py + 2.5); ctx.closePath(); ctx.fill(); }
     }
     ctx.fillStyle = GREEN; ctx.fillRect(rx - 1, ry - 1, 3, 3);
     for (const o of G.objectives || []) {   // objective blips: a hollow diamond, held at the rim when out of range
@@ -558,7 +581,7 @@ export function createHud(app) {
       ctx.fillStyle = 'rgba(140,200,255,0.35)';
       for (let i = 0; i < 14; i++) ctx.fillRect(rx - rr + random() * rr * 2, ry - rr + random() * rr * 2, random() * rr * 0.6, 1);
     }
-    ctx.fillStyle = DIM; ctx.textAlign = 'center'; ctx.fillText(`${RANGE}m`, rx, ry + rr + 9 > app.scene.view.H ? ry + rr - 8 : ry + rr + 8);
+    ctx.fillStyle = DIM; ctx.textAlign = 'center'; ctx.fillText(`${RANGE}m`, rx, ry + rr + 9 > V.H ? ry + rr - 8 : ry + rr + 8);
 
     // Left: own damage, heat, jump jets.
     ctx.textAlign = 'left';
@@ -655,7 +678,7 @@ export function createHud(app) {
     // (A mission with no objectives listed is the old ELIMINATE, which HOSTILES already counts.)
     const objs = !app.net.mp() && G.def?.objectives && G.objectives ? G.objectives.filter(o => o.state === 'active' && (o.def.type !== 'eliminate' || o.total != null)) : [];
     ctx.textAlign = 'center'; ctx.font = '11px "Lucida Console", monospace';
-    objs.forEach((o, i) => { ctx.fillStyle = o.def.secondary ? GREEN : AMBER; ctx.fillText(objectiveLine(o), app.scene.view.W / 2, 58 + i * 13); });
+    objs.forEach((o, i) => { ctx.fillStyle = o.def.secondary ? GREEN : AMBER; ctx.fillText(objectiveLine(o), V.W / 2, 58 + i * 13); });
     for (const o of objs) {
       const p = objectivePoint(G, o);
       if (p) drawMarker(L, p, o.def.secondary ? GREEN : AMBER);
@@ -665,37 +688,37 @@ export function createHud(app) {
     let my = 64 + objs.length * 13;
     for (const m of G.msgs) {
       ctx.globalAlpha = min(1, m.t);
-      ctx.fillStyle = m.col; ctx.fillText(m.text, app.scene.view.W / 2, my); my += 15;
+      ctx.fillStyle = m.col; ctx.fillText(m.text, V.W / 2, my); my += 15;
     }
     ctx.globalAlpha = 1;
     layer(null);
     if (P.shutdown) {
       // Power's gone: the instruments go dark under a veil; only the warning stays bright.
-      ctx.fillStyle = 'rgba(0,0,0,0.42)'; ctx.fillRect(0, 0, app.scene.view.W, app.scene.view.H);
+      ctx.fillStyle = 'rgba(0,0,0,0.42)'; ctx.fillRect(0, 0, V.W, V.H);
       ctx.font = 'bold 22px "Lucida Console", monospace';
       ctx.fillStyle = floor(G.time * 3) % 2 ? RED : AMBER;
-      ctx.fillText('REACTOR SHUTDOWN', app.scene.view.W / 2, L.viewBottom * 0.4);
+      ctx.fillText('REACTOR SHUTDOWN', V.W / 2, L.viewBottom * 0.4);
     }
     layer('hud');
-    if (G.zoom) { ctx.font = '11px "Lucida Console", monospace'; ctx.fillStyle = GREEN; ctx.fillText('ZOOM 2.5x', app.scene.view.W / 2, L.viewBottom - (L.frame ? 10 : 24)); }
+    if (G.zoom) { ctx.font = '11px "Lucida Console", monospace'; ctx.fillStyle = GREEN; ctx.fillText('ZOOM 2.5x', V.W / 2, L.viewBottom - (L.frame ? 10 : 24)); }
     const left = G.mechs.filter(m => m.alive && m.team !== 0).length;
     ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'right'; ctx.fillStyle = DIM;
     ctx.fillText(app.net.mp() ? `${app.net.tdm() ? '' : `PILOTS ${app.net.Net.info.size}  `}FIRST TO ${app.net.Net.limit}` : `HOSTILES ${left}`, L.hostiles.x, L.hostiles.y);
     if (app.net.mp()) drawArenaHUD(L);
     drawTutorial(L);
     if ((app.net.mp() || G.mode === 'coop') && app.net.Net.rtt > LAG_MS) {   // a slow line to the relay: say so, small
-      const tw = min(340, app.scene.view.W * 0.5);
+      const tw = L.compass.w;
       ctx.textAlign = 'left'; ctx.fillStyle = AMBER;
-      ctx.fillText('LAG', app.scene.view.W / 2 + tw / 2 + 8, 28);
+      ctx.fillText('LAG', V.W / 2 + tw / 2 + 8, 28);
     }
     else if (G.mode === 'coop') drawCoopDown(L);
     // Phones held upright get a cramped, stretched view.
-    if (G.touchUI && app.scene.view.H > app.scene.view.W) {
+    if (G.touchUI && V.H > V.W) {
       ctx.font = 'bold 16px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.fillStyle = AMBER;
-      ctx.fillText('TURN YOUR DEVICE SIDEWAYS', app.scene.view.W / 2, app.scene.view.H * 0.3);
+      ctx.fillText('TURN YOUR DEVICE SIDEWAYS', V.W / 2, V.H * 0.3);
     }
   }
 
 
-  return { draw: drawHUD, hudLayout };
+  return { draw: drawHUD, hudLayout, scale: () => V.s };   // scale: the HUD SCALE in effect (capped on a phone)
 }
