@@ -195,6 +195,28 @@ offscreen canvas), terrain draw at the far fog (split the terrain mesh into
 Load-time: sounds total ~600 KB and the code ~180 KB unminified; lazy-load the less common clips after the
 first frame; the bundle is minified by esbuild already.
 
+So far (#231, desktop only; the phones decide what gets fixed):
+- **`npm run perf` now times each frame** (the sim, the 3D render, the
+  HUD), and `PERF_CPU=1` profiles each scene (`docs/workflow.md`).
+- **The worst scene, six mechs fighting at 1280 × 720 in software GL:**
+  - sim 0.9 ms, 3D 0.6 ms and HUD 0.5 ms (medians);
+  - about 2–3.5 ms of the game's own JS a frame, against a 16.6 ms budget.
+- **No hotspot.** The HUD's drawing (`drawHUD` plus its text) is the
+  largest share, about 11% of the game's JS. Then `drawMech` 5%, the scene
+  loop 5% and the sim's `update` 3%; nothing else passes 3%. Making a new
+  Web Audio gain node for each sound is 2%.
+- **What that means for the candidates:**
+  - **Caching the dashboard** saves part of that 11%: worth it only if a
+    phone shows the HUD costing whole milliseconds.
+  - **The terrain** is one draw of about 21,000 triangles, cheap for any
+    GPU. Sixteen chunks would trade that for up to 15 more draw calls,
+    which cost more on a phone than triangles do. Don't do it without
+    numbers.
+  - **Sounds** already load after the first tap, not with the page.
+- **Next:** the reference phones' worst-case numbers (#166) say which of
+  these is real. Then fix the top three and record them in the release
+  notes (acceptance 6).
+
 ### Deploy and release
 
 - `pages.yml` deploys on tag `v*` as well as `main` (owner's choice via the

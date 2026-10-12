@@ -75,14 +75,21 @@ function setup() {
   R.drawProps = (B, meshes) => { for (const k in B) S.tris += meshes[k].count / 3 * B[k].n; return drawProps(B, meshes); };
   window.__frames = async (n, input) => {
     const { update, noInput } = await import('/src/sim/update.js');
-    const out = { draws: [], tris: [], parts: [] };
+    const out = { draws: [], tris: [], parts: [], sim: [], scene: [], hud: [] };
+    const gl = R.gl, now = () => performance.now();
     for (let i = 0; i < n; i++) {
       G.clock += 1000 / 60;
+      const t0 = now();
       if (G.state === 'menu') app.ui.menuTick(1 / 60);
       else update(G, input ? Object.assign(noInput(), input) : noInput(), 1 / 60);
       S.tris = 0;
-      app.scene.render(); app.hud.draw();
+      const t1 = now();
+      app.scene.render(); gl.finish();   // finish: the frame's GL work lands in this frame's time
+      const t2 = now();
+      app.hud.draw();
+      const t3 = now();
       out.draws.push(R.draws); out.tris.push(S.tris); out.parts.push(G.parts.length);   // render() starts the draw count at 0
+      out.sim.push(t1 - t0); out.scene.push(t2 - t1); out.hud.push(t3 - t2);
     }
     return out;
   };
@@ -111,7 +118,15 @@ try {
     if (warm) await page.evaluate(n => window.__frames(n), warm);
     await cdp.send('HeapProfiler.collectGarbage');
     await cdp.send('HeapProfiler.startSampling', { samplingInterval: 512, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });   // count garbage too, not just survivors
+    if (process.env.PERF_CPU) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 100 }); await cdp.send('Profiler.start'); }
     const f = await page.evaluate(n => window.__frames(n), frames);
+    if (process.env.PERF_CPU) {   // PERF_CPU=1 npm run perf: each scene's busiest functions, by self time
+      const { profile } = await cdp.send('Profiler.stop'), self = {}, byId = new Map(profile.nodes.map(n => [n.id, n])), dt = profile.timeDeltas;
+      profile.samples.forEach((id, i) => { const cf = byId.get(id).callFrame, key = `${cf.functionName || '(anon)'} ${cf.url.split('/src/').pop()}:${cf.lineNumber + 1}`; self[key] = (self[key] || 0) + (dt[i] || 0); });
+      const js = Object.entries(self).filter(([k]) => !k.startsWith('(')), total = js.reduce((a, [, v]) => a + v, 0);   // the game's own code: not idle, the browser or GC
+      console.log(`busiest, ${name} (% of the game's own JS time, ${(total / 1000 / frames).toFixed(2)} ms a frame):`);
+      js.sort((a, b) => b[1] - a[1]).slice(0, 12).forEach(([k, v]) => console.log(String((v / total * 100).toFixed(1)).padStart(6), k));
+    }
     const { profile } = await cdp.send('HeapProfiler.stopSampling');
     const bytes = (function sum(node) { return node.selfSize + node.children.reduce((a, c) => a + sum(c), 0); })(profile.head);
     if (process.env.PERF_TOP) {   // PERF_TOP=1 npm run perf: where each scene's garbage comes from
@@ -120,8 +135,9 @@ try {
       console.log(`top allocators, ${name} (KB/frame):`);
       Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 12).forEach(([k, v]) => console.log(String(Math.round(v / frames / 1024)).padStart(6), k));
     }
-    const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
-    results[name] = { frames, meanDraws: Math.round(mean(f.draws)), peakDraws: Math.max(...f.draws), tris: Math.round(Math.max(...f.tris)), parts: Math.round(mean(f.parts)), peakParts: Math.max(...f.parts), allocKB: Math.round(bytes / frames / 1024) };
+    const mean = a => a.reduce((x, y) => x + y, 0) / a.length, med = a => [...a].sort((x, y) => x - y)[a.length >> 1];
+    results[name] = { frames, meanDraws: Math.round(mean(f.draws)), peakDraws: Math.max(...f.draws), tris: Math.round(Math.max(...f.tris)), parts: Math.round(mean(f.parts)), peakParts: Math.max(...f.parts), allocKB: Math.round(bytes / frames / 1024),
+      simMs: +med(f.sim).toFixed(2), sceneMs: +med(f.scene).toFixed(2), hudMs: +med(f.hud).toFixed(2) };   // medians; this machine's, software GL: for comparing, not budgets
   };
 
   await scene('menu', 60);
@@ -182,7 +198,7 @@ try {
   server.kill();
 }
 
-const cols = ['meanDraws', 'peakDraws', 'tris', 'parts', 'peakParts', 'allocKB'];
+const cols = ['meanDraws', 'peakDraws', 'tris', 'parts', 'peakParts', 'allocKB', 'simMs', 'sceneMs', 'hudMs'];   // the ms columns have no budgets (machine-dependent)
 console.log(['scene'.padEnd(14), ...cols.map(c => c.padStart(10))].join(''));
 for (const [name, r] of Object.entries(results)) {
   const b = Object.fromEntries(Object.entries(BUDGETS[name] || {}).map(([k, v]) => [k, Math.round(v * SCALE)])), over = cols.filter(c => b[c] != null && r[c] > b[c]);

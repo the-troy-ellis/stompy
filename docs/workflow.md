@@ -135,6 +135,11 @@ Run the whole list; it takes about eight minutes. Report deviations in the PR.
   failing CI when a scene is over its budget (`BUDGETS` in the script). A PR
   that makes something cheaper lowers the budget it beat; a PR that has to
   raise one says why. `PERF_BUDGET_SCALE=0.5` shows it failing.
+  It also prints each scene's median milliseconds for the sim, the 3D render
+  (with `gl.finish`) and the HUD. These are this machine's numbers in
+  software GL, for comparing before and after, so they have no budget.
+  `PERF_CPU=1` lists each scene's busiest functions by share of the game's
+  own JS time; `PERF_TOP=1` lists where the garbage comes from.
 - `python3 -m unittest server/test_server.py` for the relay.
 - Sim tests build a game with `createGame({ seed })` and call
   `update(game, input, dt, fx)` directly with a fixed `dt` (1/60) and a
