@@ -386,3 +386,8 @@ html, body {
 
 /* A gamepad's highlight on a screen's buttons (input.js): D-pad to move, A to press. */
 .mech-overlay .pad-focus { outline: 3px solid #fc3; outline-offset: 2px; }
+
+/* SETTINGS in sections (ui/screens.js): a small heading over each one's toggles and dials. */
+.set-group { margin: 2px 0 8px; }
+.set-head { color: #fc3; font-size: 11px; letter-spacing: 2px; margin: 4px 0 2px; border-bottom: 1px solid #1a4a1a; }
+@media (max-height: 500px) { .set-group { margin: 0 0 4px; } .set-head { margin: 2px 0 1px; } }

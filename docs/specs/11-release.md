@@ -162,6 +162,27 @@ As shipped (#229), HUD SCALE and COLOURS (the rest of this section is #230):
   10), which is why the modes exist. The smoke test saves a screenshot of
   each mode.
 
+As shipped (#230), the rest of this section:
+- **The settings screen** (and the pause screen, which shares it) comes in
+  four sections: SOUND, CONTROLS, DISPLAY and GAME. Each has a small heading
+  over its toggles, then its dials. A phone scrolls the column.
+  - SOUND: sound, voice, VOICE RATE, VOICE VOL.
+  - CONTROLS: invert, haptics, and MOUSE, TOUCH and GAMEPAD sensitivity.
+  - DISPLAY: reduced motion, frame time, full screen, FOV, PARTICLES, HUD
+    SCALE, COLOURS.
+  - GAME: difficulty.
+  - Each dial's section is in `src/data/settings.js` (`group`,
+    `SETTING_GROUPS`), and a test checks that every dial has one.
+- **VOICE RATE:** 0.7×–1.5× on top of the voice's own 1.05.
+- **FOV** is shown as the horizontal angle on this screen's shape: 94° at
+  16:9 and about 100° on a phone. It is still stored and stepped as the
+  vertical angle, so nobody's view changes. A dial in fixed horizontal steps
+  would have widened the default desktop view.
+- **REDUCED MOTION stays as spec 13 has it:** view motion at 30%, flashes
+  shorter, a step fewer particles. This section's "no camera shake, no HUD
+  kick, weather particles at LOW" goes further than that, and the two specs
+  disagree. Which one holds is the owner's call.
+
 ### Performance pass
 
 Against the budget in [../architecture.md](../architecture.md), on the two

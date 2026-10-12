@@ -14,7 +14,7 @@ import { newMech, startMatch, foeType } from '../sim/state.js';
 import { initFeet } from '../sim/gait.js';
 import { endGuide } from '../sim/missiles.js';
 import { DIFF, DIFF_ORDER } from '../data/ai.js';
-import { SETTINGS, SETTING_KEYS, stepSetting } from '../data/settings.js';
+import { SETTINGS, SETTING_KEYS, SETTING_GROUPS, stepSetting } from '../data/settings.js';
 import { fitOf, fitOk, kitLine } from './mechlab.js';
 import { objectiveRows, debriefTitle, missionTitle, missionSpoken, verdict } from './debrief.js';
 import { recordResult, saveCampaign, restartCampaign, stripSquares, canPlay } from './campaign.js';
@@ -82,23 +82,30 @@ export function createUi(app) {
       <tr><td>L</td><td>headlights at night: on, you see; off, you are harder to see</td><td></td><td></td></tr>
     </table>`;
 
+  // The toggles: [label, get, set, SETTINGS section].
   const OPTS = {
-    sound: ['SOUND', () => prefs.sound, v => { prefs.sound = v; store.set('sound', v); }],
-    voice: ['VOICE', () => prefs.voice, v => { prefs.voice = v; store.set('mech.voice', v); }],
-    invert: ['INVERT AIM', () => prefs.invert, v => { prefs.invert = v; store.set('mech.invert', v); }],
+    sound: ['SOUND', () => prefs.sound, v => { prefs.sound = v; store.set('sound', v); }, 'sound'],
+    voice: ['VOICE', () => prefs.voice, v => { prefs.voice = v; store.set('mech.voice', v); }, 'sound'],
+    invert: ['INVERT AIM', () => prefs.invert, v => { prefs.invert = v; store.set('mech.invert', v); }, 'controls'],
+    haptics: ['HAPTICS', () => prefs.haptics, v => { prefs.haptics = v; store.set('haptics', v); }, 'controls'],
     // Less camera: kick, shake, view wobble and squash at 30%, flashes shorter, no buzz, a step fewer particles. The mechs still move.
-    motion: ['REDUCED MOTION', () => prefs.reducedMotion, v => { prefs.reducedMotion = v; G.reducedMotion = v; store.set('motion.reduced', v); app.applyParticles(); }],   // and a step fewer particles
-    haptics: ['HAPTICS', () => prefs.haptics, v => { prefs.haptics = v; store.set('haptics', v); }],
-    frameTime: ['FRAME TIME', () => prefs.frameTime, v => { prefs.frameTime = v; store.set('debug.frametime', v); }],   // the in-game readout, for playtests on real phones
+    motion: ['REDUCED MOTION', () => prefs.reducedMotion, v => { prefs.reducedMotion = v; G.reducedMotion = v; store.set('motion.reduced', v); app.applyParticles(); }, 'display'],   // and a step fewer particles
+    frameTime: ['FRAME TIME', () => prefs.frameTime, v => { prefs.frameTime = v; store.set('debug.frametime', v); }, 'display'],   // the in-game readout, for playtests on real phones
   };
   const optLabel = k => `${OPTS[k][0]}: ${OPTS[k][1]() ? 'ON' : 'OFF'}`;
   // Difficulty scales the enemies' skill, never their stats (docs/specs/05-ai.md § Difficulty).
   const diffLabel = () => `DIFFICULTY: ${DIFF[prefs.diff].label}`;
   const cycleDiff = d => { prefs.diff = DIFF_ORDER[(DIFF_ORDER.indexOf(prefs.diff) + d + DIFF_ORDER.length) % DIFF_ORDER.length]; store.set('diff', prefs.diff); };
-  const options = () => `<div class="opts">${Object.keys(OPTS).map(k => `<button class="opt" data-opt="${k}">${optLabel(k)}</button>`).join('')}
-    <button class="opt" data-a="diff">${diffLabel()}</button></div>
-    <div class="opts dials">${SETTING_KEYS.map(k => `<div class="mm-pick"><span>${SETTINGS[k].label}</span><button data-set="${k}" data-d="-1">◀</button><b>${SETTINGS[k].fmt(prefs[k])}</b><button data-set="${k}" data-d="1">▶</button></div>`).join('')}
-    <button class="opt" data-a="full">FULL SCREEN</button></div>`;
+  // The settings in sections (SOUND, CONTROLS, DISPLAY, GAME), each its
+  // toggles then its dials. A phone scrolls the column.
+  const dialText = k => SETTINGS[k].fmt(prefs[k], window.innerWidth / Math.max(1, window.innerHeight));   // FOV: the horizontal angle on this screen
+  const extra = g => (g === 'display' ? '<button class="opt" data-a="full">FULL SCREEN</button>' : g === 'game' ? `<button class="opt" data-a="diff">${diffLabel()}</button>` : '');
+  const options = () => SETTING_GROUPS.map(([g, title]) => {
+    const opts = Object.keys(OPTS).filter(k => OPTS[k][3] === g), dials = SETTING_KEYS.filter(k => SETTINGS[k].group === g);
+    return `<div class="set-group"><div class="set-head">${title}</div>
+      <div class="opts">${opts.map(k => `<button class="opt" data-opt="${k}">${optLabel(k)}</button>`).join('')}${extra(g)}</div>
+      ${dials.length ? `<div class="opts dials">${dials.map(k => `<div class="mm-pick"><span>${SETTINGS[k].label}</span><button data-set="${k}" data-d="-1">◀</button><b>${dialText(k)}</b><button data-set="${k}" data-d="1">▶</button></div>`).join('')}</div>` : ''}</div>`;
+  }).join('');
 
   function showOverlay(html, cls = '') { ov.innerHTML = html; ov.className = 'mech-overlay' + (cls ? ' ' + cls : ''); ov.hidden = false; }
   function hideOverlay() { ov.hidden = true; ov.className = 'mech-overlay'; }
@@ -348,7 +355,7 @@ export function createUi(app) {
       const k = dial.dataset.set;
       prefs[k] = stepSetting(k, prefs[k], +dial.dataset.d); store.set(SETTINGS[k].key, prefs[k]);
       if (k === 'particles') app.applyParticles();
-      dial.parentElement.querySelector('b').textContent = SETTINGS[k].fmt(prefs[k]);
+      dial.parentElement.querySelector('b').textContent = dialText(k);
       return;
     }
     if (e.target.closest('a')) return;
