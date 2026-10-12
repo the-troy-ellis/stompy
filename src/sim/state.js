@@ -52,6 +52,7 @@ export function newMech(G, type, team, x, z, yaw, opts = {}) {
 // Reset per-match state and build the world. `terrainOpts` is for tests (flat).
 export function resetMatch(G, { def, seed, pal, terrainOpts }) {
   G.rng = makeRng(seed);
+  G.tut = null;   // mission 1's tutorial: the screens start it after this (sim/tutorial.js)
   // The biome's palette at the mission's time of day; `ramp: [from, to, s]`
   // blends one into the other over s seconds (tickTime in update.js).
   const biome = pal || def.pal, r = def.ramp;

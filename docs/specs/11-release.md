@@ -101,6 +101,23 @@ PUNCH` (when a JACKAL is in reach) · `HEAT: TOO MUCH` (first over 60) · `T:
 NEXT ONE` (when a second enemy appears). Touch variants name the gesture. Skippable by pausing (the pause
 screen gains `SKIP TUTORIAL`).
 
+As shipped (#228):
+- **Where it lives:** `src/data/tutorial.js` holds the words; `src/sim/tutorial.js` decides
+  which prompt is up and when it's done, headless and tested. The HUD draws
+  it by its instrument (the throttle, the weapon list, the heat bar, the
+  target box, under the compass, under the crosshair), in the words for what
+  the pilot is holding: keys and mouse, the touch controls, or a gamepad.
+- **Order:** steps come one at a time, in the spec's order, a beat apart.
+  Each fades when it's done. A step this mech can't do (no missiles, JUMP
+  JETS NONE) is skipped. One that's ignored for 25 s gives way to the next.
+- **Events:** E: PUNCH (a JACKAL in reach), HEAT: TOO MUCH (heat past 60)
+  and T: NEXT ONE (a second hostile within 300 m) break in once each. A step
+  they interrupt comes back after. T: NEXT ONE counts only a T press, not a
+  target the game picked for you after a hit.
+- **Once:** the first mission 1 runs it. Reaching the debrief, or SKIP
+  TUTORIAL on the pause screen, sets `tut.done`, and it never shows again.
+  Quitting halfway leaves it for next time. Co-op never shows it.
+
 ### Accessibility and settings
 
 - HUD SCALE: 0.8 / 1.0 / 1.25 / 1.5 (multiplies `hudLayout` and fonts).

@@ -149,6 +149,41 @@ try {
     console.log(`touch: aim turns the legs ${aimOk}, stick sets throttle and twists ${stickOk}, right side only buttons ${rightOk}, double tap centres ${centred}`);
     if (!(aimOk && stickOk && rightOk && centred)) { failed = true; console.error('FAIL: the touch layout did not behave'); }
   });
+  // Mission 1's silent tutorial (#228): the first run shows W: GO. by the
+  // throttle and it fades when the throttle goes up; the pause screen's SKIP
+  // TUTORIAL ends it; the next mission 1 shows nothing.
+  {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 640 } });
+    page.on('pageerror', e => errors.push(`tutorial: ${e.message}`));
+    page.on('console', m => { if (m.type() === 'error') errors.push(`tutorial: console ${m.text()}`); });
+    const mission1 = async () => {
+      await page.goto(URL_);
+      await page.waitForSelector('.mm-title', { timeout: 15000 });
+      await page.click('.feel-panel [data-a="toggle"]');
+      await page.click('[data-sel="campaign"]');
+      await page.click('[data-a="go"]');
+      await page.waitForFunction(() => window.__stompy.game.state === 'play', null, { timeout: 10000 });
+      await page.evaluate(() => { const g = window.__stompy.game; for (const k in g.player.hp) g.player.hp[k] = 1e6; for (const m of g.mechs) if (m.team) { m.ai.aware = false; m.x += 2000; } });
+    };
+    await page.evaluate(() => localStorage.removeItem('stompy.tut.done')).catch(() => {});
+    await mission1();
+    const first = await page.waitForFunction(() => window.__stompy.game.tut?.cur?.id, null, { timeout: 5000 }).then(h => h.jsonValue()).catch(() => null);
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: 'test-results/smoke-tutorial.png' });
+    await page.evaluate(() => window.__stompy.app.ui.pause(false));
+    await page.keyboard.down('KeyW'); await page.waitForTimeout(800); await page.keyboard.up('KeyW');
+    const next = await page.waitForFunction(() => { const c = window.__stompy.game.tut?.cur; return c && c.id !== 'go' && !c.fade ? c.id : null; }, null, { timeout: 5000 }).then(h => h.jsonValue()).catch(() => null);
+    await page.evaluate(() => window.__stompy.app.ui.pause(true));
+    const skip = await page.$('[data-a="skiptut"]');
+    if (skip) await skip.click();
+    const after = await page.evaluate(() => ({ tut: !!window.__stompy.game.tut, saved: localStorage.getItem('stompy.tut.done') }));
+    await mission1();
+    await page.waitForTimeout(2500);
+    const again = await page.evaluate(() => !!window.__stompy.game.tut);
+    console.log(`tutorial: first prompt ${first}, after W ${next}; SKIP ${!!skip} -> tutorial ${after.tut ? 'still on' : 'off'}, saved ${after.saved}; second mission 1 shows it ${again}`);
+    if (!(first === 'go' && next === 'legs' && skip && !after.tut && after.saved === 'true' && !again)) { failed = true; console.error('FAIL: the silent tutorial'); }
+    await page.close();
+  }
   // A gamepad (#227), faked in the page: the D-pad and A pick FREE PLAY, Start
   // launches; in play the touch controls step aside, the sticks drive, RT
   // fires, Start pauses and B resumes; a thumb on the glass brings the touch
