@@ -140,7 +140,10 @@ npm run zip         # dist/ as stompy-<version>.zip
 ```
 
 `?debug=1` shows frame time, draw calls and the seed, and exposes the state
-as `window.__stompy`. `?touch=1` forces the touch layout.
+as `window.__stompy`. `?touch=1` forces the touch layout. `?edit=1` (with
+`&mission=m06`, say) opens the mission editor: the mission from above on its
+own ground. Two fingers (or the right mouse button) move the map, a pinch or
+the wheel zooms, Q and E turn it, a tap selects and a drag boxes.
 
 **The plan of record is in `docs/`.** Start with `docs/README.md`:
 - the vision and tone guide;
