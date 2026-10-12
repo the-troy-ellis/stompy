@@ -4,9 +4,9 @@
 // `at` is the instrument it sits by (render/hud.js). Steps come in order, each
 // once its prompt is done; events break in when they happen (sim/tutorial.js).
 export const TUT_STEPS = [
-  { id: 'go', at: 'throttle', kb: 'W: GO. S: LESS GO.', touch: 'STICK UP: GO. DOWN: LESS GO.', pad: 'LEFT STICK UP: GO.' },
-  { id: 'legs', at: 'compass', kb: 'A / D: LEGS', touch: 'DRAG TOP LEFT: LEGS', pad: 'LEFT STICK SIDEWAYS: LEGS' },
-  { id: 'torso', at: 'centre', kb: 'MOUSE: TORSO', touch: 'STICK SIDEWAYS: TORSO', pad: 'RIGHT STICK: TORSO' },
+  { id: 'go', at: 'throttle', kb: 'W: GO. S: LESS GO.', touch: 'UPPER STICK UP: GO.', pad: 'LEFT STICK UP: GO.' },
+  { id: 'legs', at: 'compass', kb: 'A / D: LEGS', touch: 'LOWER STICK: LEGS', pad: 'LEFT STICK SIDEWAYS: LEGS' },
+  { id: 'torso', at: 'centre', kb: 'MOUSE: TORSO', touch: 'UPPER STICK SIDEWAYS: TORSO', pad: 'RIGHT STICK: TORSO' },
   { id: 'melt', at: 'weapons', cat: 'energy', kb: 'HOLD LMB: MELT IT', touch: 'HOLD ENERGY: MELT IT', pad: 'HOLD RT: MELT IT' },
   { id: 'thump', at: 'weapons', cat: 'ballistic', kb: 'RMB: THUMP', touch: 'BALLISTIC: THUMP', pad: 'RB: THUMP' },
   { id: 'missiles', at: 'weapons', cat: 'missile', kb: 'SPACE: MISSILES (HOLD TO FLY)', touch: 'MISSILE (HOLD TO FLY)', pad: 'LT: MISSILES (HOLD TO FLY)' },

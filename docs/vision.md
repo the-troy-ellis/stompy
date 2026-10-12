@@ -57,7 +57,7 @@ When two good ideas conflict, the pillar higher in this list wins.
    tells you heat, damage, target and ammo without reading. A phone player at
    arm's length must be able to parse the screen.
 4. **Two thumbs.** Every control fits the touch layout: the left thumb flies
-   the mech (aim drag above, throttle stick below), the right thumb shoots
+   the mech (a turn-and-aim stick in the corner, the throttle stick just above it), the right thumb shoots
    (hold-to-fire buttons by category, one punch button). Desktop
    gets more buttons, never more *necessary* buttons.
 5. **Depth from systems, not menus.** Heat, melt, ammo, per-section damage,

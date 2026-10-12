@@ -62,9 +62,12 @@ Mission 1 teaches the controls the first time, one prompt at a time.
 | P / Esc | pause · M mutes |
 
 **Touch** (switches on by itself on a phone or tablet):
-- **Upper left:** drag to aim. Sideways turns the mech; double tap puts the
-  torso back over the legs.
-- **Lower left:** drag up and down for throttle, sideways to twist.
+- **Lower left:** a stick to turn and aim. Hold it sideways and the mech
+  keeps turning; up and down tilts. Double tap puts the torso back over the
+  legs.
+- **Just above it:** a stick for throttle (up and down; it stays set) and
+  torso twist (sideways). On a tablet both sit in the bottom-left corner,
+  in one thumb's reach.
 - **Right:** hold-to-fire buttons (ENERGY, BALLISTIC, MISSILE, FUSION), plus
   PUNCH, JUMP, TGT, ZOOM and STOP.
 

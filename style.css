@@ -55,7 +55,7 @@ html, body {
   display: flex; flex-direction: column; color: rgba(160, 255, 160, .28); font-size: 10px; letter-spacing: 3px;
 }
 .tzones span { flex: 1; display: flex; align-items: center; justify-content: center; }
-.tzones span:first-child { border-bottom: 1px dashed rgba(95, 255, 95, .16); }
+.tzones span:first-child { border-bottom: 1px dashed rgba(95, 255, 95, .16); align-items: flex-end; padding-bottom: 70px; }   /* THROTTLE just above the turn zone, where the thumb goes */
 .stick {
   position: absolute; width: 112px; height: 112px; margin: -56px 0 0 -56px;
   border-radius: 50%; border: 2px solid rgba(95, 255, 95, .45); background: rgba(0, 30, 0, .25);
