@@ -111,9 +111,10 @@ try {
     console.log(`touch: cluster visible ${ok}`);
     if (!ok) { failed = true; console.error('FAIL: touch UI not shown'); }
     // The left side flies the mech, the right side only shoots (input.js).
-    // Real touches through CDP: upper left aims (turns the legs, tilts),
-    // lower left is the throttle stick (sideways twists the torso), a double
-    // tap on the aim side centres the torso, a drag off the buttons on the
+    // Real touches through CDP, on 1024 x 640 (the zones meet 200 px up):
+    // the lower stick turns the legs for as long as it's held out and tilts;
+    // the upper stick is the throttle (sideways twists the torso); a double
+    // tap on the lower one centres the torso; a drag off the buttons on the
     // right does nothing.
     const cdp = await page.context().newCDPSession(page);
     const touch = async (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
@@ -126,12 +127,14 @@ try {
     const P = () => page.evaluate(() => { const p = window.__stompy.game.player; return { yaw: p.yaw, twist: p.twist, pitch: p.pitch, thr: p.throttle }; });
     await page.evaluate(() => { const g = window.__stompy.game; for (const k in g.player.hp) g.player.hp[k] = 1e6; for (const m of g.mechs) if (m.team) m.ai.aware = false; });
     let a0 = await P();
-    await drag(200, 160, 120, 120);
-    await page.waitForTimeout(900);
+    await drag(200, 560, 140, 530, 300);
+    const short = (await P()).yaw - a0.yaw;
+    a0 = await P();
+    await drag(200, 560, 140, 530, 1500);   // held out five times as long: it keeps turning
     let a1 = await P();
-    const aimOk = a1.yaw - a0.yaw > 0.1 && Math.abs(a1.twist - a0.twist) < 0.05 && a1.pitch !== a0.pitch;
+    const aimOk = a1.yaw - a0.yaw > 2 * short && a1.yaw - a0.yaw > 0.3 && Math.abs(a1.twist - a0.twist) < 0.05 && a1.pitch !== a0.pitch;
     a0 = a1;
-    await drag(200, 480, 160, 420, 500);
+    await drag(200, 300, 160, 240, 500);
     a1 = await P();
     const stickOk = a1.thr > a0.thr + 0.3 && a1.twist - a0.twist > 0.2 && Math.abs(a1.yaw - a0.yaw) < 0.05;
     a0 = a1;
@@ -143,10 +146,10 @@ try {
     // The double tap as one burst: the four events queued at once. Awaited one
     // by one, each dispatch waits for a software-rendered frame, and the two
     // taps landed 220-335 ms apart, past the 300 ms window about one run in ten.
-    await Promise.all([touch('touchStart', 200, 150), touch('touchEnd'), touch('touchStart', 200, 150), touch('touchEnd')]);
+    await Promise.all([touch('touchStart', 200, 560), touch('touchEnd'), touch('touchStart', 200, 560), touch('touchEnd')]);
     await page.waitForTimeout(800);
     const centred = Math.abs((await P()).twist) < 0.1;
-    console.log(`touch: aim turns the legs ${aimOk}, stick sets throttle and twists ${stickOk}, right side only buttons ${rightOk}, double tap centres ${centred}`);
+    console.log(`touch: the lower stick keeps turning the legs while held ${aimOk}, the upper stick sets throttle and twists ${stickOk}, right side only buttons ${rightOk}, double tap centres ${centred}`);
     if (!(aimOk && stickOk && rightOk && centred)) { failed = true; console.error('FAIL: the touch layout did not behave'); }
   });
   // HUD SCALE and COLOURS (#229): 1.5 in full on a desktop and a tablet, as

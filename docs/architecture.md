@@ -119,9 +119,11 @@ after. Win = no enemy alive; lose = player torso gone (`destroy`, line 1005).
   Never play from a timer before the first tap.
 - **Touch and mouse are both live** and switch automatically (`G.touchUI`
   starts from `(pointer: coarse)` and flips when a mouse moves). On touch
-  the left side flies (upper: aim drag, which turns the legs through
-  `input.turnBy` at the chassis's own rate; lower: throttle stick, sideways
-  twists the torso) and the right side only shoots.
+  the left side flies with two floating sticks stacked in the bottom-left
+  corner (lower: turn and aim, held out sideways it keeps turning the legs
+  through `input.turn`, up and down tilts; upper: throttle, sideways twists
+  the torso; on a tablet each zone is at most 200 px tall, so one thumb
+  reaches both) and the right side only shoots.
 - **A mech is one draw.** Its parts live in one skinned mesh (bones in
   `mesh/mechParts.js` `BONE`); a new part needs a bone, and a new body plan
   must fit in `BONE_COUNT`. Debris pieces still draw part by part.

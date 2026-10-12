@@ -130,22 +130,41 @@ export function createInput(app) {
 
   /* ---------- touch ---------- */
 
-  // The left side is for flying the mech, the right for shooting.
-  //   Upper left: drag to aim. Sideways turns the legs (the whole mech, at its
-  //     own turn rate: a drag queues the turn and the sim pays it out), up and
-  //     down pitches. A double tap swings the torso back over the legs.
-  //   Lower left: a floating stick. Up and down moves the throttle from where
-  //     it was when the thumb went down, and it stays set on release, like
-  //     W/S; sideways twists the torso.
+  // The left side is for flying the mech, the right for shooting. Both left
+  // controls are floating sticks that sit where the thumb lands, in two
+  // zones stacked in the bottom-left corner: on a phone each is half the
+  // height, on a tablet each is ZONE px, so one thumb reaches both.
+  //   Lower left: turn and aim. Sideways turns the legs (the whole mech) for
+  //     as long as it's held, faster the further out; up and down pitches. A
+  //     double tap swings the torso back over the legs.
+  //   Upper left: throttle and torso. Up and down moves the throttle from
+  //     where it was when the thumb went down, and it stays set on release,
+  //     like W/S; sideways twists the torso.
   //   Right: the buttons. Dragging the FUSION button aims the scan, and while
   //     flying missiles the aim side or the MISSILE button steers them.
   // Every finger is tracked separately.
-  const tui = $('.touch-ui', root), stick = $('.stick', tui), knob = $('.knob', tui);
+  const tui = $('.touch-ui', root), sticks = [...tui.querySelectorAll('.stick')], zoneLabels = [...tui.querySelectorAll('.tzones span')];
+  const ring = { stick: sticks[0], aim: sticks[1] };   // the throttle stick's ring and the turn stick's
   const fingers = new Map();
-  const STICK_R = 56, LEFT = 0.45, DOUBLE_TAP = 300, TURN_QUEUE = 1;   // px; share of the width; ms; rad
-  let yawDebt = 0, lastAimTap = -1e9, centreTap = false;   // lastAimTap: when a tap (not a drag) on the aim side lifted; centreTap: a double tap not yet sent
+  const STICK_R = 56, LEFT = 0.45, DOUBLE_TAP = 300, ZONE = 200;   // px; share of the width; ms; px: a zone's most height
+  let lastAimTap = -1e9, centreTap = false;   // lastAimTap: when a tap (not a drag) on the turn stick lifted; centreTap: a double tap not yet sent
+  // Where the turn zone (below) meets the throttle zone (above), in px from the top.
+  const split = h => h - Math.min(h / 2, ZONE);
+  const showStick = (s, x, y) => { s.hidden = false; s.style.left = x + 'px'; s.style.top = y + 'px'; s.firstElementChild.style.transform = 'translate(-50%, -50%)'; };
+  const moveKnob = (s, dx, dy) => { s.firstElementChild.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; };
+  // The stick's offset from where the thumb landed, clamped to its ring, and as -1..1 past a small deadzone.
+  const stickOf = (f, e) => {
+    const r = tui.getBoundingClientRect();
+    let dx = e.clientX - r.left - f.x0, dy = e.clientY - r.top - f.y0;
+    const d = hypot(dx, dy);
+    if (d > STICK_R) { dx *= STICK_R / d; dy *= STICK_R / d; }
+    const dead = v => (abs(v) < 8 ? 0 : (v - Math.sign(v) * 8) / (STICK_R - 8));
+    return { dx, dy, x: dead(dx), y: dead(dy) };
+  };
   const syncTouchUI = () => {
     tui.hidden = !(G.touchUI && !G.padActive && (G.state === 'play' || G.state === 'over') && !G.paused);   // a gamepad in use: out of the way
+    const h = tui.getBoundingClientRect().height || window.innerHeight;
+    if (zoneLabels[1]) zoneLabels[1].style.flex = `0 0 ${h - split(h)}px`;   // the faint labels follow the zones
     const jump = root.querySelector('[data-t="jump"]');
     if (jump) jump.hidden = G.player?.jets === 0;   // JUMP JETS NONE: no button
     const lights = root.querySelector('[data-t="lights"]');
@@ -155,7 +174,7 @@ export function createInput(app) {
   function releaseFingers() {
     for (const f of fingers.values()) if (f.kind === 'btn') touchButton(f.name, false, f.el);
     fingers.clear();
-    G.touchTwist = 0; yawDebt = 0; stick.hidden = true;
+    G.touchTwist = 0; G.touchTurn = 0; G.touchPitch = 0; ring.stick.hidden = true; ring.aim.hidden = true;
   }
   function touchButton(name, down, el) {
     el?.classList.toggle('on', down);
@@ -180,15 +199,14 @@ export function createInput(app) {
     const r = tui.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
     if (x >= r.width * LEFT) return;   // the right side is buttons only
     const has = k => [...fingers.values()].some(f => f.kind === k);
-    if (y >= r.height / 2 && !has('stick')) {
+    if (y < split(r.height) && !has('stick')) {
       fingers.set(e.pointerId, { kind: 'stick', x0: x, y0: y, thr0: G.player.throttle });
-      stick.hidden = false;
-      stick.style.left = x + 'px'; stick.style.top = y + 'px';
-      knob.style.transform = 'translate(-50%, -50%)';
-    } else if (y < r.height / 2 && !has('aim')) {
+      showStick(ring.stick, x, y);
+    } else if (y >= split(r.height) && !has('aim')) {
       const now = performance.now();
       if (now - lastAimTap < DOUBLE_TAP) { centreTap = true; lastAimTap = -1e9; }   // double tap: torso over the legs (the sim sees it through)
-      fingers.set(e.pointerId, { kind: 'aim', lx: e.clientX, ly: e.clientY, x0: e.clientX, y0: e.clientY });
+      fingers.set(e.pointerId, { kind: 'aim', x0: x, y0: y, lx: e.clientX, ly: e.clientY, cx: e.clientX, cy: e.clientY });
+      showStick(ring.aim, x, y);
     }
   });
   tui.addEventListener('pointermove', e => {
@@ -196,18 +214,15 @@ export function createInput(app) {
     if (!f || G.state !== 'play' || G.paused) return;
     const P = G.player;
     if (f.kind === 'stick') {
-      const r = tui.getBoundingClientRect();
-      let dx = e.clientX - r.left - f.x0, dy = e.clientY - r.top - f.y0;
-      const d = hypot(dx, dy);
-      if (d > STICK_R) { dx *= STICK_R / d; dy *= STICK_R / d; }
-      knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-      const dead = v => (abs(v) < 8 ? 0 : v - Math.sign(v) * 8);
-      G.touchTwist = clampN(-dead(dx) / (STICK_R - 8), -1, 1);
-      if (P.alive && !P.shutdown) P.throttle = clampN(f.thr0 - dead(dy) / (STICK_R - 8), -0.35, 1);
+      const s = stickOf(f, e);
+      moveKnob(ring.stick, s.dx, s.dy);
+      G.touchTwist = clampN(-s.x, -1, 1);
+      if (P.alive && !P.shutdown) P.throttle = clampN(f.thr0 - s.y, -0.35, 1);
     } else if (G.guide && (f.kind === 'aim' || (f.kind === 'btn' && f.name === 'missile'))) {
       // Flying missiles: drag the missile button itself (the thumb is
       // already on it) or the aim side to steer.
       steerBy(G, e.clientX - (f.lx ?? e.clientX), e.clientY - (f.ly ?? e.clientY), (f.kind === 'btn' ? 0.009 : 0.006) * prefs.touchSens, prefs.invert);
+      if (f.kind === 'aim') { G.touchTurn = 0; G.touchPitch = 0; }   // flying missiles: the stick steers them, not the mech
       f.lx = e.clientX; f.ly = e.clientY;
     } else if (f.kind === 'btn' && f.name === 'fusion' && P.alive) {
       // Dragging the fusion button aims the scan (the thumb is already on it).
@@ -221,22 +236,30 @@ export function createInput(app) {
       orbitSpectate(G, -(e.clientX - f.lx) * 0.008 * prefs.touchSens, (e.clientY - f.ly) * 0.006 * prefs.touchSens * (prefs.invert ? -1 : 1));
       f.lx = e.clientX; f.ly = e.clientY;
     } else if (f.kind === 'aim' && P.alive) {
-      // Sideways queues a turn of the legs; up and down pitches, as before.
-      const sens = (G.zoom ? 0.0022 : 0.0055) * prefs.touchSens;
-      yawDebt = clampN(yawDebt - (e.clientX - f.lx) * sens, -TURN_QUEUE, TURN_QUEUE);
-      P.pitch = clampN(P.pitch - (e.clientY - f.ly) * sens * (prefs.invert ? -1 : 1), -0.4, 0.45);
-      f.lx = e.clientX; f.ly = e.clientY;
+      // The turn stick: held out sideways, the legs keep turning (the sim's
+      // rate, like A / D); up and down pitches at a rate (like the arrows).
+      const s = stickOf(f, e), k = prefs.touchSens * (G.zoom ? 0.4 : 1);
+      moveKnob(ring.aim, s.dx, s.dy);
+      G.touchTurn = clampN(-s.x * Math.min(1, prefs.touchSens), -1, 1);
+      G.touchPitch = clampN(-s.y * k * (prefs.invert ? -1 : 1), -1.5, 1.5);
+      f.cx = e.clientX; f.cy = e.clientY;
     }
+    if (f.kind === 'aim') { f.lx = e.clientX; f.ly = e.clientY; }   // the drag paths above (missiles, spectating) steer by the step
   });
   const lift = e => {
     const f = fingers.get(e.pointerId);
     if (!f) return;
     fingers.delete(e.pointerId);
     if (f.kind === 'btn') touchButton(f.name, false, f.el);
-    if (f.kind === 'stick') { G.touchTwist = 0; stick.hidden = true; }
-    // A tap on the aim side (no real drag) may be the first of a double tap.
-    if (f.kind === 'aim') lastAimTap = abs(e.clientX - f.x0) + abs(e.clientY - f.y0) < 12 ? performance.now() : -1e9;
+    if (f.kind === 'stick') { G.touchTwist = 0; ring.stick.hidden = true; }
+    if (f.kind === 'aim') {
+      G.touchTurn = 0; G.touchPitch = 0; ring.aim.hidden = true;
+      // A tap on the turn stick (no real drag) may be the first of a double tap.
+      const r = tui.getBoundingClientRect();
+      lastAimTap = abs(e.clientX - r.left - f.x0) + abs(e.clientY - r.top - f.y0) < 12 ? performance.now() : -1e9;
+    }
   };
+  addEventListener('resize', () => { if (G.touchUI) syncTouchUI(); });   // the zones follow the screen
   tui.addEventListener('pointerup', lift);
   tui.addEventListener('pointercancel', lift);
   // A touchscreen laptop can switch either way: follow whatever was used last.
@@ -294,15 +317,13 @@ export function createInput(app) {
 
   // What the sim sees this frame, from the keyboard, the mouse buttons, the touch controls and a gamepad.
   function snapshotInput() {
-    // The touch turn still queued: less what the legs managed last frame.
-    yawDebt -= G.turnByUsed || 0; G.turnByUsed = 0;
-    if (!G.player?.alive || G.player.shutdown || abs(yawDebt) < 1e-4) yawDebt = 0;   // no banking turns through a shutdown
+    G.turnByUsed = 0;
     const gp = pad && !G.spectate ? pad : null, aim = gp ? prefs.padSens * PAD_AIM * (G.zoom ? 0.4 : 1) : 0;
     const inp = {
       thrUp: !!keys.KeyW, thrDown: !!keys.KeyS, stop: !!keys.KeyX, thr: gp ? gp.axes.thr : 0,
-      turn: (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0) + (gp ? gp.axes.turn : 0), turnBy: yawDebt,
+      turn: (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0) + (gp ? gp.axes.turn : 0) + (G.touchTurn || 0), turnBy: 0,
       twist: (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0) + (G.touchTwist || 0) + (gp ? gp.axes.twist * aim : 0),
-      pitch: (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0) + (gp ? gp.axes.pitch * aim * (prefs.invert ? -1 : 1) : 0),
+      pitch: (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0) + (G.touchPitch || 0) + (gp ? gp.axes.pitch * aim * (prefs.invert ? -1 : 1) : 0),
       centre: !!keys.KeyC || !!gp?.hold.centre, centreTap, jets: !!keys.KeyJ || !!gp?.hold.jets,
       held: Object.fromEntries(CATS.map(c => [c, isHeld(c) || !!gp?.hold[c]])), missileTap, punch: punchTap,
     };
