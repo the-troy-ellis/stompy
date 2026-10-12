@@ -10,3 +10,8 @@ export const flatZones = def => [
   ...(def.flat || []).map(([b, d, r]) => { const p = polar([b, d]); return [p.x, p.z, r]; }),
   ...(def.entities || []).filter(e => e.pad).map(e => { const p = polar(e.at); return [p.x, p.z, e.pad]; }),
 ];
+// World to polar, the other way: [bearing° in [0, 360), dist] from the centre.
+export const toPolar = (x, z) => [((Math.atan2(-x, z) * 180 / Math.PI) % 360 + 360) % 360, Math.hypot(x, z)];
+// A position the mission editor moved or placed, rounded so the exported file
+// stays readable: 1° and 5 m (docs/specs/15-mission-editor.md § Coordinates).
+export const roundPolar = ([b, d]) => [((Math.round(b) % 360) + 360) % 360, Math.round(d / 5) * 5];

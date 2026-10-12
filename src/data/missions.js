@@ -26,6 +26,10 @@ const PAD = { kind: 'nav', mesh: 'pad', radius: 14, pad: 16 };
 const LAUNCHER = { kind: 'turret', mesh: 'launcher', height: 6, radius: 4, tags: ['battery'], label: 'LAUNCHER', pad: 10 };
 const PROP_TANK = { kind: 'structure', mesh: 'tank', height: 7, radius: 5, hp: Infinity, pad: 11 };   // the refinery's: scenery
 const ICE_ROUTE = [[160, 110], [120, 260], [70, 520], [30, 800], [10, 1030]];   // ~1.4 km across the glacier
+// The shapes and routes above, by the names the file uses, for the mission
+// editor's export and import (data/missionIO.js).
+export const SHAPES = { RELAY, TRUCK, TANK, PAD, LAUNCHER, PROP_TANK };
+export const ROUTES = { ROUTE, ICE_ROUTE };
 
 export const MISSIONS = [
   // Act I: Redwater, dusk desert.
