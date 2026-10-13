@@ -119,9 +119,10 @@ export function gait(G, m, dt) {
   m.feet.forEach((f, i) => {
     const u = swingOf(i);
     if (!legOk(i)) {
-      // The leg is gone: nothing swings, and the body dips where its step would have carried it.
+      // The leg is gone: nothing swings, and the body dips where its step would
+      // have carried it, deeper than any stride's crouch (a walker's is deep).
       f.lifted = false;
-      if (u != null) m.bob = min(m.bob, crouch - sin(PI * u) * 0.35 * s);
+      if (u != null) m.bob = min(m.bob, crouch - sin(PI * u) * (gp.crouch + 0.35) * s);
       return;
     }
     if (u == null) {

@@ -111,9 +111,13 @@ that is the wrong colour, then the footfalls.
 
 ### Existing three, role lines refreshed
 
-- KESTREL: `REVERSE-JOINT · DOES A BIT OF EVERYTHING`
-- JACKAL: `FORWARD-JOINT · FAST, FLIMSY`
-- WARDEN: `QUADRUPED · SLOW, STUBBORN`
+- KESTREL: `FORWARD-JOINT · DOES A BIT OF EVERYTHING`
+- JACKAL: `REVERSE-JOINT · FAST, FLIMSY`
+- WARDEN: `QUADRUPED · BIG, SLOW, STUBBORN`
+
+Spec 16 (#263) swapped KESTREL's and JACKAL's legs. Each kept its body: the
+chassis sets `style` to its old plan. WARDEN became the biggest mech (90 t,
+scale 1.4, 8 m/s).
 
 ### Body plan mechanics
 

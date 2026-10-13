@@ -65,8 +65,8 @@
    ]
   },
   "warden": {
-   "tons": 60,
-   "frame": 30.5,
+   "tons": 90,
+   "frame": 56,
    "systems": {
     "sinks": 0,
     "armour": 0,
@@ -452,7 +452,7 @@
       "knuckles": 0
      }
     },
-    "tons": 45,
+    "tons": 70.5,
     "ok": true
    }
   },
@@ -476,7 +476,7 @@
       "knuckles": 0
      }
     },
-    "tons": 51,
+    "tons": 76.5,
     "ok": true
    }
   },

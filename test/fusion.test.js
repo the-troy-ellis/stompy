@@ -34,17 +34,18 @@ test('a short slip pauses the scan; a long one or a different target resets it',
   const P = G.player;
   stepFor(G, 1.5, scanning);
   const t1 = P.fusion.t;
-  // Slip for 0.4 s: the target steps far out of the beam, then comes back.
-  const z = e.z; e.z = 400; initFeet(G, e);
+  // Slip for 0.4 s: the target steps far out of the beam (sideways: a WARDEN
+  // is big enough to stay in it further along the same line), then comes back.
+  const x = e.x; e.x = 200; initFeet(G, e);
   stepFor(G, 0.4, scanning);
   assert.ok(P.fusion.slipping);
-  e.z = z; initFeet(G, e);
+  e.x = x; initFeet(G, e);
   stepFor(G, 0.2, scanning);
   assert.ok(P.fusion.t > t1, 'the scan did not resume');
   // Slip for 0.6 s: start over.
-  e.z = 400; initFeet(G, e);
+  e.x = 200; initFeet(G, e);
   stepFor(G, 0.6, scanning);
-  e.z = z; initFeet(G, e);
+  e.x = x; initFeet(G, e);
   stepFor(G, 0.1, scanning);
   assert.ok(P.fusion.t < 0.2, `scan kept ${P.fusion.t}`);
   assert.equal(e.alive, true);
