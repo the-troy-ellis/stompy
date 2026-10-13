@@ -158,6 +158,9 @@ export function stepDying(G, dt) {
         G.wrecks.push(makeWreck(G, m, d.roll));
         scorch(G, m.x, m.z, 5 * m.ch.scale);
         G.fx.sfx.boom([m.x, m.y, m.z], false);
+        // Your own view stays where the fall left it until the debrief (or a
+        // respawn): spec 13 § Death, "eye and all".
+        if (m === G.player) m.fallen = { angle: d.angle, fallYaw: d.fallYaw, roll: d.roll, drop: d.drop };
         m.dying = null; m.gone = true;
       }
     }

@@ -37,7 +37,7 @@ export function tickCoopRespawn(G) {
   if (G.time < r.at && objKey(G) === r.obj) return;
   const s = G.startAt || { x: 0, z: 0, yaw: 0 };
   Object.assign(P, { x: s.x, z: s.z, y: G.ter.height(s.x, s.z), vy: 0, yaw: s.yaw, twist: 0, pitch: 0, speed: 0, throttle: 0,
-    heat: 0, fuel: 1, shutdown: false, alive: true, gone: false, air: false, hp: { ...P.max }, spawnT: 2 });
+    heat: 0, fuel: 1, shutdown: false, alive: true, gone: false, fallen: null, air: false, hp: { ...P.max }, spawnT: 2 });
   for (const w of P.weapons) w.dead = false;   // the guns come back with the arms; the ammo doesn't
   initFeet(G, P); P.lastYaw = P.yaw;
   G.coopRespawn = null;

@@ -384,7 +384,7 @@ export function createNet(app) {
     // Far from the hostiles; in team deathmatch, on your side's half (net/teams.js).
     const P = G.player, [x, z] = spawnPoint(G, sideOf(Net.mode, myTeam()));
     Object.assign(P, { x, z, y: G.ter.height(x, z), vy: 0, yaw: atan2(-x, -z), twist: 0, pitch: 0, speed: 0, throttle: 0,
-      heat: 0, fuel: 1, shutdown: false, alive: true, air: false, hp: { ...P.max }, spawnT: 2 });
+      heat: 0, fuel: 1, shutdown: false, alive: true, fallen: null, air: false, hp: { ...P.max }, spawnT: 2 });
     P.weapons.forEach(w => { w.cd = 0; w.dead = false; w.ammo = w.def.ammo || null; });
     initFeet(G, P); P.lastYaw = P.yaw;
     G.respawnAt = 0; G.flash = 0; G.killer = 0; G.spectate = null;   // back in the cockpit
