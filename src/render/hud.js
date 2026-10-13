@@ -119,6 +119,49 @@ export function createHud(app) {
     box('LA', -3.2, 0.2, 1.4, 3.6); box('T', -1.6, 0, 3.2, 4.2); box('RA', 1.8, 0.2, 1.4, 3.6);
     box('LL', -1.6, 4.4, 1.5, 4); box('RL', 0.1, 4.4, 1.5, 4);
   }
+  // Your own damage: your mech in wireframe, posed as it is this frame (it
+  // walks, twists and aims as you do), seen from behind and a little to one
+  // side, each section's lines in its damage colour. A section that's gone
+  // is gone. (x, y) is the top centre of a box `u` units across: the same
+  // footprint as the old box diagram, which stays for the target panel.
+  const WIRE_YAW = 0.3, WIRE_TILT = 0.2, cy0 = Math.cos(WIRE_YAW), sy0 = Math.sin(WIRE_YAW), ct = Math.cos(WIRE_TILT), st = Math.sin(WIRE_TILT);
+  // Whole pixels: small integers reach the canvas unboxed, so the lines make no garbage.
+  const WIRE_SECS = ['T', 'LA', 'RA', 'LL', 'RL'], wirePaths = Object.fromEntries(WIRE_SECS.map(k => [k, { pts: new Int16Array(16384), n: 0 }])), wireHeight = new Map();
+  function mechWire(m, x, y, u) {
+    const pose = app.scene.poseWire?.(m);
+    if (!pose) { mechDiagram(m, x, y, u); return; }
+    if (!wireHeight.has(m.partsKey)) wireHeight.set(m.partsKey, heightOf(pose));
+    const h = 10.5 * u, k = h / (wireHeight.get(m.partsKey) * 1.1), ox = x, oy = y + h - 2;
+    for (const sec of WIRE_SECS) wirePaths[sec].n = 0;
+    for (let j = 0; j < pose.n; j++) {
+      const part = pose.parts[j], e = part.edges, q = part.mat, path = wirePaths[part.sec], pts = path.pts;
+      for (let i = 0; i < e.length && path.n < pts.length; i += 3) {
+        const px = e[i], py = e[i + 1], pz = e[i + 2];
+        const X = q[0] * px + q[4] * py + q[8] * pz + q[12], Y = q[1] * px + q[5] * py + q[9] * pz + q[13], Z = q[2] * px + q[6] * py + q[10] * pz + q[14];
+        const Xv = X * cy0 + Z * sy0, Zv = -X * sy0 + Z * cy0;   // turned a little, then seen from behind: its left on your left
+        pts[path.n++] = Math.round(ox - Xv * k); pts[path.n++] = Math.round(oy - (Y * ct + Zv * st) * k);
+      }
+    }
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x - 4.4 * u, y - u, 8.8 * u, h + u); ctx.clip();   // a long stride stays in its box
+    ctx.lineWidth = 1;
+    for (const sec of WIRE_SECS) {
+      const { pts, n } = wirePaths[sec];
+      if (!n) continue;
+      ctx.strokeStyle = hpCol(m.hp[sec] / m.max[sec]);
+      ctx.beginPath();
+      for (let i = 0; i + 3 < n; i += 4) { ctx.moveTo(pts[i], pts[i + 1]); ctx.lineTo(pts[i + 2], pts[i + 3]); }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // The posed mech's height, once, for the diagram's scale.
+  function heightOf(pose) {
+    let top = 0;
+    for (let j = 0; j < pose.n; j++) { const { edges: e, mat: q } = pose.parts[j]; for (let i = 0; i < e.length; i += 3) top = max(top, q[1] * e[i] + q[5] * e[i + 1] + q[9] * e[i + 2] + q[13]); }
+    return top || 8;
+  }
+
 
   // An objective marker: a diamond with the distance under it; off-screen (or
   // behind), held at the edge of the view with an arrow pointing the way.
@@ -150,7 +193,7 @@ export function createHud(app) {
         frame: true, dash, viewBottom: V.H - dash,
         radar: { x: V.W / 2, y: V.H - dash / 2 + 4, r: dash * 0.4 },
         bars: { x: V.W * 0.1 + 6, y: top, h: dash - 30 },
-        diag: { x: V.W * 0.1 + 34 + 3.2 * u, y: top + 6, u },
+        diag: { x: V.W * 0.1 + 34 + 4.4 * u, y: top + 6, u },
         weapons: { x: min(V.W * 0.62, V.W * 0.9 - 26 - 200), y: top + 4 },   // the list is 190 wide: never into the throttle (HUD SCALE)
         throttle: { x: V.W * 0.9 - 26, y: top, h: dash - 30 },
         target: { x: V.W * 0.1 + 8, y: 48 },
@@ -163,7 +206,7 @@ export function createHud(app) {
       frame: false, dash: 0, viewBottom: V.H,
       radar: { x: V.W - r - 14, y: r + 12, r },
       bars: { x: 64, y: 112, h: 70 },
-      diag: { x: 100 + 3.2 * u, y: 116, u },
+      diag: { x: 100 + 4.4 * u, y: 116, u },
       weapons: { x: V.W - 205, y: 2 * r + 34 },
       throttle: { x: 14, y: V.H - 196, h: 120 },
       target: { x: tgtX, y: 10 },   // right of the pause and zoom buttons
@@ -585,7 +628,7 @@ export function createHud(app) {
 
     // Left: own damage, heat, jump jets.
     ctx.textAlign = 'left';
-    mechDiagram(P, L.diag.x, L.diag.y, L.diag.u);
+    mechWire(P, L.diag.x, L.diag.y, L.diag.u);
     const bar = (x, label, f, col, warn) => {
       const bh = L.bars.h, top = L.bars.y;
       ctx.fillStyle = '#031203'; ctx.fillRect(x, top, 10, bh);

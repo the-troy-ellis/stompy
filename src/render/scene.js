@@ -171,8 +171,9 @@ export function createScene(app) {
   const BONES = new Float32Array(BONE_COUNT * 16), PLANES = new Float32Array(24);
   // Bounding spheres, generous: a toppling mech or a fallen tower lies along the ground.
   const seen = (x, y, z, r) => sphereVisible(PLANES, x, y, z, r) || (R.culled++, false);   // R.culled: the ?debug=1 overlay's count
-  let putTint = null;
+  let putTint = null, grab = null;   // grab: poseWire's capture of a pose instead of drawing it
   const put = (bone, mesh, mat) => {
+    if (grab) { grab(bone, mesh, mat); return; }
     if (R.skinned) BONES.set(mat, bone * 16);
     else R.draw(mesh, mat, putTint);
   };
@@ -190,7 +191,7 @@ export function createScene(app) {
     const tint = mf ? mix3(VPtint || [1, 1, 1], hudPalette(app.prefs.colourMode).melt, mf * 0.6) : VPtint || [1, 1, 1];   // the glow follows COLOURS
     if (mf) R.drawHeat = min(1, R.drawHeat + mf * 0.3);
     const g = geoOf(m), back = mul(fwd, -1);
-    if (R.skinned) BONES.fill(0);   // a part that isn't drawn this frame keeps a zero matrix
+    if (R.skinned && !grab) BONES.fill(0);   // a part that isn't drawn this frame keeps a zero matrix
     putTint = tint;
     put(BONE.hip, parts.hip, chain(B, M.T(0, g.hip, 0)));
     const hull = M.apply(B, [0, g.hip, 0]);
@@ -227,7 +228,8 @@ export function createScene(app) {
       // Fists follow the aim only a little; guns follow it all the way.
       const AM = chain(TB, M.T(s * g.armX, g.armY, 0), M.RX(fists ? -m.pitch * 0.3 + fists[k] : -m.pitch + pose.arm));
       put(BONE.arm[side], parts.arm, AM);
-      if (parts.fist && !R.skinned) R.draw(parts.fist, AM, tint);   // skinned, the fist rides on the arm's bone
+      if (parts.fist && grab) grab(BONE.arm[side], parts.fist, AM);
+      else if (parts.fist && !R.skinned) R.draw(parts.fist, AM, tint);   // skinned, the fist rides on the arm's bone
       // The arm's gun, shaped by what is fitted there; nothing for an EMPTY hardpoint.
       const w = m.weapons.find(x => x.mount === k && x.def.kind !== 'fusion');
       if (w && parts.barrel) {
@@ -235,8 +237,37 @@ export function createScene(app) {
         put(BONE.barrel[side], parts.barrel, chain(AM, M.T(...at), M.S(bw, bw, bl), M.T(-at[0], -at[1], -at[2])));
       }
     }
-    if (R.skinned) R.drawSkinned(parts.skin, BONES, tint);
+    if (R.skinned && !grab) R.drawSkinned(parts.skin, BONES, tint);
     R.drawHeat = heatWas;
+  }
+  // A mech's pose as the HUD's damage diagram draws it: every part's edges
+  // (mesh/wire.js) with its matrix in the mech's own space (its feet at the
+  // origin, facing +z, at scale 1) and its section. The same pose drawMech
+  // gives it this frame (legs on their footfalls, the torso's twist and
+  // wobble, the arms' aim), so the diagram walks as the mech does.
+  // The pose is written into a pool that is reused every frame: { n, parts }.
+  const WIRE = { n: 0, parts: Array.from({ length: 24 }, () => ({ edges: null, mat: new Float32Array(16), sec: 'T' })) };   // reused every frame
+  let wireOf = null, wireInv = null, wireLegs = null;
+  const wireSec = bone => {
+    if (bone === BONE.arm[0] || bone === BONE.barrel[0]) return 'LA';
+    if (bone === BONE.arm[1] || bone === BONE.barrel[1]) return 'RA';
+    if (bone >= BONE.leg(0)) return wireLegs[Math.floor((bone - BONE.leg(0)) / 3)]?.hx > 0 ? 'LL' : 'RL';
+    return 'T';
+  };
+  const grabWire = (bone, mesh, mat) => {
+    const edges = wireOf.get(mesh);
+    if (!edges || WIRE.n >= WIRE.parts.length) return;
+    const p = WIRE.parts[WIRE.n++];
+    p.edges = edges; p.mat.set(M.mul(wireInv, mat)); p.sec = wireSec(bone);
+  };
+  function poseWire(m) {
+    const parts = R.mechParts[m.partsKey];
+    if (!parts?.wire || !m.feet) return null;
+    wireOf = parts.wire; wireLegs = geoOf(m).legs; WIRE.n = 0;
+    wireInv = chain(M.S(1 / m.ch.scale), M.RY(-m.yaw), M.T(-m.x, -m.y, -m.z));
+    grab = grabWire;
+    try { drawMech(m); } finally { grab = null; }
+    return WIRE;
   }
   // Muzzle flash: a hot streak out of the barrel for two frames. After the
   // mechs, so the skinned ones stay one run of draws in their own program.
@@ -585,5 +616,5 @@ export function createScene(app) {
 
 
   const view = { get W() { return W; }, get H() { return H; }, get dpr() { return dpr; } };
-  return { resize, render, uploadWorld, view };
+  return { resize, render, uploadWorld, view, poseWire };
 }

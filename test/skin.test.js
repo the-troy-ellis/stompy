@@ -43,5 +43,5 @@ test('the shader holds BONE_COUNT matrices and falls back where the GPU has no r
   assert.match(gl, /uBones\[\$\{BONE_COUNT\}\]/);
   assert.match(gl, /MAX_VERTEX_UNIFORM_VECTORS\) >= BONE_COUNT \* 4/);
   const scene = readFileSync('src/render/scene.js', 'utf8');
-  assert.match(scene, /if \(R\.skinned\) R\.drawSkinned\(parts\.skin, BONES, tint\)/);
+  assert.match(scene, /if \(R\.skinned(?: && !grab)?\) R\.drawSkinned\(parts\.skin, BONES, tint\)/);   // !grab: poseWire captures a pose without drawing it
 });
