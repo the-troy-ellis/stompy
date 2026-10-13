@@ -16,18 +16,20 @@ import { FIST_MELEE } from './melee.js';
 // plan (geoFor), `style` picks the torso and arms (mesh/mechParts.js), and
 // `melee` gives a chassis fists (data/melee.js).
 export const CHASSIS = {
-  kestrel: { name: NAMES.chassis.kestrel, legs: 'reverse', speed: 15, turn: 1.05, sink: 10, scale: 1, pref: 300, acc0: 0.03, ai: { profile: 'baseline' },
+  // KESTREL and JACKAL swapped legs in spec 16 and kept their bodies: `style` names the old torso and arms.
+  kestrel: { name: NAMES.chassis.kestrel, legs: 'forward', style: 'reverse', speed: 15, turn: 1.05, sink: 10, scale: 1, pref: 300, acc0: 0.03, ai: { profile: 'baseline' },
     hp: { T: 72, LA: 32, RA: 32, LL: 42, RL: 42 }, col: [0.55, 0.58, 0.62], acc: [0.85, 0.6, 0.15],
     tons: 45, frame: 12.5, systems: { sinks: 0, armour: 0, jets: 1 },
     hardpoints: [{ id: 'la', loc: 'LA', cat: 'energy', stock: 'laser' }, { id: 'ra', loc: 'RA', cat: 'energy', stock: 'laser' },
       { id: 't1', loc: 'T', cat: 'ballistic', stock: 'ac' }, { id: 't2', loc: 'T', cat: 'missile', stock: 'lrm' }] },
-  jackal: { name: NAMES.chassis.jackal, legs: 'forward', speed: 19, turn: 1.6, sink: 9, scale: 0.85, pref: 140, acc0: 0.035, ai: { profile: 'harass' },
+  jackal: { name: NAMES.chassis.jackal, legs: 'reverse', style: 'forward', speed: 19, turn: 1.6, sink: 9, scale: 0.85, pref: 140, acc0: 0.035, ai: { profile: 'harass' },
     hp: { T: 30, LA: 13, RA: 13, LL: 18, RL: 18 }, col: [0.62, 0.26, 0.2], acc: [0.2, 0.2, 0.22],
     tons: 25, frame: 15.5, systems: { sinks: 0, armour: 0, jets: 1 },
     hardpoints: [{ id: 'la', loc: 'LA', cat: 'energy', stock: 'mlaser' }, { id: 'ra', loc: 'RA', cat: 'energy', stock: 'mlaser' }] },
-  warden: { name: NAMES.chassis.warden, legs: 'quad', speed: 9, turn: 0.7, sink: 10, scale: 1.15, pref: 330, acc0: 0.025, ai: { profile: 'line' },
+  // The biggest (spec 16): heavier, larger and slower than PURPLE PUNCHER.
+  warden: { name: NAMES.chassis.warden, legs: 'quad', speed: 8, turn: 0.7, sink: 10, scale: 1.4, pref: 330, acc0: 0.025, ai: { profile: 'line' },
     hp: { T: 58, LA: 28, RA: 28, LL: 34, RL: 34 }, col: [0.36, 0.4, 0.3], acc: [0.75, 0.7, 0.2],
-    tons: 60, frame: 30.5, systems: { sinks: 0, armour: 0, jets: 1 }, unlock: 4,
+    tons: 90, frame: 56, systems: { sinks: 0, armour: 0, jets: 1 }, unlock: 4,
     hardpoints: [{ id: 't1', loc: 'T', cat: 'missile', stock: 'lrm' }, { id: 'ra', loc: 'RA', cat: 'ballistic', stock: 'ac' },
       { id: 'la', loc: 'LA', cat: 'energy', stock: 'laser' }] },
   // The one with fists. Slow enough to kite, ruinous if it reaches you.

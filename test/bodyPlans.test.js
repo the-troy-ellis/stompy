@@ -60,7 +60,7 @@ test('geoFor merges a chassis partial over its leg type, and moves what sits on 
   assert.ok(Math.abs(g.torsoY - (base.torsoY + 0.8)) < 1e-9 && Math.abs(g.height - (base.height + 0.8)) < 1e-9 && Math.abs(g.legTop - (base.legTop + 0.8)) < 1e-9);
   assert.equal(GEO.forward.hip, 4.6, 'the shared plan is untouched');
   assert.equal(geoFor(CHASSIS.kestrel), geoFor(CHASSIS.kestrel), 'built once per chassis');
-  assert.equal(geoFor(CHASSIS.kestrel).hip, GEO.reverse.hip, 'no partial, no change');
+  assert.equal(geoFor(CHASSIS.kestrel).hip, GEO.forward.hip, 'no partial, no change');
 });
 
 test('every body plan can reach the ground with a bent knee', () => withStilts(() => {
@@ -74,9 +74,22 @@ test('each chassis is under 700 triangles; legs follow the leg type and the body
   const tris = ch => Object.values(buildMechParts(ch)).reduce((a, b) => a + b.d.length / 27, 0);
   for (const k of ALL) assert.ok(tris(CHASSIS[k]) < 700, `${k}: ${tris(CHASSIS[k])} triangles`);
   assert.equal(styleOf(CHASSIS.kestrel), 'reverse');
-  const s = buildMechParts(STILTS), q = buildMechParts(CHASSIS.warden), j = buildMechParts(CHASSIS.jackal);
+  const s = buildMechParts(STILTS), q = buildMechParts(CHASSIS.warden), j = buildMechParts(CHASSIS.kestrel);
   assert.equal(s.torso.d.length, q.torso.d.length, 'the quad turret');
   assert.equal(s.foot.d.length, j.foot.d.length, 'forward feet');
   const top = b => Math.min(...b.d.filter((_, i) => i % 9 === 1));
   assert.ok(Math.abs(top(s.uleg) - top(j.uleg) + 0.4) < 1e-6, 'the upper leg is 0.4 longer, as l1 says');
 }));
+
+test('the roster by class (spec 16): JACKAL runs on bird legs, KESTREL walks on forward knees, WARDEN is the biggest', () => {
+  assert.equal(CHASSIS.jackal.legs, 'reverse');
+  assert.equal(CHASSIS.kestrel.legs, 'forward');
+  const others = Object.keys(CHASSIS).filter(k => k !== 'warden');
+  for (const k of others) {
+    assert.ok(CHASSIS.warden.tons > CHASSIS[k].tons && CHASSIS.warden.scale > CHASSIS[k].scale, `WARDEN outweighs and outsizes ${k}`);
+    assert.ok(CHASSIS.warden.speed < CHASSIS[k].speed, `and is slower than ${k}`);
+  }
+  // New legs, same bodies: no two chassis share a body style.
+  const styles = Object.values(CHASSIS).map(styleOf);
+  assert.equal(new Set(styles).size, styles.length, styles.join(' '));
+});

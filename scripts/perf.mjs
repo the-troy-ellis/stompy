@@ -49,13 +49,19 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   fight, so its budget covers that swing, not one seed's luck.
 //   The HUD's wireframe loop is its own function now (hud.js wireEdges): it
 //   was stuck half compiled and boxed 36 KB a frame; looking-away 104 KB.
+// After #263 (the roster: a 1.4-scale WARDEN, JACKAL and KESTREL on new legs,
+//   so again a differently-fought field): fight-deaths 48/56 · wrecks 52/57.
+//   Main with only the dust's rolls moved gave the same (48/60, wrecks 52/61):
+//   these two scenes' draws follow how the scripted fight goes (shed limbs,
+//   shots in the air, what burns), not the renderer, so their budgets cover
+//   that spread. A scene that holds the field fixed would let them tighten.
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
   menu:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 26 },
   'free-start':   { meanDraws: 8, peakDraws: 8, tris: 25000, allocKB: 115 },
   fight:          { meanDraws: 31, peakDraws: 50, tris: 27000, allocKB: 205 },
-  'fight-deaths': { meanDraws: 41, peakDraws: 72, tris: 27000, allocKB: 205 },
-  wrecks:         { meanDraws: 42, peakDraws: 50, tris: 26000, allocKB: 145 },
+  'fight-deaths': { meanDraws: 55, peakDraws: 72, tris: 27000, allocKB: 205 },
+  wrecks:         { meanDraws: 60, peakDraws: 70, tris: 26000, allocKB: 145 },
   'looking-away': { meanDraws: 21, peakDraws: 24, tris: 27000, allocKB: 135 },
   rain:           { meanDraws: 9, peakDraws: 9, tris: 25000, allocKB: 90 },   // free-start in a downpour: one more draw (the rain), no more garbage
   snow:           { meanDraws: 11, peakDraws: 11, tris: 25000, allocKB: 90 },   // and in snow

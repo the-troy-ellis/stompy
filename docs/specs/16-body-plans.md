@@ -66,6 +66,10 @@ for #79 to settle:
 | Mech | Tons | Scale | Speed (m/s) |
 |---|---|---|---|
 | WARDEN | 60 → 90 | 1.15 → 1.4 | 9 → 8 |
+
+Shipped in #263 as proposed. The frame rose to 56 t, so the stock loadout
+still uses 85% of the budget and 13.5 t is free for armour and systems.
+Armour is unchanged, for #79 to settle.
 | JACKAL, KESTREL | unchanged | unchanged | unchanged |
 
 Speed order after: runners (19–22) > walkers (9–15) > crawler (8).
