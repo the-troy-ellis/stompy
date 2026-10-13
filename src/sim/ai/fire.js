@@ -48,7 +48,10 @@ export function decideFire(G, e, P, { dist, toYaw }, dt) {
   if (beam && may && off < 0.3 && dist < beam.def.range * 0.95) {
     if (e.heat > cap - 2) a.coolT = r.range(1.5, 3);
     if ((a.coolT = max(0, (a.coolT || 0) - dt)) === 0) {
-      const err = aimError(G, e, P, dist), k = G.time * 0.9 + a.strafeT;
+      // The drift's phase is the mech's own and never jumps. It used to ride the strafe
+      // timer, which counts down at 1/s, so it moved at 0.1/s; it still does, but a
+      // hit (which resets that timer) no longer throws the beam across the target.
+      const err = aimError(G, e, P, dist), k = (a.aimPhase ??= a.strafeT + G.time * 0.1) - G.time * 0.1;
       a.beamAim = add(pc, [sin(k * 1.3) * err, sin(k * 1.7) * err * 0.5, cos(k * 1.1) * err]);
       e.beamOn = true;
     }

@@ -39,7 +39,10 @@ export const keepRange = (pref, band = [0.6, 1.35]) => (G, e, ctx) => {
 // jump becomes a dive: over the target it cuts the jets and drops on it.
 export const harass = (G, e, ctx, dt, { stomp = false } = {}) => {
   const a = e.ai, { dist, toYaw, seen } = ctx;
-  if (a.hitAt != null && a.hitAt !== a.flippedAt) { a.flippedAt = a.hitAt; a.strafe *= -1; a.strafeT = G.rng.range(3, 7); }
+  // A new hit flips the strafe, at most once a beat: a beam on it is a hit every frame.
+  if (a.hitAt != null && a.hitAt !== a.flippedAt && !(a.hitAt - (a.flipT ?? -Infinity) < B.hitFlipEvery)) {
+    a.flippedAt = a.flipT = a.hitAt; a.strafe *= -1; a.strafeT = G.rng.range(3, 7);
+  }
   if (a.jump) {
     if (stomp && e.air && dist < B.stompOver) { a.jump.until = 0; return { moveYaw: toYaw, thr: 0, jets: false }; }   // right on top: drop
     if (G.time < a.jump.until) return { moveYaw: stomp ? toYaw : a.jump.yaw, thr: 1, jets: true };
