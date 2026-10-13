@@ -223,6 +223,20 @@ gestures, markers and picking, #247 placing, the panel and line of sight,
 #248 objectives and waves, export, PLAY and back. All four are built (#250 to
 #253); a real phone check by the owner is what is left.
 
+## M7.5 — Body plans by class
+
+Goal: heavy machines move like heavy machines, and a mech's legs say what it
+is. Bird legs run (fast), forward knees walk (normal speed, more armour and
+guns), quads crawl (slowest, biggest, and hills don't slow them).
+
+- #261 gaits by class: runners with a flight phase, walkers with long slow
+  stomping strides, crawlers trotting; look only, no balance numbers.
+- #262 quad traction: no slope factor for quads, and the AI knows it.
+- #263 the roster: JACKAL bird legs, KESTREL forward knees, WARDEN the
+  biggest (with #79).
+
+Spec: [specs/16-body-plans.md](specs/16-body-plans.md).
+
 ## What is deliberately not scheduled
 
 See the non-goals in [vision.md](vision.md). Also not scheduled, pending a
