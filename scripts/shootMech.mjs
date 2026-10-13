@@ -18,7 +18,7 @@ try {
   const lockedRun = !!process.env.SHOOT_LOCKED, sfx = lockedRun ? '-locked' : '';
   for (const [name, vp] of [['menu' + sfx, { width: 1024, height: 640 }], ['menu-phone' + sfx, { width: 740, height: 360 }]]) {
     const page = await browser.newPage({ viewport: vp });
-    await page.goto(`http://localhost:${PORT}/?debug=1${lockedRun ? '' : '&unlock'}`);
+    await page.goto(`http://localhost:${PORT}/?debug=1${lockedRun ? '&lock' : ''}`);
     await page.evaluate(k => localStorage.setItem('stompy.mech.chassis', JSON.stringify(k)), key);
     await page.reload();
     await page.waitForSelector('.mm-title');

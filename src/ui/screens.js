@@ -134,8 +134,10 @@ export function createUi(app) {
   }
   // The mech on show: multiplayer shows it in your arena colour.
   // Unlocked chassis live in the campaign save (ui/campaign.js); a restarted
-  // campaign keeps them. ?unlock opens everything (for testing).
-  const unlockAll = new URLSearchParams(location.search).has('unlock');
+  // campaign keeps them. ?unlock (or ?debug=1) opens every chassis and
+  // mission, for testing; winning one still counts in the save. &lock keeps
+  // a debug run's locks, as a new player has them (the smoke test).
+  const unlockAll = (app.params.has('unlock') || app.params.has('debug')) && !app.params.has('lock');
   const REALLY_MS = 3000;
   let reallyUntil = 0, frontierWin = false;
   const camp = app.campaign;
@@ -161,7 +163,7 @@ export function createUi(app) {
       const all = missionFoes(d);   // waves are hostiles too
       const counts = all.reduce((a, f) => ((a[foeType(f)] = (a[foeType(f)] || 0) + 1), a), {});
       // The strip: twelve squares, done (tap to replay), the next one, the rest locked.
-      const strip = stripSquares(camp).map((st, i) => `<button class="sq ${st}${i === prefs.mission ? ' sel' : ''}" data-mis="${i}" ${st === 'locked' ? 'disabled' : ''}>${i + 1}</button>`).join('');
+      const strip = stripSquares(camp, unlockAll).map((st, i) => `<button class="sq ${st}${i === prefs.mission ? ' sel' : ''}" data-mis="${i}" ${st === 'locked' ? 'disabled' : ''}>${i + 1}</button>`).join('');
       const really = performance.now() < reallyUntil;
       return `<div class="strip">${strip}</div>
         <div class="k">${esc(missionTitle(prefs.mission + 1, d.name))}</div>
@@ -371,7 +373,7 @@ export function createUi(app) {
       if (sel) { const wasMp = prefs.menuSel === 'mp'; prefs.menuSel = sel; store.set('menu.sel', sel); if (wasMp !== (sel === 'mp')) showMech(); renderMenu(); return; }
       if (md) { cycleMech(+md.dataset.mech); return; }
       const mis = e.target.closest('[data-mis]');
-      if (mis) { const n = +mis.dataset.mis; if (canPlay(camp, n)) { prefs.mission = n; renderMenu(); } return; }
+      if (mis) { const n = +mis.dataset.mis; if (canPlay(camp, n, unlockAll)) { prefs.mission = n; renderMenu(); } return; }
       // MULTIPLAYER: the arena or co-op, host or join, and the host's mission (from the campaign strip).
       const mpk = e.target.closest('[data-mpk]'), cj = e.target.closest('[data-cj]'), cp = e.target.closest('[data-cp]');
       const ap = e.target.closest('[data-ap]'), am = e.target.closest('[data-am]');
@@ -382,7 +384,7 @@ export function createUi(app) {
         if (cj) { prefs.coopJoin = cj.dataset.cj === '1'; store.set('coop.join', prefs.coopJoin); }
         if (ap) { prefs.arenaPick = +ap.dataset.ap; store.set('arena.pick', prefs.arenaPick); }
         if (am) { prefs.arenaMode = prefs.arenaMode === 'tdm' ? 'ffa' : 'tdm'; store.set('arena.mode', prefs.arenaMode); }   // two modes: either arrow flips it
-        if (cp) { const n = prefs.mission + +cp.dataset.d; if (n >= 0 && canPlay(camp, n)) prefs.mission = n; }
+        if (cp) { const n = prefs.mission + +cp.dataset.d; if (n >= 0 && canPlay(camp, n, unlockAll)) prefs.mission = n; }
         renderMenu(); return;
       }
       if (fp) {

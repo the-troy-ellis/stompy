@@ -48,8 +48,10 @@ export function restartCampaign(c) {
 }
 
 // The strip's squares: done (won), current (the next unplayed), or locked.
-export function stripSquares(c) {
-  return Array.from({ length: STRIP }, (_, i) => (c.best[i]?.won ? 'done' : i === Math.min(c.mission, STRIP - 1) && c.mission < STRIP ? 'current' : i < c.mission ? 'done' : 'locked'));
+// With `all` (?unlock or ?debug=1) nothing is locked: the rest are open.
+export function stripSquares(c, all = false) {
+  return Array.from({ length: STRIP }, (_, i) => (c.best[i]?.won ? 'done' : i === Math.min(c.mission, STRIP - 1) && c.mission < STRIP ? 'current' : i < c.mission ? 'done' : all ? 'open' : 'locked'));
 }
-// Which missions can be launched: any won one (replay) and the next unplayed.
-export const canPlay = (c, n) => n <= c.mission;
+// Which missions can be launched: any won one (replay) and the next unplayed;
+// with `all`, every mission on the strip too.
+export const canPlay = (c, n, all = false) => n <= (all ? Math.max(c.mission, STRIP - 1) : c.mission);
