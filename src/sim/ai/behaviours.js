@@ -4,6 +4,7 @@ import { geoOf } from '../../data/geo.js';
 import { center } from '../geom.js';
 import { eyeAt, blocked } from '../sight.js';
 import { BEHAVIOUR as B } from '../../data/ai.js';
+import { gradeFactor, grips } from '../mech.js';
 
 const { sin, cos, atan2, abs, hypot, min, PI } = Math;
 
@@ -18,6 +19,13 @@ const { sin, cos, atan2, abs, hypot, min, PI } = Math;
 
 const towards = (e, x, z) => atan2(x - e.x, z - e.z);
 const inMap = v => clampN(v, -BOUND + 40, BOUND - 40);
+// How far away a spot is, in flat metres' worth of walking: a climb costs a
+// walker its slope penalty; a crawler doesn't care (spec 16).
+export function travel(G, e, x, z) {
+  const d = hypot(x - e.x, z - e.z);
+  if (grips(e) || d < 1) return d;
+  return d / gradeFactor((G.ter.height(x, z) - G.ter.height(e.x, e.z)) / d);
+}
 
 // Strafe side and its timer, shared by everything that orbits.
 export function strafeTick(G, e, dt) {
@@ -68,8 +76,9 @@ export function findCover(G, e, target) {
   for (const d of B.coverDists) for (let k = 0; k < 8; k++) {
     const a = k * PI / 4, x = inMap(e.x + sin(a) * d), z = inMap(e.z + cos(a) * d);
     if (!blocked(G, eyeAt(G, e, x, z), tc)) continue;
-    if (!best || d < best.d) best = { x, z, d };
-    if (best && best.d === B.coverDists[0]) return best;
+    const t = travel(G, e, x, z);
+    if (!best || t < best.d) best = { x, z, d: t };
+    if (best.d <= B.coverDists[0]) return best;   // the nearest ring, and no climb: nothing beats it
   }
   return best;
 }
@@ -105,7 +114,7 @@ export function findRidge(G, e, target, avoid = null) {
     if (h < base + B.ridgeAbove) continue;
     if (avoid && hypot(x - avoid.x, z - avoid.z) < B.relocateAway) continue;   // somewhere it has not just been shooting from
     if (blocked(G, eyeAt(G, e, x, z), tc)) continue;
-    const d = hypot(x - e.x, z - e.z);
+    const d = travel(G, e, x, z);
     if (!best || d < best.d) best = { x, z, d };
   }
   return best;

@@ -15,12 +15,17 @@ const { sin, cos, min, max } = Math;
 // How fast a push dies out, per second: an impulse of v m/s moves the mech about v / PUSH_DECAY metres.
 export const PUSH_DECAY = 2.5;
 
-// The grade under the mech along its heading, as a speed factor: uphill
-// slow, downhill a touch quick. Sampled two metres fore and aft.
+// A grade (rise over run) as a speed factor: uphill slow, downhill a touch quick.
+export const gradeFactor = grade => clampN(grade > 0 ? 1 - grade * WALK.slopeUp : 1 - grade * WALK.slopeDown, WALK.slopeMin, WALK.slopeMax);
+// Four legs keep their grip: a crawler (quad) walks a hill at its flat speed (spec 16).
+export const grips = m => m.ch.legs === 'quad';
+
+// The grade under the mech along its heading, as a speed factor. Sampled two
+// metres fore and aft.
 export function slopeFactor(G, m) {
+  if (grips(m)) return 1;
   const fx = sin(m.yaw), fz = cos(m.yaw);
-  const grade = (G.ter.height(m.x + fx * 2, m.z + fz * 2) - G.ter.height(m.x - fx * 2, m.z - fz * 2)) / 4;
-  return clampN(grade > 0 ? 1 - grade * WALK.slopeUp : 1 - grade * WALK.slopeDown, WALK.slopeMin, WALK.slopeMax);
+  return gradeFactor((G.ter.height(m.x + fx * 2, m.z + fz * 2) - G.ter.height(m.x - fx * 2, m.z - fz * 2)) / 4);
 }
 
 // Touchdown dust: a puff under the feet, and for a hard landing (force over

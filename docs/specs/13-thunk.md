@@ -145,7 +145,8 @@ that loses both legs sits down and keeps firing until it goes.
 
 The ground pushes back (`src/data/walk.js`, `slopeFactor` in `mech.js`):
 the grade under the heading, sampled two metres fore and aft, scales top
-speed, a 20% climb to half and a descent up to 1.15×. A landing digs the
+speed, a 20% climb to half and a descent up to 1.15×. Quads ignore it
+(spec 16 § Crawler traction). A landing digs the
 feet in: it takes up to 60% of the forward speed and holds the legs at 30%
 for up to 0.35 s, scaled by the landing force, before they drive again. The
 landing squash already shows it; this makes it felt in the throttle.
