@@ -25,7 +25,35 @@ for (const chassis of MECH_ORDER) {
       prev = P.feet.map(f => ({ lifted: f.lifted, pos: [...f.pos] }));
     }
     assert.ok(steps > 10, `only ${steps} steps`);
-    assert.ok(planted > 1000);
+    assert.ok(planted > 600, `${planted} planted foot-frames`);   // a runner at full throttle has a flight phase (spec 16), so fewer
     assert.ok(P.speed > P.ch.speed * 0.9);
+  });
+}
+
+// Gaits by class (spec 16, #261): fewer, longer steps; runners leave the
+// ground at speed, walkers and crawlers never do. Measured at top speed on
+// flat ground. "Before" is what each took when this landed.
+const BEFORE = { kestrel: 3.75, jackal: 5.59, warden: 2.37, puncher: 2.16, light1: 5.85, sniper1: 3.25 };
+function topSpeedGait(chassis) {
+  const G = createTestGame({ chassis, foes: [] }), P = G.player;
+  let lands = 0, flight = 0, frames = 0, prev = P.feet.map(f => f.lifted);
+  for (let k = 0; k < 30 * 60; k++) {
+    update(G, input({ thrUp: true }), DT);
+    if (k >= 600) {
+      frames++;
+      P.feet.forEach((f, i) => { if (prev[i] && !f.lifted) lands++; });
+      if (P.feet.every(f => f.lifted)) flight++;
+    }
+    prev = P.feet.map(f => f.lifted);
+  }
+  return { perSec: lands / (frames * DT) / (P.feet.length === 4 ? 2 : 1), flight: flight / frames, legs: P.ch.legs };
+}
+for (const chassis of MECH_ORDER) {
+  test(`${chassis}: fewer, longer steps, and only a runner leaves the ground`, () => {
+    const { perSec, flight, legs } = topSpeedGait(chassis);
+    assert.ok(perSec < BEFORE[chassis] * 0.85, `${perSec.toFixed(2)} footfalls a second (was ${BEFORE[chassis]})`);
+    if (legs === 'reverse') assert.ok(flight > 0.15, `a runner in the air ${(flight * 100).toFixed(0)}% of the time`);
+    else assert.equal(flight, 0, 'a walker or crawler always has a foot down');
+    if (chassis === 'puncher' || chassis === 'warden') assert.ok(perSec < 1.9, `a heavy at ${perSec.toFixed(2)} a second`);
   });
 }

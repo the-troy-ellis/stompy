@@ -4,6 +4,7 @@ import { geoOf } from '../data/geo.js';
 import { particle } from './effects.js';
 import { feel } from './feel.js';
 import { FEEL } from '../data/feel.js';
+import { GAIT } from '../data/walk.js';
 
 const { sin, cos, abs, min, hypot, PI } = Math;
 
@@ -40,18 +41,49 @@ export function restCyc(g) {
 // quadruped trots, diagonal pairs together); between swings all feet are
 // planted. Each swing aims, every frame, at where its rest spot will be
 // at touchdown plus a stance's worth ahead.
-function swingTarget(G, m, i, u, D, dir) {
-  const sw = geoOf(m).swing;
+function swingTarget(G, m, i, u, D, dir, sw) {
   return restFoot(G, m, i, dir * ((1 - u) * sw * D + ((1 - sw) / 2) * D));
 }
 
+// The class's gait (data/walk.js GAIT): a runner's, a walker's or a crawler's.
+export const gaitOf = m => GAIT[m.ch.legs] || GAIT.forward;
+// The share of the cycle a foot is in the air now: a runner's grows from its
+// walk to its run as it passes runAt (a flight phase once past a half).
+export function swingNow(m, pace) {
+  const g = geoOf(m), gp = gaitOf(m), t = clampN((pace - gp.runAt) / 0.2, 0, 1);
+  return lerp(g.swing, Math.max(g.swing, gp.runSwing), t * t * (3 - 2 * t));
+}
+// How far a planted foot may sit ahead of or behind its rest spot before its
+// leg is straight, in metres, with the hips sunk by `crouch` (model units).
+export function legRoom(g, s, crouch) {
+  let room = Infinity;
+  const L = (g.l1 + g.l2) * 0.97, dy = g.hip - crouch - g.ankle;
+  for (const l of g.legs) {
+    const dx = l.fx - l.hx, flat = L * L - dy * dy - dx * dx;
+    if (flat <= 0) return 0;
+    const r = Math.sqrt(flat), off = l.fz - l.hz;
+    room = min(room, r - off, r + off);
+  }
+  return Math.max(0, room) * s;
+}
+// The cycle's length in metres at this pace: from the walking stride up to
+// the class's cadence at top speed, never more than the legs can reach and
+// never less than the plan's own top stride.
+export function strideOf(m, pace, sw) {
+  const g = geoOf(m), gp = gaitOf(m), s = m.ch.scale, top = m.maxSpeed ?? m.ch.speed;
+  const reach = 2 * legRoom(g, s, gp.crouch * pace) / (1 - sw) * 0.95;
+  const want = Math.max(s * (g.stride[0] + g.stride[1]), (2 * top) / gp.cadence);
+  const Dtop = Math.max(s * g.stride[0], min(want, reach));
+  return s * g.stride[0] + (Dtop - s * g.stride[0]) * pace;
+}
+
 export function gait(G, m, dt) {
-  const s = m.ch.scale, pace = min(1, abs(m.speed) / (m.maxSpeed ?? m.ch.speed)), crouch = -0.35 * s * pace;
+  const gp = gaitOf(m), s = m.ch.scale, pace = min(1, abs(m.speed) / (m.maxSpeed ?? m.ch.speed)), crouch = -gp.crouch * s * pace;
   const g0 = geoOf(m), legOk = i => m.hp[g0.legs[i].hx > 0 ? 'LL' : 'RL'] > 0;
   // No legs left: the hull sits on the ground, the torso still turns and fires.
   if (m.hp.LL <= 0 && m.hp.RL <= 0) {
     m.feet.forEach((f, i) => { f.pos = restFoot(G, m, i); f.lifted = false; f.yaw = m.yaw; });
-    m.bob = -(g0.hip - 0.9) * s; m.lean = 0; m.lastYaw = m.yaw;
+    m.bob = -(g0.hip - 0.9) * s; m.lean = 0; m.sway = 0; m.hipYaw = 0; m.lastYaw = m.yaw;
     return;
   }
   // One leg gone: lean toward the gap, about 8 degrees.
@@ -62,15 +94,15 @@ export function gait(G, m, dt) {
   if (m.air) {
     // Legs hang under the body until touchdown.
     m.feet.forEach((f, i) => { const r = restFoot(G, m, i); f.pos = [r[0], m.y + 1.4 * s, r[2]]; f.lifted = false; f.yaw = m.yaw; });
-    m.bob = 0; m.wasAir = true;
+    m.bob = 0; m.sway = 0; m.hipYaw = 0; m.wasAir = true;
     return;
   }
   if (m.wasAir) { m.wasAir = false; m.cyc = restCyc(geoOf(m)); m.feet.forEach((f, i) => { f.pos = restFoot(G, m, i); f.yaw = m.yaw; }); }
 
   // Cycle length in distance: longer strides when faster, but a planted
   // foot never gets more than (1 - swing) / 2 * D from its hip (leg reach).
-  const g = geoOf(m), D = s * (g.stride[0] + g.stride[1] * pace);
-  const swingOf = i => { const u = (((m.cyc - g.legs[i].ph) % 1 + 1) % 1) / g.swing; return u < 1 ? u : null; };
+  const g = geoOf(m), sw = swingNow(m, pace), D = strideOf(m, pace, sw);
+  const swingOf = i => { const u = (((m.cyc - g.legs[i].ph) % 1 + 1) % 1) / sw; return u < 1 ? u : null; };
   const before = g.legs.map((_, i) => swingOf(i));
   const moving = abs(m.speed) > 0.3 || dyaw > 1e-4;
   // Stopped mid-stride: finish the step on the clock rather than freeze with a foot up.
@@ -78,7 +110,12 @@ export function gait(G, m, dt) {
   m.cyc = (m.cyc + min(adv, 0.2)) % 1;
 
   const dir = abs(m.speed) > 0.3 ? Math.sign(m.speed) : 0;
-  m.bob = crouch;
+  // The hull: sunk by the crouch, dipped by the last footfall (a quick drop
+  // and a slower recovery), raised over a swinging leg; the hips shift over
+  // the planted foot and turn with the stride.
+  const since = G.time - (m.stepAt ?? -9), tau = 0.1, dip = since < 1 ? (since / tau) * Math.exp(1 - since / tau) : 0;
+  m.bob = crouch - dip * gp.drop * s * (0.4 + 0.6 * pace);
+  let rise = 0, sway = 0, turn = 0;
   m.feet.forEach((f, i) => {
     const u = swingOf(i);
     if (!legOk(i)) {
@@ -88,21 +125,28 @@ export function gait(G, m, dt) {
       return;
     }
     if (u == null) {
-      if (before[i] != null) {   // the swing just ended: put it down exactly on target
-        f.pos = swingTarget(G, m, i, 1, D, dir);
+      if (f.lifted) {   // the swing just ended (it was in the air: the swing's share can change with pace): put it down exactly on target
+        f.pos = swingTarget(G, m, i, 1, D, dir, sw);
         f.yaw = m.yaw; f.lifted = false;
         footDown(G, m, f, pace);
       }
       return;
     }
     if (!f.lifted) { f.from = [...f.pos]; f.lifted = true; }
-    const t = swingTarget(G, m, i, u, D, dir), e = u * u * (3 - 2 * u);
+    // A heavy foot lifts slowly and is driven into the ground (slam), its
+    // lift peaking early so it comes down rather than glides down.
+    const t = swingTarget(G, m, i, u, D, dir, sw), e = lerp(u * u * (3 - 2 * u), u * u, gp.slam);
     if (hypot(f.from[0] - t[0], f.from[2] - t[2]) > 9 * s) f.from = [...t];   // shoved mid-stride
-    f.pos = [lerp(f.from[0], t[0], e), lerp(f.from[1], t[1], e) + sin(PI * u) * (0.5 + 1.1 * pace) * s, lerp(f.from[2], t[2], e)];
+    const up = sin(PI * Math.pow(u, gp.liftEarly)) * (gp.lift[0] + gp.lift[1] * pace) * s;
+    f.pos = [lerp(f.from[0], t[0], e), lerp(f.from[1], t[1], e) + up, lerp(f.from[2], t[2], e)];
     f.yaw += wrapA(m.yaw - f.yaw) * min(1, dt * 10);
-    // The body rises over the swinging leg and settles as it lands.
-    m.bob = crouch + sin(PI * u) * 0.3 * s * (0.3 + pace);
+    const arc = sin(PI * u), leg = g.legs[i], side = Math.sign(leg.hx) * (leg.hz >= -0.2 ? 1 : 0);   // a quad shifts by its front legs
+    rise = Math.max(rise, arc * gp.bounce * (0.3 + pace));
+    sway -= side * arc * gp.sway * min(1, 0.3 + pace);
+    turn -= side * arc * gp.hipTurn * pace;
   });
+  m.bob += rise * s;
+  m.sway = sway; m.hipYaw = turn;   // drawn (render/scene.js), not felt: the guns and the eye don't sway
   // A planted foot left hopelessly far away (shoved, respawned) just resets.
   m.feet.forEach((f, i) => {
     if (f.lifted) return;
@@ -114,6 +158,7 @@ export function gait(G, m, dt) {
 // Touchdown: the sound, the cockpit jolt, a puff of dust.
 function footDown(G, m, f, pace) {
   const P = G.player, r = G.rng, d = P ? hypot(m.x - P.x, m.z - P.z) : 1e9;
+  m.stepAt = G.time;   // the hull's dip (gait)
   // Heavier mechs thump harder; a planted foot's weight scales with scale^2.
   feel(G, 'step', { mech: m, k: (0.35 + 0.65 * pace) * m.ch.scale * m.ch.scale, at: m === P ? null : f.pos });
   const entering = m !== P && revealing(G, m);   // a wave's big entrance (waves.js): heard and felt from anywhere

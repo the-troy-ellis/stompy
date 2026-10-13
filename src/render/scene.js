@@ -185,7 +185,9 @@ export function createScene(app) {
     // A dying mech topples rigidly about the ground under it (toppleOf), feet and all.
     const top = toppleOf(m), place = p => (top ? M.apply(top, p) : p);
     // The body frame is frame(m) (sim/geom.js) built from the arena.
-    const B = chain(top || M.id(), M.T(0, -sag, 0), M.T(m.x, m.y + (m.bob || 0), m.z), M.RY(m.yaw), M.S(m.ch.scale), M.RZ(m.lean || 0)), parts = R.mechParts[m.partsKey], sc = m.ch.scale;
+    // The hips shift over the planted foot (m.sway, model units, +x its left) and turn with the stride (m.hipYaw): sim/gait.js.
+    const B = chain(top || M.id(), M.T(0, -sag, 0), M.T(m.x, m.y + (m.bob || 0), m.z), M.RY(m.yaw), M.S(m.ch.scale), M.RZ(m.lean || 0), M.T(m.sway || 0, 0, 0)), parts = R.mechParts[m.partsKey], sc = m.ch.scale;
+    const BH = m.hipYaw ? chain(B, M.RY(m.hipYaw)) : B;   // the hips; the torso above them doesn't turn
     const fwd = [sin(m.yaw), 0, cos(m.yaw)];
     // Armour under a beam glows orange as it melts (another colour in a COLOURS mode), and runs hotter in IR.
     const mf = meltFrac(m), heatWas = R.drawHeat;
@@ -194,14 +196,14 @@ export function createScene(app) {
     const g = geoOf(m), back = mul(fwd, -1);
     if (R.skinned && !grab) BONES.fill(0);   // a part that isn't drawn this frame keeps a zero matrix
     putTint = tint;
-    put(BONE.hip, parts.hip, chain(B, M.T(0, g.hip, 0)));
+    put(BONE.hip, parts.hip, chain(BH, M.T(0, g.hip, 0)));
     const hull = M.apply(B, [0, g.hip, 0]);
     // Legs reach for wherever the feet actually are; the knee bends forward,
     // backward (bird legs) or out and up (the quadruped's spider legs).
     m.feet.forEach((f, i) => {
       const leg = g.legs[i];
       if (m.hp[leg.hx > 0 ? 'LL' : 'RL'] <= 0) return;   // the leg came off; it's lying somewhere behind
-      const H = M.apply(B, [leg.hx, g.hip, leg.hz]);
+      const H = M.apply(BH, [leg.hx, g.hip, leg.hz]);
       const out = norm([H[0] - hull[0], 0, H[2] - hull[2]]), splay = legSplay(m.squash ? m.squash.x : 0) + (m.dying ? (m.dying.buckle || 0) * 0.5 : 0);   // knees bow out as the legs give way
       let pole = g.knee === 'forward' ? fwd : g.knee === 'back' ? back : norm(add(out, [0, 0.9, 0]));
       if (splay > 0) pole = norm(add(pole, mul(out, splay)));   // knees bow out as the body squashes

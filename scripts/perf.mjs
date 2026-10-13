@@ -41,12 +41,20 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 // After #163 (explosions: the scorches are one more draw, each burning wreck
 //   one more for 30 s; garbage unchanged): fight 27/44 · fight-deaths 36/42 ·
 //   wrecks 37/44 · looking-away 18/21
+// After #261 (gaits by class: fewer footfalls, so less dust drawn from G.rng,
+//   so a differently-fought field): fight-deaths 40/63, the peak the frame the
+//   three die, with 27 shed limbs and 17 shots in the air (main had 14 and 8).
+//   No new draws: the same main, with only the dust's rolls moved off G.rng,
+//   peaks at 60 and averages 48. This scene's peak swings ~20 draws with the
+//   fight, so its budget covers that swing, not one seed's luck.
+//   The HUD's wireframe loop is its own function now (hud.js wireEdges): it
+//   was stuck half compiled and boxed 36 KB a frame; looking-away 104 KB.
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
   menu:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 26 },
   'free-start':   { meanDraws: 8, peakDraws: 8, tris: 25000, allocKB: 115 },
   fight:          { meanDraws: 31, peakDraws: 50, tris: 27000, allocKB: 205 },
-  'fight-deaths': { meanDraws: 41, peakDraws: 48, tris: 27000, allocKB: 205 },
+  'fight-deaths': { meanDraws: 41, peakDraws: 72, tris: 27000, allocKB: 205 },
   wrecks:         { meanDraws: 42, peakDraws: 50, tris: 26000, allocKB: 145 },
   'looking-away': { meanDraws: 21, peakDraws: 24, tris: 27000, allocKB: 135 },
   rain:           { meanDraws: 9, peakDraws: 9, tris: 25000, allocKB: 90 },   // free-start in a downpour: one more draw (the rain), no more garbage
