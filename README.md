@@ -139,8 +139,9 @@ npm run build       # one minified bundle plus the static files, in dist/
 npm run zip         # dist/ as stompy-<version>.zip
 ```
 
-`?debug=1` shows frame time, draw calls and the seed, and exposes the state
-as `window.__stompy`. `?touch=1` forces the touch layout. `?edit=1` (with
+`?debug=1` shows frame time, draw calls and the seed, exposes the state
+as `window.__stompy`, and opens every mech and mission (as `?unlock` does; add `&lock` to keep a
+fresh save's locks). `?touch=1` forces the touch layout. `?edit=1` (with
 `&mission=m06`, say) opens the mission editor: the mission from above on its
 own ground. Two fingers (or the right mouse button) move the map, a pinch or
 the wheel zooms, Q and E turn it. A tap selects, dragging a thing moves it

@@ -55,6 +55,11 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   these two scenes' draws follow how the scripted fight goes (shed limbs,
 //   shots in the air, what burns), not the renderer, so their budgets cover
 //   that spread. A scene that holds the field fixed would let them tighten.
+// After #262 and #263 together (walkers weigh a climb when they pick cover,
+//   on the new roster): fight 29/47 · fight-deaths 51/65 · wrecks 50/57 ·
+//   looking-away 22/26, the field reshuffled once more; looking-away's budget
+//   covers it. The harness keeps a fresh save's locks (&lock): ?debug=1 alone
+//   opens every mech.
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
   menu:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 26 },
@@ -62,7 +67,7 @@ export const BUDGETS = {
   fight:          { meanDraws: 31, peakDraws: 50, tris: 27000, allocKB: 205 },
   'fight-deaths': { meanDraws: 55, peakDraws: 72, tris: 27000, allocKB: 205 },
   wrecks:         { meanDraws: 60, peakDraws: 70, tris: 26000, allocKB: 145 },
-  'looking-away': { meanDraws: 21, peakDraws: 24, tris: 27000, allocKB: 135 },
+  'looking-away': { meanDraws: 26, peakDraws: 30, tris: 27000, allocKB: 135 },
   rain:           { meanDraws: 9, peakDraws: 9, tris: 25000, allocKB: 90 },   // free-start in a downpour: one more draw (the rain), no more garbage
   snow:           { meanDraws: 11, peakDraws: 11, tris: 25000, allocKB: 90 },   // and in snow
   dust:           { meanDraws: 11, peakDraws: 11, tris: 25000, allocKB: 90 },   // and in a dust storm (2,500 grains)
@@ -70,7 +75,7 @@ export const BUDGETS = {
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;
 
-const PORT = 8124, URL_ = `http://localhost:${PORT}/?debug=1`;
+const PORT = 8124, URL_ = `http://localhost:${PORT}/?debug=1&lock`;   // &lock: a fresh save's field (?debug=1 alone opens every mech, and Free Play picks from them)
 const candidates = [process.env.PLAYWRIGHT_CHROMIUM, '/opt/pw-browsers/chromium', '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].filter(Boolean);
 let executablePath = candidates.find(p => existsSync(p));
 if (!executablePath) { try { executablePath = execSync('which chromium || which chromium-browser || which google-chrome').toString().trim() || undefined; } catch { /* playwright's own */ } }

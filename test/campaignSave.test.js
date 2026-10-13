@@ -46,6 +46,14 @@ test('replay: any won mission and the next unplayed one can launch, nothing past
   assert.ok(!canPlay(c, 3));
 });
 
+test('?unlock and ?debug=1 open the whole strip: nothing locked, every mission can launch', () => {
+  const c = loadCampaign(memory().get);
+  recordResult(c, 0, { won: true, time: 1 });
+  assert.deepEqual(stripSquares(c, true), ['done', 'current', ...Array(10).fill('open')]);
+  assert.ok(canPlay(c, 11, true) && !canPlay(c, 12, true));
+  assert.ok(!canPlay(c, 2), 'without it, still the next unplayed only');
+});
+
 test('the unlock ladder: WARDEN 4, PIPSQUEAK 6, BEANPOLE 8, PURPLE PUNCHER 11', () => {
   assert.deepEqual(unlockedAfter(3), ['kestrel', 'jackal']);
   assert.ok(unlockedAfter(4).includes('warden'));

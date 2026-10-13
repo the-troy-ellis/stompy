@@ -28,7 +28,7 @@ try {
     await page.screenshot({ path: `test-results/smoke-${name}.png` });
     await page.close();
   };
-  await run('desktop', URL_, async page => {
+  await run('desktop', URL_ + '&lock', async page => {   // &lock: the locks a fresh save has, which ?debug=1 would open
     // FIT: cycle the left arm, see the preview mech change, go overweight, reset, back.
     await page.click('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way
     await page.click('[data-a="fit"]');
