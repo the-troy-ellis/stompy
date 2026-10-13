@@ -4,6 +4,7 @@ import { PROP_CAP, PROP_FLOATS } from './propBatch.js';
 import { buildEffectShapes, EFFECT_SHAPES, DITHER_SHAPES } from '../mesh/effects.js';
 import { Builder } from '../mesh/builder.js';
 import { buildMechParts, skinMech, lampSpots, BONE_COUNT, SKIN_FLOATS } from '../mesh/mechParts.js';
+import { wireEdges } from '../mesh/wire.js';
 import { geoFor } from '../data/geo.js';
 import { CHASSIS, lockedLook } from '../data/chassis.js';
 import { MP_COLORS } from '../data/colors.js';
@@ -182,6 +183,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
     const p = buildMechParts(ch), set = Object.fromEntries(Object.entries(p).map(([n, b]) => [n, upload(b)]));
     if (skinProg) set.skin = uploadSkin(skinMech(p, geoFor(ch).legs.length));
     set.lamps = lampSpots(p);   // torso space, for the headlamps
+    set.wire = new Map(Object.entries(p).filter(([n]) => set[n]?.buf).map(([n, b]) => [set[n], wireEdges(b.d)]));   // each part's edges, for the HUD's damage diagram
     return set;
   };
   const mechParts = {};
