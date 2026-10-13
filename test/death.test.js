@@ -76,3 +76,38 @@ test('the player dies the same way and the match still ends on time', () => {
   stepFor(G, 2.5);
   assert.equal(G.state, 'debrief');
 });
+
+// #259: your view goes down with the body and stays down until the debrief;
+// it never snaps back to the standing eye over your own wreck.
+test('after the topple, your view stays where the fall left it, rolled with the body', () => {
+  const G = createTestGame({ foes: ['jackal'] });
+  const P = G.player, e = foes(G)[0];
+  damage(G, P, [P.x, P.y + 5, P.z], 1000, e);
+  P.dying.roll = 1;   // a fall to the side
+  let last = null;
+  while (P.dying) { last = toppleOf(P); stepFor(G, 1 / 60); }
+  assert.ok(P.gone && P.fallen, 'the fall is kept');
+  const end = toppleOf(P);
+  for (let i = 0; i < 16; i++) assert.ok(Math.abs(end[i] - last[i]) < 0.1, 'the kept fall is where the topple ended');
+  const rot = (T, v) => { const o = M.apply(T, [0, 0, 0]), p = M.apply(T, v); return [p[0] - o[0], p[1] - o[1], p[2] - o[2]]; };
+  for (const dt of [0.1, 1, 0.6]) {   // to just before the debrief (G.endT = 3.2 s from the kill)
+    stepFor(G, dt);
+    assert.equal(G.state, 'over');
+    const T = toppleOf(P);
+    assert.ok(T, 'the view still falls');
+    for (let i = 0; i < 16; i++) assert.ok(Math.abs(T[i] - end[i]) < 1e-6, `the view moved after the fall (element ${i})`);
+    const eye = M.apply(T, G.eye);
+    assert.ok(eye[1] < G.eye[1] - 3, `the eye is back up at ${eye[1].toFixed(1)} (standing ${G.eye[1].toFixed(1)})`);
+    assert.ok(Math.abs(rot(T, [0, 1, 0])[1]) < 0.5, 'up is still up: the view did not roll with the body');
+  }
+  stepFor(G, 3);
+  assert.equal(G.state, 'debrief');
+});
+
+test('the fall is only kept for your own view: a foe goes down to a wreck', () => {
+  const G = createTestGame({ foes: ['jackal'] });
+  const e = foes(G)[0];
+  damage(G, e, [e.x, e.y + 5, e.z], 1000, G.player);
+  stepFor(G, DEATH_BEAT + DEATH_BUCKLE + DEATH_TOPPLE + 0.05);
+  assert.ok(e.gone && !e.fallen && toppleOf(e) === null);
+});

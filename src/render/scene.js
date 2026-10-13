@@ -75,8 +75,9 @@ export function meleePose(m) {
 // The topple of a dying mech: a rotation by its fall angle about a horizontal
 // axis through the ground under it, leaning the way it falls. Null when it
 // is not falling. Pure, for the tests.
+// A dying mech's fall, or (your own) where the fall ended: m.fallen keeps it.
 export function toppleOf(m) {
-  const d = m.dying;
+  const d = m.dying || m.fallen;
   if (!d || !(d.angle > 0)) return null;
   return chain(M.T(m.x, m.y, m.z), M.RY(d.fallYaw), M.RX(d.angle), M.RZ(d.roll * d.angle), M.RY(-d.fallYaw), M.T(-m.x, -m.y, -m.z));
 }
@@ -105,7 +106,7 @@ export function createScene(app) {
 
   // The HUD canvas is always full resolution; the 3D canvas renders R.look.lines
   // tall (0: full) and the browser scales it up with hard edges (render/look.js).
-  const NO_SHADE = [1, 1, 1], LAMP_COL = [1, 0.95, 0.75];
+  const UP = [0, 1, 0], NO_SHADE = [1, 1, 1], LAMP_COL = [1, 0.95, 0.75];
   const SPOT = { on: false, pos: [0, 0, 0], dir: [0, 0, 1], col: [0, 0, 0], cone: [Math.cos(HEADLIGHTS.cone[0]), Math.cos(HEADLIGHTS.cone[1])], range: HEADLIGHTS.range };
   let DARK = 0;   // how dark this frame is (palettes.js darkness)
   const FOG = [0, 0];   // this frame's fog distances: the palette's, cut by the weather (data/weather.js)
@@ -486,7 +487,7 @@ export function createScene(app) {
     const hor = ir ? IR_HOR : SKY_H;
     R.gl.clearColor(hor[0], hor[1], hor[2], 1);
     R.gl.clear(R.gl.COLOR_BUFFER_BIT | R.gl.DEPTH_BUFFER_BIT);
-    let fov, yaw, pitch, eye, dir, spec, near = 0.5, far = 1800, top;
+    let fov, yaw, pitch, eye, dir, spec, near = 0.5, far = 1800, top, up = UP;
     if (G.state === 'edit' && (top = app.topView?.())) {
       // The mission editor (ui/editor.js): from above, in daylight with no fog,
       // the whole map in view.
@@ -522,19 +523,26 @@ export function createScene(app) {
     } else {
       fov = G.zoom ? 0.42 : (app.prefs?.fov || 62) * Math.PI / 180;   // the FOV setting; 62 degrees is the old 1.08 rad
       const sh = G.shake * 0.012, wv = FEEL.view.wobble * (G.reducedMotion ? FEEL.view.reducedScale : 1), wp = P.wob ? P.wob.p.x : 0, wr = P.wob ? P.wob.r.x : 0;
-      yaw = viewYaw(P) + rnd(-sh, sh) + wr * wv * 0.5; pitch = P.pitch + rnd(-sh, sh) - (P.alive || P.dying ? 0 : 0.15) + wp * wv;
+      yaw = viewYaw(P) + rnd(-sh, sh) + wr * wv * 0.5; pitch = P.pitch + rnd(-sh, sh) - (P.alive || P.dying || P.fallen ? 0 : 0.15) + wp * wv;
       // Running hot: the view swims, a slow breath in the field of view and a sway, until the reactor trips.
       const hot = hotFrac(P.heat) * (P.shutdown ? 0 : 1) * (G.reducedMotion ? FEEL.view.reducedScale : 1);
       if (hot > 0) { fov *= 1 + HEAT.fov * hot * sin(G.time * 2.6); yaw += HEAT.sway * hot * sin(G.time * 1.9); pitch += HEAT.sway * 0.6 * hot * cos(G.time * 1.3); }
       const drop = G.kick + (G.bob ? G.bob.x : 0);   // the instant kick plus the eased bob
-      eye = add(G.eye, [0, -drop * 0.35 - (P.squash ? P.squash.x * 2 : 0) - (P.sag ? P.sag.x : 0) - (P.dying ? P.dying.drop || 0 : 0), 0]); dir = dirOf(yaw, pitch - drop * 0.016);
-      // Going down: the view goes with the body.
+      const fall = P.dying || P.fallen;
+      eye = add(G.eye, [0, -drop * 0.35 - (P.squash ? P.squash.x * 2 : 0) - (P.sag ? P.sag.x : 0) - (fall ? fall.drop || 0 : 0), 0]); dir = dirOf(yaw, pitch - drop * 0.016);
+      // Going down: the view goes with the body, turned by the same topple
+      // (so a fall to the side rolls the horizon), and stays there once it's
+      // down until the debrief (P.fallen; spec 13 § Death).
       const top = toppleOf(P);
-      if (top) { eye = M.apply(top, eye); const toward = cos(P.dying.fallYaw - yaw); pitch -= P.dying.angle * toward; yaw += P.dying.angle * 0.3 * sin(P.dying.fallYaw - yaw); dir = dirOf(yaw, pitch); }
+      if (top) {
+        const o = M.apply(top, [0, 0, 0]), turn = v => norm(sub(M.apply(top, v), o));
+        eye = M.apply(top, eye); dir = turn(dir); up = turn(UP);
+        yaw = atan2(dir[0], dir[2]); pitch = Math.asin(clampN(dir[1], -1, 1));
+      }
     }
     G.ear = eye; G.earYaw = yaw;   // sounds are heard from the camera
     const proj = M.persp(fov, W / max(1, H), near, far);
-    const VP = M.mul(proj, M.lookAt(eye, add(eye, dir)));
+    const VP = M.mul(proj, M.lookAt(eye, add(eye, dir), up));
     G.VP = VP;
     frustumPlanes(VP, PLANES);   // culling (spec 14 P6): what is wholly outside the view isn't drawn
 
