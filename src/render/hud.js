@@ -120,11 +120,12 @@ export function createHud(app) {
     box('LL', -1.6, 4.4, 1.5, 4); box('RL', 0.1, 4.4, 1.5, 4);
   }
   // Your own damage: your mech in wireframe, posed as it is this frame (it
-  // walks, twists and aims as you do), seen from behind and a little to one
-  // side, each section's lines in its damage colour. A section that's gone
-  // is gone. (x, y) is the top centre of a box `u` units across: the same
+  // walks, twists and aims as you do), turning slowly on the spot so every
+  // side shows in time (held still, from behind and a little to one side,
+  // with REDUCED MOTION), each section's lines in its damage colour. A
+  // section that's gone is gone. (x, y) is the top centre of a box `u` units across: the same
   // footprint as the old box diagram, which stays for the target panel.
-  const WIRE_YAW = 0.3, WIRE_TILT = 0.2, cy0 = Math.cos(WIRE_YAW), sy0 = Math.sin(WIRE_YAW), ct = Math.cos(WIRE_TILT), st = Math.sin(WIRE_TILT);
+  const WIRE_YAW = 0.3, WIRE_SPIN = TAU / 16, WIRE_TILT = 0.2, ct = Math.cos(WIRE_TILT), st = Math.sin(WIRE_TILT);   // SPIN: once round in 16 s
   // Whole pixels: small integers reach the canvas unboxed, so the lines make no garbage.
   const WIRE_SECS = ['T', 'LA', 'RA', 'LL', 'RL'], wirePaths = Object.fromEntries(WIRE_SECS.map(k => [k, { pts: new Int16Array(16384), n: 0 }])), wireHeight = new Map();
   function mechWire(m, x, y, u) {
@@ -132,13 +133,14 @@ export function createHud(app) {
     if (!pose) { mechDiagram(m, x, y, u); return; }
     if (!wireHeight.has(m.partsKey)) wireHeight.set(m.partsKey, heightOf(pose));
     const h = 10.5 * u, k = h / (wireHeight.get(m.partsKey) * 1.1), ox = x, oy = y + h - 2;
+    const turn = WIRE_YAW + (G.reducedMotion ? 0 : G.time * WIRE_SPIN), cy0 = Math.cos(turn), sy0 = Math.sin(turn);
     for (const sec of WIRE_SECS) wirePaths[sec].n = 0;
     for (let j = 0; j < pose.n; j++) {
       const part = pose.parts[j], e = part.edges, q = part.mat, path = wirePaths[part.sec], pts = path.pts;
       for (let i = 0; i < e.length && path.n < pts.length; i += 3) {
         const px = e[i], py = e[i + 1], pz = e[i + 2];
         const X = q[0] * px + q[4] * py + q[8] * pz + q[12], Y = q[1] * px + q[5] * py + q[9] * pz + q[13], Z = q[2] * px + q[6] * py + q[10] * pz + q[14];
-        const Xv = X * cy0 + Z * sy0, Zv = -X * sy0 + Z * cy0;   // turned a little, then seen from behind: its left on your left
+        const Xv = X * cy0 + Z * sy0, Zv = -X * sy0 + Z * cy0;   // turned about its own feet, then seen from behind: its left on your left
         pts[path.n++] = Math.round(ox - Xv * k); pts[path.n++] = Math.round(oy - (Y * ct + Zv * st) * k);
       }
     }
