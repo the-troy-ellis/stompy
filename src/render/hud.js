@@ -136,13 +136,8 @@ export function createHud(app) {
     const turn = WIRE_YAW + (G.reducedMotion ? 0 : G.time * WIRE_SPIN), cy0 = Math.cos(turn), sy0 = Math.sin(turn);
     for (const sec of WIRE_SECS) wirePaths[sec].n = 0;
     for (let j = 0; j < pose.n; j++) {
-      const part = pose.parts[j], e = part.edges, q = part.mat, path = wirePaths[part.sec], pts = path.pts;
-      for (let i = 0; i < e.length && path.n < pts.length; i += 3) {
-        const px = e[i], py = e[i + 1], pz = e[i + 2];
-        const X = q[0] * px + q[4] * py + q[8] * pz + q[12], Y = q[1] * px + q[5] * py + q[9] * pz + q[13], Z = q[2] * px + q[6] * py + q[10] * pz + q[14];
-        const Xv = X * cy0 + Z * sy0, Zv = -X * sy0 + Z * cy0;   // turned about its own feet, then seen from behind: its left on your left
-        pts[path.n++] = Math.round(ox - Xv * k); pts[path.n++] = Math.round(oy - (Y * ct + Zv * st) * k);
-      }
+      const part = pose.parts[j], path = wirePaths[part.sec];
+      path.n = wireEdges(part.edges, part.mat, path.pts, path.n, cy0, sy0, ox, oy, k);
     }
     ctx.save();
     ctx.beginPath(); ctx.rect(x - 4.4 * u, y - u, 8.8 * u, h + u); ctx.clip();   // a long stride stays in its box
@@ -156,6 +151,18 @@ export function createHud(app) {
       ctx.stroke();
     }
     ctx.restore();
+  }
+  // One part's edges onto the diagram, appended to pts from n; returns the new n.
+  // Its own small function, called per part: a once-a-frame loop stays half
+  // compiled (on-stack replacement that exits every call) and boxes every number.
+  function wireEdges(e, q, pts, n, cy0, sy0, ox, oy, k) {
+    for (let i = 0; i < e.length && n < pts.length; i += 3) {
+      const px = e[i], py = e[i + 1], pz = e[i + 2];
+      const X = q[0] * px + q[4] * py + q[8] * pz + q[12], Y = q[1] * px + q[5] * py + q[9] * pz + q[13], Z = q[2] * px + q[6] * py + q[10] * pz + q[14];
+      const Xv = X * cy0 + Z * sy0, Zv = -X * sy0 + Z * cy0;   // turned about its own feet, then seen from behind: its left on your left
+      pts[n++] = Math.round(ox - Xv * k); pts[n++] = Math.round(oy - (Y * ct + Zv * st) * k);
+    }
+    return n;
   }
   // The posed mech's height, once, for the diagram's scale.
   function heightOf(pose) {
