@@ -4,7 +4,7 @@
 import { HPK } from '../data/chassis.js';
 import { WEAPONS } from '../data/weapons.js';
 
-export const PROTOCOL = 19;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit. 5: hh (heat) on hit. 6: knuckles in lo.sys. 7: lt (headlights) in s. 8: the server enforces the version (version message) and rebuilds s clean. 9: the lobby (ch in hello; ready; ping; ch, ready, ping in scores). 10: team deathmatch (team; team in scores; teams, mode and limit in newround; teams in welcome, kill and roundover). 11: the round-end vote (vote, stats; tally; best and acc in scores; vote in newround). 12: reconnect (token in hello; token and resumed in welcome). 13: rooms (room and create in hello; room, kind, host, def, started in welcome; noroom; host; started in ready; the co-op routing of es, ent, entx, obj, over, ehit). 14: co-op enemies (es; ehit; eid on an enemy's fx, te on a volley at one, e2 on a fusion shot at one). 15: co-op world sync (ehit with ent for a mission entity; ent, entx, obj and over from the host). 16: es batched, {gt, l: [changes per enemy]}, with a full report every 2 s. 17: ts on s, the sender's clock in ms (net/interp.js draws between reports by it). 18: the relay's limits (busy when an address opens rooms too fast; kick and admin in hello for the owner). 19: private arenas, create {kind: 'arena', mode} in hello
+export const PROTOCOL = 20;   // 2: melee (pu in s and fx; kb/me/st on hit; me on died). 3: lo (mechlab loadout) in s, note from the server. 4: w on fx s and fx m; zap on hit. 5: hh (heat) on hit. 6: knuckles in lo.sys. 7: lt (headlights) in s. 8: the server enforces the version (version message) and rebuilds s clean. 9: the lobby (ch in hello; ready; ping; ch, ready, ping in scores). 10: team deathmatch (team; team in scores; teams, mode and limit in newround; teams in welcome, kill and roundover). 11: the round-end vote (vote, stats; tally; best and acc in scores; vote in newround). 12: reconnect (token in hello; token and resumed in welcome). 13: rooms (room and create in hello; room, kind, host, def, started in welcome; noroom; host; started in ready; the co-op routing of es, ent, entx, obj, over, ehit). 14: co-op enemies (es; ehit; eid on an enemy's fx, te on a volley at one, e2 on a fusion shot at one). 15: co-op world sync (ehit with ent for a mission entity; ent, entx, obj and over from the host). 16: es batched, {gt, l: [changes per enemy]}, with a full report every 2 s. 17: ts on s, the sender's clock in ms (net/interp.js draws between reports by it). 18: the relay's limits (busy when an address opens rooms too fast; kick and admin in hello for the owner). 19: private arenas, create {kind: 'arena', mode} in hello. 20: bm on hit and ehit (beam damage, batched apart from impacts)
 export const r2 = v => Math.round(v * 100) / 100;
 const v3 = p => p.map(r2);
 
@@ -62,16 +62,25 @@ export const fxPunch = () => ({ t: 'fx', k: 'pu' });   // the swing starts: othe
 // Damage to another pilot (the victim applies it); fu: a fusion kill.
 // kb: a knockback impulse [vx, vz] the victim adds to its push (the server
 // clamps each part to +-30); me: it was a punch; st: it was a stomp.
-export function hit(to, amt, p, fu = false, { kb, me, st, zap, hh } = {}) {
+export function hit(to, amt, p, fu = false, { kb, me, st, zap, hh, bm } = {}) {
   const m = fu ? { t: 'hit', to, amt: 40, p: v3(p), fu: 1 } : { t: 'hit', to, amt: r2(amt), p: v3(p) };
   if (kb && (kb[0] || kb[1])) m.kb = [r2(kb[0]), r2(kb[1])];
   if (me) m.me = 1;
   if (st) m.st = 1;
   if (zap) m.zap = 1;   // a bolt: the victim's HUD scrambles
+  if (bm) m.bm = 1;   // beam damage: no sparks, no jolt, no clang past the first (sim/combat.js)
   if (hh > 0) m.hh = r2(hh);   // heat poured in (TOASTER): the victim adds it
   return m;
 }
 // Co-op: a guest's damage to an enemy (eid), for the host to apply; the same fields as hit.
+// One batched queue as messages: its impacts (with the extras) as one hit,
+// its beam damage as another flagged bm. `make(amt, extra)` builds either.
+export function batchMessages(q, make) {
+  const out = [], { bamt = 0 } = q, extras = q.kb || q.me || q.st || q.zap || q.hh;
+  if (q.amt > 0 || (extras && !(bamt > 0))) out.push(make(q.amt, q));
+  if (bamt > 0) out.push(make(bamt, out.length ? { bm: 1 } : { ...q, bm: 1 }));
+  return out;
+}
 export function ehit(eid, amt, p, extra = {}) {
   const m = hit(0, amt, p, false, extra);
   delete m.to;

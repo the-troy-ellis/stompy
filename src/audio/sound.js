@@ -1,10 +1,11 @@
 import { clampN, rnd, wrapA } from '../util/math.js';
 import { msg } from '../sim/effects.js';
 import { viewYaw } from '../sim/geom.js';
-import { MELT_MAX, beamMult } from '../sim/beams.js';
+import { MELT_MAX, beamMult, meltFrac } from '../sim/beams.js';
+import { BEAM_CONTACT_GAP } from '../sim/combat.js';
 import { createThump } from './thump.js';
 import { createAmbience } from './ambience.js';
-import { HEAT, hotFrac } from '../data/feel.js';
+import { HEAT, hotFrac, FEEL } from '../data/feel.js';
 
 const { sin, cos, atan2, min, max, abs, PI, random, hypot, floor } = Math;
 
@@ -404,6 +405,29 @@ export function createAudio(app) {
     hum.f.frequency.setTargetAtTime(700 + 2200 * k, t, 0.08);
   }
 
+  // Being melted: a gritty sizzle while a beam is on you (low, filtered noise
+  // over a buzzing saw, below your own beam's hum so the two read apart),
+  // rising in pitch and level with your melt; it fades over about 0.2 s.
+  // Through the duckable bus, like the loops.
+  let sizzle = null;
+  function meltSound(on, k) {
+    const c = ac(), buf = c && noise();
+    if (!c || !buf) { if (sizzle) sizzle.g.gain.value = 0; return; }
+    if (!sizzle || sizzle.c !== c) {
+      const n = c.createBufferSource(), bp = c.createBiquadFilter(), saw = c.createOscillator(), lp = c.createBiquadFilter(), g = c.createGain();
+      n.buffer = buf; n.loop = true; bp.type = 'bandpass'; bp.Q.value = 1.6;
+      saw.type = 'sawtooth'; lp.type = 'lowpass'; lp.frequency.value = 420; g.gain.value = 0;
+      n.connect(bp).connect(g); saw.connect(lp).connect(g); g.connect(thumper.loopBus() || out());
+      n.start(); saw.start();
+      sizzle = { c, bp, saw, g };
+    }
+    const t = c.currentTime, lvl = FEEL.sound.sizzle;
+    sizzle.g.gain.setTargetAtTime(on ? (0.05 + 0.07 * k) * lvl : 0, t, on ? 0.03 : 0.06);
+    sizzle.bp.frequency.setTargetAtTime(420 + 1300 * k, t, 0.08);
+    sizzle.saw.frequency.setTargetAtTime(55 + 45 * k, t, 0.08);
+  }
+  // Is a beam on you now (sim/combat.js stamps G.beamOnAt on each beam hit)?
+  const beamOnYou = G => G.player.alive && !G.paused && G.time - (G.beamOnAt ?? -Infinity) < Math.min(0.2, BEAM_CONTACT_GAP);
 
   // Continuous layers follow the sim state: reactor hum, jets, torso servo, laser bite.
   function audioTick() {
@@ -415,6 +439,7 @@ export function createAudio(app) {
     const twistRate = G.twistRate || 0;
     loopSet('servo_loop', live ? min(0.13, twistRate * 0.07) : 0, 0.75 + min(0.6, twistRate * 0.25));
     beamSound(P.beaming && !G.paused, beamMult(P));
+    meltSound(beamOnYou(G), meltFrac(P));
     ambience.tick(G, !G.paused);   // the biome's bed and the weather's layer (audio/ambience.js)
   }
 
@@ -427,5 +452,5 @@ export function createAudio(app) {
     thumper.duck(duck);
     if (haptic > 2 && G.touchUI && prefs.haptics !== false) { try { navigator.vibrate?.(min(100, Math.round(haptic))); } catch { /* unsupported */ } }
   }
-  return { Sound, settings, loadSamples, play, loopSet, loops, sfx, say, beamSound, fusionSound, thump, tick: audioTick, ambience };
+  return { Sound, settings, loadSamples, play, loopSet, loops, sfx, say, beamSound, meltSound, fusionSound, thump, tick: audioTick, ambience };
 }

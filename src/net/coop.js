@@ -7,7 +7,7 @@ import { knock } from '../sim/knock.js';
 import { damageEntity, destroyEntity } from '../sim/entities.js';
 import { activate } from '../sim/objectives.js';
 import { voice } from '../sim/voice.js';
-import { ehit, r2, stateMessage } from './protocol.js';
+import { ehit, batchMessages, r2, stateMessage } from './protocol.js';
 import { applyRemote } from './remote.js';
 
 // Co-op's enemies (docs/specs/09-coop.md § Authority split): the host runs
@@ -212,9 +212,10 @@ export function applyEnemyState(G, d, now, gt) {   // gt: the batch's host game 
 // entities, one ehit each.
 export function flushEHits(G, send) {
   for (const q of G.pendingEHits.values()) {
-    const m = ehit(q.eid || 0, q.amt, q.p, q);
-    if (q.ent) { delete m.eid; m.ent = q.ent; if (q.yaw != null) m.yaw = Math.round(q.yaw * 100) / 100; }   // a mission entity, not an enemy
-    send(m);
+    for (const m of batchMessages(q, (amt, x) => ehit(q.eid || 0, amt, q.p, x))) {
+      if (q.ent) { delete m.eid; m.ent = q.ent; if (q.yaw != null) m.yaw = Math.round(q.yaw * 100) / 100; }   // a mission entity, not an enemy
+      send(m);
+    }
   }
   G.pendingEHits.clear();
 }
@@ -236,7 +237,7 @@ export function applyEHit(G, h, src = null) {
   if (h.fu) { e.hp.T = 0; destroy(G, e, src); return true; }
   const melee = !!(h.me || h.st);
   if (melee) e.lastHitMelee = h.st ? 'stomp' : 'punch';
-  damage(G, e, p, Math.max(0, Math.min(40, +h.amt || 0)), src, false, melee);
+  damage(G, e, p, Math.max(0, Math.min(40, +h.amt || 0)), src, !!h.bm, melee);
   if (h.zap && e.alive) scramble(G, e, WEAPONS.ppc.scramble, p);
   if (h.hh > 0 && e.alive) e.heat += Math.min(h.hh, 20);
   if (Array.isArray(h.kb) && e.alive) {

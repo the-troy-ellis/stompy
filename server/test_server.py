@@ -33,6 +33,10 @@ class Helpers(unittest.TestCase):
         self.assertEqual(relay.clean_name("", 5), "PILOT 5")
         self.assertEqual(len(relay.clean_name("x" * 40, 1)), 12)
 
+    def test_a_beam_hit_keeps_its_flag(self):
+        self.assertEqual(relay.clean_hit({"amt": 3, "p": [0, 1, 2], "bm": 1}, 4).get("bm"), 1)
+        self.assertNotIn("bm", relay.clean_hit({"amt": 3, "p": [0, 1, 2]}, 4))
+
     def test_num(self):
         self.assertEqual(relay.num("3.5", 0, 10), 3.5)
         self.assertEqual(relay.num(99, 0, 10), 10)

@@ -50,7 +50,7 @@ PING_EVERY = 10
 DROP_AFTER = 25           # seconds of silence (a phone that went to sleep)
 MAX_BUFFERED = 256 * 1024 # a client this far behind is dropped, not waited for
 PALETTES = ("dusk", "ice", "volcanic")
-PROTOCOL = 19             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
+PROTOCOL = 20             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
 HALF = 96 * 24 / 2        # the map's half width (src/world/terrain.js): positions are clamped to it
 FX_RATE = 40              # weapon effects per second per pilot; more are dropped (a beam flash is per shot, guided updates 15 Hz)
 PER_IP = int(os.environ.get("STOMPY_PER_IP", 8))   # sockets from one address at once (phones and a laptop behind one NAT)
@@ -398,6 +398,8 @@ def clean_hit(msg, sender):
         out["st"] = 1
     if msg.get("zap"):
         out["zap"] = 1   # a bolt: the victim's HUD scrambles
+    if msg.get("bm"):
+        out["bm"] = 1    # beam damage: no sparks, jolt or repeated clang on the victim's screen
     hh = num(msg.get("hh"), 0, 20)
     if hh > 0:
         out["hh"] = hh   # heat poured in (TOASTER), clamped

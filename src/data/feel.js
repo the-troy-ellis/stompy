@@ -76,8 +76,10 @@ export const FEEL = {
   // per m/s x rad/s), never past `max`. k / scale^2 and zeta: the spring, so a bigger mech swings slower.
   // view: how much of the pitch your own view takes.
   inertia: { pitch: 0.012, roll: 0.005, max: 0.1, k: 28, zeta: 0.4, view: 0.6 },
+  // Sound levels: sizzle, the sustained sound of being melted while a beam is on you (audio/sound.js meltSound).
+  sound: { sizzle: 1 },
 };
-const TUNING = new Set(['view', 'spring', 'knock', 'inertia']);   // blocks of constants, not event rows
+const TUNING = new Set(['view', 'spring', 'knock', 'inertia', 'sound']);   // blocks of constants, not event rows
 export const FEEL_EVENTS = Object.keys(FEEL).filter(k => !TUNING.has(k));
 export const FEEL_COLS = ['kick', 'bob', 'shake', 'flash', 'white', 'squash', 'wobble', 'bass', 'duck', 'dust', 'haptic', 'push'];
 // Rows leave out columns they don't use; fill them so every row has every column.
