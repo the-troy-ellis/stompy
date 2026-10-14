@@ -83,6 +83,13 @@ frame** in the fight-with-deaths scene (680 KB in a plain fight, 160 KB with
 nobody shooting), which is roughly 80 MB a second for the phone's garbage
 collector at 60 fps. P2 and P3 aim straight at that number.
 
+Since the bench (`src/sim/bench.js`, `?debug=1&bench=1`), the harness's fight
+scenes are its segments (`bench-walk` to `bench-away`): one scripted scene in
+which nobody thinks or takes damage and every limb and kill comes on its
+clock, so a change to the AI, the walk or the dice no longer reshuffles what
+is measured. The same scene, played in the browser, ends on a card of each
+segment's frame rate and draws beside the last run's, for a real phone.
+
 After P1 (instanced effects): the fight-with-deaths scene is 106 draws on
 average (112 at peak, from 470 / 529) and about 545 KB of garbage a frame
 (from 1,315), because effects no longer build matrices per particle. What

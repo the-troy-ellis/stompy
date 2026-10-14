@@ -283,7 +283,7 @@ export function createUi(app) {
     app.audio.loadSamples();
     app.input.lockPointer();
     app.input.syncWeaponButtons();
-    app.audio.say(G.kind === 'campaign' ? `${missionSpoken(prefs.mission + 1, G.def.name)} Systems online.` : G.kind === 'edit' ? 'Systems online.' : 'Free play. Systems online.', true);
+    app.audio.say(G.kind === 'campaign' ? `${missionSpoken(prefs.mission + 1, G.def.name)} Systems online.` : G.kind === 'edit' || G.kind === 'bench' ? 'Systems online.' : 'Free play. Systems online.', true);
   }
 
   function debrief() {
@@ -409,6 +409,7 @@ export function createUi(app) {
     }
     if (a === 'menu') { if (frontierWin) { prefs.mission = camp.mission; frontierWin = false; } mainMenu(); return; }
     if (a === 'mp') { mainMenu('mp'); return; }
+    if (a === 'bench') { app.bench?.start(); return; }   // the bench's AGAIN (?debug=1, ui/bench.js)
     if (a === 'leave') { app.net.leaveArena(); return; }
     if (a === 'ready') { app.net.ready(); return; }   // the arena lobby
     if (a === 'vote') { app.net.vote(+e.target.closest('[data-v]').dataset.v); return; }   // between arena rounds
