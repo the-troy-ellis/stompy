@@ -2,7 +2,7 @@ import { add, clampN, dot, len, mul, norm, sub, wrapA } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { WEAPONS } from '../data/weapons.js';
 import { center, muzzle, rayHit, rayTerrain } from './geom.js';
-import { destroy } from './combat.js';
+import { destroy, invincible } from './combat.js';
 import { explode, particle } from './effects.js';
 import { r2 } from '../net/protocol.js';
 import { feel } from './feel.js';
@@ -76,7 +76,7 @@ export function fusionFire(G, m, w, mz, t) {
   m.fusion.t = 0; m.fusion.mech = null; m.fusion.on = false;
   feel(G, 'fusionFire', { mech: m, at: m === G.player ? null : mz });
   if (m === G.player) { G.fx.fusionSound(false, 0); G.fx.sfx.fusionCrack(); G.fx.sfx.powerdown(); }
-  const cost = m.max.T * d.feedback;
+  const cost = invincible(G, m) ? 0 : m.max.T * d.feedback;
   m.hp.T -= cost;
   if (m === G.player) { G.stats.taken += cost; G.fx.sfx.clang(); }
   if (m.hp.T <= 0) { m.hp.T = 0; destroy(G, m, null); return; }
