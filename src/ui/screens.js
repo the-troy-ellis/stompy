@@ -52,16 +52,16 @@ export function createUi(app) {
 
   const TOUCH_CONTROLS = `
     <table class="mech-keys">
-      <tr><td>Lower left</td><td>stick: sideways turns the mech (hold it to keep turning), up / down tilts. Double tap: torso back over the legs</td></tr>
-      <tr><td>Above it</td><td>stick: up / down sets the throttle (it stays set), sideways twists the torso</td></tr>
+      <tr><td>Lower left</td><td>stick: sideways turns the mech (hold it to keep turning), up / down tilts. Double tap: punch</td></tr>
+      <tr><td>Above it</td><td>stick: up / down sets the throttle (it stays set), sideways twists the torso. Tap, then tap and hold: jump jets</td></tr>
+      <tr><td>Compass</td><td>tap: torso back over the legs</td></tr>
       <tr><td>Right side</td><td>the buttons</td></tr>
       <tr><td>ENERGY (hold)</td><td>laser beams: damage climbs the longer you hold them on one target -- watch your heat</td></tr>
       <tr><td>FUSION (hold)</td><td>keep the scan on a mech for 3 s (drag the button to aim; brief slips are forgiven): it dies outright -- and the feedback hurts your own torso and shuts your reactor down</td></tr>
       <tr><td>BALLISTIC (hold)</td><td>autocannon: big single hits, little heat, limited ammo</td></tr>
       <tr><td>MISSILE</td><td>tap: fire the LRMs (they home in on a locked target)<br>hold: fly them yourself in IR -- drag to steer, let go to detonate</td></tr>
-      <tr><td>PUNCH</td><td>shove whoever is in front of you (it lights up when someone is in reach; drop onto a mech from a jump to stomp it)</td></tr>
+      <tr><td>Punch</td><td>double tap the lower stick: shove whoever is in front of you (the fist by the crosshair means someone is in reach; drop onto a mech from a jump to stomp it)</td></tr>
       <tr><td>TGT</td><td>next target</td></tr>
-      <tr><td>JUMP (hold)</td><td>jump jets</td></tr>
       <tr><td>ZOOM / STOP / II</td><td>zoom, full stop, pause</td></tr>
       <tr><td>LIGHTS</td><td>headlights at night: on, you see; off, you are harder to see</td></tr>
     </table>`;

@@ -67,14 +67,13 @@ function start(root) {
         <button class="tbtn tzoom" data-t="zoom">ZOOM</button>
         <button class="tbtn tlights" data-t="lights" hidden>LIGHTS</button>
         <button class="tbtn tstop" data-t="stop">STOP</button>
+        <button class="tcompass" data-t="centre" aria-label="Torso back over the legs"></button>
         <div class="tcluster">
-          <button class="tbtn" data-t="jump">JUMP</button>
           <button class="tbtn" data-t="tgt">TGT</button>
           <button class="tbtn tfire t-fusion" data-t="fusion">FUSION</button>
           <button class="tbtn tfire t-missile" data-t="missile">MISSILE</button>
           <button class="tbtn tfire t-energy" data-t="energy">ENERGY</button>
           <button class="tbtn tfire t-ballistic" data-t="ballistic">BALLISTIC</button>
-          <button class="tbtn tfire t-punch" data-t="punch">PUNCH</button>
         </div>
       </div>
       <div class="mech-overlay"></div>
