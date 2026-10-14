@@ -70,19 +70,25 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   walk 13/13 · run 9/27 · fight 49/70 · deaths 69/75 · wrecks 69/88 ·
 //   away 25/80 (its peak is the first frames, still facing the wrecks).
 //   Two runs agree to the draw, bar a peak's one.
+// After #231's terrain chunks (16 squares, each with its box; each run of
+//   neighbours in view is one draw, and past the fog none): about half the
+//   triangles for 0-2 more draws. menu 4/4 11.3k · free-start 7/7 11.6k ·
+//   bench-walk 13/14 15.0k · run 11/29 15.4k · fight 49/70 16.1k ·
+//   deaths 70/76 16.3k · wrecks 69/89 16.5k · away 27/82 15.3k · rain 8.7k ·
+//   snow 3.7k · dust 3.2k (their fog is short).
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
-  menu:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 26 },
-  'free-start':   { meanDraws: 8, peakDraws: 8, tris: 25000, allocKB: 115 },
-  'bench-walk':   { meanDraws: 15, peakDraws: 15, tris: 30000, allocKB: 145 },
-  'bench-run':    { meanDraws: 11, peakDraws: 31, tris: 30000, allocKB: 115 },
-  'bench-fight':  { meanDraws: 56, peakDraws: 81, tris: 30500, allocKB: 215 },
-  'bench-deaths': { meanDraws: 79, peakDraws: 87, tris: 30500, allocKB: 190 },
-  'bench-wrecks': { meanDraws: 79, peakDraws: 101, tris: 31000, allocKB: 140 },
-  'bench-away':   { meanDraws: 29, peakDraws: 92, tris: 31000, allocKB: 95 },
-  rain:           { meanDraws: 9, peakDraws: 9, tris: 25000, allocKB: 90 },   // free-start in a downpour: one more draw (the rain), no more garbage
-  snow:           { meanDraws: 11, peakDraws: 11, tris: 25000, allocKB: 90 },   // and in snow
-  dust:           { meanDraws: 11, peakDraws: 11, tris: 25000, allocKB: 90 },   // and in a dust storm (2,500 grains)
+  menu:           { meanDraws: 4, peakDraws: 4, tris: 13000, allocKB: 26 },
+  'free-start':   { meanDraws: 8, peakDraws: 8, tris: 13500, allocKB: 115 },
+  'bench-walk':   { meanDraws: 15, peakDraws: 15, tris: 17500, allocKB: 145 },
+  'bench-run':    { meanDraws: 11, peakDraws: 31, tris: 18000, allocKB: 115 },
+  'bench-fight':  { meanDraws: 56, peakDraws: 81, tris: 18500, allocKB: 215 },
+  'bench-deaths': { meanDraws: 79, peakDraws: 87, tris: 19000, allocKB: 190 },
+  'bench-wrecks': { meanDraws: 79, peakDraws: 101, tris: 19000, allocKB: 140 },
+  'bench-away':   { meanDraws: 29, peakDraws: 92, tris: 18000, allocKB: 95 },
+  rain:           { meanDraws: 9, peakDraws: 9, tris: 10000, allocKB: 90 },   // free-start in a downpour: one more draw (the rain), no more garbage
+  snow:           { meanDraws: 11, peakDraws: 11, tris: 4500, allocKB: 90 },   // and in snow
+  dust:           { meanDraws: 11, peakDraws: 11, tris: 4000, allocKB: 90 },   // and in a dust storm (2,500 grains)
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;

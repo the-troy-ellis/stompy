@@ -1,9 +1,10 @@
 import { hudPalette } from '../data/colors.js';
 import { backingSize } from './look.js';
 import { effectLook, SHAPE_BY_KIND, TUMBLE_BY_KIND } from '../mesh/effects.js';
-import { M as M0, add, makeMatrixArena, frustumPlanes, sphereVisible, clampN, dirOf, mix3, mul, norm, rnd, sub, len, cross, TAU } from '../util/math.js';
+import { M as M0, add, makeMatrixArena, frustumPlanes, sphereVisible, boxVisible, clampN, dirOf, mix3, mul, norm, rnd, sub, len, cross, TAU } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { buildTerrainMesh } from '../world/terrainMesh.js';
+import { Builder } from '../mesh/builder.js';
 import { viewYaw } from '../sim/geom.js';
 import { solveKnee, limb } from '../sim/gait.js';
 import { meltFrac } from '../sim/beams.js';
@@ -94,11 +95,30 @@ function inverse3(m) {
 // their IK legs, wrecks, shots, pulses, beams and particles.
 export function createScene(app) {
   const G = app.G, R = app.R, wrap = app.wrap, cv = app.cv, hud = app.hud;
-  let world = null;
-  // The terrain mesh on the GPU, rebuilt whenever the sim builds a new world.
+  // The terrain on the GPU (world/terrainMesh.js: 16 chunks, each with its
+  // box), rebuilt whenever the sim builds a new world. One buffer, the chunks
+  // in rows, so each run of neighbours in view is one draw.
+  let world = { buf: null, chunks: [] };
+  const RUN = { buf: null, first: 0, count: 0 };
   function uploadWorld() {
-    if (world) R.gl.deleteBuffer(world.buf);
-    world = R.upload(buildTerrainMesh(G.ter, G.pal, G.ter.seed));
+    if (world.buf) R.gl.deleteBuffer(world.buf);
+    const chunks = buildTerrainMesh(G.ter, G.pal, G.ter.seed), all = new Builder();
+    world = { chunks: chunks.map(({ b, ...ch }) => { const first = all.d.length / 9; for (const v of b.d) all.d.push(v); return { ...ch, first, count: b.d.length / 9 }; }) };
+    world.buf = R.upload(all).buf;
+  }
+  // A chunk is drawn when its box is in view and some of it is nearer than the fog's end.
+  function drawWorld(eye) {
+    RUN.buf = world.buf; RUN.count = 0;
+    for (const ch of world.chunks) {
+      const dx = Math.max(ch.lo[0] - eye[0], 0, eye[0] - ch.hi[0]), dz = Math.max(ch.lo[2] - eye[2], 0, eye[2] - ch.hi[2]);
+      if (dx * dx + dz * dz > FOG[1] * FOG[1] || !boxVisible(PLANES, ch.lo, ch.hi)) {
+        if (RUN.count) { R.draw(RUN, M.id()); RUN.count = 0; }
+        continue;
+      }
+      if (!RUN.count) RUN.first = ch.first;
+      RUN.count += ch.count;
+    }
+    if (RUN.count) R.draw(RUN, M.id());
   }
 
   // Scan tone: a pulsing whine that climbs as the scan converges.
@@ -592,7 +612,7 @@ export function createScene(app) {
     Object.assign(FRAME, { VP, spot: SPOT, light: G.pal.light, shade: ir ? NO_SHADE : SHADE, cam: eye, fog: FOG, fogCol: hor, ir: ir ? 1 : 0 }); R.frame = FRAME;   // the instanced effects shader's copy
 
     R.drawHeat = 0;
-    R.draw(world, M.id());
+    drawWorld(eye);
     drawScorches();
     // In the missile camera your own mech is out there too.
     R.drawHeat = 1;
