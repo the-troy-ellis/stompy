@@ -79,7 +79,7 @@ export function update(G, input, dt) {
 
   const live = P.alive && !G.paused && !G.roundOver;
   if (live && input.punch) meleePress(G, P);
-  G.punchReady = live && !P.melee && !!meleeTarget(G, P);   // the HUD's fist and the PUNCH button light up
+  G.punchReady = live && !P.melee && !!meleeTarget(G, P);   // the HUD's fist by the crosshair lights up
   const armed = live && !P.melee;   // no guns during a swing or its recovery
   P.beamOn = armed && input.held.energy && !G.guide;
   fusionTick(G, P, dt, armed && input.held.fusion && !G.guide);

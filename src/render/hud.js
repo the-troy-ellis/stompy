@@ -83,7 +83,6 @@ export function aiLabel(e) {
 // throttle, messages, the arena board, and the missile camera's IR feed.
 export function createHud(app) {
   const G = app.G, ctx = app.ctx;
-  const punchBtn = app.root.querySelector('[data-t="punch"]');
 
   const project = p => {
     const v = G.VP, x = v[0] * p[0] + v[4] * p[1] + v[8] * p[2] + v[12], y = v[1] * p[0] + v[5] * p[1] + v[9] * p[2] + v[13];
@@ -504,7 +503,6 @@ export function createHud(app) {
       ctx.strokeRect(ch[0] - 1, ch[1] - 1, 2, 2);
     }
     // Someone is in reach: a fist beside the crosshair, and the touch button wakes up.
-    if (punchBtn) punchBtn.classList.toggle('ready', !!G.punchReady);
     if (G.punchReady || (P.melee && P.melee.phase === 'windup')) {
       const fx0 = ch[0] + 24, fy0 = ch[1] + 18, winding = P.melee && P.melee.phase === 'windup';
       ctx.fillStyle = winding ? '#fff' : AMBER;

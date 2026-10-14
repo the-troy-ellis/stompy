@@ -104,7 +104,7 @@ Run the whole list; it takes about eight minutes. Report deviations in the PR.
 
 **Touch (phone, landscape)**
 - [ ] Full screen and landscape lock requested on launch; upright phone shows the turn-sideways prompt.
-- [ ] Lower left: the stick turns the mech for as long as it's held, and tilts; double tap centres the torso. Just above it: the stick sets throttle and twists the torso. On a tablet both are within one thumb's reach. Right side: buttons only; two fire buttons can be held at once while the left thumb flies.
+- [ ] Lower left: the stick turns the mech for as long as it's held, and tilts; a double tap punches. Just above it: the stick sets throttle and twists the torso; tap, then tap and hold, burns the jump jets. A tap on the compass centres the torso. On a tablet both are within one thumb's reach. Right side: buttons only; two fire buttons can be held at once while the left thumb flies.
 - [ ] Missile button drag steers the guided volley; fusion button drag aims.
 - [ ] Audio plays after the first tap, including with the ring switch on silent (iOS).
 - [ ] Backgrounding and returning resumes audio and shows the pause/menu.

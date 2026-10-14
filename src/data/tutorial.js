@@ -10,10 +10,10 @@ export const TUT_STEPS = [
   { id: 'melt', at: 'weapons', cat: 'energy', kb: 'HOLD LMB: MELT IT', touch: 'HOLD ENERGY: MELT IT', pad: 'HOLD RT: MELT IT' },
   { id: 'thump', at: 'weapons', cat: 'ballistic', kb: 'RMB: THUMP', touch: 'BALLISTIC: THUMP', pad: 'RB: THUMP' },
   { id: 'missiles', at: 'weapons', cat: 'missile', kb: 'SPACE: MISSILES (HOLD TO FLY)', touch: 'MISSILE (HOLD TO FLY)', pad: 'LT: MISSILES (HOLD TO FLY)' },
-  { id: 'jump', at: 'centre', jets: true, kb: 'J: UP', touch: 'JUMP: UP', pad: 'A: UP' },
+  { id: 'jump', at: 'centre', jets: true, kb: 'J: UP', touch: 'UPPER STICK: TAP, TAP-HOLD: UP', pad: 'A: UP' },
 ];
 export const TUT_EVENTS = [
-  { id: 'punch', at: 'centre', kb: 'E: PUNCH', touch: 'TAP PUNCH', pad: 'RIGHT STICK CLICK: PUNCH' },
+  { id: 'punch', at: 'centre', kb: 'E: PUNCH', touch: 'LOWER STICK: TAP TAP: PUNCH', pad: 'RIGHT STICK CLICK: PUNCH' },
   { id: 'heat', at: 'heat', kb: 'HEAT: TOO MUCH', touch: 'HEAT: TOO MUCH', pad: 'HEAT: TOO MUCH' },
   { id: 'target', at: 'target', kb: 'T: NEXT ONE', touch: 'TGT: NEXT ONE', pad: 'X: NEXT ONE' },
 ];
