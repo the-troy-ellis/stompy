@@ -60,11 +60,14 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   looking-away 22/26, the field reshuffled once more; looking-away's budget
 //   covers it. The harness keeps a fresh save's locks (&lock): ?debug=1 alone
 //   opens every mech.
+// After the weight pass (your view dips and lifts with your acceleration and
+//   lurches with each step, so the frustum takes in a little more): fight
+//   28/50, 51 on CI (runs jitter by a draw); its peak budget is that plus ~15%.
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
   menu:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 26 },
   'free-start':   { meanDraws: 8, peakDraws: 8, tris: 25000, allocKB: 115 },
-  fight:          { meanDraws: 31, peakDraws: 50, tris: 27000, allocKB: 205 },
+  fight:          { meanDraws: 31, peakDraws: 58, tris: 27000, allocKB: 205 },
   'fight-deaths': { meanDraws: 55, peakDraws: 72, tris: 27000, allocKB: 205 },
   wrecks:         { meanDraws: 60, peakDraws: 70, tris: 26000, allocKB: 145 },
   'looking-away': { meanDraws: 26, peakDraws: 30, tris: 27000, allocKB: 135 },
