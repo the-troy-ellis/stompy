@@ -125,22 +125,32 @@ export function createHud(app) {
   // with REDUCED MOTION), each section's lines in its damage colour. A
   // section that's gone is gone. (x, y) is the top centre of a box `u` units across: the same
   // footprint as the old box diagram, which stays for the target panel.
-  const WIRE_YAW = 0.3, WIRE_SPIN = TAU / 16, WIRE_TILT = 0.2, ct = Math.cos(WIRE_TILT), st = Math.sin(WIRE_TILT);   // SPIN: once round in 16 s
+  // WIRE_HALF: the box's half-width in u, wider than the old box diagram's 4.4: a spinning WARDEN is as wide as it is tall.
+  const WIRE_HALF = 6, WIRE_YAW = 0.3, WIRE_SPIN = TAU / 16, WIRE_TILT = 0.2, ct = Math.cos(WIRE_TILT), st = Math.sin(WIRE_TILT);   // SPIN: once round in 16 s
   // Whole pixels: small integers reach the canvas unboxed, so the lines make no garbage.
-  const WIRE_SECS = ['T', 'LA', 'RA', 'LL', 'RL'], wirePaths = Object.fromEntries(WIRE_SECS.map(k => [k, { pts: new Int16Array(16384), n: 0 }])), wireHeight = new Map();
+  const WIRE_SECS = ['T', 'LA', 'RA', 'LL', 'RL'], wirePaths = Object.fromEntries(WIRE_SECS.map(k => [k, { pts: new Int16Array(16384), n: 0 }]));
+  // Each mech's reach for the diagram's scale, per partsKey: [height, distance from its upright axis],
+  // the most seen so far (a long stride or a WARDEN's splayed legs reach wider than it stands still).
+  const wireExt = new Map(), seen = new Float64Array(2);
   function mechWire(m, x, y, u) {
     const pose = app.scene.poseWire?.(m);
     if (!pose) { mechDiagram(m, x, y, u); return; }
-    if (!wireHeight.has(m.partsKey)) wireHeight.set(m.partsKey, heightOf(pose));
-    const h = 10.5 * u, k = h / (wireHeight.get(m.partsKey) * 1.1), ox = x, oy = y + h - 2;
+    let ext = wireExt.get(m.partsKey);
+    if (!ext) wireExt.set(m.partsKey, ext = extentOf(pose));
+    // It spins, so its width is twice its reach from the axis; tilted toward you, the near
+    // feet sit below the baseline and the far ones above. Whichever fits tighter sets the scale.
+    const h = 10.5 * u, half = WIRE_HALF * u - 3, top = ext[0], r = ext[1];
+    const k = min((h - 2) / ((top * ct + 2 * r * st) * 1.04), half / (r * 1.04)), ox = x, oy = y + h - 2 - r * st * k;
+    seen[0] = 0; seen[1] = 0;
     const turn = WIRE_YAW + (G.reducedMotion ? 0 : G.time * WIRE_SPIN), cy0 = Math.cos(turn), sy0 = Math.sin(turn);
     for (const sec of WIRE_SECS) wirePaths[sec].n = 0;
     for (let j = 0; j < pose.n; j++) {
       const part = pose.parts[j], path = wirePaths[part.sec];
       path.n = wireEdges(part.edges, part.mat, path.pts, path.n, cy0, sy0, ox, oy, k);
     }
+    ext[0] = max(ext[0], seen[0]); ext[1] = max(ext[1], Math.sqrt(seen[1]));   // next frame fits anything reached this one
     ctx.save();
-    ctx.beginPath(); ctx.rect(x - 4.4 * u, y - u, 8.8 * u, h + u); ctx.clip();   // a long stride stays in its box
+    ctx.beginPath(); ctx.rect(x - WIRE_HALF * u, y - u, 2 * WIRE_HALF * u, h + u); ctx.clip();   // a long stride stays in its box
     ctx.lineWidth = 1;
     for (const sec of WIRE_SECS) {
       const { pts, n } = wirePaths[sec];
@@ -159,16 +169,24 @@ export function createHud(app) {
     for (let i = 0; i < e.length && n < pts.length; i += 3) {
       const px = e[i], py = e[i + 1], pz = e[i + 2];
       const X = q[0] * px + q[4] * py + q[8] * pz + q[12], Y = q[1] * px + q[5] * py + q[9] * pz + q[13], Z = q[2] * px + q[6] * py + q[10] * pz + q[14];
+      if (Y > seen[0]) seen[0] = Y;
+      const rr = X * X + Z * Z; if (rr > seen[1]) seen[1] = rr;   // typed array: no garbage
       const Xv = X * cy0 + Z * sy0, Zv = -X * sy0 + Z * cy0;   // turned about its own feet, then seen from behind: its left on your left
       pts[n++] = Math.round(ox - Xv * k); pts[n++] = Math.round(oy - (Y * ct + Zv * st) * k);
     }
     return n;
   }
-  // The posed mech's height, once, for the diagram's scale.
-  function heightOf(pose) {
-    let top = 0;
-    for (let j = 0; j < pose.n; j++) { const { edges: e, mat: q } = pose.parts[j]; for (let i = 0; i < e.length; i += 3) top = max(top, q[1] * e[i] + q[5] * e[i + 1] + q[9] * e[i + 2] + q[13]); }
-    return top || 8;
+  // The posed mech's height and reach from its upright axis, the first time it's drawn (with some room for a stride).
+  function extentOf(pose) {
+    let top = 0, r2 = 0;
+    for (let j = 0; j < pose.n; j++) {
+      const { edges: e, mat: q } = pose.parts[j];
+      for (let i = 0; i < e.length; i += 3) {
+        const X = q[0] * e[i] + q[4] * e[i + 1] + q[8] * e[i + 2] + q[12], Z = q[2] * e[i] + q[6] * e[i + 1] + q[10] * e[i + 2] + q[14];
+        top = max(top, q[1] * e[i] + q[5] * e[i + 1] + q[9] * e[i + 2] + q[13]); r2 = max(r2, X * X + Z * Z);
+      }
+    }
+    return new Float64Array([top || 8, Math.sqrt(r2) * 1.05 || 3]);
   }
 
 
@@ -202,7 +220,7 @@ export function createHud(app) {
         frame: true, dash, viewBottom: V.H - dash,
         radar: { x: V.W / 2, y: V.H - dash / 2 + 4, r: dash * 0.4 },
         bars: { x: V.W * 0.1 + 6, y: top, h: dash - 30 },
-        diag: { x: V.W * 0.1 + 34 + 4.4 * u, y: top + 6, u },
+        diag: { x: V.W * 0.1 + 38 + WIRE_HALF * u, y: top + 6, u },   // 4 px clear of the bars
         weapons: { x: min(V.W * 0.62, V.W * 0.9 - 26 - 200), y: top + 4 },   // the list is 190 wide: never into the throttle (HUD SCALE)
         throttle: { x: V.W * 0.9 - 26, y: top, h: dash - 30 },
         target: { x: V.W * 0.1 + 8, y: 48 },
@@ -215,7 +233,7 @@ export function createHud(app) {
       frame: false, dash: 0, viewBottom: V.H,
       radar: { x: V.W - r - 14, y: r + 12, r },
       bars: { x: 64, y: 112, h: 70 },
-      diag: { x: 100 + 4.4 * u, y: 116, u },
+      diag: { x: 104 + WIRE_HALF * u, y: 116, u },
       weapons: { x: V.W - 205, y: 2 * r + 34 },
       throttle: { x: 14, y: V.H - 196, h: 120 },
       target: { x: tgtX, y: 10 },   // right of the pause and zoom buttons
