@@ -48,6 +48,8 @@ export function scramble(G, t, secs, p) {
 
 // The ?debug=1 INVINCIBLE option (G.invincible, set by the FEEL panel): your
 // own mech takes hits but no damage. Single player only (not the arena or co-op).
+// Beam damage after this long without any is a new contact: it clangs once.
+export const BEAM_CONTACT_GAP = 0.6;
 export const invincible = (G, m) => !!G.invincible && m === G.player && G.mode === 'sp';
 
 export function damage(G, m, p, amt, src, beam = false, melee = false) {
@@ -60,7 +62,8 @@ export function damage(G, m, p, amt, src, beam = false, melee = false) {
     if (G.roundOver || m.mate) return;   // a teammate (team deathmatch): friendly fire is off
     if (!beam) hitSparks(G, m, p, sectionHit(m, p), amt);   // the shooter sees the sparks; the damage is the victim's to apply
     const q = hitQueue(G, m, p);
-    q.amt += amt; q.p = p;
+    if (beam) q.bamt = (q.bamt || 0) + amt; else q.amt += amt;   // a beam's damage goes out flagged (bm), apart from impacts
+    q.p = p;
     if (melee) q.me = 1;
     if (src === G.player) { if (!beam) { G.stats.hits++; G.hitStop = HIT_STOP; } G.stats.dealt += amt; G.hitMark = 0.25; }
     return;
@@ -76,7 +79,10 @@ export function damage(G, m, p, amt, src, beam = false, melee = false) {
   if (!beam) feel(G, 'hit', { mech: m, k: amt / 10 * (HIT_BY_SECTION[sec] || 1), roll: side, at: m === G.player ? null : p });   // beams don't jolt: the renderer sways a melting mech instead
   if (m === G.player) {
     G.stats.taken += amt;
-    if (!beam || G.time - (G.lastClang || 0) > 0.35) { G.lastClang = G.time; G.fx.sfx.clang(sectionHit(m, p)); }   // arms ring, legs thud, the torso is dull
+    // Arms ring, legs thud, the torso is dull. Under beams, one clang on contact,
+    // then the sizzle (audio/sound.js meltSound, while G.beamOnAt is fresh).
+    if (!beam || !(G.time - (G.beamOnAt ?? -Infinity) < BEAM_CONTACT_GAP)) G.fx.sfx.clang(sectionHit(m, p));
+    if (beam) G.beamOnAt = G.time;
     if (!G.target && src && src.alive) G.target = src;
   } else if (m.team !== 0 && !m.remote) { m.ai.hitAt = G.time; alertEnemy(G, m, G.player, src && src !== m ? [src.x, src.y, src.z] : null); }   // being hit is a contact; the shooter's spot is the belief
   if (m.hp[sec] > 0) {

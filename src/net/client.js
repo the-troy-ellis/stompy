@@ -16,7 +16,7 @@ import { voice } from '../sim/voice.js';
 import { beamMult } from '../sim/beams.js';
 import { launchPulse } from '../sim/fusion.js';
 import { SEND_HZ } from '../sim/missiles.js';
-import { hit, hello, ping as pingMsg, ready as readyMsg, team as teamMsg, vote as voteMsg, roundStats, stateMessage, PING_EVERY } from './protocol.js';
+import { hit, batchMessages, hello, ping as pingMsg, ready as readyMsg, team as teamMsg, vote as voteMsg, roundStats, stateMessage, PING_EVERY } from './protocol.js';
 import { coopNote, lobbyHTML, lobbyHead, lobbyRows } from '../ui/lobby.js';
 import { summaryHTML, summaryRows, voteCount, voteOf } from '../ui/summary.js';
 import { fitOf } from '../ui/mechlab.js';
@@ -276,7 +276,7 @@ export function createNet(app) {
         else {
           const melee = !!(m.me || m.st);
           if (melee) G.player.lastHitMelee = m.st ? 'stomp' : 'punch';
-          damage(G, G.player, m.p, m.amt, mechById(m.from) || null, false, melee);
+          damage(G, G.player, m.p, m.amt, mechById(m.from) || null, !!m.bm, melee);   // bm: beam damage (no sparks, no jolt, one clang)
           if (m.zap && G.player.alive) scramble(G, G.player, WEAPONS.ppc.scramble, m.p);
           if (m.hh > 0 && G.player.alive) G.player.heat += Math.min(m.hh, 20);
           // A shove or a stomp: the push, the aim jolt and the lurch happen here, on the victim's screen.
@@ -457,7 +457,7 @@ export function createNet(app) {
 
   // Beam damage lands every frame; in the arena it's sent a few times a second.
   function flushHits() {
-    for (const [to, q] of G.pendingHits) if (!mate(to)) netSend(hit(to, q.amt, q.p, false, q));   // friendly fire is off (the relay drops it too)
+    for (const [to, q] of G.pendingHits) if (!mate(to)) for (const m of batchMessages(q, (amt, x) => hit(to, amt, q.p, false, x))) netSend(m);   // friendly fire is off (the relay drops it too)
     G.pendingHits.clear();
   }
 
