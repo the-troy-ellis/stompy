@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTestGame, input, DT } from './helpers.js';
+import { createTestGame, input, DT, stepFor } from './helpers.js';
+import { geoOf } from '../src/data/geo.js';
 import { update } from '../src/sim/update.js';
 import { MECH_ORDER } from '../src/data/chassis.js';
 
@@ -57,3 +58,24 @@ for (const chassis of MECH_ORDER) {
     if (chassis === 'puncher' || chassis === 'warden') assert.ok(perSec < 1.9, `a heavy at ${perSec.toFixed(2)} a second`);
   });
 }
+
+test('no high kicks: a swinging foot never jumps, and never gets far out ahead of its hip', () => {
+  for (const chassis of MECH_ORDER) {
+    const G = createTestGame({ chassis, foes: [] });
+    const P = G.player, g = geoOf(P), s = P.ch.scale, L = (g.l1 + g.l2) * s;
+    stepFor(G, 4, input({ thrUp: true }));
+    let last = P.feet.map(f => [...f.pos]), maxJump = 0, maxAhead = 0;
+    for (let k = 0; k < 300; k++) {
+      stepFor(G, 1 / 60, input({ thrUp: true }));
+      const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
+      P.feet.forEach((f, i) => {
+        const leg = g.legs[i], hx = P.x + (rx * leg.hx + fx * leg.hz) * s, hz = P.z + (rz * leg.hx + fz * leg.hz) * s;
+        maxAhead = Math.max(maxAhead, ((f.pos[0] - hx) * fx + (f.pos[2] - hz) * fz) / L);
+        maxJump = Math.max(maxJump, Math.hypot(f.pos[0] - last[i][0], f.pos[2] - last[i][2]) / L);
+        last[i] = [...f.pos];
+      });
+    }
+    assert.ok(maxAhead < 0.75, `${chassis}: a foot ${maxAhead.toFixed(2)} leg lengths ahead of its hip`);
+    assert.ok(maxJump < 0.4, `${chassis}: a foot jumped ${maxJump.toFixed(2)} leg lengths in one frame`);
+  }
+});

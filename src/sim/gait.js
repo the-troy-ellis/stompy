@@ -71,7 +71,7 @@ export function legRoom(g, s, crouch) {
 // never less than the plan's own top stride.
 export function strideOf(m, pace, sw) {
   const g = geoOf(m), gp = gaitOf(m), s = m.ch.scale, top = m.maxSpeed ?? m.ch.speed;
-  const reach = 2 * legRoom(g, s, gp.crouch * pace) / (1 - sw) * 0.95;
+  const reach = 2 * legRoom(g, s, gp.crouch * pace) / (1 - sw) * 0.85;
   const want = Math.max(s * (g.stride[0] + g.stride[1]), (2 * top) / gp.cadence);
   const Dtop = Math.max(s * g.stride[0], min(want, reach));
   return s * g.stride[0] + (Dtop - s * g.stride[0]) * pace;
@@ -137,7 +137,8 @@ export function gait(G, m, dt) {
     // A heavy foot lifts slowly and is driven into the ground (slam), its
     // lift peaking early so it comes down rather than glides down.
     const t = swingTarget(G, m, i, u, D, dir, sw), e = lerp(u * u * (3 - 2 * u), u * u, gp.slam);
-    if (hypot(f.from[0] - t[0], f.from[2] - t[2]) > 9 * s) f.from = [...t];   // shoved mid-stride
+    // Shoved mid-stride: a normal step starts about a stride (D) from its target; far more than that, start from the target.
+    if (hypot(f.from[0] - t[0], f.from[2] - t[2]) > 1.5 * D + 3 * s) f.from = [...t];
     const up = sin(PI * Math.pow(u, gp.liftEarly)) * (gp.lift[0] + gp.lift[1] * pace) * s;
     f.pos = [lerp(f.from[0], t[0], e), lerp(f.from[1], t[1], e) + up, lerp(f.from[2], t[2], e)];
     f.yaw += wrapA(m.yaw - f.yaw) * min(1, dt * 10);
