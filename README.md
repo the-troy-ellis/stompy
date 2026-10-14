@@ -142,7 +142,12 @@ npm run zip         # dist/ as stompy-<version>.zip
 `?debug=1` shows frame time, draw calls and the seed, exposes the state
 as `window.__stompy`, and opens every mech and mission (as `?unlock` does; add `&lock` to keep a
 fresh save's locks). Its FEEL panel has an INVINCIBLE box: your mech takes
-hits but no damage, in single player only. `?touch=1` forces the touch layout. `?edit=1` (with
+hits but no damage, in single player only, and a BENCH button (or `&bench=1`
+in the URL): a scripted 25-second scene, the same frames every run. Five
+mechs walk circles, you run and jump, everyone shoots, three lose a limb,
+three die, and you turn away from the wrecks. At the end a card gives each
+part's frame rate, milliseconds of work, draws and particles beside the last
+run's, for judging a change to the look, the walk or the effects. `?touch=1` forces the touch layout. `?edit=1` (with
 `&mission=m06`, say) opens the mission editor: the mission from above on its
 own ground. Two fingers (or the right mouse button) move the map, a pinch or
 the wheel zooms, Q and E turn it. A tap selects, dragging a thing moves it

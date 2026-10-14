@@ -63,17 +63,32 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 // After the weight pass (your view dips and lifts with your acceleration and
 //   lurches with each step, so the frustum takes in a little more): fight
 //   28/50, 51 on CI (runs jitter by a draw); its peak budget is that plus ~15%.
+// The bench replaces the fight scenes (fight, fight-deaths, wrecks,
+//   looking-away): src/sim/bench.js scripts the whole field (nobody thinks,
+//   nobody is hurt, limbs and kills on its clock), so their draws stop
+//   following how a fight goes. Its segments, first measured:
+//   walk 13/13 · run 9/27 · fight 49/70 · deaths 69/75 · wrecks 69/88 ·
+//   away 25/80 (its peak is the first frames, still facing the wrecks).
+//   Two runs agree to the draw, bar a peak's one.
+// After #231's terrain chunks (16 squares, each with its box; each run of
+//   neighbours in view is one draw, and past the fog none): about half the
+//   triangles for 0-2 more draws. menu 4/4 11.3k · free-start 7/7 11.6k ·
+//   bench-walk 13/14 15.0k · run 11/29 15.4k · fight 49/70 16.1k ·
+//   deaths 70/76 16.3k · wrecks 69/89 16.5k · away 27/82 15.3k · rain 8.7k ·
+//   snow 3.7k · dust 3.2k (their fog is short).
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
-  menu:           { meanDraws: 4, peakDraws: 4, tris: 25000, allocKB: 26 },
-  'free-start':   { meanDraws: 8, peakDraws: 8, tris: 25000, allocKB: 115 },
-  fight:          { meanDraws: 31, peakDraws: 58, tris: 27000, allocKB: 205 },
-  'fight-deaths': { meanDraws: 55, peakDraws: 72, tris: 27000, allocKB: 205 },
-  wrecks:         { meanDraws: 60, peakDraws: 70, tris: 26000, allocKB: 145 },
-  'looking-away': { meanDraws: 26, peakDraws: 30, tris: 27000, allocKB: 135 },
-  rain:           { meanDraws: 9, peakDraws: 9, tris: 25000, allocKB: 90 },   // free-start in a downpour: one more draw (the rain), no more garbage
-  snow:           { meanDraws: 11, peakDraws: 11, tris: 25000, allocKB: 90 },   // and in snow
-  dust:           { meanDraws: 11, peakDraws: 11, tris: 25000, allocKB: 90 },   // and in a dust storm (2,500 grains)
+  menu:           { meanDraws: 4, peakDraws: 4, tris: 13000, allocKB: 26 },
+  'free-start':   { meanDraws: 8, peakDraws: 8, tris: 13500, allocKB: 115 },
+  'bench-walk':   { meanDraws: 15, peakDraws: 15, tris: 17500, allocKB: 145 },
+  'bench-run':    { meanDraws: 11, peakDraws: 31, tris: 18000, allocKB: 115 },
+  'bench-fight':  { meanDraws: 56, peakDraws: 81, tris: 18500, allocKB: 215 },
+  'bench-deaths': { meanDraws: 79, peakDraws: 87, tris: 19000, allocKB: 190 },
+  'bench-wrecks': { meanDraws: 79, peakDraws: 101, tris: 19000, allocKB: 140 },
+  'bench-away':   { meanDraws: 29, peakDraws: 92, tris: 18000, allocKB: 95 },
+  rain:           { meanDraws: 9, peakDraws: 9, tris: 10000, allocKB: 90 },   // free-start in a downpour: one more draw (the rain), no more garbage
+  snow:           { meanDraws: 11, peakDraws: 11, tris: 4500, allocKB: 90 },   // and in snow
+  dust:           { meanDraws: 11, peakDraws: 11, tris: 4000, allocKB: 90 },   // and in a dust storm (2,500 grains)
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;
@@ -177,26 +192,20 @@ try {
     await app.audio.loadSamples();
   });
   await scene('free-start', 60, 10);
-  // Six mechs 70-145 m ahead, all awake and shooting; the player can't die.
-  await page.evaluate(async () => {
-    const { newMech } = await import('/src/sim/state.js');
-    const G = window.__stompy.game, P = G.player;
-    for (const m of G.mechs) if (m.team) { m.alive = false; m.x += 5000; }
-    ['jackal', 'warden', 'puncher', 'sniper1', 'light1', 'jackal'].forEach((t, i) => {
-      const a = (i - 2.5) * 0.25, d = 70 + i * 15;
-      const e = newMech(G, t, 1, P.x + Math.sin(P.yaw + a) * d, P.z + Math.cos(P.yaw + a) * d, P.yaw + Math.PI);
-      e.ai.aware = true; G.mechs.push(e);
-    });
-    for (const k in P.hp) P.hp[k] = 1e6;
+  // The bench (src/sim/bench.js): one scripted scene, nobody thinking and
+  // nobody hurt, every step, shot, lost limb and kill on its clock, so a
+  // change to the AI, the dice or the walk doesn't reshuffle what it measures.
+  // Each of its segments is a scene here, recorded end to end.
+  const segs = await page.evaluate(async () => {
+    const { startBench, BENCH_SEGS } = await import('/src/sim/bench.js');
+    const G = window.__stompy.game, app = window.__stompy.app;
+    startBench(G);
+    app.scene.uploadWorld(); app.ui.launch();
+    window.requestAnimationFrame = () => 0;
+    return BENCH_SEGS;
   });
-  await scene('fight', 120, 150);
-  await page.evaluate(() => { const s = window.__stompy; s.game.mechs.filter(m => m.team && m.alive).slice(0, 3).forEach(m => s.kill(m)); });
-  await scene('fight-deaths', 45);
-  await scene('wrecks', 120, 60);
-  // The same field with the player turned away: culling (spec 14 P6) skips
-  // the mechs, wrecks and smoke behind.
-  await page.evaluate(() => { const P = window.__stompy.game.player; P.yaw += Math.PI; P.twist = 0; });
-  await scene('looking-away', 60);
+  let from = 0;
+  for (const s of segs) { await scene(`bench-${s.key}`, Math.round((s.to - from) * 60)); from = s.to; }
   // Weather on its own: the free-start match again, in rain and in snow, to
   // compare with free-start (spec 07: the box of drops is one more draw and
   // no garbage).

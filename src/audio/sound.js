@@ -142,15 +142,23 @@ export function createAudio(app) {
     return loop;
   }
 
+  // Two waves (spec 11, the performance pass): first one take of everything
+  // heard in the first seconds; then the other takes and the rare ones (jets,
+  // shutting down and starting up), so on a slow line the steps and guns
+  // come first. Until a sound has a take, synthesis plays it; a name with one
+  // take plays that one until the rest arrive.
+  const LATER = new Set(['jet_loop', 'powerdown', 'powerup']);
   function loadSamples() {
     const c = Sound.ctx;
     if (!c || loading) return loading;
-    loading = Promise.all(Object.entries(SAMPLES).flatMap(([name, n]) => Array.from({ length: n }, (_, i) =>
-      fetch(`sounds/${n > 1 ? name + i : name}.mp3`)
-        .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
-        .then(b => new Promise((ok, fail) => c.decodeAudioData(b, ok, fail)))   // callback form: every Safari
-        .then(buf => { (buffers[name] ||= []).push(name.endsWith('_loop') ? seamless(buf) : buf); })
-        .catch(() => { /* synthesis covers it */ }))));
+    const take = (name, file) => fetch(`sounds/${file}.mp3`)
+      .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
+      .then(b => new Promise((ok, fail) => c.decodeAudioData(b, ok, fail)))   // callback form: every Safari
+      .then(buf => { (buffers[name] ||= []).push(name.endsWith('_loop') ? seamless(buf) : buf); })
+      .catch(() => { /* synthesis covers it */ });
+    const files = Object.entries(SAMPLES).flatMap(([name, n]) => Array.from({ length: n }, (_, i) => ({ name, file: n > 1 ? name + i : name, later: i > 0 || LATER.has(name) })));
+    loading = Promise.all(files.filter(f => !f.later).map(f => take(f.name, f.file)))
+      .then(() => Promise.all(files.filter(f => f.later).map(f => take(f.name, f.file))));
     return loading;   // resolves when every take has loaded or failed (the perf harness waits on it)
   }
   // Play one random take. Lower rate = deeper and longer = heavier.
