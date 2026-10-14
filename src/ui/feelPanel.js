@@ -15,7 +15,7 @@ export function createFeelPanel(app) {
   const el = document.createElement('div');
   el.className = 'feel-panel';
   const rows = FEEL_EVENTS.map(ev => `<tr><th>${ev}</th>${FEEL_COLS.map(c => `<td><input type="number" step="0.05" data-ev="${ev}" data-col="${c}" value="${FEEL[ev][c]}"></td>`).join('')}</tr>`).join('');
-  const extra = ['view', 'spring', 'knock'].map(g => `<tr><th>${g}</th><td colspan="${FEEL_COLS.length}">${Object.keys(FEEL[g]).map(k => `${k} <input type="number" step="0.05" data-ev="${g}" data-col="${k}" value="${FEEL[g][k]}">`).join(' ')}</td></tr>`).join('');
+  const extra = ['view', 'spring', 'knock', 'inertia'].map(g => `<tr><th>${g}</th><td colspan="${FEEL_COLS.length}">${Object.keys(FEEL[g]).map(k => `${k} <input type="number" step="0.05" data-ev="${g}" data-col="${k}" value="${FEEL[g][k]}">`).join(' ')}</td></tr>`).join('');
   // The gaits by class (data/walk.js GAIT, spec 16): a row per leg type; `lift` is two numbers.
   const num = (attrs, v) => `<input type="number" step="0.05" ${attrs} value="${v}">`;
   const gaitRows = Object.entries(GAIT).map(([plan, row]) => `<tr><th>gait ${plan}</th><td colspan="${FEEL_COLS.length}">${Object.entries(row).map(([k, v]) =>

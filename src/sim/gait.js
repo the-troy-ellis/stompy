@@ -83,7 +83,7 @@ export function gait(G, m, dt) {
   // No legs left: the hull sits on the ground, the torso still turns and fires.
   if (m.hp.LL <= 0 && m.hp.RL <= 0) {
     m.feet.forEach((f, i) => { f.pos = restFoot(G, m, i); f.lifted = false; f.yaw = m.yaw; });
-    m.bob = -(g0.hip - 0.9) * s; m.lean = 0; m.sway = 0; m.hipYaw = 0; m.lastYaw = m.yaw;
+    m.bob = -(g0.hip - 0.9) * s; m.lean = 0; m.sway = 0; m.hipYaw = 0; m.surge = 0; m.lastYaw = m.yaw;
     return;
   }
   // One leg gone: lean toward the gap, about 8 degrees.
@@ -94,7 +94,7 @@ export function gait(G, m, dt) {
   if (m.air) {
     // Legs hang under the body until touchdown.
     m.feet.forEach((f, i) => { const r = restFoot(G, m, i); f.pos = [r[0], m.y + 1.4 * s, r[2]]; f.lifted = false; f.yaw = m.yaw; });
-    m.bob = 0; m.sway = 0; m.hipYaw = 0; m.wasAir = true;
+    m.bob = 0; m.sway = 0; m.hipYaw = 0; m.surge = 0; m.wasAir = true;
     return;
   }
   if (m.wasAir) { m.wasAir = false; m.cyc = restCyc(geoOf(m)); m.feet.forEach((f, i) => { f.pos = restFoot(G, m, i); f.yaw = m.yaw; }); }
@@ -115,6 +115,10 @@ export function gait(G, m, dt) {
   // the planted foot and turn with the stride.
   const since = G.time - (m.stepAt ?? -9), tau = 0.1, dip = since < 1 ? (since / tau) * Math.exp(1 - since / tau) : 0;
   m.bob = crouch - dip * gp.drop * s * (0.4 + 0.6 * pace);
+  // Weight going over the new foot: the body lurches ahead after a footfall
+  // and drops back through the step, instead of gliding (drawn, not moved).
+  const lurch = since < 1.5 ? (since / 0.16) * Math.exp(1 - since / 0.16) : 0;
+  m.surge = lurch * gp.surge * pace * dir;
   let rise = 0, sway = 0, turn = 0;
   m.feet.forEach((f, i) => {
     const u = swingOf(i);
