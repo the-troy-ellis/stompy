@@ -186,7 +186,9 @@ export function createScene(app) {
     const top = toppleOf(m), place = p => (top ? M.apply(top, p) : p);
     // The body frame is frame(m) (sim/geom.js) built from the arena.
     // The hips shift over the planted foot (m.sway, model units, +x its left) and turn with the stride (m.hipYaw): sim/gait.js.
-    const B = chain(top || M.id(), M.T(0, -sag, 0), M.T(m.x, m.y + (m.bob || 0), m.z), M.RY(m.yaw), M.S(m.ch.scale), M.RZ(m.lean || 0), M.T(m.sway || 0, 0, 0)), parts = R.mechParts[m.partsKey], sc = m.ch.scale;
+    // The whole body tips about its feet with its inertia (m.tilt, sim/feel.js) and lurches ahead after a footfall (m.surge).
+    const tp = m.tilt ? m.tilt.p.x : 0, tr = m.tilt ? m.tilt.r.x : 0;
+    const B = chain(top || M.id(), M.T(0, -sag, 0), M.T(m.x, m.y + (m.bob || 0), m.z), M.RY(m.yaw), M.S(m.ch.scale), M.RX(tp), M.RZ((m.lean || 0) + tr), M.T(m.sway || 0, 0, m.surge || 0)), parts = R.mechParts[m.partsKey], sc = m.ch.scale;
     const BH = m.hipYaw ? chain(B, M.RY(m.hipYaw)) : B;   // the hips; the torso above them doesn't turn
     const fwd = [sin(m.yaw), 0, cos(m.yaw)];
     // Armour under a beam glows orange as it melts (another colour in a COLOURS mode), and runs hotter in IR.
@@ -526,12 +528,15 @@ export function createScene(app) {
       fov = G.zoom ? 0.42 : (app.prefs?.fov || 62) * Math.PI / 180;   // the FOV setting; 62 degrees is the old 1.08 rad
       const sh = G.shake * 0.012, wv = FEEL.view.wobble * (G.reducedMotion ? FEEL.view.reducedScale : 1), wp = P.wob ? P.wob.p.x : 0, wr = P.wob ? P.wob.r.x : 0;
       yaw = viewYaw(P) + rnd(-sh, sh) + wr * wv * 0.5; pitch = P.pitch + rnd(-sh, sh) - (P.alive || P.dying || P.fallen ? 0 : 0.15) + wp * wv;
+      // Your own weight: the view dips as you brake and lifts as you pull away (FEEL.inertia.view).
+      if (P.tilt) pitch -= P.tilt.p.x * FEEL.inertia.view * (G.reducedMotion ? FEEL.view.reducedScale : 1);
       // Running hot: the view swims, a slow breath in the field of view and a sway, until the reactor trips.
       const hot = hotFrac(P.heat) * (P.shutdown ? 0 : 1) * (G.reducedMotion ? FEEL.view.reducedScale : 1);
       if (hot > 0) { fov *= 1 + HEAT.fov * hot * sin(G.time * 2.6); yaw += HEAT.sway * hot * sin(G.time * 1.9); pitch += HEAT.sway * 0.6 * hot * cos(G.time * 1.3); }
       const drop = G.kick + (G.bob ? G.bob.x : 0);   // the instant kick plus the eased bob
       const fall = P.dying || P.fallen;
-      eye = add(G.eye, [0, -drop * 0.35 - (P.squash ? P.squash.x * 2 : 0) - (P.sag ? P.sag.x : 0) - (fall ? fall.drop || 0 : 0), 0]); dir = dirOf(yaw, pitch - drop * 0.016);
+      const lurch = (P.surge || 0) * P.ch.scale * (G.reducedMotion ? FEEL.view.reducedScale : 1);   // and lurches with each step
+      eye = add(G.eye, [Math.sin(P.yaw) * lurch, -drop * 0.35 - (P.squash ? P.squash.x * 2 : 0) - (P.sag ? P.sag.x : 0) - (fall ? fall.drop || 0 : 0), Math.cos(P.yaw) * lurch]); dir = dirOf(yaw, pitch - drop * 0.016);
       // Going down: the view goes with the body, turned by the same topple
       // (so a fall to the side rolls the horizon), and stays there once it's
       // down until the debrief (P.fallen; spec 13 § Death).

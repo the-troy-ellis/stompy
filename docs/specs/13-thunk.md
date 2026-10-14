@@ -151,6 +151,21 @@ feet in: it takes up to 60% of the forward speed and holds the legs at 30%
 for up to 0.35 s, scaled by the landing force, before they drive again. The
 landing squash already shows it; this makes it felt in the throttle.
 
+### Weight
+
+Moving at constant speed on rails reads as weightless, so the body carries
+its own inertia. These are drawn and felt, not simulated: speed, turning and
+the feet are untouched. All the numbers are FEEL panel knobs.
+
+- **Inertia lean** (`FEEL.inertia`, `sim/feel.js`). The whole body tips about
+  its feet against its own acceleration. It rocks back as it pulls away,
+  pitches forward and rocks as it brakes, and rolls out of a turn. The spring
+  is softer the bigger the mech (k / scale²), so a WARDEN swings slow.
+  Your view dips as you brake and lifts as you pull away (`view`).
+- **Step surge** (`GAIT.*.surge`, `sim/gait.js`). After each footfall the
+  body lurches ahead and drops back through the step, instead of gliding.
+  Walkers lurch most and runners least. In the cockpit the eye lurches with it.
+
 ### Heat feel (M1 #26, shipped)
 
 From 85 heat to shutdown (`hotFrac`, `HEAT` in `src/data/feel.js`) the view

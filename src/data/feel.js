@@ -71,8 +71,13 @@ export const FEEL = {
   knock: { twist: 0.3, pitch: 0.1, skidDust: 12 },
   // Spring stiffness and damping ratio for the body springs.
   spring: { squashK: 160, squashZeta: 0.7, wobbleK: 90, wobbleZeta: 0.35, sagK: 45, sagZeta: 1, bobK: 200, bobZeta: 1 },
+  // Weight: the whole body tips on a slow spring about its feet (sim/feel.js stepFeel). It rocks back as it
+  // speeds up and pitches forward as it brakes (pitch: radians per m/s^2), rolls out of a turn (roll: radians
+  // per m/s x rad/s), never past `max`. k / scale^2 and zeta: the spring, so a bigger mech swings slower.
+  // view: how much of the pitch your own view takes.
+  inertia: { pitch: 0.012, roll: 0.005, max: 0.1, k: 28, zeta: 0.4, view: 0.6 },
 };
-const TUNING = new Set(['view', 'spring', 'knock']);   // blocks of constants, not event rows
+const TUNING = new Set(['view', 'spring', 'knock', 'inertia']);   // blocks of constants, not event rows
 export const FEEL_EVENTS = Object.keys(FEEL).filter(k => !TUNING.has(k));
 export const FEEL_COLS = ['kick', 'bob', 'shake', 'flash', 'white', 'squash', 'wobble', 'bass', 'duck', 'dust', 'haptic', 'push'];
 // Rows leave out columns they don't use; fill them so every row has every column.

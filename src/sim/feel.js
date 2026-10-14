@@ -1,5 +1,6 @@
 import { FEEL } from '../data/feel.js';
 import { kickSpring, makeSpring, stepSpring } from '../util/spring.js';
+import { clampN, wrapA } from '../util/math.js';
 
 const { min, max } = Math;
 
@@ -10,12 +11,34 @@ export function initFeel(m) {
   m.squash = makeSpring(S.squashK, S.squashZeta);
   m.wob = { p: makeSpring(S.wobbleK, S.wobbleZeta), r: makeSpring(S.wobbleK, S.wobbleZeta) };
   m.sag = makeSpring(S.sagK, S.sagZeta);   // hip drop while shut down, metres
+  m.tilt = { p: makeSpring(), r: makeSpring() };   // the whole body's lean from its own inertia, radians
 }
 export function stepFeel(m, dt) {
   if (!m.squash) initFeel(m);
   stepSpring(m.squash, dt); stepSpring(m.wob.p, dt); stepSpring(m.wob.r, dt);
+  stepTilt(m, dt);
   // A mech with its reactor down slumps; a running one stands back up.
   stepSpring(m.sag, dt, m.shutdown ? FEEL.shutdown.sag * m.ch.scale : 0);
+}
+
+// Weight (FEEL.inertia): the body tips about its feet against its own
+// acceleration, back as it speeds up, forward as it brakes (and rocks), and
+// out of a turn. Seen, not simulated: the feet, the aim and the eye stay put.
+// tilt.p > 0 pitches it forward (RX), tilt.r > 0 rolls it toward its right
+// (RZ; a mech's left is +x, where its LL leg is). A turn left is yaw rising.
+export function inertiaTargets(m, accel, yawRate) {
+  const I = FEEL.inertia;
+  if (m.air || !m.alive) return [0, 0];
+  return [clampN(-accel * I.pitch, -I.max, I.max), clampN((m.speed || 0) * yawRate * I.roll, -I.max, I.max)];
+}
+function stepTilt(m, dt) {
+  const I = FEEL.inertia, sp = m.speed || 0;
+  if (!m.tilt) m.tilt = { p: makeSpring(), r: makeSpring() };
+  const accel = dt > 0 ? (sp - (m.tiltSpeed ?? sp)) / dt : 0, yawRate = dt > 0 ? wrapA(m.yaw - (m.tiltYaw ?? m.yaw)) / dt : 0;
+  m.tiltSpeed = sp; m.tiltYaw = m.yaw;
+  const [p, r] = inertiaTargets(m, accel, yawRate), k = I.k / (m.ch.scale * m.ch.scale), c = 2 * Math.sqrt(k) * I.zeta;
+  for (const s of [m.tilt.p, m.tilt.r]) { s.k = k; s.c = c; }   // live from the FEEL panel
+  stepSpring(m.tilt.p, dt, p); stepSpring(m.tilt.r, dt, r);
 }
 
 // The camera's eased drop (the `bob` column), in the same units as G.kick.
