@@ -46,6 +46,10 @@ export function scramble(G, t, secs, p) {
   feel(G, 'bolt', { mech: t, k: 1, roll: side, at: t === G.player ? null : p });
 }
 
+// The ?debug=1 INVINCIBLE option (G.invincible, set by the FEEL panel): your
+// own mech takes hits but no damage. Single player only (not the arena or co-op).
+export const invincible = (G, m) => !!G.invincible && m === G.player && G.mode === 'sp';
+
 export function damage(G, m, p, amt, src, beam = false, melee = false) {
   if (!m.alive) return;
   if (!melee) m.lastHitMelee = false;
@@ -64,7 +68,7 @@ export function damage(G, m, p, amt, src, beam = false, melee = false) {
   if (m === G.player && mp(G) && (m.spawnT > 0 || G.roundOver)) return;
   let sec = sectionHit(m, p);
   if (m.hp[sec] <= 0) sec = 'T';
-  m.hp[sec] -= amt;
+  m.hp[sec] -= invincible(G, m) ? 0 : amt;   // the debug option: still sparks, clangs and jolts
   if (!beam) hitSparks(G, m, p, sec, amt);
   if (src === G.player && m !== G.player) { if (!beam) { G.stats.hits++; G.hitStop = HIT_STOP; } G.stats.dealt += amt; }
   // Which side the blow came from, in torso space: the wobble leans away from it.
