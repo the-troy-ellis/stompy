@@ -237,6 +237,14 @@ guns), quads crawl (slowest, biggest, and hills don't slow them).
 
 Spec: [specs/16-body-plans.md](specs/16-body-plans.md).
 
+## Parked
+
+- **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
+  the phone held upright, with a square window and every control in one band
+  at the bottom. The direction is set and there is a playable mockup
+  ([mockups/portrait-cockpit.html](mockups/portrait-cockpit.html)); the fine
+  tuning waits for the owner.
+
 ## What is deliberately not scheduled
 
 See the non-goals in [vision.md](vision.md). Also not scheduled, pending a

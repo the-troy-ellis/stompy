@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- The portrait cockpit mockup (docs/specs/17-portrait-cockpit.md), parked. Open it in a browser; on a phone, hold it upright. Not part of the game build. -->
+<style>html, body { margin: 0; }</style>
+</head>
+<body>
+<title>Portrait Cockpit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bungee&display=swap">
+<style>
+/* Layout: one phone, held upright. Top band of instruments, a square window, a lamp panel, and every control in one band at
+   the bottom, so both thumbs rest at the same height.
+   On a wide screen the phone sits in a frame with the notes beside it; on a phone it fills the screen. */
+:root {
+  color-scheme: dark;
+  --void: #07090a;        /* behind everything */
+  --hull: #141a17;        /* cockpit panels */
+  --hull-2: #1d2621;      /* raised panels, struts */
+  --line: #2c3a32;        /* panel seams */
+  --phos: #6dff7a;        /* the HUD's green */
+  --phos-dim: #2f7a38;
+  --amber: #ffc23d;       /* warnings, the title */
+  --red: #ff5a3c;
+  --energy: #5ad8ff; --ballistic: #ffd04a; --missile: #ff7a4a; --fusion: #c77dff;
+  --ink: #c9d6cd;         /* notes text */
+  --ink-dim: #7d8c83;
+  --hud: "Share Tech Mono", "Lucida Console", ui-monospace, monospace;
+  --display: "Bungee", "Arial Black", Impact, sans-serif;
+}
+html, body { height: 100%; }
+body { background: var(--void); color: var(--ink); font-family: var(--hud); overflow: hidden;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+/* ---------- stage: phone frame + notes on wide screens ---------- */
+.stage { height: 100%; display: flex; gap: 32px; align-items: center; justify-content: center; padding-block: 16px; }
+.frame { height: min(844px, calc(100% - 8px)); aspect-ratio: 390 / 844; max-width: 100%; border: 10px solid #000; border-radius: 44px;
+  box-shadow: 0 0 0 2px var(--line); overflow: hidden; flex: none; background: var(--hull); position: relative; }
+.notes { width: 330px; max-height: 100%; overflow-y: auto; flex: none; display: grid; gap: 18px; align-content: start; }
+.notes h1 { font-family: var(--display); color: var(--amber); font-size: 26px; margin: 0; letter-spacing: 0.02em; line-height: 1.1; }
+.notes p { margin: 0; line-height: 1.5; color: var(--ink); font-size: 13.5px; }
+.notes .dim { color: var(--ink-dim); }
+.notes h2 { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.14em; color: var(--phos); font-weight: normal; }
+.opt { display: grid; gap: 6px; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { flex: 1; background: var(--hull); border: 0; padding: 8px 6px; cursor: pointer; font-size: 12.5px; color: var(--ink-dim); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--hull-2); color: var(--phos); }
+.keys { font-size: 12.5px; color: var(--ink-dim); line-height: 1.6; }
+
+/* phone-sized screen: the cockpit fills it; the notes become an overlay */
+@media (max-width: 560px) {
+  body { padding-left: 0; padding-right: 0; }
+  .stage { padding: 0; display: block; }
+  .frame { height: 100%; width: 100%; aspect-ratio: auto; border: 0; border-radius: 0; box-shadow: none; }
+  .notes { position: fixed; inset: 0; width: auto; max-height: none; z-index: 20; background: var(--void);
+    padding: calc(56px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  .notes[data-closed="true"] { display: none; }
+}
+@media (min-width: 561px) { .info, .notes .close { display: none; } }
+
+/* ---------- the cockpit ---------- */
+.pit { position: absolute; inset: 0; display: grid; grid-template-rows: auto auto 1fr auto auto; background: var(--hull); user-select: none; -webkit-user-select: none; touch-action: none; }
+.top { padding: 8px 10px 6px; display: grid; gap: 6px; border-bottom: 1px solid var(--line); }
+.compass { height: 22px; border: 1px solid var(--phos-dim); position: relative; overflow: hidden; background: #030a04; }
+.compass canvas { width: 100%; height: 100%; display: block; }
+.band { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 8px; align-items: stretch; }
+.inst { border: 1px solid var(--line); background: #070d09; position: relative; min-width: 0; }
+.inst canvas { width: 100%; aspect-ratio: 1; display: block; image-rendering: pixelated; }
+.tgt { padding: 6px 7px; display: grid; align-content: start; gap: 3px; font-size: 12px; color: var(--phos); line-height: 1.25; }
+.tgt .nm { color: var(--amber); font-size: 13px; letter-spacing: 0.04em; }
+.tgt .hp { height: 5px; background: #0b1f0e; border: 1px solid var(--phos-dim); margin-top: 3px; }
+.tgt .hp i { display: block; height: 100%; background: var(--phos); }
+.tgt .none { color: var(--phos-dim); }
+.lbl { position: absolute; left: 4px; bottom: 2px; font-size: 9px; color: var(--phos-dim); letter-spacing: 0.1em; }
+.bars { display: grid; grid-template-columns: auto 1fr auto 1fr auto; gap: 6px; align-items: center; font-size: 10px; color: var(--phos-dim); letter-spacing: 0.1em; }
+.bar { height: 7px; border: 1px solid var(--phos-dim); background: #031203; }
+.bar i { display: block; height: 100%; width: 0; background: var(--phos); }
+.bar.jj i { background: var(--energy); }
+.spd { color: var(--phos); min-width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* the window: struts either side, the view square between */
+.win { display: grid; grid-template-columns: 9px 1fr 9px; background: var(--hull-2); }
+.strut { background: repeating-linear-gradient(180deg, var(--hull-2) 0 18px, var(--line) 18px 20px); }
+.view { position: relative; aspect-ratio: 1; touch-action: none; cursor: crosshair; overflow: hidden; background: #000; }
+.view canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.view .hint { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; font-size: 11px; color: var(--phos); letter-spacing: 0.12em; pointer-events: none; opacity: 0.85; }
+.view .tip { position: absolute; left: 0; right: 0; top: 38%; text-align: center; font-family: var(--display); font-size: 22px; color: var(--amber); pointer-events: none; }
+.stick .tag2 { position: absolute; left: 0; right: 0; bottom: -16px; text-align: center; font-size: 9px; color: var(--phos-dim); letter-spacing: 0.1em; }
+
+/* dash strip: weapon readouts */
+.dash { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 6px 8px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--hull); }
+.wpn { border: 1px solid var(--line); background: #070d09; padding: 4px 5px; font-size: 10.5px; letter-spacing: 0.06em; display: grid; gap: 2px; min-width: 0; touch-action: none; }
+.wpn b { font-weight: normal; font-variant-numeric: tabular-nums; font-size: 13px; }
+.wpn[data-w="energy"] { color: var(--energy); } .wpn[data-w="ballistic"] { color: var(--ballistic); }
+.wpn[data-w="missile"] { color: var(--missile); } .wpn[data-w="fusion"] { color: var(--fusion); }
+
+/* the lamp panel: fills what's left between the window and the dash */
+.lamps { display: flex; flex-wrap: wrap; gap: 6px; align-content: center; justify-content: center; padding: 6px 10px; min-height: 0; overflow: hidden;
+  background: repeating-linear-gradient(90deg, var(--hull) 0 46px, var(--line) 46px 47px); }
+.lamp { font-size: 10px; letter-spacing: 0.12em; padding: 3px 7px; border: 1px solid var(--line); color: #33443a; background: #0a100c; }
+.lamp.on { color: var(--amber); border-color: var(--amber); }
+.lamp.on.red { color: var(--red); border-color: var(--red); }
+
+/* controls: one band at the bottom. LEGS in the left corner, AIM in the right, fire buttons between,
+   all centred on one line so both thumbs rest at the same height. */
+.ctl { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px;
+  padding: 22px 12px calc(22px + env(safe-area-inset-bottom, 0px)); }
+.pit[data-aim="fire"] .ctl { grid-template-columns: auto 1fr; }
+.stick { width: min(112px, 29vw); aspect-ratio: 1; border-radius: 50%; border: 2px solid var(--phos-dim); position: relative; touch-action: none; background: #070d09; }
+.stick .knob { position: absolute; width: 42%; aspect-ratio: 1; border-radius: 50%; left: 29%; top: 29%; background: var(--hull-2); border: 2px solid var(--phos); }
+.stick .tag { position: absolute; left: -10px; right: -10px; top: -17px; text-align: center; font-size: 10px; color: var(--phos-dim); letter-spacing: 0.14em; }
+.stick .tag2 { position: absolute; left: -14px; right: -14px; bottom: -17px; text-align: center; font-size: 9px; color: var(--phos-dim); letter-spacing: 0.08em; }
+.pit[data-aim="fire"] #aim { display: none; }
+.fireZone { display: grid; grid-template-columns: repeat(2, minmax(0, 58px)); gap: 7px; justify-content: center; align-content: center; }
+.pit[data-aim="fire"] .fireZone { grid-template-columns: repeat(2, minmax(0, 76px)); justify-content: end; }
+.btn { border-radius: 50%; aspect-ratio: 1; border: 2px solid currentColor; background: #070d09; display: grid; place-items: center; font-size: 10.5px; letter-spacing: 0.04em; cursor: pointer; touch-action: none; min-width: 0; padding: 0; }
+.btn.on { background: #13241a; }
+.btn.sm { grid-column: 1 / -1; border-radius: 10px; aspect-ratio: auto; padding: 5px 2px; color: var(--phos); font-size: 10px; }
+.btn.energy { color: var(--energy); } .btn.ballistic { color: var(--ballistic); } .btn.missile { color: var(--missile); } .btn.fusion { color: var(--fusion); }
+
+/* thumb reach: comfortable arcs from the bottom corners */
+.reach { position: absolute; inset: 0; pointer-events: none; display: none; }
+.pit[data-reach="on"] .reach { display: block; }
+.reach i { position: absolute; bottom: -38%; width: 92%; aspect-ratio: 1; border: 2px dashed var(--amber); border-radius: 50%; opacity: 0.7; }
+.reach i.l { left: -46%; } .reach i.r { right: -46%; }
+.reach span { position: absolute; top: 4px; right: 8px; font-size: 10px; color: var(--amber); letter-spacing: 0.1em; }
+
+.info { position: absolute; z-index: 30; top: calc(8px + env(safe-area-inset-top, 0px)); right: calc(10px + env(safe-area-inset-right, 0px)); width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--phos-dim); background: var(--hull); color: var(--phos); font-size: 14px; cursor: pointer; }
+.notes .close { justify-self: start; background: var(--hull-2); border: 1px solid var(--line); padding: 8px 14px; border-radius: 6px; cursor: pointer; color: var(--phos); }
+.sideways { display: none; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .sideways { display: grid; place-items: center; position: fixed; inset: 0; z-index: 40; background: var(--void); color: var(--amber); font-family: var(--display); font-size: 22px; text-align: center; padding: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { .reach i { transition: none; } }
+</style>
+
+<div class="stage">
+  <div class="frame">
+    <div class="pit" id="pit" data-aim="stick" data-reach="off">
+      <div class="top">
+        <div class="compass"><canvas id="compass" width="360" height="22"></canvas></div>
+        <div class="band">
+          <div class="inst"><canvas id="radar" width="96" height="96"></canvas><span class="lbl">800 M</span></div>
+          <div class="inst tgt" id="tgt"></div>
+          <div class="inst"><canvas id="wire" width="96" height="96"></canvas><span class="lbl">YOU</span></div>
+        </div>
+        <div class="bars"><span>HT</span><div class="bar"><i id="heat"></i></div><span>JJ</span><div class="bar jj"><i id="jets"></i></div><span class="spd" id="spd">0 KPH</span></div>
+      </div>
+      <div class="win">
+        <div class="strut"></div>
+        <div class="view" id="view"><canvas id="scene" width="168" height="168"></canvas><div class="hint" id="hint">DRAG: AIM. TAP TAP: PUNCH.</div><div class="tip" id="tip" hidden></div></div>
+        <div class="strut"></div>
+      </div>
+      <div class="lamps" id="lamps"><span class="lamp" data-l="heat">HEAT</span><span class="lamp" data-l="jets">JETS</span><span class="lamp" data-l="ammo">AMMO</span><span class="lamp" data-l="lock">LOCK</span><span class="lamp" data-l="reach">REACH</span><span class="lamp" data-l="hit">HIT</span></div>
+      <div class="dash" id="dash">
+        <div class="wpn" data-w="energy">ENERGY<b id="aE">▮▮</b></div>
+        <div class="wpn" data-w="ballistic">BALLISTIC<b id="aB">30</b></div>
+        <div class="wpn" data-w="missile">MISSILE<b id="aM">14</b></div>
+        <div class="wpn" data-w="fusion">FUSION<b id="aF">READY</b></div>
+      </div>
+      <div class="ctl">
+        <div class="stick" id="stick"><span class="tag">LEGS</span><div class="knob"></div><span class="tag2">TAP, TAP-HOLD: JETS</span></div>
+        <div class="fireZone">
+          <button class="btn sm" data-b="tgt">TGT</button>
+          <button class="btn energy" data-b="energy">ENERGY</button>
+          <button class="btn ballistic" data-b="ballistic">BAL</button>
+          <button class="btn missile" data-b="missile">MSL</button>
+          <button class="btn fusion" data-b="fusion">FUS</button>
+        </div>
+        <div class="stick" id="aim"><span class="tag">AIM</span><div class="knob"></div><span class="tag2">TAP TAP: PUNCH</span></div>
+        <div class="reach"><i class="l"></i><i class="r"></i><span>EASY THUMB REACH</span></div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="notes" id="notes" data-closed="true">
+    <button class="close" id="close">BACK TO THE COCKPIT</button>
+    <h1>PORTRAIT COCKPIT</h1>
+    <p>A mockup of STOMPY held upright. The window is square. The instruments sit above it. The controls sit below, where your thumbs are.</p>
+    <p class="dim">Fake world, real feel: walk, turn, aim and shoot the targets. Hold the phone upright to try it.</p>
+    <p>Every control sits in one band at the bottom, so both thumbs rest at the same height. LEGS on the left, AIM on the right, the fire buttons between.</p>
+    <p>No JUMP or PUNCH buttons. Tap LEGS, then tap and hold it: the jets burn. Double tap AIM: punch. Hold a fire button and slide it: you aim while you shoot.</p>
+    <div class="opt"><h2>AIM</h2>
+      <div class="seg" data-opt="aim"><button data-v="stick" aria-pressed="true">AIM STICK</button><button data-v="fire" aria-pressed="false">FIRE BUTTONS ONLY</button></div>
+      <p class="dim">Fire buttons only: no AIM stick. Bigger buttons in the right corner; slide a held one to aim, double tap the window to punch.</p></div>
+    <div class="opt"><h2>THUMB REACH</h2>
+      <div class="seg" data-opt="reach"><button data-v="off" aria-pressed="true">HIDE</button><button data-v="on" aria-pressed="false">SHOW</button></div></div>
+    <p class="keys">On a desktop: W/S throttle, A/D turn, drag the window or a held fire button to aim, 1 2 3 4 fire, space jumps, F punches, T targets.</p>
+  </aside>
+</div>
+<button class="info" id="info" aria-label="Options and notes">?</button>
+<div class="sideways">HOLD IT UPRIGHT.<br>THIS IS THE UPRIGHT ONE.</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id), pit = $('pit');
+  const { sin, cos, atan2, hypot, min, max, abs, PI, tan, round } = Math, TAU = PI * 2;
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const wrap = a => { a %= TAU; if (a > PI) a -= TAU; if (a < -PI) a += TAU; return a; };
+
+  // ---------- options (remembered in this browser only) ----------
+  const opts = { aim: 'stick', reach: 'off' };
+  try { const o = JSON.parse(localStorage.getItem('pitOpts2') || '{}'); if (['stick', 'fire'].includes(o.aim)) opts.aim = o.aim; if (['on', 'off'].includes(o.reach)) opts.reach = o.reach; } catch { /* fine */ }
+  function applyOpts() {
+    for (const k in opts) {
+      pit.dataset[k] = opts[k];
+      document.querySelectorAll(`.seg[data-opt="${k}"] button`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === opts[k])));
+    }
+    try { localStorage.setItem('pitOpts2', JSON.stringify(opts)); } catch { /* fine */ }
+  }
+  document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return; opts[seg.dataset.opt] = b.dataset.v; applyOpts();
+  }));
+  $('info').onclick = () => { $('notes').dataset.closed = 'false'; };
+  $('close').onclick = () => { $('notes').dataset.closed = 'true'; };
+  applyOpts();
+
+  // ---------- the world ----------
+  const P = { x: 0, z: 0, yaw: 0, twist: 0, pitch: -0.04, speed: 0, thr: 0, turn: 0, heat: 0, jets: 1, y: 0, vy: 0, bob: 0, shake: 0,
+    ammo: { ballistic: 30, missile: 14 }, fusion: 0, hp: { T: 1, LA: 1, RA: 1, LL: 1, RL: 1 } };
+  const KINDS = [{ name: 'JACKAL', s: 0.85, c: ['#a8483a', '#6b2b22'] }, { name: 'WARDEN', s: 1.4, c: ['#6b7a52', '#3f4a30'] }, { name: 'PIPSQUEAK', s: 0.8, c: ['#4f9a92', '#2e5d58'] }];
+  const foes = [];
+  function spawn(i) {
+    const a = Math.random() * TAU, d = 55 + Math.random() * 60, k = KINDS[i % KINDS.length];
+    foes[i] = { ...k, x: P.x + sin(a) * d, z: P.z + cos(a) * d, hp: 1, orbit: Math.random() < 0.5 ? 1 : -1, dead: 0, flash: 0, wobble: 0 };
+  }
+  for (let i = 0; i < 3; i++) spawn(i);
+  let target = 0;
+  const shots = [];   // tracers and missiles: {x,y,z,vx,vy,vz,t,col}
+  const ridge = a => 0.06 + 0.035 * sin(a * 3 + 1) + 0.02 * sin(a * 7 + 2) + 0.012 * sin(a * 13);
+
+  // ---------- input ----------
+  const held = { energy: false, ballistic: false, missile: false, fusion: false, jump: false };
+  // A double tap (or tap, then tap and hold) on a stick: onDouble(true) on the second touch, onDouble(false) when it lifts.
+  function stick(el, onMove, onDouble) {
+    const knob = el.querySelector('.knob'); let id = null, lastTap = -1e9, down = null, dbl = false;
+    const set = (cx, cy) => {
+      const r = el.getBoundingClientRect(), R = r.width / 2;
+      let dx = (cx - r.left - R) / R, dy = (cy - r.top - R) / R; const m = hypot(dx, dy); if (m > 1) { dx /= m; dy /= m; }
+      knob.style.transform = `translate(${dx * R * 0.6}px, ${dy * R * 0.6}px)`; onMove(dx, dy);
+    };
+    el.addEventListener('pointerdown', e => {
+      id = e.pointerId; el.setPointerCapture(id); down = [e.clientX, e.clientY];
+      dbl = performance.now() - lastTap < 300; if (dbl) { lastTap = -1e9; onDouble?.(true); }
+      set(e.clientX, e.clientY);
+    });
+    el.addEventListener('pointermove', e => { if (e.pointerId === id) set(e.clientX, e.clientY); });
+    const end = e => {
+      if (e.pointerId !== id) return; id = null; knob.style.transform = ''; onMove(0, 0, true);
+      const tap = abs(e.clientX - down[0]) + abs(e.clientY - down[1]) < 12;
+      if (dbl) { onDouble?.(false); lastTap = -1e9; } else lastTap = tap ? performance.now() : -1e9;
+    };
+    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  }
+  stick($('stick'), (dx, dy, up) => { P.turn = dx; if (!up) P.thr = clamp(-dy * 1.15, -0.35, 1); },   // the throttle stays where you leave it
+    on => { held.jump = on; if (on) { fireOnce('jump'); flashTip('JETS'); } else tipEl.hidden = true; });   // tap, then tap and hold: the jets burn
+  let twistRate = 0, pitchRate = 0;
+  stick($('aim'), (dx, dy) => { twistRate = dx; pitchRate = -dy; }, on => { if (on) doPunch(); });   // double tap: punch
+
+  const view = $('view'); let drag = null, lastViewTap = -1e9;
+  view.addEventListener('pointerdown', e => {
+    if (performance.now() - lastViewTap < 300) { lastViewTap = -1e9; doPunch(); }   // double tap the window: punch
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 }; view.setPointerCapture(e.pointerId);
+  });
+  view.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const w = view.getBoundingClientRect().width, dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    drag.x = e.clientX; drag.y = e.clientY; drag.moved += abs(dx) + abs(dy);
+    P.twist = clamp(P.twist + dx / w * 1.3, -1.1, 1.1); P.pitch = clamp(P.pitch - dy / w * 0.9, -0.35, 0.3);
+  });
+  const viewUp = e => { if (drag && e.pointerId === drag.id) { lastViewTap = drag.moved < 8 ? performance.now() : -1e9; drag = null; } };
+  view.addEventListener('pointerup', viewUp); view.addEventListener('pointercancel', viewUp);
+
+  function press(b, on) {
+    if (b === 'tgt') { if (on) cycleTarget(); return; }
+    if (b === 'punch') { if (on) doPunch(); return; }
+    held[b] = on;
+    document.querySelectorAll(`[data-b="${b}"], .wpn[data-w="${b}"]`).forEach(el => el.classList.toggle('on', on));
+    if (on) fireOnce(b);
+  }
+  // A held fire button aims as it slides (the thumb is already on it), like FUSION does in landscape.
+  document.querySelectorAll('[data-b]').forEach(el => {
+    let last = null;
+    el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture(e.pointerId); last = [e.clientX, e.clientY]; press(el.dataset.b, true); });
+    el.addEventListener('pointermove', e => {
+      if (!last || el.dataset.b === 'tgt') return;
+      const w = view.getBoundingClientRect().width, dx = e.clientX - last[0], dy = e.clientY - last[1]; last = [e.clientX, e.clientY];
+      P.twist = clamp(P.twist + dx / w * 1.6, -1.1, 1.1); P.pitch = clamp(P.pitch - dy / w * 1.1, -0.35, 0.3);
+    });
+    const up = () => { last = null; press(el.dataset.b, false); };
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  });
+  const keys = {};
+  addEventListener('keydown', e => {
+    if (keys[e.code]) return; keys[e.code] = true;
+    const m = { Digit1: 'energy', Digit2: 'ballistic', Digit3: 'missile', Digit4: 'fusion', Space: 'jump', KeyT: 'tgt', KeyF: 'punch' }[e.code];
+    if (m) { e.preventDefault(); press(m, true); }
+  });
+  addEventListener('keyup', e => {
+    keys[e.code] = false;
+    const m = { Digit1: 'energy', Digit2: 'ballistic', Digit3: 'missile', Digit4: 'fusion', Space: 'jump' }[e.code];
+    if (m) press(m, false);
+  });
+
+  // ---------- combat, roughly ----------
+  const viewYaw = () => P.yaw + P.twist;
+  function cycleTarget() {
+    const live = foes.map((f, i) => [f, i]).filter(([f]) => !f.dead).sort((a, b) => dist(a[0]) - dist(b[0]));
+    if (!live.length) return;
+    const at = live.findIndex(([, i]) => i === target);
+    target = live[(at + 1) % live.length][1];
+  }
+  const dist = f => hypot(f.x - P.x, f.z - P.z);
+  function underCross() {   // the foe whose body covers the crosshair, if any
+    let best = null;
+    for (const f of foes) {
+      if (f.dead) continue;
+      const p = project(f.x, f.s * 5, f.z); if (!p) continue;
+      const w = f.s * 3.2 * p.k, h = f.s * 9 * p.k;
+      if (abs(p.x - W / 2) < w && abs(p.y - H / 2) < h / 2 && (!best || p.z < best.z)) best = { f, z: p.z };
+    }
+    return best && best.f;
+  }
+  function hit(f, amt) { f.hp -= amt; f.flash = 0.12; f.wobble = 1; if (f.hp <= 0 && !f.dead) { f.dead = 1; f.hp = 0; } }
+  function fireOnce(b) {
+    const yaw = viewYaw(), dir = [sin(yaw) * cos(P.pitch), sin(P.pitch), cos(yaw) * cos(P.pitch)], eye = [P.x, 6 + P.y, P.z];
+    if (b === 'ballistic' && P.ammo.ballistic > 0) {
+      P.ammo.ballistic--; P.shake = max(P.shake, 0.35); P.heat += 0.04;
+      shots.push({ p: [...eye], v: dir.map(d => d * 260), t: 0, col: '#ffd04a', kind: 'shell' });
+    }
+    if (b === 'missile' && P.ammo.missile >= 2) {
+      P.ammo.missile -= 2; P.heat += 0.06;
+      for (let i = 0; i < 2; i++) shots.push({ p: [eye[0], eye[1] + 1, eye[2]], v: [dir[0] * 90 + (i - 0.5) * 18, 20, dir[2] * 90], t: 0, col: '#ff7a4a', kind: 'msl', tg: foes[target] });
+    }
+    if (b === 'jump' && P.jets > 0.2 && P.y === 0) P.vy = 9;
+  }
+  function doPunch() { P.shake = 1; flashTip('PUNCH'); const f = foes[target]; if (f && !f.dead && dist(f) < 25) hit(f, 0.3); }
+  // A word in the window for a gesture that has no button, so it reads.
+  let tipT = 0; const tipEl = $('tip');
+  function flashTip(t) { if (!t) return; tipEl.textContent = t; tipEl.hidden = false; tipT = 0.7; }
+
+  // ---------- the view: a tiny flat-shaded world in chunky pixels ----------
+  const cv = $('scene'), cx = cv.getContext('2d'), W = cv.width, H = cv.height, FOV = 70 * PI / 180, F = (W / 2) / tan(FOV / 2);
+  cx.imageSmoothingEnabled = false;
+  function project(x, y, z) {
+    const yaw = viewYaw(), dx = x - P.x, dz = z - P.z;
+    const fz = dx * sin(yaw) + dz * cos(yaw), rx = dx * cos(yaw) - dz * sin(yaw);
+    if (fz < 1) return null;
+    const eyeY = 6 + P.y + P.bob, hy = H / 2 + tan(P.pitch) * F;
+    return { x: W / 2 + rx / fz * F, y: hy - (y - eyeY) / fz * F, z: fz, k: F / fz };
+  }
+  const hash = (i, j) => { const s = sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); };
+  function drawScene(t) {
+    const yaw = viewYaw(), hy = round(H / 2 + tan(P.pitch) * F), sh = P.shake * 3;
+    cx.save(); cx.translate(round((Math.random() - 0.5) * sh), round((Math.random() - 0.5) * sh));
+    // sky in flat bands, dusk
+    const bands = ['#2b2340', '#4a2f4a', '#7a4148', '#b25a3f'];
+    for (let i = 0; i < 4; i++) { cx.fillStyle = bands[i]; cx.fillRect(-4, -4 + i * (hy + 4) / 4, W + 8, (hy + 4) / 4 + 1); }
+    // far ridge, at infinity
+    cx.fillStyle = '#3b2734'; cx.beginPath(); cx.moveTo(-4, hy);
+    for (let sx = -4; sx <= W + 4; sx += 3) { const a = yaw + atan2(sx - W / 2, F); cx.lineTo(sx, hy - tan(ridge(a)) * F); }
+    cx.lineTo(W + 4, hy); cx.fill();
+    // ground
+    cx.fillStyle = '#7a5236'; cx.fillRect(-4, hy, W + 8, H - hy + 8);
+    cx.fillStyle = '#6c4930'; cx.fillRect(-4, hy, W + 8, 3);
+    // rocks: a grid of flat triangles around you, so walking reads as walking
+    const g = 14, ci = Math.floor(P.x / g), cj = Math.floor(P.z / g), rocks = [];
+    for (let i = ci - 7; i <= ci + 7; i++) for (let j = cj - 7; j <= cj + 7; j++) {
+      if (hash(i, j) > 0.42) continue;
+      const x = (i + hash(j, i)) * g, z = (j + hash(i + 3, j)) * g, p = project(x, 0, z); if (p && p.z < 95) rocks.push(p);
+    }
+    rocks.sort((a, b) => b.z - a.z);
+    for (const p of rocks) { const s = max(1, p.k * 0.9); cx.fillStyle = p.z < 40 ? '#4f3423' : '#5d3e2a'; cx.beginPath(); cx.moveTo(p.x - s, p.y); cx.lineTo(p.x, p.y - s * 1.1); cx.lineTo(p.x + s, p.y); cx.fill(); }
+    // mechs: flat two-tone blocks, far first
+    const list = foes.map(f => ({ f, p: project(f.x, 0, f.z) })).filter(o => o.p).sort((a, b) => b.p.z - a.p.z);
+    for (const { f, p } of list) {
+      const k = p.k * f.s, lean = f.wobble * 0.15, lit = f.flash > 0 ? '#ffffff' : f.dead ? '#2a2420' : f.c[0], dk = f.dead ? '#1c1714' : f.c[1];
+      const step = f.dead ? 0 : sin(t * 4 + f.x) * 0.5;
+      const rect = (x0, y0, w, h, col) => { cx.fillStyle = col; cx.fillRect(round(p.x + x0 * k), round(p.y - (y0 + h) * k), max(1, round(w * k)), max(1, round(h * k))); };
+      if (f.dead) { rect(-2.2, 0, 4.4, 1.6, dk); rect(-1.4, 1.6, 2.2, 1, lit); continue; }
+      rect(-1.3 + step * 0.3, 0, 0.8, 4.4, dk); rect(0.5 - step * 0.3, 0, 0.8, 4.4, dk);   // legs
+      rect(-1.6 + lean, 4.2, 3.2, 2.6, lit); rect(0.6 + lean, 4.2, 1.0, 2.6, dk);              // torso, its shaded side
+      rect(-2.4 + lean, 4.6, 0.8, 1.8, dk); rect(1.6 + lean, 4.6, 0.8, 1.8, dk);               // arms
+      rect(-0.6 + lean, 6.0, 1.2, 0.5, '#1b1b22');                                               // canopy
+      if (foes[target] === f) { cx.strokeStyle = '#ffc23d'; cx.lineWidth = 1; const w = 3.4 * k, h = 7.4 * k; cx.strokeRect(round(p.x - w / 2) + 0.5, round(p.y - h) + 0.5, round(w), round(h)); }
+    }
+    // shots
+    for (const s of shots) { const p = project(s.p[0], s.p[1], s.p[2]); if (!p) continue; cx.fillStyle = s.col; const r = s.kind === 'msl' ? 2 : 1; cx.fillRect(round(p.x) - r / 2, round(p.y) - r / 2, r + 1, r + 1); }
+    // beams from the arm muzzles to the crosshair
+    if (held.energy && P.heat < 1) {
+      cx.strokeStyle = '#5ad8ff'; cx.lineWidth = 2;
+      for (const mx of [W * 0.12, W * 0.88]) { cx.beginPath(); cx.moveTo(mx, H + 2); cx.lineTo(W / 2 + (mx < W / 2 ? -1 : 1), H / 2); cx.stroke(); }
+      cx.fillStyle = '#e8fbff'; cx.fillRect(W / 2 - 1, H / 2 - 1, 3, 3);
+    }
+    if (held.fusion && P.fusion > 0) {   // the scan: a tightening ring
+      cx.strokeStyle = '#c77dff'; cx.lineWidth = 1; const r = round(24 * (1 - P.fusion) + 4);
+      cx.strokeRect(W / 2 - r + 0.5, H / 2 - r + 0.5, r * 2, r * 2);
+    }
+    cx.restore();
+    // crosshair
+    cx.fillStyle = '#6dff7a';
+    cx.fillRect(W / 2 - 7, H / 2, 5, 1); cx.fillRect(W / 2 + 3, H / 2, 5, 1); cx.fillRect(W / 2, H / 2 - 7, 1, 5); cx.fillRect(W / 2, H / 2 + 3, 1, 5);
+    if (whiteOut > 0) { cx.fillStyle = `rgba(255,255,255,${min(1, whiteOut)})`; cx.fillRect(0, 0, W, H); }
+  }
+  let whiteOut = 0;
+
+  // ---------- instruments ----------
+  const cc = $('compass').getContext('2d'), rc = $('radar').getContext('2d'), wc = $('wire').getContext('2d');
+  function drawCompass() {
+    const w = 360, h = 22, deg = ((viewYaw() * 180 / PI) % 360 + 360) % 360;
+    cc.fillStyle = '#030a04'; cc.fillRect(0, 0, w, h); cc.fillStyle = '#6dff7a'; cc.font = '11px "Share Tech Mono", monospace'; cc.textAlign = 'center';
+    for (let d = -90; d <= 90; d += 15) {
+      const a = Math.round((deg + d) / 15) * 15, x = w / 2 + (a - deg) * 2; if (x < 0 || x > w) continue;
+      const lab = ((a % 360) + 360) % 360, name = { 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[lab] ?? (lab % 30 === 0 ? String(lab / 10).padStart(2, '0') : '');
+      cc.fillRect(round(x), h - (name ? 6 : 4), 1, name ? 6 : 4); if (name) cc.fillText(name, x, 12);
+    }
+    cc.fillStyle = '#ffc23d'; cc.fillRect(w / 2 - 1, 0, 2, h);
+  }
+  function drawRadar() {
+    const s = 96, c = s / 2, R = 44; rc.fillStyle = '#070d09'; rc.fillRect(0, 0, s, s);
+    rc.strokeStyle = '#2f7a38'; rc.lineWidth = 1; rc.beginPath(); rc.arc(c, c, R, 0, TAU); rc.stroke(); rc.beginPath(); rc.arc(c, c, R / 2, 0, TAU); rc.stroke();
+    const yaw = viewYaw(); rc.beginPath(); rc.moveTo(c, c); rc.lineTo(c + sin(-FOV / 2) * R, c - cos(-FOV / 2) * R); rc.moveTo(c, c); rc.lineTo(c + sin(FOV / 2) * R, c - cos(FOV / 2) * R); rc.stroke();
+    for (const f of foes) {
+      if (f.dead) continue;
+      const dx = f.x - P.x, dz = f.z - P.z, a = atan2(dx, dz) - yaw, d = min(1, hypot(dx, dz) / 800 * 3);
+      rc.fillStyle = foes[target] === f ? '#ffc23d' : '#ff5a3c'; rc.fillRect(round(c + sin(a) * d * R) - 2, round(c - cos(a) * d * R) - 2, 4, 4);
+    }
+    rc.fillStyle = '#6dff7a'; rc.fillRect(c - 1, c - 1, 3, 3);
+  }
+  // your mech, in wireframe, turning slowly: boxes for torso, arms, legs
+  const box = (x, y, z, w, h, d) => { const v = []; for (const a of [0, 1]) for (const b of [0, 1]) for (const e of [0, 1]) v.push([x + a * w, y + b * h, z + e * d]); return v; };
+  const EDGES = [[0, 1], [0, 2], [0, 4], [1, 3], [1, 5], [2, 3], [2, 6], [3, 7], [4, 5], [4, 6], [5, 7], [6, 7]];
+  const PARTS = [['T', box(-1.5, 4.3, -1, 3, 2.6, 2)], ['LA', box(1.6, 4.6, -0.6, 0.8, 1.9, 1.6)], ['RA', box(-2.4, 4.6, -0.6, 0.8, 1.9, 1.6)], ['LL', box(0.4, 0, -0.5, 0.8, 4.3, 1)], ['RL', box(-1.2, 0, -0.5, 0.8, 4.3, 1)]];
+  function drawWire(t) {
+    const s = 96; wc.fillStyle = '#070d09'; wc.fillRect(0, 0, s, s);
+    const a = 0.3 + t * 0.39, ca = cos(a), sa = sin(a), k = 9.5, ox = s / 2, oy = s - 10, step = sin(t * 5) * min(1, abs(P.speed) / 10);
+    for (const [sec, vs] of PARTS) {
+      const hp = P.hp[sec]; wc.strokeStyle = hp > 0.66 ? '#6dff7a' : hp > 0.33 ? '#ffc23d' : '#ff5a3c'; wc.beginPath();
+      const pts = vs.map(([x, y, z]) => { if (sec === 'LL') z += step; if (sec === 'RL') z -= step; const X = x * ca + z * sa, Z = -x * sa + z * ca; return [ox - X * k, oy - (y * 0.98 + Z * 0.2) * k]; });
+      for (const [i, j] of EDGES) { wc.moveTo(round(pts[i][0]) + 0.5, round(pts[i][1]) + 0.5); wc.lineTo(round(pts[j][0]) + 0.5, round(pts[j][1]) + 0.5); }
+      wc.stroke();
+    }
+  }
+  function drawTarget() {
+    const f = foes[target], el = $('tgt');
+    if (!f || f.dead) { el.innerHTML = '<span class="none">NO TARGET</span><span class="none">TAP TGT</span>'; return; }
+    el.innerHTML = `<span class="nm">${f.name}</span><span>RNG ${round(dist(f))} M</span><span>${f.dead ? 'DOWN' : 'HOSTILE'}</span><span class="hp"><i style="width:${round(f.hp * 100)}%"></i></span>`;
+  }
+
+  // ---------- the loop ----------
+  let last = performance.now(), tAll = 0, tgtT = 0, enemyFireT = 2, deadT = [0, 0, 0];
+  function step(dt) {
+    tAll += dt;
+    const thr = P.thr + ((keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0)) * dt * 0.8; P.thr = clamp(thr, -0.35, 1);
+    const turn = P.turn + (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+    P.yaw = wrap(P.yaw + clamp(turn, -1, 1) * 1.05 * dt);
+    if (opts.aim === 'stick') { P.twist = clamp(P.twist + twistRate * 1.4 * dt, -1.1, 1.1); P.pitch = clamp(P.pitch + pitchRate * 0.7 * dt, -0.35, 0.3); }
+    const top = 15 * (P.heat > 0.85 ? 0.65 : 1), want = P.thr * top;
+    P.speed += clamp(want - P.speed, -11 * dt, 7 * dt);
+    P.x += sin(P.yaw) * P.speed * dt; P.z += cos(P.yaw) * P.speed * dt;
+    P.bob = -abs(sin(tAll * 4.2)) * 0.35 * min(1, abs(P.speed) / 10);
+    // jets
+    if (held.jump && P.jets > 0) { P.vy += 22 * dt; P.jets = max(0, P.jets - 0.35 * dt); }
+    else P.jets = min(1, P.jets + 0.12 * dt);
+    P.vy -= 18 * dt; P.y += P.vy * dt; if (P.y < 0) { if (P.vy < -6) P.shake = 1; P.y = 0; P.vy = 0; }
+    // weapons
+    if (held.energy && P.heat < 1) { P.heat += 0.16 * dt; const f = underCross(); if (f) hit(f, 0.22 * dt); }
+    if (held.fusion) { const f = underCross(); P.fusion = f ? min(1, P.fusion + dt / 3) : max(0, P.fusion - dt); if (P.fusion >= 1 && f) { hit(f, 2); whiteOut = 1; P.heat = 1.1; P.fusion = 0; P.shake = 1.4; } }
+    else P.fusion = max(0, P.fusion - dt * 2);
+    P.heat = max(0, P.heat - 0.07 * dt);
+    for (let i = shots.length - 1; i >= 0; i--) {
+      const s = shots[i]; s.t += dt;
+      if (s.kind === 'msl' && s.tg && !s.tg.dead) { const d = [s.tg.x - s.p[0], s.tg.s * 5 - s.p[1], s.tg.z - s.p[2]], m = hypot(...d) || 1; s.v = s.v.map((v, j) => v + (d[j] / m * 110 - v) * min(1, dt * 2.5)); }
+      else s.v[1] -= 4 * dt;
+      s.p = s.p.map((p, j) => p + s.v[j] * dt);
+      const f = foes.find(f => !f.dead && hypot(f.x - s.p[0], f.z - s.p[2]) < 2.5 * f.s && s.p[1] < 8 * f.s);
+      if (f) { hit(f, s.kind === 'msl' ? 0.14 : 0.08); shots.splice(i, 1); } else if (s.t > 3 || s.p[1] < 0) shots.splice(i, 1);
+    }
+    // foes circle you; one shoots now and then
+    foes.forEach((f, i) => {
+      f.flash = max(0, f.flash - dt); f.wobble = max(0, f.wobble - dt * 3);
+      if (f.dead) { if ((deadT[i] += dt) > 4) { deadT[i] = 0; spawn(i); } return; }
+      const dx = f.x - P.x, dz = f.z - P.z, d = hypot(dx, dz), a = atan2(dx, dz) + f.orbit * 0.12 * dt * (60 / max(40, d));
+      const want = clamp(d - (d > 90 ? 6 : d < 45 ? -6 : 0) * dt, 35, 200);
+      f.x = P.x + sin(a) * want; f.z = P.z + cos(a) * want;
+    });
+    if ((enemyFireT -= dt) <= 0) {
+      enemyFireT = 2.5 + Math.random() * 3; const secs = ['T', 'LA', 'RA', 'LL', 'RL'], s = secs[Math.floor(Math.random() * 5)];
+      P.hp[s] = max(0.05, P.hp[s] - 0.08); P.shake = max(P.shake, 0.7);
+    }
+    for (const k in P.hp) P.hp[k] = min(1, P.hp[k] + dt * 0.004);   // a mockup: you mend
+    P.shake = max(0, P.shake - dt * 3); whiteOut = max(0, whiteOut - dt * 1.5);
+    if (tipT > 0 && (tipT -= dt) <= 0 && !held.jump) tipEl.hidden = true;
+    if (!foes[target] || foes[target].dead) { if ((tgtT += dt) > 0.6) { tgtT = 0; cycleTarget(); } }
+  }
+  function frame(now) {
+    const dt = min(0.05, (now - last) / 1000); last = now;
+    step(dt);
+    drawScene(tAll); drawCompass(); drawRadar(); drawWire(tAll); drawTarget();
+    $('heat').style.width = `${round(clamp(P.heat, 0, 1) * 100)}%`; $('heat').style.background = P.heat > 0.85 ? 'var(--red)' : '';
+    $('jets').style.width = `${round(P.jets * 100)}%`;
+    $('spd').textContent = `${round(P.speed * 3.6)} KPH`;
+    $('aB').textContent = P.ammo.ballistic; $('aM').textContent = P.ammo.missile;
+    $('aF').textContent = P.fusion > 0 ? `${round(P.fusion * 100)}%` : P.heat > 1 ? 'HOT' : 'READY';
+    $('aE').textContent = P.heat >= 1 ? 'HOT' : '▮▮';
+    const lamp = (k, on, red) => { const el = lampEls[k]; el.classList.toggle('on', !!on); el.classList.toggle('red', !!red); };
+    const tf = foes[target];
+    lamp('heat', P.heat > 0.7, P.heat > 0.9); lamp('jets', held.jump && P.jets > 0); lamp('ammo', P.ammo.ballistic < 8 || P.ammo.missile < 4, P.ammo.ballistic === 0);
+    lamp('lock', tf && !tf.dead && underCross() === tf); lamp('reach', tf && !tf.dead && dist(tf) < 25); lamp('hit', P.shake > 0.5, true);
+    requestAnimationFrame(frame);
+  }
+  const lampEls = Object.fromEntries([...document.querySelectorAll('.lamp')].map(el => [el.dataset.l, el]));
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
