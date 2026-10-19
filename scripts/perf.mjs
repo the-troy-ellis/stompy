@@ -78,7 +78,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   snow 3.7k · dust 3.2k (their fog is short).
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
-  menu:           { meanDraws: 4, peakDraws: 4, tris: 13000, allocKB: 26 },
+  menu:           { meanDraws: 4, peakDraws: 4, tris: 13000, allocKB: 32 },   // 26 to 32 (27-29 measured, plus ~15%) with the terrain chunks: the menu's 60 frames are too few for drawWorld to be optimized, so its sums box (~1-2 KB); in play it is, and free-start is unchanged
   'free-start':   { meanDraws: 8, peakDraws: 8, tris: 13500, allocKB: 115 },
   'bench-walk':   { meanDraws: 15, peakDraws: 15, tris: 17500, allocKB: 145 },
   'bench-run':    { meanDraws: 11, peakDraws: 31, tris: 18000, allocKB: 115 },

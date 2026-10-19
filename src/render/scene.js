@@ -107,18 +107,20 @@ export function createScene(app) {
     world.buf = R.upload(all).buf;
   }
   // A chunk is drawn when its box is in view and some of it is nearer than the fog's end.
+  const ID = M0.id();   // the ground is drawn where it is
   function drawWorld(eye) {
     RUN.buf = world.buf; RUN.count = 0;
-    for (const ch of world.chunks) {
-      const dx = Math.max(ch.lo[0] - eye[0], 0, eye[0] - ch.hi[0]), dz = Math.max(ch.lo[2] - eye[2], 0, eye[2] - ch.hi[2]);
+    const cs = world.chunks;
+    for (let i = 0; i < cs.length; i++) {   // an index, not for-of: no iterator garbage while this is still cold
+      const ch = cs[i], dx = Math.max(ch.lo[0] - eye[0], 0, eye[0] - ch.hi[0]), dz = Math.max(ch.lo[2] - eye[2], 0, eye[2] - ch.hi[2]);
       if (dx * dx + dz * dz > FOG[1] * FOG[1] || !boxVisible(PLANES, ch.lo, ch.hi)) {
-        if (RUN.count) { R.draw(RUN, M.id()); RUN.count = 0; }
+        if (RUN.count) { R.draw(RUN, ID); RUN.count = 0; }
         continue;
       }
       if (!RUN.count) RUN.first = ch.first;
       RUN.count += ch.count;
     }
-    if (RUN.count) R.draw(RUN, M.id());
+    if (RUN.count) R.draw(RUN, ID);
   }
 
   // Scan tone: a pulsing whine that climbs as the scan converges.
