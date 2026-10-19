@@ -136,10 +136,12 @@ export function createInput(app) {
   // height, on a tablet each is ZONE px, so one thumb reaches both.
   //   Lower left: turn and aim. Sideways turns the legs (the whole mech) for
   //     as long as it's held, faster the further out; up and down pitches. A
-  //     double tap swings the torso back over the legs.
+  //     double tap punches.
   //   Upper left: throttle and torso. Up and down moves the throttle from
   //     where it was when the thumb went down, and it stays set on release,
-  //     like W/S; sideways twists the torso.
+  //     like W/S; sideways twists the torso. Tap, then tap and hold: the jump
+  //     jets burn for as long as the second touch stays down.
+  //   The compass tape: a tap swings the torso back over the legs.
   //   Right: the buttons. Dragging the FUSION button aims the scan, and while
   //     flying missiles the aim side or the MISSILE button steers them.
   // Every finger is tracked separately.
@@ -147,7 +149,8 @@ export function createInput(app) {
   const ring = { stick: sticks[0], aim: sticks[1] };   // the throttle stick's ring and the turn stick's
   const fingers = new Map();
   const STICK_R = 56, LEFT = 0.45, DOUBLE_TAP = 300, ZONE = 200;   // px; share of the width; ms; px: a zone's most height
-  let lastAimTap = -1e9, centreTap = false;   // lastAimTap: when a tap (not a drag) on the turn stick lifted; centreTap: a double tap not yet sent
+  // lastAimTap / lastStickTap: when a tap (not a drag) on the turn / throttle stick lifted; centreTap: a compass tap not yet sent.
+  let lastAimTap = -1e9, lastStickTap = -1e9, centreTap = false;
   // Where the turn zone (below) meets the throttle zone (above), in px from the top.
   const split = h => h - Math.min(h / 2, ZONE);
   const showStick = (s, x, y) => { s.hidden = false; s.style.left = x + 'px'; s.style.top = y + 'px'; s.firstElementChild.style.transform = 'translate(-50%, -50%)'; };
@@ -165,24 +168,21 @@ export function createInput(app) {
     tui.hidden = !(G.touchUI && !G.padActive && (G.state === 'play' || G.state === 'over') && !G.paused);   // a gamepad in use: out of the way
     const h = tui.getBoundingClientRect().height || window.innerHeight;
     if (zoneLabels[1]) zoneLabels[1].style.flex = `0 0 ${h - split(h)}px`;   // the faint labels follow the zones
-    const jump = root.querySelector('[data-t="jump"]');
-    if (jump) jump.hidden = G.player?.jets === 0;   // JUMP JETS NONE: no button
     const lights = root.querySelector('[data-t="lights"]');
     if (lights) { lights.hidden = !(darkness(G.pal) > 0.3 || G.palRamp); lights.classList.toggle('lit', !!G.player?.lights); }   // only where night falls
     if (tui.hidden) releaseFingers();
   };
   function releaseFingers() {
-    for (const f of fingers.values()) if (f.kind === 'btn') touchButton(f.name, false, f.el);
+    for (const f of fingers.values()) { if (f.kind === 'btn') touchButton(f.name, false, f.el); if (f.jets) keys.KeyJ = false; }
     fingers.clear();
     G.touchTwist = 0; G.touchTurn = 0; G.touchPitch = 0; ring.stick.hidden = true; ring.aim.hidden = true;
   }
   function touchButton(name, down, el) {
     el?.classList.toggle('on', down);
     if (CATS.includes(name)) { held[name] = down; if (down && name === 'missile') missileTap = true; }
-    else if (name === 'jump') keys.KeyJ = down;
     if (!down) return;
-    if (name === 'punch') punchTap = true;
-    if (name === 'tgt') { if (G.spectate) nextSpectate(G); else cycleTarget(G); }
+    if (name === 'centre') centreTap = true;
+    else if (name === 'tgt') { if (G.spectate) nextSpectate(G); else cycleTarget(G); }
     else if (name === 'zoom') G.zoom = !G.zoom;
     else if (name === 'lights') toggleLights();
     else if (name === 'stop') G.player.throttle = 0;
@@ -199,12 +199,15 @@ export function createInput(app) {
     const r = tui.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
     if (x >= r.width * LEFT) return;   // the right side is buttons only
     const has = k => [...fingers.values()].some(f => f.kind === k);
+    const now = performance.now();
     if (y < split(r.height) && !has('stick')) {
-      fingers.set(e.pointerId, { kind: 'stick', x0: x, y0: y, thr0: G.player.throttle });
+      // Tap, then tap and hold: the jets burn while this touch stays down (JUMP JETS NONE: nothing).
+      const jets = now - lastStickTap < DOUBLE_TAP && G.player.jets > 0;
+      if (jets) { keys.KeyJ = true; lastStickTap = -1e9; }
+      fingers.set(e.pointerId, { kind: 'stick', x0: x, y0: y, thr0: G.player.throttle, jets });
       showStick(ring.stick, x, y);
     } else if (y >= split(r.height) && !has('aim')) {
-      const now = performance.now();
-      if (now - lastAimTap < DOUBLE_TAP) { centreTap = true; lastAimTap = -1e9; }   // double tap: torso over the legs (the sim sees it through)
+      if (now - lastAimTap < DOUBLE_TAP) { punchTap = true; lastAimTap = -1e9; }   // double tap: a punch
       fingers.set(e.pointerId, { kind: 'aim', x0: x, y0: y, lx: e.clientX, ly: e.clientY, cx: e.clientX, cy: e.clientY });
       showStick(ring.aim, x, y);
     }
@@ -251,12 +254,16 @@ export function createInput(app) {
     if (!f) return;
     fingers.delete(e.pointerId);
     if (f.kind === 'btn') touchButton(f.name, false, f.el);
-    if (f.kind === 'stick') { G.touchTwist = 0; ring.stick.hidden = true; }
+    // A tap (no real drag) on either stick may be the first of a double tap.
+    const tapped = (() => { const r = tui.getBoundingClientRect(); return abs(e.clientX - r.left - (f.x0 ?? 0)) + abs(e.clientY - r.top - (f.y0 ?? 0)) < 12; })();
+    if (f.kind === 'stick') {
+      G.touchTwist = 0; ring.stick.hidden = true;
+      if (f.jets) keys.KeyJ = false;
+      lastStickTap = tapped && !f.jets ? performance.now() : -1e9;
+    }
     if (f.kind === 'aim') {
       G.touchTurn = 0; G.touchPitch = 0; ring.aim.hidden = true;
-      // A tap on the turn stick (no real drag) may be the first of a double tap.
-      const r = tui.getBoundingClientRect();
-      lastAimTap = abs(e.clientX - r.left - f.x0) + abs(e.clientY - r.top - f.y0) < 12 ? performance.now() : -1e9;
+      lastAimTap = tapped ? performance.now() : -1e9;
     }
   };
   addEventListener('resize', () => { if (G.touchUI) syncTouchUI(); });   // the zones follow the screen
