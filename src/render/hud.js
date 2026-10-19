@@ -83,7 +83,6 @@ export function aiLabel(e) {
 // throttle, messages, the arena board, and the missile camera's IR feed.
 export function createHud(app) {
   const G = app.G, ctx = app.ctx;
-  const punchBtn = app.root.querySelector('[data-t="punch"]');
 
   const project = p => {
     const v = G.VP, x = v[0] * p[0] + v[4] * p[1] + v[8] * p[2] + v[12], y = v[1] * p[0] + v[5] * p[1] + v[9] * p[2] + v[13];
@@ -438,7 +437,7 @@ export function createHud(app) {
     ctx.font = '10px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.lineWidth = 1;
     const at = (x, z) => [x, G.ter.height(x, z) + 1, z];
     for (const e of G.mechs) {
-      if (e.team === 0 || e.remote || !e.alive) continue;
+      if (e.team === 0 || e.remote || !e.alive || e.script) continue;   // the bench's cast doesn't think (sim/bench.js)
       const a = e.ai, head = project([e.x, e.y + 9.5 * e.ch.scale, e.z]), foot = project([e.x, e.y + 1, e.z]);
       if (head) { ctx.fillStyle = a.seen && a.aware ? '#f66' : a.aware ? AMBER : '#9f9'; ctx.fillText(aiLabel(e), head[0], head[1]); }
       const line = (p, col) => {
@@ -504,7 +503,6 @@ export function createHud(app) {
       ctx.strokeRect(ch[0] - 1, ch[1] - 1, 2, 2);
     }
     // Someone is in reach: a fist beside the crosshair, and the touch button wakes up.
-    if (punchBtn) punchBtn.classList.toggle('ready', !!G.punchReady);
     if (G.punchReady || (P.melee && P.melee.phase === 'windup')) {
       const fx0 = ch[0] + 24, fy0 = ch[1] + 18, winding = P.melee && P.melee.phase === 'windup';
       ctx.fillStyle = winding ? '#fff' : AMBER;

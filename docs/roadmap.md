@@ -255,6 +255,14 @@ mission authors sculpt the ground in the editor.
 Spec: [specs/18-voxel-ground.md](specs/18-voxel-ground.md) (draft). The
 prototype it was measured with: [mockups/voxel-ground.html](mockups/voxel-ground.html).
 
+## Parked
+
+- **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
+  the phone held upright, with a square window and every control in one band
+  at the bottom. The direction is set and there is a playable mockup
+  ([mockups/portrait-cockpit.html](mockups/portrait-cockpit.html)); the fine
+  tuning waits for the owner.
+
 ## What is deliberately not scheduled
 
 See the non-goals in [vision.md](vision.md). Also not scheduled, pending a

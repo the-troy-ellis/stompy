@@ -142,15 +142,28 @@ try {
     await page.waitForTimeout(300);
     a1 = await P();
     const rightOk = Math.abs(a1.yaw - a0.yaw) < 0.01 && Math.abs(a1.twist - a0.twist) < 0.01 && a1.pitch === a0.pitch;
-    await page.evaluate(() => { window.__stompy.game.player.twist = 1.2; });
-    // The double tap as one burst: the four events queued at once. Awaited one
+    // A double tap as one burst: the four events queued at once. Awaited one
     // by one, each dispatch waits for a software-rendered frame, and the two
     // taps landed 220-335 ms apart, past the 300 ms window about one run in ten.
+    // On the lower stick it punches.
+    await page.evaluate(() => { const p = window.__stompy.game.player; p.melee = null; p.meleeCd = 0; });
     await Promise.all([touch('touchStart', 200, 560), touch('touchEnd'), touch('touchStart', 200, 560), touch('touchEnd')]);
+    await page.waitForTimeout(150);
+    const punched = await page.evaluate(() => !!window.__stompy.game.player.melee);
+    // Tap, then tap and hold, on the upper stick: the jets burn while it's held.
+    await page.waitForTimeout(800);
+    await Promise.all([touch('touchStart', 200, 300), touch('touchEnd'), touch('touchStart', 200, 300)]);
+    await page.waitForTimeout(700);
+    const jumped = await page.evaluate(() => { const p = window.__stompy.game.player; return !!p.air && p.jetting; });
+    await touch('touchEnd');
+    // A tap on the compass: the torso swings back over the legs.
+    await page.evaluate(() => { window.__stompy.game.player.twist = 1.2; });
+    await Promise.all([touch('touchStart', 512, 24), touch('touchEnd')]);
     await page.waitForTimeout(800);
     const centred = Math.abs((await P()).twist) < 0.1;
-    console.log(`touch: the lower stick keeps turning the legs while held ${aimOk}, the upper stick sets throttle and twists ${stickOk}, right side only buttons ${rightOk}, double tap centres ${centred}`);
-    if (!(aimOk && stickOk && rightOk && centred)) { failed = true; console.error('FAIL: the touch layout did not behave'); }
+    const gone = await page.evaluate(() => !document.querySelector('[data-t="jump"]') && !document.querySelector('[data-t="punch"]'));
+    console.log(`touch: the lower stick keeps turning the legs while held ${aimOk}, the upper stick sets throttle and twists ${stickOk}, right side only buttons ${rightOk}, double tap lower punches ${punched}, tap then hold upper jumps ${jumped}, compass tap centres ${centred}, no JUMP or PUNCH buttons ${gone}`);
+    if (!(aimOk && stickOk && rightOk && punched && jumped && centred && gone)) { failed = true; console.error('FAIL: the touch layout did not behave'); }
   });
   // The mission editor (#246): ?edit=1 shows a mission from above; a tap on a
   // truck selects it, a box round the four trucks selects them all, and

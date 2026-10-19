@@ -208,10 +208,23 @@ So far (#231, desktop only; the phones decide what gets fixed):
 - **What that means for the candidates:**
   - **Caching the dashboard** saves part of that 11%: worth it only if a
     phone shows the HUD costing whole milliseconds.
-  - **The terrain** is one draw of about 21,000 triangles, cheap for any
-    GPU. Sixteen chunks would trade that for up to 15 more draw calls,
-    which cost more on a phone than triangles do. Don't do it without
-    numbers.
+  - **The terrain** was one draw of about 21,000 triangles. Sixteen chunks
+    as sixteen draws would cost more on a phone than the triangles save.
+- **Done since (desktop numbers, `npm run perf`):**
+  - **Terrain chunks.** `world/terrainMesh.js` cuts the ground into 16
+    squares, each with its box. They share one buffer in rows, so each run
+    of neighbours in view is a single draw, and a chunk wholly past the fog
+    is skipped. Triangles about halve (a fight 26.6k to 16.1k; a fresh
+    match 22.4k to 11.6k; snow and dust, with their short fog, 22k to under
+    4k) for 0 to 2 more draws. The look is unchanged: the same frames on
+    the bench differ only by the debug overlay's timings.
+  - **Sounds in two waves.** One take of each sound comes first; the other
+    takes and the rare ones (jets, shutting down, starting up) come after.
+    On a slow line the steps and guns are real sooner.
+  - **The dashboard cache: not done.** The cockpit frame is three filled
+    shapes. Drawn as paths it costs about the same as copying a cached
+    image (0.004 to 0.009 ms a frame, either way, in Chromium). #139 can
+    close unless a phone says otherwise.
   - **Sounds** already load after the first tap, not with the page.
 - **Next:** the reference phones' worst-case numbers (#166) say which of
   these is real. Then fix the top three and record them in the release

@@ -8,7 +8,8 @@ import { store } from '../util/store.js';
 // the box below it) to paste back into src/data/feel.js once it feels right.
 // The LOOK row above the table tunes the 3D view's resolution (render/look.js):
 // how many lines tall it renders, and antialiasing (which reloads the page).
-// It is saved, and ?lines=240&aa=0 in the URL shares a setting.
+// It is saved, and ?lines=240&aa=0 in the URL shares a setting. BENCH plays
+// the scripted scene (sim/bench.js, ui/bench.js) and shows its frame times.
 const GOD_KEY = 'debug.invincible';
 
 export function createFeelPanel(app) {
@@ -24,7 +25,7 @@ export function createFeelPanel(app) {
   const presets = LOOK_PRESETS.map(n => `<button data-lines="${n}">${n || 'NATIVE'}</button>`).join('');
   // INVINCIBLE: your mech takes hits but no damage (sim/combat.js invincible; single player only). Saved.
   app.G.invincible = !!store.get(GOD_KEY, false);
-  el.innerHTML = `<div class="feel-head"><b>FEEL</b> <button data-a="toggle">hide</button> <button data-a="copy">COPY</button>
+  el.innerHTML = `<div class="feel-head"><b>FEEL</b> <button data-a="toggle">hide</button> <button data-a="copy">COPY</button> <button data-a="bench">BENCH</button>
     <label class="feel-god"><input type="checkbox" data-a="god" ${app.G.invincible ? 'checked' : ''}> INVINCIBLE</label></div>
     <div class="feel-body"><div class="feel-look"><b>LOOK</b> lines <input type="range" min="0" max="720" step="10" data-look="lines" value="${look.lines}">
       <input type="number" min="0" max="2160" step="10" data-look="lines" value="${look.lines}"> <span class="feel-res"></span><br>${presets}
@@ -58,6 +59,7 @@ export function createFeelPanel(app) {
   el.addEventListener('click', e => {
     if (e.target.dataset.lines != null) return setLines(+e.target.dataset.lines);
     const a = e.target.dataset.a; if (!a || a === 'god') return;
+    if (a === 'bench') { app.bench.start(); return; }   // the scripted scene (ui/bench.js)
     if (a === 'toggle') { const b = el.querySelector('.feel-body'); b.hidden = !b.hidden; e.target.textContent = b.hidden ? 'show' : 'hide'; }
     if (a === 'copy') {
       const text = JSON.stringify({ ...FEEL, GAIT }, null, 2);   // GAIT goes back into src/data/walk.js

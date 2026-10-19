@@ -25,6 +25,7 @@ import { createInput } from './input/input.js';
 import { createUi } from './ui/screens.js';
 import { createNet } from './net/client.js';
 import { createFeelPanel } from './ui/feelPanel.js';
+import { createBench } from './ui/bench.js';
 import { readLook, LOOK_DEFAULT, LOOK_KEY } from './render/look.js';
 import { loadCampaign, saveCampaign } from './ui/campaign.js';
 import { DIFF } from './data/ai.js';
@@ -67,14 +68,13 @@ function start(root) {
         <button class="tbtn tzoom" data-t="zoom">ZOOM</button>
         <button class="tbtn tlights" data-t="lights" hidden>LIGHTS</button>
         <button class="tbtn tstop" data-t="stop">STOP</button>
+        <button class="tcompass" data-t="centre" aria-label="Torso back over the legs"></button>
         <div class="tcluster">
-          <button class="tbtn" data-t="jump">JUMP</button>
           <button class="tbtn" data-t="tgt">TGT</button>
           <button class="tbtn tfire t-fusion" data-t="fusion">FUSION</button>
           <button class="tbtn tfire t-missile" data-t="missile">MISSILE</button>
           <button class="tbtn tfire t-energy" data-t="energy">ENERGY</button>
           <button class="tbtn tfire t-ballistic" data-t="ballistic">BALLISTIC</button>
-          <button class="tbtn tfire t-punch" data-t="punch">PUNCH</button>
         </div>
       </div>
       <div class="mech-overlay"></div>
@@ -118,7 +118,7 @@ function start(root) {
   G.hooks.debrief = app.ui.debrief;
   G.hooks.arenaDeath = () => app.net.sendState();
   // ?debug=1 exposes the state for the smoke test and for poking at in the console.
-  if (params.has('debug')) { window.__stompy = { game: G, app, kill: m => destroy(G, m, G.player) }; createFeelPanel(app); }
+  if (params.has('debug')) { window.__stompy = { game: G, app, kill: m => destroy(G, m, G.player) }; app.bench = createBench(app); createFeelPanel(app); }
 
   const quiet = () => { for (const k of Object.keys(app.audio.loops)) app.audio.loopSet(k, 0); app.audio.beamSound(false, 1); app.audio.fusionSound(false, 0); app.audio.ambience.tick(G, false); };
   let last = 0, lastAudioCheck = 0;
@@ -137,19 +137,23 @@ function start(root) {
     G.clock = performance.now();
     app.input.pollPad(dt);   // a gamepad: the snapshot below, or the screen that's up
     if (G.state === 'menu') app.ui.menuTick(dt);
+    const t0 = performance.now();
     if ((G.state === 'play' && (!G.paused || app.net.mp())) || G.state === 'over') {
-      update(G, app.input.snapshot(), dt);
+      if (G.bench) app.bench.tick(dt);   // ?debug=1's scripted scene, at a fixed step (ui/bench.js)
+      else update(G, app.input.snapshot(), dt);
       app.net.tick(dt);
       app.audio.tick();
     } else quiet();
     app.scene.render();
     app.hud.draw();
+    if (G.bench && G.state === 'play') app.bench.record(ts, performance.now() - t0);
   };
 
   // ?edit=1: the mission editor instead of the menu, in its own chunk so
   // normal play never downloads it (docs/specs/15-mission-editor.md).
   if (params.has('edit')) { G.state = 'edit'; ov.hidden = true; import('./ui/editor.js').then(m => { app.editor = m.createEditor(app); }); }
   else app.ui.mainMenu();
+  if (app.bench && params.has('bench')) app.bench.start();   // ?debug=1&bench=1: straight into the bench
   // Installed and offline (the built game only): a new version waiting shows UPDATED · RELOAD on the menu.
   registerServiceWorker(apply => { app.update = apply; if (G.state === 'menu' && !G.lobby && document.activeElement?.tagName !== 'INPUT') app.ui.renderMenu(); });
   requestAnimationFrame(loop);

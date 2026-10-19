@@ -22,6 +22,7 @@ import { tickObjectives } from './objectives.js';
 import { stepTurrets } from './turrets.js';
 import { tickCoopRespawn } from './coopRules.js';
 import { tickTutorial } from './tutorial.js';
+import { benchStep } from './bench.js';
 
 const { sin, abs, min, max, hypot, cos } = Math;
 
@@ -41,6 +42,7 @@ export function update(G, input, dt) {
   tickWeather(G);   // lightning and thunder (weather.js)
   G.cbeams = [];   // continuous beams are redrawn every frame they're on
   G.frame = (G.frame || 0) + 1;
+  if (G.bench) input = benchStep(G, noInput(), dt);   // ?debug=1's scripted scene drives everyone (sim/bench.js)
   G.input = input;
   const P = G.player;
   if (P.alive && !P.shutdown && !G.paused) {
@@ -79,7 +81,7 @@ export function update(G, input, dt) {
 
   const live = P.alive && !G.paused && !G.roundOver;
   if (live && input.punch) meleePress(G, P);
-  G.punchReady = live && !P.melee && !!meleeTarget(G, P);   // the HUD's fist and the PUNCH button light up
+  G.punchReady = live && !P.melee && !!meleeTarget(G, P);   // the HUD's fist by the crosshair lights up
   const armed = live && !P.melee;   // no guns during a swing or its recovery
   P.beamOn = armed && input.held.energy && !G.guide;
   fusionTick(G, P, dt, armed && input.held.fusion && !G.guide);
@@ -97,7 +99,7 @@ export function update(G, input, dt) {
       if (m.alive && m.net?.fl) G.cbeams.push({ a: muzzle(m, m.weapons.find(w => w.def.kind === 'fusion')), b: m.net.fl, col: WEAPONS.fusion.col, w: 0.05 + 0.035 * abs(sin(G.time * 37)) });
       continue;
     }
-    if (m.team !== 0 && m.alive) think(G, m, dt);
+    if (m.team !== 0 && m.alive && !m.script) think(G, m, dt);   // the bench's cast is on a script
     if (m.alive) { stepMech(G, m, dt); meleeTick(G, m, dt); }
     if (m.alive && m.beamOn) beamTick(G, m, dt, m === P ? G.aim : m.ai.beamAim);
     else m.beaming = false;
@@ -118,7 +120,7 @@ export function update(G, input, dt) {
   stepEntities(G, dt);
   // A co-op guest doesn't run the world: the host's turrets, objectives and
   // waves arrive over the wire (docs/specs/09-coop.md).
-  if (G.role !== 'guest') { stepTurrets(G, dt); tickObjectives(G); }
+  if (G.role !== 'guest') { stepTurrets(G, dt); if (!G.bench) tickObjectives(G); }   // the bench has nothing to win
   if (G.role !== 'solo') tickCoopRespawn(G);   // co-op: down is not out (sim/coopRules.js)
   pushOutOfEntities(G, m => geoOf(m).radius * m.ch.scale);
 

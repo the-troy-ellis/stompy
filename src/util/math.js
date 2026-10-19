@@ -104,3 +104,11 @@ export function sphereVisible(planes, x, y, z, r) {
   for (let o = 0; o < 24; o += 4) if (planes[o] * x + planes[o + 1] * y + planes[o + 2] * z + planes[o + 3] < -r) return false;
   return true;
 }
+// And whether a box (its low and high corners) does: the corner furthest along each plane's normal is inside.
+export function boxVisible(planes, lo, hi) {
+  for (let o = 0; o < 24; o += 4) {
+    const a = planes[o], b = planes[o + 1], c = planes[o + 2];
+    if (a * (a > 0 ? hi[0] : lo[0]) + b * (b > 0 ? hi[1] : lo[1]) + c * (c > 0 ? hi[2] : lo[2]) + planes[o + 3] < 0) return false;
+  }
+  return true;
+}

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { M, frustumPlanes, sphereVisible } from '../src/util/math.js';
+import { M, frustumPlanes, sphereVisible, boxVisible } from '../src/util/math.js';
 
 // A camera at the origin looking down +z, 60° tall, 16:9, 0.5 m to 1000 m.
 const VP = M.mul(M.persp(Math.PI / 3, 16 / 9, 0.5, 1000), M.lookAt([0, 0, 0], [0, 0, 1]));
@@ -32,4 +32,12 @@ test('the planes agree with projecting the point: inside the frustum exactly whe
     n++;
   }
   assert.ok(n > 300);
+});
+
+test('a box (a terrain chunk) is seen when any of it is in view', () => {
+  assert.ok(boxVisible(P, [-5, -5, 50], [5, 5, 60]), 'ahead');
+  assert.ok(!boxVisible(P, [-5, -5, -60], [5, 5, -50]), 'behind');
+  assert.ok(!boxVisible(P, [500, -5, 10], [520, 5, 20]), 'far to the side');
+  assert.ok(boxVisible(P, [-500, -5, 100], [500, 5, 120]), 'wider than the view');
+  assert.ok(boxVisible(P, [-300, -20, -300], [300, 20, 300]), 'all round the camera');
 });
