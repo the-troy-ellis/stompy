@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| Status | draft (the owner asked for it; the phone prototype passed) |
+| Status | draft (the owner asked for it; the phone prototype passed). Owner decisions so far: the battle dig table (tweakable later); construction mechs dig more; unsupported ground falls |
 | Milestone | M8 (proposed; after M7.5) |
-| Size | L (split into five issues; see the end) |
+| Size | L (split into six issues; see the end) |
 | Depends on | [14-look-and-performance.md](14-look-and-performance.md) (chunks, budgets, the bench); [15-mission-editor.md](15-mission-editor.md) (the editor it extends); [16-body-plans.md](16-body-plans.md) (feet on the ground); [09-coop.md](09-coop.md) and [10-internet-play.md](10-internet-play.md) (sync) |
 | Touch parity | Full. Play needs nothing new. The editor's brushes paint with one finger, as its other tools do |
 
@@ -150,8 +150,8 @@ bunker with patience. A construction mech reshapes it.
 How the sizes read at 8 m cells: under about 3 m the surface drops by up to a
 metre (a **dent**); from about 6 m a corner clears and you get a **crater**.
 
-The battle radii are balance numbers, so the owner sets them. The defaults
-below are for review; nothing ships before they're approved:
+The battle radii are balance numbers. The owner approved this table as the
+starting point, to tweak after play:
 
 | What blows up | Hit today | Dig radius | Reads as |
 |---|---|---|---|
@@ -179,6 +179,37 @@ below are for review; nothing ships before they're approved:
 - **Props and structures** whose base loses its ground settle onto the new
   ground; a prop with nothing under it breaks.
 
+### Falling ground
+
+Ground that loses its support falls. Blow out the base of a ridge, an arch's
+leg or the stem under a mesa's lip, and what was resting on it comes down.
+Buildings are destroyable too (they are entities with hit points, as today),
+so a fight can bring both down.
+
+- **What counts as supported:** a solid cell is supported if a chain of solid
+  cells, touching face to face, links it to bedrock. After each carve, the
+  solid cells around the hole (its box plus one cell) are flood-filled. The
+  fill stops at bedrock (supported), or at 4,096 cells (big enough to be
+  part of the land, so supported). This bounds the cost at well under 1 ms.
+- **What falls:** each unsupported island is cut out of the grid and becomes a
+  falling chunk. It is meshed from its own cells by the same mesher and
+  drawn as one moving piece. It drops straight down under gravity, with a
+  slight tumble that is drawn only.
+- **Where it lands:** the first ground below it, in the column under each of
+  its cells. A small piece (under 8 cells, about 4,000 m³) shatters into
+  debris and dust, like a blast's bits. A bigger one is stamped back into the
+  grid where it lands, as a heap: a build, so the new ground is real.
+- **The thunk:** a landing is a feel event scaled by the chunk's size:
+  camera shake by distance, the landing squash on mechs nearby, sub-bass and
+  dust ([13-thunk.md](13-thunk.md)).
+- **What it hits:** a mech under a falling chunk takes a crush hit to the
+  torso, and a prop or structure under it breaks. The crush numbers are
+  balance (open question below). Default: 3 per cell, at most 40.
+- **Mechs standing on it** fall with it, through the existing air and landing
+  path, and land on (or with) the heap.
+- **Buildings** keep the rule above: one whose ground falls away settles onto
+  the new ground or breaks. They don't hold ground up in this spec.
+
 ### Construction mechs (later, not in this spec)
 
 Their mechs, tools and names come after this spec, with their own. This spec
@@ -204,17 +235,27 @@ only makes room for them:
   co-op host for enemies, turrets and wrecks. The owner carves at once and
   sends `dig`. Everyone else applies `dig` when it arrives; their local
   copy of a remote shell explodes but doesn't dig.
-- **Message:** `dig { op, p: [x, y, z], r }`, op 0 carve (the only one in
-  play here), positions rounded to 0.25 m, r to 0.5 m. Batched with hits at
-  15 Hz as `digs: [[op, x, y, z, r], ...]`; the relay adds a room sequence
-  number to each (see Construction mechs).
-- **Late joiners:** the relay keeps each room's dig list, capped at 4,000
-  digs (about 64 KB), and sends it in `welcome`. Applying the list in any order
-  gives the same ground. A round's new map starts a new list. The server
-  clamps r to the largest battle value (7 m) and drops digs outside the map
-  and any op but carve, until construction gear exists.
+- **Message:** `dig { op, p: [x, y, z], r }`, op 0 carve, positions
+  rounded to 0.25 m, r to 0.5 m. Batched with hits at 15 Hz as
+  `digs: [[op, x, y, z, r], ...]`. The relay adds a room sequence number to
+  each and echoes it back to everyone, the sender included.
+- **Falls are data, in the relay's order.** Carving alone gives the same
+  ground in any order; a fall (cells cut out here, stamped back there) does
+  not. So the client that owns the triggering dig works the fall out and
+  sends it as `fall { seq, cells, drop }`. That's the triggering dig's
+  sequence number, the island's cells (run-length coded), and how far it
+  dropped. Everyone applies digs and falls in the relay's sequence order.
+  A client re-carves its own not-yet-echoed digs after applying a fall, so
+  its predicted holes are never filled back in. Single player has no relay:
+  the sim applies falls as they happen.
+- **Late joiners:** the relay keeps each room's list of digs and falls, in
+  sequence order, capped at 4,000 entries (a few hundred KB at most), and
+  sends it in `welcome`. Replaying it in that order gives the same ground. A
+  round's new map starts a new list. The server clamps r to the largest
+  battle value (7 m), drops digs outside the map and any op but carve until
+  construction gear exists, and caps a fall's cells at 4,096.
 - **Version:** this is a network message change, so `PROTOCOL` goes to 21 and
-  `docs/architecture.md` lists `dig`/`digs`.
+  `docs/architecture.md` lists `dig`/`digs` and `fall`.
 
 ### The AI in canyons and caves
 
@@ -308,16 +349,22 @@ round-trips it, and `check` gains the three problems above.
    out (headless tests).
 6. An overhang blocks a shot and a line of sight that its open top would not
    (headless tests).
-7. Two clients that apply the same digs in different orders end with
-   identical bytes (test). In the smoke test, two arena clients and a late
-   joiner end a fight with the same ground hash.
+7. Two clients that apply the same carves in different orders end with
+   identical bytes; with falls in the mix, replaying the relay's order gives
+   identical bytes (tests). In the smoke test, two arena clients and a late
+   joiner end a fight, with a fall in it, holding the same ground hash.
 8. The editor's brushes, landmarks and slice work with one finger and with a
    mouse. The `ground` block round-trips through export and import, and the
    problem strip catches the three new cases.
 9. `npm run perf` passes with the new budgets. Each budget's reason is
    written above it, as the existing ones are.
 10. `docs/architecture.md` states the new invariant and lists `dig`/`digs`
-    under PROTOCOL 21.
+    and `fall` under PROTOCOL 21.
+11. Blowing out an arch's leg drops the rest of the arch. The pieces under 8
+    cells shatter, and the larger ones land as heaps in the grid, with the
+    landing's thunk. A mech under one takes the crush hit; a mech standing
+    on one rides it down. The flood fill costs under 1 ms on the bench's
+    `bench-dig` segment (headless tests and the bench).
 
 ## Tests
 
@@ -335,6 +382,9 @@ round-trips it, and `check` gains the three problems above.
   ceilings, digging under a mech, feet in a tunnel.
 - `test/dig.test.js`: the radius table, materials, scorch placement, props
   settling.
+- `test/falls.test.js`: an arch losing a leg falls; supported ground
+  doesn't; the 4,096-cell limit counts as supported; shatter versus heap by
+  size; the crush hit; a rider falls with it.
 - `test/digSync.test.js`: the owner digs and others apply; dig lists in any
   order; relay clamps (also in `server/test_server.py`).
 - `test/nav.test.js`: a path around a mesa and into a tunnel; re-marking
@@ -361,12 +411,12 @@ spec, not an option.
 
 ## Open questions
 
-- **Dig radii** (balance, the owner's). Default: the battle table above,
-  tried in the bench before any mission uses them. The owner's rule is set:
-  battle mechs dig, construction mechs dig more.
+- **Dig radii.** Decided: the battle table above, to tweak after play.
+  Battle mechs dig; construction mechs (later) dig more.
 - **Do lasers dig?** Default: no; they scorch.
-- **Unsupported ground** (a ridge whose base is blown out). Default: it stays
-  up. Dropping small floating pieces as debris can come later.
+- **Unsupported ground.** Decided: it falls (see Falling ground).
+- **Crush damage from a falling chunk** (balance, the owner's). Default: 3
+  per cell to the torso, at most 40, tried in the bench first.
 - **A stomp landing dents the ground?** Default: no; a 2 m dent under the
   feet would add thunk, and is cheap if the owner wants it.
 - **Damage from falling into a dug hole.** Default: none beyond the landing
@@ -398,10 +448,12 @@ spec, not an option.
 2. **Mechs and shots on 3D ground.** Standing, walls, ceilings, falling, feet
    from the hip; `ter.ray` for shots, missiles, beams and sight; debris and
    particles; the invariant rewritten.
-3. **Digging and its sync.** The radius table (once approved), materials,
-   scorches, props and structures settling; `dig`/`digs`, the relay's list,
+3. **Digging and its sync.** The radius table, materials, scorches, props
+   and structures settling; `dig`/`digs`, the relay's sequence and list,
    PROTOCOL 21; the smoke test with a late joiner.
-4. **The AI in canyons and caves.** Feelers, clearance, the nav grid and A*,
-   re-marking after digs.
-5. **Sculpting in the editor.** Brushes, landmarks, slice, the `ground`
+4. **Falling ground.** The support fill, falling chunks, shatter or heap,
+   the landing thunk, crush hits and riders; `fall` in the relay's order.
+5. **The AI in canyons and caves.** Feelers, clearance, the nav grid and A*,
+   re-marking after digs and falls.
+6. **Sculpting in the editor.** Brushes, landmarks, slice, the `ground`
    block in `missionIO`, the new problems.
