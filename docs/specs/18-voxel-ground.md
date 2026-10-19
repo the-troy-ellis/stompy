@@ -131,28 +131,70 @@ changes to match:
 ### Digging in play
 
 Carving takes the smaller of the ground and the hole, so blasts give the same
-ground whichever lands first. That makes sync cheap. Building only happens in
-the editor, so play only ever carves.
+ground whichever lands first. That makes sync cheap. In this spec, building
+only happens in the editor, so play only ever carves.
 
-Dig radii are balance numbers, so the owner sets them. The defaults below are
-for review; nothing ships before they're approved:
+**Battle mechs dig less than construction mechs.** The owner plans
+construction-oriented mechs later. So how much something digs is its own
+number, `dig` (a radius in metres) on each weapon in `data/weapons.js`. It is
+not worked out from damage. Battle weapons stay in a modest band; construction
+gear (below) gets the big numbers. A gun can roughen the ground and open a
+bunker with patience. A construction mech reshapes it.
 
-| What blows up | Dig radius |
-|---|---|
-| AUTOCANNON, PEASHOOTER shell | 1.5 m (a dent) |
-| THUNDERCLAP, BIG BONKER | 3 m |
-| a missile (LRM, FIRECRACKERS) | 2 m each, so a volley craters |
-| FUSION CANNON | 6 m |
-| a mech's death blast | 7 m × scale |
-| ammunition cooking off in a wreck | 9 m |
-| lasers, punches, stomps | 0 (lasers scorch, as today) |
+| Tier | Dig radius | On rock | Builds |
+|---|---|---|---|
+| Battle weapons | 0 to 4 m: dents and small craters | half | no |
+| Big battle events (FUSION, deaths, cook-offs) | 6 to 7 m: a crater, one cell deep | half | no |
+| Construction gear (later) | 8 to 16 m | full | yes |
 
+How the sizes read at 8 m cells: under about 3 m the surface drops by up to a
+metre (a **dent**); from about 6 m a corner clears and you get a **crater**.
+
+The battle radii are balance numbers, so the owner sets them. The defaults
+below are for review; nothing ships before they're approved:
+
+| What blows up | Hit today | Dig radius | Reads as |
+|---|---|---|---|
+| PEASHOOTER burst | 0.8 × 6 | 0 | dust and scorch; a hose of fire shouldn't plane the map |
+| AUTOCANNON shell | 11 | 2.5 m | a dent; a sustained stream gouges a groove |
+| BIG BONKER slug | 20 | 3.5 m | a deep dent |
+| THUNDERCLAP bolt | 14 | 4 m | a shallow crater |
+| FIRECRACKERS, each missile | 2.6 × 6 | 2 m | a salvo leaves a rough ~5 m crater |
+| LRM-10, each missile | 1.9 × 10 | 1.5 m | spread wide, so it peppers an area |
+| a guided volley set off by hand | (10 m splash) | 4 m | a crater where you set it off |
+| FUSION CANNON | | 6 m | a pit |
+| a mech's death blast | | 5 m × scale, at most 7 m | WARDEN 7 m, PIPSQUEAK 4 m |
+| ammunition cooking off in a wreck | | 7 m | the biggest hole a battle makes |
+| lasers, TOASTER, punches | | 0 | scorch, as today |
+| a stomp landing | | 0 (open question) | |
+
+- **Cover lasts a fight against small guns.** Two mechs trading AUTOCANNON
+  fire through a hill groove it within a minute, but it stays a hill. Big
+  guns and deaths can break it. Digging through cover is a choice ("bring the
+  big gun"), not background noise. The bench checks this (`bench-dig`).
 - **Material:** soft ground digs at full radius. The rock band under each
-  biome's surface digs at half. Bedrock doesn't dig at all. So a battle
-  roughs the ground up without erasing every hill.
+  biome's surface digs at half for battle weapons, and at full for
+  construction gear. Bedrock doesn't dig at all.
 - **Scorches** sit on the dug surface at the blast point.
 - **Props and structures** whose base loses its ground settle onto the new
   ground; a prop with nothing under it breaks.
+
+### Construction mechs (later, not in this spec)
+
+Their mechs, tools and names come after this spec, with their own. This spec
+only makes room for them:
+- **Data.** A weapon's `dig` (and a `build` radius, unused until then) lives
+  in `data/weapons.js`. A construction tool is a weapon-slot item with
+  `kind: 'tool'` (a drill, a scoop, a piler), so the mechlab, slots and
+  sync carry it like any other.
+- **Rock at full strength, and building in play.** These are what set
+  construction gear apart, beyond size.
+- **Sync, once building happens in play.** Carving alone gives the same ground
+  in any order; carving mixed with building does not. So the `dig` message
+  carries its operation from the start: `[op, x, y, z, r]`, op 0 carve, 1 build.
+  The relay stamps each one with a room sequence number, and late joiners
+  replay the list in that order. With carving only (this spec), the order is
+  free; the stamp costs nothing and is there when building arrives.
 
 ### Sync
 
@@ -162,12 +204,15 @@ for review; nothing ships before they're approved:
   co-op host for enemies, turrets and wrecks. The owner carves at once and
   sends `dig`. Everyone else applies `dig` when it arrives; their local
   copy of a remote shell explodes but doesn't dig.
-- **Message:** `dig { p: [x, y, z], r }`, positions rounded to 0.25 m, r to
-  0.5 m. Batched with hits at 15 Hz as `digs: [[x, y, z, r], ...]`.
+- **Message:** `dig { op, p: [x, y, z], r }`, op 0 carve (the only one in
+  play here), positions rounded to 0.25 m, r to 0.5 m. Batched with hits at
+  15 Hz as `digs: [[op, x, y, z, r], ...]`; the relay adds a room sequence
+  number to each (see Construction mechs).
 - **Late joiners:** the relay keeps each room's dig list, capped at 4,000
   digs (about 64 KB), and sends it in `welcome`. Applying the list in any order
   gives the same ground. A round's new map starts a new list. The server
-  clamps r to the largest table value and drops digs outside the map.
+  clamps r to the largest battle value (7 m) and drops digs outside the map
+  and any op but carve, until construction gear exists.
 - **Version:** this is a network message change, so `PROTOCOL` goes to 21 and
   `docs/architecture.md` lists `dig`/`digs`.
 
@@ -316,11 +361,14 @@ spec, not an option.
 
 ## Open questions
 
-- **Dig radii** (balance, the owner's). Default: the table above, tried in
-  the bench before any mission uses them.
+- **Dig radii** (balance, the owner's). Default: the battle table above,
+  tried in the bench before any mission uses them. The owner's rule is set:
+  battle mechs dig, construction mechs dig more.
 - **Do lasers dig?** Default: no; they scorch.
 - **Unsupported ground** (a ridge whose base is blown out). Default: it stays
   up. Dropping small floating pieces as debris can come later.
+- **A stomp landing dents the ground?** Default: no; a 2 m dent under the
+  feet would add thunk, and is cheap if the owner wants it.
 - **Damage from falling into a dug hole.** Default: none beyond the landing
   feel. A leg hit on long falls would be a balance issue.
 - **Digging in the arena.** Default: on, with no cap.
