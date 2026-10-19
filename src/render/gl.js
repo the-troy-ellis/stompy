@@ -209,19 +209,20 @@ export function createRenderer(cv, { antialias = true } = {}) {
   // `heat` is for the IR view; unset, it uses drawHeat (set around groups of draws).
   const R = { drawHeat: 0, curMesh: null, draws: 0 };   // drawHeat: for the IR view, set around groups of draws; draws: per-frame count
   const WHITE = [1, 1, 1];
+  // `mesh.first` draws part of a buffer (the terrain's runs of chunks in view).
   const draw = (mesh, m, tint = WHITE, emis = 0, heat) => {
-    if (R.curMesh !== mesh) {
+    if (R.curMesh !== mesh.buf) {
       gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
       gl.vertexAttribPointer(A.pos, 3, gl.FLOAT, false, 36, 0);
       gl.vertexAttribPointer(A.nrm, 3, gl.FLOAT, false, 36, 12);
       gl.vertexAttribPointer(A.col, 3, gl.FLOAT, false, 36, 24);
-      R.curMesh = mesh;
+      R.curMesh = mesh.buf;
     }
     gl.uniformMatrix4fv(U.M, false, m);
     gl.uniform3fv(U.tint, tint);
     gl.uniform1f(U.emis, emis);
     gl.uniform1f(U.heat, heat === undefined ? R.drawHeat : heat);
-    gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+    gl.drawArrays(gl.TRIANGLES, mesh.first || 0, mesh.count);
     R.draws++;
   };
 
