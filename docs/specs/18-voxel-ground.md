@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (the owner asked for it; the phone prototype passed). Owner decisions so far: the battle dig table (tweakable later); construction mechs dig more; unsupported ground falls |
+| Status | ready: approved by the owner, with the open questions' defaults (the battle dig table and crush numbers to tweak after play; construction mechs dig more; unsupported ground falls) |
 | Milestone | M8 (proposed; after M7.5) |
 | Size | L (split into six issues; see the end) |
 | Depends on | [14-look-and-performance.md](14-look-and-performance.md) (chunks, budgets, the bench); [15-mission-editor.md](15-mission-editor.md) (the editor it extends); [16-body-plans.md](16-body-plans.md) (feet on the ground); [09-coop.md](09-coop.md) and [10-internet-play.md](10-internet-play.md) (sync) |
@@ -440,20 +440,20 @@ spec, not an option.
 - **Spec 15's "height painting".** Superseded by this spec. Its default
   ("no") is replaced by sculpting here.
 
-## Issues, in order
+## Issues, in order (filed as #281 to #286)
 
-1. **The ground as voxels.** `voxels.js`, `mesher.js`, the worker, chunks,
+1. **The ground as voxels.** #281. `voxels.js`, `mesher.js`, the worker, chunks,
    LOD, colour; `G.ter` with `height` kept. Every mission looks right and
    plays as today. Budgets on the bench.
-2. **Mechs and shots on 3D ground.** Standing, walls, ceilings, falling, feet
+2. **Mechs and shots on 3D ground.** #282. Standing, walls, ceilings, falling, feet
    from the hip; `ter.ray` for shots, missiles, beams and sight; debris and
    particles; the invariant rewritten.
-3. **Digging and its sync.** The radius table, materials, scorches, props
+3. **Digging and its sync.** #283. The radius table, materials, scorches, props
    and structures settling; `dig`/`digs`, the relay's sequence and list,
    PROTOCOL 21; the smoke test with a late joiner.
-4. **Falling ground.** The support fill, falling chunks, shatter or heap,
+4. **Falling ground.** #284. The support fill, falling chunks, shatter or heap,
    the landing thunk, crush hits and riders; `fall` in the relay's order.
-5. **The AI in canyons and caves.** Feelers, clearance, the nav grid and A*,
+5. **The AI in canyons and caves.** #285. Feelers, clearance, the nav grid and A*,
    re-marking after digs and falls.
-6. **Sculpting in the editor.** Brushes, landmarks, slice, the `ground`
+6. **Sculpting in the editor.** #286. Brushes, landmarks, slice, the `ground`
    block in `missionIO`, the new problems.

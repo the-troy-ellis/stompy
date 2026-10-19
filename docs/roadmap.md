@@ -237,7 +237,7 @@ guns), quads crawl (slowest, biggest, and hills don't slow them).
 
 Spec: [specs/16-body-plans.md](specs/16-body-plans.md).
 
-## M8 — Voxel ground (proposed)
+## M8 — Voxel ground
 
 Goal: the ground is something to fight over and through. Canyons with steep
 walls, tunnels and caves, arches and overhangs; explosions dig craters, and
@@ -254,7 +254,10 @@ mission authors sculpt the ground in the editor.
 - The AI turns along walls and finds its way through tunnels.
 - DIG, BUILD and SMOOTH brushes and landmarks in the editor.
 
-Spec: [specs/18-voxel-ground.md](specs/18-voxel-ground.md) (draft). The
+Spec: [specs/18-voxel-ground.md](specs/18-voxel-ground.md) (approved). Issues, in
+order: #281 the ground as voxels, #282 mechs and shots on 3D ground, #283
+digging and its sync, #284 falling ground, #285 the AI in canyons and caves,
+#286 sculpting in the editor. The
 prototype it was measured with: [mockups/voxel-ground.html](mockups/voxel-ground.html).
 
 ## Parked
