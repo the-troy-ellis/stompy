@@ -48,9 +48,10 @@ export function scramble(G, t, secs, p) {
 
 // The ?debug=1 INVINCIBLE option (G.invincible, set by the FEEL panel): your
 // own mech takes hits but no damage. Single player only (not the arena or co-op).
+// On the bench (sim/bench.js) nobody does: limbs and kills come off its clock.
+export const invincible = (G, m) => !!G.bench || (!!G.invincible && m === G.player && G.mode === 'sp');
 // Beam damage after this long without any is a new contact: it clangs once.
 export const BEAM_CONTACT_GAP = 0.6;
-export const invincible = (G, m) => !!G.invincible && m === G.player && G.mode === 'sp';
 
 export function damage(G, m, p, amt, src, beam = false, melee = false) {
   if (!m.alive) return;
@@ -92,6 +93,14 @@ export function damage(G, m, p, amt, src, beam = false, melee = false) {
   const over = -m.hp[sec];
   m.hp[sec] = 0;
   if (sec === 'T') return destroy(G, m, src);
+  loseSection(G, m, sec, p, src);
+  if (over > 0) { m.hp.T -= over; if (m.hp.T <= 0) { m.hp.T = 0; destroy(G, m, src); } }
+}
+
+// An arm or a leg at zero: its weapons die, it comes off, and the body
+// reels. The bench (sim/bench.js) takes limbs off this way on its clock.
+export function loseSection(G, m, sec, p, src) {
+  m.hp[sec] = 0;
   m.weapons.forEach(w => { if (w.mount === sec) w.dead = true; });
   shedSection(G, m, sec, p);
   feel(G, 'sectionLost', { mech: m, roll: sec === 'LA' || sec === 'LL' ? -1 : sec === 'RA' || sec === 'RL' ? 1 : 0, at: m === G.player ? null : p });
@@ -102,7 +111,6 @@ export function damage(G, m, p, amt, src, beam = false, melee = false) {
     else voice(G, leg ? 'legLost' : 'armLost', { flat: `${SECT_NAME[sec]} destroyed.` });
   }
   else if (src === G.player) msg(G, `${m.ch.name}: ${SECT_NAME[sec].toUpperCase()} DESTROYED`);
-  if (over > 0) { m.hp.T -= over; if (m.hp.T <= 0) { m.hp.T = 0; destroy(G, m, src); } }
 }
 
 // The part comes off: an arm as one piece from the shoulder, a leg as thigh,

@@ -437,7 +437,7 @@ export function createHud(app) {
     ctx.font = '10px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.lineWidth = 1;
     const at = (x, z) => [x, G.ter.height(x, z) + 1, z];
     for (const e of G.mechs) {
-      if (e.team === 0 || e.remote || !e.alive) continue;
+      if (e.team === 0 || e.remote || !e.alive || e.script) continue;   // the bench's cast doesn't think (sim/bench.js)
       const a = e.ai, head = project([e.x, e.y + 9.5 * e.ch.scale, e.z]), foot = project([e.x, e.y + 1, e.z]);
       if (head) { ctx.fillStyle = a.seen && a.aware ? '#f66' : a.aware ? AMBER : '#9f9'; ctx.fillText(aiLabel(e), head[0], head[1]); }
       const line = (p, col) => {

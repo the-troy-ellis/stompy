@@ -140,6 +140,9 @@ Run the whole list; it takes about eight minutes. Report deviations in the PR.
   software GL, for comparing before and after, so they have no budget.
   `PERF_CPU=1` lists each scene's busiest functions by share of the game's
   own JS time; `PERF_TOP=1` lists where the garbage comes from.
+  The fight scenes are the bench's segments (`src/sim/bench.js`, `bench-*`):
+  a scripted scene where nobody thinks or takes damage, so a change to the
+  AI, the walk or the dice doesn't move their numbers; only what is drawn does.
 - `python3 -m unittest server/test_server.py` for the relay.
 - Sim tests build a game with `createGame({ seed })` and call
   `update(game, input, dt, fx)` directly with a fixed `dt` (1/60) and a
@@ -159,6 +162,12 @@ Procedure: Free Play, 6 hostiles, volcanic plain, with any new feature on.
 Open the browser's performance panel or use the in-game frame-time readout
 (M1 adds one behind a settings toggle). Record median and 95th percentile
 frame time over 60 s of fighting. Report both in the PR.
+
+For before and after on the same device, use the bench: `?debug=1&bench=1`
+(or BENCH on the FEEL panel) plays the same scripted 25 seconds every time
+and ends on a card of each part's frame rate, work time (mean and 95th
+percentile), draws and particles, with the last run's beside them. Run it
+on main, then on the branch.
 
 ## Naming things
 
