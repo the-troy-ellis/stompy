@@ -326,6 +326,19 @@ spec, not an option.
 - **Digging in the arena.** Default: on, with no cap.
 - **Caves in the campaign.** Default: none until the missions are reworked in
   the editor (spec 15's open question). This spec only makes them possible.
+- **WebAssembly for the mesher, if JavaScript is too slow.** Default: no.
+  The game stays JavaScript: its own JS is ~2-3.5 ms of a 16.6 ms frame,
+  and what a phone runs out of is draws, fill and garbage, which no language
+  changes. The one hot loop this spec adds is the chunk mesher (surface
+  nets: pure arithmetic over a byte grid, ~200 lines, no side effects), and
+  it runs in the worker. Revisit only if, on a reference phone, the bench's
+  `bench-dig` segment shows a chunk costing more than 10 ms in the worker
+  (blasts visibly lag behind their craters), or the fallback path takes more
+  than the 2 ms main-thread budget. Then port just `mesher.js` to
+  WebAssembly, keep the JavaScript one as the reference and the fallback,
+  test that both give the same triangles, and compare them on the bench.
+  It would be the first build step beyond esbuild, so it needs the owner's
+  yes (`docs/architecture.md` limits the tooling).
 - **Spec 15's "height painting".** Superseded by this spec. Its default
   ("no") is replaced by sculpting here.
 
