@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- The voxel ground prototype for docs/specs/18-voxel-ground.md: open it in a browser or on a phone. Not part of the game build. -->
+<title>Voxel Ground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=VT323&display=swap">
+<style>
+/* Layout: the 3D view fills the page; the readouts sit top left, the settings top right, the tools along the bottom. One dark look, on purpose: it's a cockpit test rig. */
+:root {
+  --bg: #07080a; --panel: rgba(14, 17, 20, 0.88); --line: #2a3038; --fg: #d9dee4; --dim: #7d8794;
+  --hud: #6dff8a; --amber: #ffbf3a; --red: #ff5a40;
+  --display: "Chakra Petch", "Arial Narrow", system-ui, sans-serif;
+  --pix: "VT323", "Lucida Console", "Courier New", monospace;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; }
+body { font-family: var(--display); touch-action: none; user-select: none; -webkit-user-select: none; }
+#view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; image-rendering: crisp-edges; cursor: crosshair; }
+.ui { position: fixed; z-index: 2; }
+#stats { top: calc(10px + env(safe-area-inset-top, 0px)); left: max(12px, env(safe-area-inset-left, 0px)); background: var(--panel); border: 1px solid var(--line); padding: 8px 10px; font: 18px/1.05 var(--pix); color: var(--hud); min-width: 190px; pointer-events: none; }
+#stats b { color: var(--fg); font-weight: 400; }
+#stats .warn { color: var(--amber); }
+#stats .bad { color: var(--red); }
+#stats .t { color: var(--dim); font: 600 11px var(--display); letter-spacing: 0.12em; margin-bottom: 4px; }
+#side { top: calc(10px + env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); display: grid; gap: 6px; justify-items: end; max-width: min(300px, 60vw); }
+.panel { background: var(--panel); border: 1px solid var(--line); padding: 8px 10px; display: grid; gap: 8px; }
+.panel[hidden] { display: none !important; }
+.row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.row > span { color: var(--dim); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; width: 100%; }
+button { font: 600 12px var(--display); letter-spacing: 0.08em; text-transform: uppercase; background: #161a1f; color: var(--dim); border: 1px solid var(--line); padding: 7px 10px; cursor: pointer; }
+button[aria-pressed="true"] { background: #1f2a22; color: var(--hud); border-color: #2f5a3a; }
+button:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
+#tools { left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 32px); }
+#tools button { font-size: 13px; padding: 9px 12px; }
+#tools .sep { width: 10px; }
+#cross { left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; pointer-events: none; }
+#cross::before, #cross::after { content: ""; position: absolute; background: var(--hud); }
+#cross::before { left: 10px; top: 0; width: 2px; height: 22px; clip-path: polygon(0 0, 100% 0, 100% 35%, 0 35%, 0 65%, 100% 65%, 100% 100%, 0 100%); }
+#cross::after { top: 10px; left: 0; height: 2px; width: 22px; clip-path: polygon(0 0, 35% 0, 35% 100%, 0 100%, 0 0, 65% 0, 100% 0, 100% 100%, 65% 100%); }
+#help { left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--panel); border: 1px solid var(--line); padding: 16px 18px; max-width: min(460px, calc(100vw - 40px)); display: grid; gap: 10px; }
+#help h1 { margin: 0; font-size: 22px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--hud); }
+#help p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--fg); }
+#help kbd { font: 16px var(--pix); color: var(--amber); }
+#help .go { justify-self: start; color: var(--hud); border-color: #2f5a3a; background: #1f2a22; font-size: 14px; padding: 9px 16px; }
+#busy { left: 50%; top: 40%; transform: translate(-50%, -50%); font: 26px var(--pix); color: var(--amber); background: var(--panel); padding: 8px 14px; border: 1px solid var(--line); }
+/* Touch: a stick for the legs, the right side drags to look, and two buttons. */
+.touch { display: none; }
+body.is-touch .touch { display: block; }
+#stick { left: max(18px, env(safe-area-inset-left, 0px)); bottom: calc(70px + env(safe-area-inset-bottom, 0px)); width: 120px; height: 120px; border-radius: 50%; border: 2px solid rgba(109, 255, 138, 0.35); }
+#knob { position: absolute; left: 40px; top: 40px; width: 40px; height: 40px; border-radius: 50%; background: rgba(109, 255, 138, 0.35); }
+#tfire, #tjets { right: max(18px, env(safe-area-inset-right, 0px)); width: 84px; height: 84px; border-radius: 50%; font: 600 13px var(--display); letter-spacing: 0.08em; color: var(--hud); background: rgba(14, 17, 20, 0.6); border: 2px solid rgba(109, 255, 138, 0.45); display: none; }
+body.is-touch #tfire, body.is-touch #tjets { display: grid; place-items: center; }
+#tfire { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); width: 96px; height: 96px; border-color: rgba(255, 191, 58, 0.6); color: var(--amber); }
+#tjets { bottom: calc(66px + env(safe-area-inset-bottom, 0px)); right: calc(max(18px, env(safe-area-inset-right, 0px)) + 104px); }
+@media (max-width: 640px) { #stats { font-size: 15px; min-width: 150px; } }
+/* Touch: the tools move to the top, clear of the thumbs; the readout shrinks and folds on a tap. */
+body.is-touch #tools { top: calc(8px + env(safe-area-inset-top, 0px)); bottom: auto; gap: 4px; }
+body.is-touch #tools button { font-size: 11px; padding: 7px 8px; }
+body.is-touch #tools .sep { width: 2px; }
+body.is-touch #stats, body.is-touch #side { top: calc(92px + env(safe-area-inset-top, 0px)); }
+body.is-touch #stats { font-size: 13px; min-width: 0; pointer-events: auto; padding: 5px 8px; }
+@media (orientation: portrait) { body.is-touch #stats, body.is-touch #side { top: calc(156px + env(safe-area-inset-top, 0px)); } }
+body.is-touch #stats.folded #statsBody .more { display: none; }
+</style>
+
+<canvas id="view"></canvas>
+<div id="cross" class="ui" aria-hidden="true"></div>
+
+<div id="stats" class="ui" aria-live="off"><div class="t">READOUT<span class="tch-only"> · TAP</span></div><div id="statsBody">…</div></div>
+
+<div id="side" class="ui">
+  <button id="setBtn" aria-expanded="false">Settings</button>
+  <div class="panel" id="settings" hidden>
+    <div class="row"><span>Cell size</span><button data-cell="8" aria-pressed="true">8 m</button><button data-cell="4" aria-pressed="false">4 m</button></div>
+    <div class="row"><span>Lines tall</span><button data-lines="180">180</button><button data-lines="270" aria-pressed="true">270</button><button data-lines="360">360</button><button data-lines="0">Full</button></div>
+    <div class="row"><span>Rebuild budget a frame</span><button data-budget="2">2 ms</button><button data-budget="6" aria-pressed="true">6 ms</button><button data-budget="16">16 ms</button></div>
+    <div class="row"><span>Ground</span><button id="soft" aria-pressed="false">Soft sand</button><button id="reset">Reset</button><button id="reseed">New ground</button></div>
+    <div class="row"><span>Help</span><button id="helpBtn">Controls</button></div>
+  </div>
+</div>
+
+<div id="tools" class="ui" role="toolbar" aria-label="Tools">
+  <button data-tool="shoot" aria-pressed="true">Shoot</button>
+  <button data-tool="dig" aria-pressed="false">Dig</button>
+  <button data-tool="build" aria-pressed="false">Build</button>
+  <button data-tool="smooth" aria-pressed="false">Smooth</button>
+  <span class="sep"></span>
+  <button data-size="0" aria-pressed="false">S</button>
+  <button data-size="1" aria-pressed="true">M</button>
+  <button data-size="2" aria-pressed="false">L</button>
+  <span class="sep"></span>
+  <button id="flyBtn" aria-pressed="false">Fly</button>
+</div>
+
+<div id="stick" class="ui touch"><div id="knob"></div></div>
+<button id="tfire" class="ui">FIRE</button>
+<button id="tjets" class="ui">JETS</button>
+
+<div id="help" class="ui">
+  <h1>Voxel ground</h1>
+  <p>The ground is a grid of solid and empty cells. A shell carves a ball out of it, and only the chunks it touched are rebuilt. Shoot the hills. Walk into the tunnel. Knock the ground out from under the mechs.</p>
+  <p class="desk"><kbd>WASD</kbd> walk · <kbd>mouse</kbd> look · <kbd>click</kbd> fire or use the tool · <kbd>Space</kbd> jets · <kbd>F</kbd> fly · <kbd>1</kbd>–<kbd>4</kbd> tools · <kbd>[</kbd> <kbd>]</kbd> size · <kbd>Esc</kbd> lets go of the mouse.</p>
+  <p class="tch">Left stick walks. Drag the right side to look. FIRE fires or uses the tool. JETS lifts you.</p>
+  <button class="go" id="goBtn">Start</button>
+</div>
+<div id="busy" class="ui" hidden>BUILDING GROUND…</div>
+
+<script>
+'use strict';
+// ====================================================================
+// Settings that shape the world
+// ====================================================================
+const EXTENT = [768, 256, 768];   // metres: x, y (up), z
+const CS = 16;                    // cells per chunk side
+const PAL = { zen: [0.16, 0.1, 0.3], hor: [0.9, 0.56, 0.38], low: [0.56, 0.36, 0.23], mid: [0.74, 0.52, 0.31], high: [0.92, 0.8, 0.62], rock: [0.42, 0.3, 0.25], deep: [0.3, 0.2, 0.17] };
+const LIGHT = norm3([0.4, 0.8, -0.45]);
+const SIZES = { shoot: [6, 12, 22], brush: [6, 10, 16] };
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isTouch = matchMedia('(pointer: coarse)').matches;
+if (isTouch) document.body.classList.add('is-touch');
+document.querySelector(isTouch ? '#help .desk' : '#help .tch').hidden = true;
+
+let S = 8, NX, NY, NZ, D, TOP, seed = 7, soft = false;
+let tool = 'shoot', size = 1, lines = 270, budget = 6, fly = false;
+
+// ====================================================================
+// Small maths
+// ====================================================================
+function norm3(v) { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; }
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const M4 = {
+  persp(fovy, aspect, n, f) { const t = 1 / Math.tan(fovy / 2), o = new Float32Array(16); o[0] = t / aspect; o[5] = t; o[10] = (f + n) / (n - f); o[11] = -1; o[14] = (2 * f * n) / (n - f); return o; },
+  look(e, c, u) {
+    const z = norm3([e[0] - c[0], e[1] - c[1], e[2] - c[2]]), x = norm3([u[1] * z[2] - u[2] * z[1], u[2] * z[0] - u[0] * z[2], u[0] * z[1] - u[1] * z[0]]), y = [z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]];
+    return new Float32Array([x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -(x[0] * e[0] + x[1] * e[1] + x[2] * e[2]), -(y[0] * e[0] + y[1] * e[1] + y[2] * e[2]), -(z[0] * e[0] + z[1] * e[1] + z[2] * e[2]), 1]);
+  },
+  mul(a, b) { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; },
+};
+function planes(VP, out) {
+  for (let p = 0; p < 6; p++) {
+    const row = p >> 1, sg = p & 1 ? -1 : 1, o = p * 4;
+    const a = VP[3] + sg * VP[row], b = VP[7] + sg * VP[4 + row], c = VP[11] + sg * VP[8 + row], d = VP[15] + sg * VP[12 + row], l = Math.hypot(a, b, c) || 1;
+    out[o] = a / l; out[o + 1] = b / l; out[o + 2] = c / l; out[o + 3] = d / l;
+  }
+}
+function boxSeen(P, lo, hi) {
+  for (let o = 0; o < 24; o += 4) { const a = P[o], b = P[o + 1], c = P[o + 2]; if (a * (a > 0 ? hi[0] : lo[0]) + b * (b > 0 ? hi[1] : lo[1]) + c * (c > 0 ? hi[2] : lo[2]) + P[o + 3] < 0) return false; }
+  return true;
+}
+
+// Value noise from a seed: 2D and 3D, smooth and cheap.
+function hash3(i, j, k) { const s = Math.sin(i * 127.1 + j * 311.7 + k * 74.7 + seed * 19.19) * 43758.5453; return s - Math.floor(s); }
+function noise3(x, y, z) {
+  const i = Math.floor(x), j = Math.floor(y), k = Math.floor(z), fx = x - i, fy = y - j, fz = z - k;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
+  const l = (a, b, t) => a + (b - a) * t;
+  return l(l(l(hash3(i, j, k), hash3(i + 1, j, k), u), l(hash3(i, j + 1, k), hash3(i + 1, j + 1, k), u), v),
+           l(l(hash3(i, j, k + 1), hash3(i + 1, j, k + 1), u), l(hash3(i, j + 1, k + 1), hash3(i + 1, j + 1, k + 1), u), v), w);
+}
+const fbm2 = (x, z) => noise3(x, 0.5, z) * 0.55 + noise3(x * 2.1, 3.5, z * 2.1) * 0.3 + noise3(x * 4.3, 7.5, z * 4.3) * 0.15;
+
+// ====================================================================
+// The world: a density at every grid corner. Above 128 is solid.
+// The landmarks are built from distance shapes, so their surfaces sit
+// between grid points where they belong.
+// ====================================================================
+const idx = (i, j, k) => i + (NX + 1) * (j + (NY + 1) * k);
+const val = (i, j, k) => (D[idx(i, j, k)] - 128) / 127;
+const Q = d => clamp(Math.round(d * 127) + 128, 1, 255);
+let LAND;   // where the landmarks are, for placing the mechs and you
+
+function generate() {
+  NX = EXTENT[0] / S; NY = EXTENT[1] / S; NZ = EXTENT[2] / S;
+  D = new Uint8Array((NX + 1) * (NY + 1) * (NZ + 1));
+  TOP = new Int16Array((NX + 1) * (NZ + 1));
+  const W = EXTENT[0], L = EXTENT[2];
+  LAND = {
+    hill: [W * 0.27, L * 0.42], mesa: [W * 0.73, L * 0.38], arch: [W * 0.17, 0, L * 0.84],
+    canyonZ: x => L * 0.6 + 55 * Math.sin(x / 110),
+    tunnel: [[W * 0.27 - 160, 52, L * 0.42 - 20], [W * 0.27 + 160, 52, L * 0.42 + 30]],
+    start: [W * 0.5, L * 0.12],
+  };
+  LAND.arch[1] = heightAt(LAND.arch[0], LAND.arch[2]) - 6;   // the arch stands on the ground there
+  const tA = LAND.tunnel[0], tB = LAND.tunnel[1], tAB = [tB[0] - tA[0], tB[1] - tA[1], tB[2] - tA[2]], tL2 = tAB[0] ** 2 + tAB[1] ** 2 + tAB[2] ** 2;
+  for (let k = 0; k <= NZ; k++) for (let i = 0; i <= NX; i++) {
+    const x = i * S, z = k * S;
+    const h = heightAt(x, z);
+    for (let j = 0; j <= NY; j++) {
+      const y = j * S;
+      let d = h - y;
+      // The mesa: steep sides, and a lip that hangs out over them (an overhang).
+      const md = Math.hypot(x - LAND.mesa[0], z - LAND.mesa[1]);
+      const R = y > 92 ? 92 + 6 * fbm2(x / 30, z / 30) : 66 + 5 * fbm2(x / 30, z / 30);
+      d = Math.max(d, Math.min(R - md, 128 - y));
+      // An arch: half a ring standing on the ground.
+      const ax = x - LAND.arch[0], az = z - LAND.arch[2], ring = Math.hypot(Math.hypot(ax, y - LAND.arch[1]) - 46, az * 0.8);
+      d = Math.max(d, 9 - ring);
+      // Little pockets under the ground.
+      if (y < h - 18) { const n = noise3(x / 46, y / 28, z / 46); if (n > 0.74) d = Math.min(d, (0.74 - n) * 120); }
+      // The tunnel: a tube through the big hill, tall enough for a mech.
+      const px = x - tA[0], py = y - tA[1], pz = z - tA[2], t = clamp((px * tAB[0] + py * tAB[1] + pz * tAB[2]) / tL2, 0, 1);
+      const tube = Math.hypot(px - tAB[0] * t, (py - tAB[1] * t) * 0.8, pz - tAB[2] * t);
+      d = Math.min(d, tube - 15);
+      d /= S;
+      // Bedrock at the bottom; open air round the edges, so the slab is closed.
+      if (j <= 1) d = 1;
+      if (i === 0 || k === 0 || i === NX || k === NZ || j === NY) d = -1;
+      D[idx(i, j, k)] = Q(clamp(d, -1, 1));
+    }
+  }
+  for (let k = 0; k <= NZ; k++) for (let i = 0; i <= NX; i++) topOf(i, k);
+}
+// The rolling ground, a big hill for the tunnel, and a canyon that wanders across.
+function heightAt(x, z) {
+  let h = 26 + 40 * fbm2(x / 260, z / 260) + 10 * fbm2(x / 70, z / 70);
+  const hd = Math.hypot(x - LAND.hill[0], z - LAND.hill[1]);
+  h += 78 * Math.exp(-(hd * hd) / (2 * 95 * 95));
+  const cd = Math.abs(z - LAND.canyonZ(x));
+  return h - 44 * smooth(46, 20, cd) * (0.8 + 0.2 * fbm2(x / 40, z / 40));
+}
+function topOf(i, k) { let j = NY; while (j > 0 && D[idx(i, j, k)] <= 128) j--; TOP[i + (NX + 1) * k] = j; }
+
+// Density anywhere, by trilinear blend: below the slab is solid, outside it is air.
+function sample(x, y, z) {
+  const fx = x / S, fy = y / S, fz = z / S;
+  if (fy <= 0) return 1;
+  if (fx < 0 || fz < 0 || fx >= NX || fz >= NZ || fy >= NY) return -1;
+  const i = fx | 0, j = fy | 0, k = fz | 0, u = fx - i, v = fy - j, w = fz - k;
+  const a = lerp(lerp(val(i, j, k), val(i + 1, j, k), u), lerp(val(i, j + 1, k), val(i + 1, j + 1, k), u), v);
+  const b = lerp(lerp(val(i, j, k + 1), val(i + 1, j, k + 1), u), lerp(val(i, j + 1, k + 1), val(i + 1, j + 1, k + 1), u), v);
+  return lerp(a, b, w);
+}
+// The ground under a point: the first solid surface found going down from y.
+// This is the query a mech's feet would ask, and it works under overhangs.
+function groundBelow(x, y, z) {
+  if (sample(x, y, z) > 0) return y;
+  const step = S / 4;
+  for (let yy = y; yy > -S; yy -= step) {
+    if (sample(x, yy, z) > 0) { let a = yy, b = yy + step; for (let n = 0; n < 6; n++) { const m = (a + b) / 2; if (sample(x, m, z) > 0) a = m; else b = m; } return (a + b) / 2; }
+  }
+  return 0;
+}
+// Along a ray: where it first meets solid ground, or null.
+function rayHit(o, d, max) {
+  const step = S * 0.4;
+  let prev = 0;
+  for (let t = step; t < max; t += step) {
+    if (sample(o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t) > 0) {
+      let a = prev, b = t; for (let n = 0; n < 7; n++) { const m = (a + b) / 2; if (sample(o[0] + d[0] * m, o[1] + d[1] * m, o[2] + d[2] * m) > 0) b = m; else a = m; }
+      return [o[0] + d[0] * b, o[1] + d[1] * b, o[2] + d[2] * b];
+    }
+    prev = t;
+  }
+  return null;
+}
+
+// ====================================================================
+// Editing: carving takes the smaller of the ground and the hole, so any
+// two blasts give the same ground whichever lands first (good for the net).
+// ====================================================================
+function edit(c, r, mode, strength = 1) {
+  const i0 = clamp(Math.floor((c[0] - r) / S) - 1, 1, NX - 1), i1 = clamp(Math.ceil((c[0] + r) / S) + 1, 1, NX - 1);
+  const j0 = clamp(Math.floor((c[1] - r) / S) - 1, 2, NY - 1), j1 = clamp(Math.ceil((c[1] + r) / S) + 1, 2, NY - 1);
+  const k0 = clamp(Math.floor((c[2] - r) / S) - 1, 1, NZ - 1), k1 = clamp(Math.ceil((c[2] + r) / S) + 1, 1, NZ - 1);
+  if (i0 > i1 || j0 > j1 || k0 > k1) return;
+  let copy = null;
+  if (mode === 'smooth') { copy = new Float32Array((i1 - i0 + 3) * (j1 - j0 + 3) * (k1 - k0 + 3)); }
+  const cw = i1 - i0 + 3, ch = j1 - j0 + 3;
+  if (copy) for (let k = k0 - 1; k <= k1 + 1; k++) for (let j = j0 - 1; j <= j1 + 1; j++) for (let i = i0 - 1; i <= i1 + 1; i++) copy[(i - i0 + 1) + cw * ((j - j0 + 1) + ch * (k - k0 + 1))] = val(clamp(i, 0, NX), clamp(j, 0, NY), clamp(k, 0, NZ));
+  const cv = (i, j, k) => copy[(i - i0 + 1) + cw * ((j - j0 + 1) + ch * (k - k0 + 1))];
+  for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const dist = Math.hypot(i * S - c[0], j * S - c[1], k * S - c[2]), d = val(i, j, k);
+    let nd = d;
+    if (mode === 'carve') nd = Math.min(d, (dist - r) / S * (soft ? 0.6 : 1));
+    else if (mode === 'build') nd = Math.max(d, (r - dist) / S);
+    else if (mode === 'smooth') {
+      if (dist > r) continue;
+      const avg = (cv(i, j, k) * 2 + cv(i - 1, j, k) + cv(i + 1, j, k) + cv(i, j - 1, k) + cv(i, j + 1, k) + cv(i, j, k - 1) + cv(i, j, k + 1)) / 8;
+      nd = lerp(d, avg, 0.6 * strength * (1 - dist / r));
+    }
+    D[idx(i, j, k)] = Q(clamp(nd, -1, 1));
+  }
+  for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) topOf(i, k);
+  dirtyRange(i0, i1, j0, j1, k0, k1);
+}
+
+// ====================================================================
+// Meshing: surface nets. One vertex per cell the surface passes through,
+// one quad per grid edge it crosses; every triangle flat-shaded, lit and
+// coloured on the CPU, as the game does its terrain.
+// ====================================================================
+let CX, CY, CZ, chunks = [];
+const dirty = new Set();
+const SCR = new Float32Array(2_400_000);   // scratch for one chunk's triangles
+const vcache = new Int32Array((CS + 2) ** 3), vpos = new Float32Array((CS + 2) ** 3 * 3);
+const EDGES = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+const COFF = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]];
+const meshStats = { last: 0, max: 0, sum: 0, n: 0, full: 0, up: 0, upMax: 0, upSum: 0 };
+
+function setupChunks() {
+  for (const c of chunks) if (c.buf) gl.deleteBuffer(c.buf);
+  CX = Math.ceil(NX / CS); CY = Math.ceil(NY / CS); CZ = Math.ceil(NZ / CS);
+  chunks = [];
+  for (let cz = 0; cz < CZ; cz++) for (let cy = 0; cy < CY; cy++) for (let cx = 0; cx < CX; cx++) chunks.push({ cx, cy, cz, buf: null, count: 0, lo: [0, 0, 0], hi: [0, 0, 0] });
+}
+function dirtyRange(i0, i1, j0, j1, k0, k1) {
+  const a = (v, n, m) => clamp(Math.floor(v / CS), 0, m - 1);
+  for (let cz = a(k0 - 1, NZ, CZ); cz <= a(k1 + 1, NZ, CZ); cz++) for (let cy = a(j0 - 1, NY, CY); cy <= a(j1 + 1, NY, CY); cy++) for (let cx = a(i0 - 1, NX, CX); cx <= a(i1 + 1, NX, CX); cx++) dirty.add(cx + CX * (cy + CY * cz));
+}
+
+function colourFor(cx, cy, cz, n) {
+  // Flat tops are sand by height; steep faces are banded rock; under cover is darker.
+  let c;
+  if (n[1] > 0.72) { const t = clamp(cy / 110, 0, 1); c = t < 0.5 ? [lerp(PAL.low[0], PAL.mid[0], t * 2), lerp(PAL.low[1], PAL.mid[1], t * 2), lerp(PAL.low[2], PAL.mid[2], t * 2)] : [lerp(PAL.mid[0], PAL.high[0], t * 2 - 1), lerp(PAL.mid[1], PAL.high[1], t * 2 - 1), lerp(PAL.mid[2], PAL.high[2], t * 2 - 1)]; }
+  else { const band = (Math.floor(cy / 9) & 1) ? 1 : 0.88; c = cy < 18 ? PAL.deep.map(v => v * band) : PAL.rock.map(v => v * band); }
+  const jit = 0.92 + 0.1 * hash3(Math.round(cx * 3), Math.round(cy * 3), Math.round(cz * 3));
+  const ox = clamp(Math.round((cx + n[0] * S) / S), 0, NX), oz = clamp(Math.round((cz + n[2] * S) / S), 0, NZ);
+  const covered = cy < TOP[ox + (NX + 1) * oz] * S - S * 1.5;
+  const lit = (0.42 + 0.62 * Math.max(0, n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2])) * jit * (covered ? 0.48 : 1);
+  return [Math.min(1, c[0] * lit), Math.min(1, c[1] * lit), Math.min(1, c[2] * lit)];
+}
+
+function meshChunk(ch) {
+  const t0 = performance.now();
+  const i0 = ch.cx * CS, i1 = Math.min(NX, i0 + CS), j0 = ch.cy * CS, j1 = Math.min(NY, j0 + CS), k0 = ch.cz * CS, k1 = Math.min(NZ, k0 + CS);
+  const W = CS + 2, base = (i, j, k) => (i - i0 + 1) + W * ((j - j0 + 1) + W * (k - k0 + 1));
+  vcache.fill(-1);
+  const cs = new Float32Array(8);
+  // One vertex in each cell the surface crosses (cells from one before the chunk, for its border quads).
+  for (let k = Math.max(0, k0 - 1); k < Math.min(NZ, k1); k++) for (let j = Math.max(0, j0 - 1); j < Math.min(NY, j1); j++) for (let i = Math.max(0, i0 - 1); i < Math.min(NX, i1); i++) {
+    let mask = 0;
+    for (let c = 0; c < 8; c++) { cs[c] = val(i + COFF[c][0], j + COFF[c][1], k + COFF[c][2]); if (cs[c] > 0) mask |= 1 << c; }
+    if (mask === 0 || mask === 255) continue;
+    let sx = 0, sy = 0, sz = 0, n = 0;
+    for (const [a, b] of EDGES) {
+      const da = cs[a], db = cs[b];
+      if ((da > 0) === (db > 0)) continue;
+      const t = da / (da - db), A = COFF[a], B = COFF[b];
+      sx += A[0] + (B[0] - A[0]) * t; sy += A[1] + (B[1] - A[1]) * t; sz += A[2] + (B[2] - A[2]) * t; n++;
+    }
+    const v = base(i, j, k);
+    vcache[v] = v; vpos[v * 3] = (i + sx / n) * S; vpos[v * 3 + 1] = (j + sy / n) * S; vpos[v * 3 + 2] = (k + sz / n) * S;
+  }
+  let f = 0;
+  const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+  const tri = (a, b, c, dir) => {
+    const A = vpos.subarray(a * 3, a * 3 + 3), B = vpos.subarray(b * 3, b * 3 + 3), C = vpos.subarray(c * 3, c * 3 + 3);
+    const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2], vx = C[0] - A[0], vy = C[1] - A[1], vz = C[2] - A[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const l = Math.hypot(nx, ny, nz); if (l < 1e-6) return;
+    nx /= l; ny /= l; nz /= l;
+    let P = [A, B, C];
+    if (nx * dir[0] + ny * dir[1] + nz * dir[2] < 0) { nx = -nx; ny = -ny; nz = -nz; P = [A, C, B]; }
+    const col = colourFor((A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3, (A[2] + B[2] + C[2]) / 3, [nx, ny, nz]);
+    for (const p of P) {
+      SCR[f++] = p[0]; SCR[f++] = p[1]; SCR[f++] = p[2]; SCR[f++] = col[0]; SCR[f++] = col[1]; SCR[f++] = col[2];
+      for (let q = 0; q < 3; q++) { if (p[q] < lo[q]) lo[q] = p[q]; if (p[q] > hi[q]) hi[q] = p[q]; }
+    }
+  };
+  const quad = (a, b, c, d, dir) => { if (a < 0 || b < 0 || c < 0 || d < 0 || f > SCR.length - 64) return; tri(a, b, c, dir); tri(a, c, d, dir); };
+  // One quad for each grid edge the surface crosses; it faces from solid to air.
+  for (let k = k0; k < k1; k++) for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) {
+    const s0 = val(i, j, k) > 0;
+    if (i < NX && j >= 1 && k >= 1 && (val(i + 1, j, k) > 0) !== s0)
+      quad(vcache[base(i, j - 1, k - 1)], vcache[base(i, j, k - 1)], vcache[base(i, j, k)], vcache[base(i, j - 1, k)], [s0 ? 1 : -1, 0, 0]);
+    if (j < NY && i >= 1 && k >= 1 && (val(i, j + 1, k) > 0) !== s0)
+      quad(vcache[base(i - 1, j, k - 1)], vcache[base(i, j, k - 1)], vcache[base(i, j, k)], vcache[base(i - 1, j, k)], [0, s0 ? 1 : -1, 0]);
+    if (k < NZ && i >= 1 && j >= 1 && (val(i, j, k + 1) > 0) !== s0)
+      quad(vcache[base(i - 1, j - 1, k)], vcache[base(i, j - 1, k)], vcache[base(i, j, k)], vcache[base(i - 1, j, k)], [0, 0, s0 ? 1 : -1]);
+  }
+  const t1 = performance.now();
+  if (!ch.buf) ch.buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, ch.buf);
+  gl.bufferData(gl.ARRAY_BUFFER, SCR.subarray(0, f), gl.STATIC_DRAW);
+  ch.count = f / 6; ch.lo = lo; ch.hi = hi;
+  const ms = t1 - t0, up = performance.now() - t1;   // building the surface (ours) and handing it to the GPU (the driver's)
+  meshStats.last = ms; meshStats.max = Math.max(meshStats.max, ms); meshStats.sum += ms; meshStats.n++;
+  meshStats.up = up; meshStats.upMax = Math.max(meshStats.upMax, up); meshStats.upSum += up;
+  return ms + up;
+}
+function buildAll() {
+  const t0 = performance.now();
+  for (const ch of chunks) meshChunk(ch);
+  dirty.clear();
+  meshStats.full = performance.now() - t0; meshStats.max = 0; meshStats.sum = 0; meshStats.n = 0; meshStats.upMax = 0; meshStats.upSum = 0;
+}
+// Dirty chunks rebuild nearest first, within the frame's budget.
+function rebuildSome(eye) {
+  if (!dirty.size) return 0;
+  const t0 = performance.now();
+  const list = [...dirty].map(n => { const c = chunks[n]; return [n, Math.hypot((c.cx + 0.5) * CS * S - eye[0], (c.cz + 0.5) * CS * S - eye[2])]; }).sort((a, b) => a[1] - b[1]);
+  let done = 0;
+  for (const [n] of list) { meshChunk(chunks[n]); dirty.delete(n); done++; if (performance.now() - t0 > budget) break; }
+  return done;
+}
+
+// ====================================================================
+// GL
+// ====================================================================
+const cv = document.getElementById('view');
+const gl = cv.getContext('webgl', { antialias: false, alpha: false, preserveDrawingBuffer: false });
+function prog(vs, fs) {
+  const p = gl.createProgram();
+  for (const [t, s] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) { const sh = gl.createShader(t); gl.shaderSource(sh, s); gl.compileShader(sh); if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh)); gl.attachShader(p, sh); }
+  gl.linkProgram(p); return p;
+}
+const P1 = prog(`attribute vec3 aP; attribute vec3 aC; uniform mat4 uVP; uniform vec3 uEye; varying vec3 vC; varying float vD;
+  void main(){ gl_Position = uVP * vec4(aP, 1.0); vC = aC; vD = distance(aP, uEye); }`,
+  `precision mediump float; varying vec3 vC; varying float vD; uniform vec2 uFog; uniform vec3 uFogC;
+  void main(){ float f = clamp((vD - uFog.x) / (uFog.y - uFog.x), 0.0, 1.0); gl_FragColor = vec4(mix(vC, uFogC, f * f), 1.0); }`);
+const P2 = prog(`attribute vec2 aQ; void main(){ gl_Position = vec4(aQ, 0.9999, 1.0); }`,
+  `precision mediump float; uniform float uHy; uniform float uH; uniform vec3 uZen; uniform vec3 uHor;
+  void main(){ float y = gl_FragCoord.y / uH * 2.0 - 1.0; float t = clamp((y - uHy) / 1.1, 0.0, 1.0); t = floor(t * 7.0) / 7.0; gl_FragColor = vec4(mix(uHor, uZen, t), 1.0); }`);
+const U1 = { VP: gl.getUniformLocation(P1, 'uVP'), eye: gl.getUniformLocation(P1, 'uEye'), fog: gl.getUniformLocation(P1, 'uFog'), fogC: gl.getUniformLocation(P1, 'uFogC') };
+const A1 = { P: gl.getAttribLocation(P1, 'aP'), C: gl.getAttribLocation(P1, 'aC') };
+const U2 = { hy: gl.getUniformLocation(P2, 'uHy'), H: gl.getUniformLocation(P2, 'uH'), zen: gl.getUniformLocation(P2, 'uZen'), hor: gl.getUniformLocation(P2, 'uHor') };
+const skyBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+const dynBuf = gl.createBuffer();
+gl.enable(gl.DEPTH_TEST);
+
+// ====================================================================
+// Things in the world: you, shells, blasts, bits of ground, and mechs
+// standing about that fall when the ground goes.
+// ====================================================================
+const me = { x: 0, y: 0, z: 0, vy: 0, yaw: 0, pitch: -0.05, grounded: false };
+let shells = [], bits = [], booms = [], mechs = [], shake = 0, blasts = 0, dug = 0;
+
+function placeAll() {
+  me.x = LAND.start[0]; me.z = LAND.start[1]; me.y = groundBelow(me.x, 250, me.z); me.vy = 0; me.yaw = 0.1; me.pitch = -0.04;
+  const at = [[LAND.mesa[0] + 84, LAND.mesa[1]], [LAND.arch[0], LAND.arch[2]], [LAND.start[0] - 40, LAND.canyonZ(LAND.start[0] - 40)], [LAND.tunnel[1][0] + 20, LAND.tunnel[1][2] + 10], [LAND.start[0] + 60, LAND.start[1] + 140], [LAND.mesa[0], LAND.mesa[1]]];
+  mechs = at.map(([x, z], n) => ({ x, z, y: groundBelow(x, 250, z), vy: 0, yaw: n * 1.3, hit: 0, col: n % 2 ? [0.42, 0.24, 0.55] : [0.38, 0.4, 0.44] }));
+}
+
+const DYN = new Float32Array(600_000);
+let dn = 0;
+function dtri(a, b, c, col) {
+  const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+  const n = norm3([uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx]);
+  const lit = 0.45 + 0.6 * Math.abs(n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2]);
+  if (dn > DYN.length - 32) return;
+  for (const p of [a, b, c]) { DYN[dn++] = p[0]; DYN[dn++] = p[1]; DYN[dn++] = p[2]; DYN[dn++] = Math.min(1, col[0] * lit); DYN[dn++] = Math.min(1, col[1] * lit); DYN[dn++] = Math.min(1, col[2] * lit); }
+}
+function dbox(cx, cy, cz, sx, sy, sz, yaw, col) {
+  const c = Math.cos(yaw), s = Math.sin(yaw), p = (x, y, z) => [cx + x * c + z * s, cy + y, cz - x * s + z * c];
+  const v = [p(-sx, -sy, -sz), p(sx, -sy, -sz), p(sx, sy, -sz), p(-sx, sy, -sz), p(-sx, -sy, sz), p(sx, -sy, sz), p(sx, sy, sz), p(-sx, sy, sz)];
+  for (const [a, b, cc, d] of [[0, 1, 2, 3], [5, 4, 7, 6], [4, 0, 3, 7], [1, 5, 6, 2], [3, 2, 6, 7], [4, 5, 1, 0]]) { dtri(v[a], v[b], v[cc], col); dtri(v[a], v[cc], v[d], col); }
+}
+function docta(cx, cy, cz, r, col) {
+  const v = [[cx + r, cy, cz], [cx - r, cy, cz], [cx, cy + r, cz], [cx, cy - r, cz], [cx, cy, cz + r], [cx, cy, cz - r]];
+  for (const [a, b, c] of [[0, 2, 4], [4, 2, 1], [1, 2, 5], [5, 2, 0], [4, 3, 0], [1, 3, 4], [5, 3, 1], [0, 3, 5]]) dtri(v[a], v[b], v[c], col);
+}
+
+function boom(p, r) {
+  blasts++;
+  edit(p, r, 'carve');
+  booms.push({ p, r, t: 0 });
+  // Bits of ground thrown out, coloured like what was there.
+  const n = Math.min(60, Math.round(r * 2.5)), col = p[1] > 70 ? PAL.mid : PAL.rock;
+  for (let q = 0; q < n; q++) {
+    const a = Math.random() * Math.PI * 2, up = 0.4 + Math.random() * 0.9, sp = 8 + Math.random() * r * 1.4;
+    bits.push({ p: [p[0], p[1] + 1, p[2]], v: [Math.cos(a) * sp, up * sp * 1.2, Math.sin(a) * sp], s: 0.6 + Math.random() * (r / 7), life: 1.6 + Math.random() * 1.4, col: col.map(c => c * (0.8 + Math.random() * 0.3)), spin: Math.random() * 6 });
+  }
+  if (!reduceMotion) shake = Math.min(1, shake + r / Math.max(30, Math.hypot(p[0] - me.x, p[2] - me.z)) * 1.6);
+}
+
+function fire() {
+  const e = eye(), d = viewDir();
+  shells.push({ p: [e[0] + d[0] * 3, e[1] - 1.5 + d[1] * 3, e[2] + d[2] * 3], v: [d[0] * 260, d[1] * 260, d[2] * 260], life: 4 });
+}
+
+// ====================================================================
+// Input
+// ====================================================================
+const keys = {};
+let held = false, lastFire = 0, lastBrush = 0, stickV = [0, 0], jetsHeld = false;
+const eye = () => [me.x, me.y + 9, me.z];
+const viewDir = () => [Math.sin(me.yaw) * Math.cos(me.pitch), Math.sin(me.pitch), Math.cos(me.yaw) * Math.cos(me.pitch)];
+addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('button') && (e.code === 'Space' || e.code === 'Enter')) return;
+  keys[e.code] = true;
+  if (e.code === 'KeyF') setFly(!fly);
+  if (e.code >= 'Digit1' && e.code <= 'Digit4') setTool(['shoot', 'dig', 'build', 'smooth'][+e.code.slice(5) - 1]);
+  if (e.code === 'BracketLeft') setSize(Math.max(0, size - 1));
+  if (e.code === 'BracketRight') setSize(Math.min(2, size + 1));
+  if (e.code === 'KeyE' || e.code === 'Enter') held = true;
+  if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+});
+addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'KeyE' || e.code === 'Enter') held = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; held = false; });
+
+// Desktop: click takes the mouse (where the browser allows it); otherwise drag to look and click to fire.
+let dragging = null, moved = 0;
+cv.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'touch') return;
+  if (document.pointerLockElement === cv) { held = true; return; }
+  dragging = { x: e.clientX, y: e.clientY }; moved = 0;
+  try { const r = cv.requestPointerLock && cv.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch {}
+});
+addEventListener('pointermove', e => {
+  if (e.pointerType === 'touch') return;
+  if (document.pointerLockElement === cv) { look(e.movementX, e.movementY); return; }
+  if (!dragging) return;
+  const dx = e.clientX - dragging.x, dy = e.clientY - dragging.y; moved += Math.abs(dx) + Math.abs(dy);
+  look(dx, dy); dragging = { x: e.clientX, y: e.clientY };
+});
+addEventListener('pointerup', e => {
+  if (e.pointerType === 'touch') return;
+  if (document.pointerLockElement === cv) { held = false; return; }
+  if (dragging && moved < 4 && document.pointerLockElement !== cv) { if (tool === 'shoot') fire(); else { held = true; setTimeout(() => { held = false; }, 120); } }
+  dragging = null;
+});
+function look(dx, dy) { me.yaw += dx * 0.0032; me.pitch = clamp(me.pitch - dy * 0.0032, -1.45, 1.45); }
+
+// Touch: the stick, look on the right, FIRE and JETS.
+const stick = document.getElementById('stick'), knob = document.getElementById('knob');
+let stickId = null, lookId = null, lookAt = null;
+stick.addEventListener('pointerdown', e => { stickId = e.pointerId; stick.setPointerCapture(e.pointerId); stickMove(e); e.preventDefault(); });
+stick.addEventListener('pointermove', e => { if (e.pointerId === stickId) stickMove(e); });
+const stickEnd = e => { if (e.pointerId !== stickId) return; stickId = null; stickV = [0, 0]; knob.style.transform = ''; };
+stick.addEventListener('pointerup', stickEnd); stick.addEventListener('pointercancel', stickEnd);
+function stickMove(e) {
+  const r = stick.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2), l = Math.hypot(dx, dy), m = r.width / 2;
+  const k = l > m ? m / l : 1; stickV = [dx * k / m, -dy * k / m]; knob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
+}
+cv.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch' || lookId !== null) return; lookId = e.pointerId; lookAt = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('pointermove', e => { if (e.pointerId !== lookId) return; look((e.clientX - lookAt[0]) * 1.4, (e.clientY - lookAt[1]) * 1.4); lookAt = [e.clientX, e.clientY]; });
+const lookEnd = e => { if (e.pointerId === lookId) lookId = null; };
+cv.addEventListener('pointerup', lookEnd); cv.addEventListener('pointercancel', lookEnd);
+const tfire = document.getElementById('tfire'), tjets = document.getElementById('tjets');
+tfire.addEventListener('pointerdown', e => { held = true; tfire.setPointerCapture(e.pointerId); e.preventDefault(); });
+for (const ev of ['pointerup', 'pointercancel']) { tfire.addEventListener(ev, () => { held = false; }); tjets.addEventListener(ev, () => { jetsHeld = false; }); }
+tjets.addEventListener('pointerdown', e => { jetsHeld = true; tjets.setPointerCapture(e.pointerId); e.preventDefault(); });
+
+// ====================================================================
+// One frame
+// ====================================================================
+function step(dt) {
+  // Walking (or flying).
+  let fwd = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + stickV[1];
+  let side = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + stickV[0];
+  const sp = (fly ? 60 : 16) * (keys.ShiftLeft ? 1.8 : 1);
+  const sy = Math.sin(me.yaw), cy = Math.cos(me.yaw);
+  if (fly) {
+    const d = viewDir();
+    me.x += (d[0] * fwd + cy * side) * sp * dt; me.z += (d[2] * fwd - sy * side) * sp * dt; me.y += (d[1] * fwd + ((keys.Space || jetsHeld) ? 1 : 0) - (keys.KeyC ? 1 : 0)) * sp * dt;
+    me.x = clamp(me.x, -100, EXTENT[0] + 100); me.z = clamp(me.z, -100, EXTENT[2] + 100); me.y = clamp(me.y, 1, 600);
+  } else {
+    const dx = (sy * fwd + cy * side) * sp * dt, dz = (cy * fwd - sy * side) * sp * dt;
+    // A wall at knee or chest height stops you on that axis, so you slide along it.
+    const wall = (x, z) => sample(x, me.y + 4, z) > 0 || sample(x, me.y + 8, z) > 0;
+    if (!wall(me.x + dx + Math.sign(dx) * 3, me.z)) me.x += dx;
+    if (!wall(me.x, me.z + dz + Math.sign(dz) * 3)) me.z += dz;
+    me.x = clamp(me.x, S * 2, EXTENT[0] - S * 2); me.z = clamp(me.z, S * 2, EXTENT[2] - S * 2);
+    if (keys.Space || jetsHeld) me.vy = Math.min(me.vy + 42 * dt, 14);
+    me.vy -= 24 * dt; me.y += me.vy * dt;
+    if (me.vy > 0 && sample(me.x, me.y + 11, me.z) > 0) me.vy = 0;   // a ceiling: the jets bump it
+    const g = groundBelow(me.x, me.y + 3.5, me.z);
+    me.grounded = me.y <= g + 0.05;
+    if (me.y < g) { if (me.vy < -16 && !reduceMotion) shake = Math.min(1, shake + 0.4); me.y = g; me.vy = 0; }
+  }
+
+  // The trigger: shells for SHOOT, brushes for the rest, at what you look at.
+  const now = performance.now();
+  if (held && tool === 'shoot' && now - lastFire > 220) { fire(); lastFire = now; }
+  aim = tool === 'shoot' ? null : rayHit(eye(), viewDir(), 420);
+  if (held && aim && tool !== 'shoot' && now - lastBrush > 60) {
+    lastBrush = now; const r = SIZES.brush[size];
+    if (tool === 'dig') { edit(aim, r, 'carve'); dug++; }
+    else if (tool === 'build') { const d = viewDir(); edit([aim[0] - d[0] * r * 0.5, aim[1] - d[1] * r * 0.5, aim[2] - d[2] * r * 0.5], r, 'build'); }
+    else edit(aim, r * 1.4, 'smooth');
+  }
+
+  // Shells: a little drop, and a blast where they meet ground or a mech.
+  for (const s of shells) {
+    const n = Math.ceil(Math.hypot(s.v[0], s.v[1], s.v[2]) * dt / 2);
+    s.v[1] -= 18 * dt;
+    for (let q = 0; q < n && s.life > 0; q++) {
+      const np = [s.p[0] + s.v[0] * dt / n, s.p[1] + s.v[1] * dt / n, s.p[2] + s.v[2] * dt / n];
+      const m = mechs.find(m => Math.abs(np[0] - m.x) < 4 && Math.abs(np[2] - m.z) < 4 && np[1] > m.y && np[1] < m.y + 13);
+      if (m) { m.hit = 0.25; boom(np, SIZES.shoot[size]); s.life = 0; break; }
+      if (sample(np[0], np[1], np[2]) > 0) { boom(s.p, SIZES.shoot[size]); s.life = 0; break; }
+      s.p = np;
+    }
+    s.life -= dt;
+    if (s.p[1] < -20) s.life = 0;
+  }
+  shells = shells.filter(s => s.life > 0);
+
+  // Thrown ground bounces and settles; blasts grow and fade.
+  for (const b of bits) {
+    b.v[1] -= 26 * dt; b.p[0] += b.v[0] * dt; b.p[1] += b.v[1] * dt; b.p[2] += b.v[2] * dt; b.life -= dt;
+    if (sample(b.p[0], b.p[1], b.p[2]) > 0) { b.p[1] += 0.6; b.v[1] = Math.abs(b.v[1]) * 0.3; b.v[0] *= 0.55; b.v[2] *= 0.55; }
+  }
+  bits = bits.filter(b => b.life > 0);
+  for (const b of booms) b.t += dt;
+  booms = booms.filter(b => b.t < 0.45);
+
+  // Mechs stand on whatever is under their feet, and drop when it goes.
+  for (const m of mechs) {
+    const g = groundBelow(m.x, m.y + 1, m.z);
+    if (m.y > g + 0.05) { m.vy -= 24 * dt; m.y += m.vy * dt; if (m.y <= g) { if (m.vy < -14 && !reduceMotion) shake = Math.min(1, shake + 6 / Math.max(20, Math.hypot(m.x - me.x, m.z - me.z))); m.y = g; m.vy = 0; } }
+    else { m.y = g; m.vy = 0; }
+    m.hit = Math.max(0, m.hit - dt);
+  }
+  shake = Math.max(0, shake - dt * 2.2);
+}
+let aim = null;
+
+let W = 1, H = 1;
+function resize() {
+  const cw = innerWidth, ch = innerHeight, dpr = Math.min(2, devicePixelRatio || 1);
+  if (lines) { H = lines; W = Math.round(lines * cw / ch); } else { W = Math.round(cw * dpr); H = Math.round(ch * dpr); }
+  cv.width = W; cv.height = H; gl.viewport(0, 0, W, H);
+}
+addEventListener('resize', resize);
+
+const PL = new Float32Array(24);
+let drawn = 0, drawnTris = 0, totalTris = 0;
+function render(t) {
+  const e = eye(), d = viewDir();
+  const sx = shake ? (Math.sin(t * 61) * 0.6 + Math.sin(t * 37) * 0.4) * shake * 1.2 : 0, syk = shake ? Math.cos(t * 53) * shake * 0.9 : 0;
+  const ee = [e[0] + sx * Math.cos(me.yaw), e[1] + syk, e[2] - sx * Math.sin(me.yaw)];
+  const V = M4.look(ee, [ee[0] + d[0], ee[1] + d[1], ee[2] + d[2]], [0, 1, 0]), Pm = M4.persp(1.1, W / H, 0.5, 1400), VP = M4.mul(Pm, V);
+  planes(VP, PL);
+  const fogEnd = 640, fogStart = 140;
+  // Sky: where the horizon sits on screen, then the bands above it.
+  const hp = [ee[0] + Math.sin(me.yaw) * 1000, ee[1], ee[2] + Math.cos(me.yaw) * 1000];
+  const cy = VP[1] * hp[0] + VP[5] * hp[1] + VP[9] * hp[2] + VP[13], cw = VP[3] * hp[0] + VP[7] * hp[1] + VP[11] * hp[2] + VP[15];
+  const hy = cw > 0 ? cy / cw : (me.pitch > 0 ? -3 : 3);
+  gl.clearColor(PAL.hor[0], PAL.hor[1], PAL.hor[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.useProgram(P2); gl.depthMask(false);
+  gl.uniform1f(U2.hy, hy); gl.uniform1f(U2.H, H); gl.uniform3fv(U2.zen, PAL.zen); gl.uniform3fv(U2.hor, PAL.hor);
+  gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf); const aq = gl.getAttribLocation(P2, 'aQ'); gl.enableVertexAttribArray(aq); gl.vertexAttribPointer(aq, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3); gl.disableVertexAttribArray(aq); gl.depthMask(true);
+  // The ground, chunk by chunk: what's in view and nearer than the fog's end.
+  gl.useProgram(P1);
+  gl.uniformMatrix4fv(U1.VP, false, VP); gl.uniform3fv(U1.eye, ee); gl.uniform2f(U1.fog, fogStart, fogEnd); gl.uniform3fv(U1.fogC, PAL.hor);
+  gl.enableVertexAttribArray(A1.P); gl.enableVertexAttribArray(A1.C);
+  drawn = 0; drawnTris = 0; totalTris = 0;
+  for (const c of chunks) {
+    totalTris += c.count / 3;
+    if (!c.count) continue;
+    const dx = Math.max(c.lo[0] - ee[0], 0, ee[0] - c.hi[0]), dz = Math.max(c.lo[2] - ee[2], 0, ee[2] - c.hi[2]);
+    if (dx * dx + dz * dz > fogEnd * fogEnd || !boxSeen(PL, c.lo, c.hi)) continue;
+    gl.bindBuffer(gl.ARRAY_BUFFER, c.buf);
+    gl.vertexAttribPointer(A1.P, 3, gl.FLOAT, false, 24, 0); gl.vertexAttribPointer(A1.C, 3, gl.FLOAT, false, 24, 12);
+    gl.drawArrays(gl.TRIANGLES, 0, c.count); drawn++; drawnTris += c.count / 3;
+  }
+  // Everything that moves, in one buffer: mechs, shells, bits, blasts, the brush.
+  dn = 0;
+  for (const m of mechs) {
+    const col = m.hit > 0 ? [1, 1, 1] : m.col, c = Math.cos(m.yaw), s = Math.sin(m.yaw);
+    dbox(m.x - c * 1.6, m.y + 2.6, m.z + s * 1.6, 0.9, 2.6, 1.1, m.yaw, [0.3, 0.3, 0.33]);
+    dbox(m.x + c * 1.6, m.y + 2.6, m.z - s * 1.6, 0.9, 2.6, 1.1, m.yaw, [0.3, 0.3, 0.33]);
+    dbox(m.x, m.y + 7.6, m.z, 3, 2.4, 2.4, m.yaw, col);
+    dbox(m.x + s * 2.2, m.y + 8.2, m.z + c * 2.2, 1.4, 0.5, 0.4, m.yaw, [1, 0.8, 0.35]);
+  }
+  for (const s of shells) docta(s.p[0], s.p[1], s.p[2], 0.7, [1, 0.9, 0.5]);
+  for (const b of bits) { const r = b.s * Math.min(1, b.life); dbox(b.p[0], b.p[1], b.p[2], r, r * 0.8, r, b.spin * b.life, b.col); }
+  for (const b of booms) { const k = b.t / 0.45, r = b.r * (0.35 + 0.65 * Math.sqrt(k)); docta(b.p[0], b.p[1], b.p[2], r, k < 0.3 ? [1, 0.85, 0.35] : k < 0.6 ? [1, 0.45, 0.15] : [0.28, 0.24, 0.22]); }
+  if (aim) docta(aim[0], aim[1], aim[2], tool === 'build' ? 1.6 : 1.3, tool === 'dig' ? [1, 0.35, 0.25] : tool === 'build' ? [0.4, 1, 0.5] : [0.4, 0.7, 1]);
+  if (dn) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, dynBuf); gl.bufferData(gl.ARRAY_BUFFER, DYN.subarray(0, dn), gl.DYNAMIC_DRAW);
+    gl.vertexAttribPointer(A1.P, 3, gl.FLOAT, false, 24, 0); gl.vertexAttribPointer(A1.C, 3, gl.FLOAT, false, 24, 12);
+    gl.drawArrays(gl.TRIANGLES, 0, dn / 6); drawn++; drawnTris += dn / 18;
+  }
+}
+
+// ====================================================================
+// The readout: what this costs, live.
+// ====================================================================
+const statsBody = document.getElementById('statsBody');
+let frames = 0, fpsT = performance.now(), fps = 0, frameMs = 0, frameMax = 0, rebuildMs = 0, rebuildN = 0;
+function readout() {
+  const mem = (D.length + TOP.length * 2) / 1024, mesh = meshStats.n ? meshStats.sum / meshStats.n : 0;
+  const cls = (v, a, b) => (v > b ? 'bad' : v > a ? 'warn' : '');
+  const more = s => `<span class="more">${s}<br></span>`;   // the lines a folded readout leaves out
+  statsBody.innerHTML = [
+    `<span class="${cls(-fps, -55, -30)}">FPS <b>${fps}</b></span>`,
+    `A CHUNK avg <b>${mesh.toFixed(2)}</b> <span class="${cls(meshStats.max, 4, 10)}">max <b>${meshStats.max.toFixed(2)}</b></span> ms`,
+    `TO GPU avg <b>${(meshStats.n ? meshStats.upSum / meshStats.n : 0).toFixed(2)}</b> <span class="${cls(meshStats.upMax, 4, 10)}">max <b>${meshStats.upMax.toFixed(2)}</b></span> ms`,
+    `DRAWS <b>${drawn}</b> · TRIS <b>${Math.round(drawnTris / 1000)}k</b> of <b>${Math.round(totalTris / 1000)}k</b>`,
+  ].join('<br>') + '<br>' + [
+    `JS A FRAME <b>${frameMs.toFixed(1)}</b> ms <span class="${cls(frameMax, 12, 20)}">max <b>${frameMax.toFixed(1)}</b></span>`,
+    `REBUILD <b>${rebuildMs.toFixed(1)}</b> ms · <b>${rebuildN}</b> chunks`,
+    `WAITING <b>${dirty.size}</b> chunks`,
+    `CELLS <b>${S} m</b> · <b>${NX}×${NY}×${NZ}</b>`,
+    `GRID <b>${Math.round(mem)}</b> KB · <b>${chunks.length}</b> chunks`,
+    `FIRST BUILD <b>${Math.round(meshStats.full)}</b> ms`,
+    `BLASTS <b>${blasts}</b> · ${fly ? 'FLYING' : me.grounded ? 'WALKING' : 'IN THE AIR'}`,
+  ].map(more).join('');
+  frameMax = 0;
+}
+
+let last = performance.now(), statT = 0;
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const t0 = performance.now();
+  step(dt);
+  const r0 = performance.now(); const n = rebuildSome(eye()); const r1 = performance.now();
+  if (n) { rebuildMs = r1 - r0; rebuildN = n; }
+  render(now / 1000);
+  frameMs = performance.now() - t0; frameMax = Math.max(frameMax, frameMs);
+  frames++;
+  if (now - fpsT > 500) { fps = Math.round(frames * 1000 / (now - fpsT)); frames = 0; fpsT = now; }
+  if (now - statT > 250) { statT = now; readout(); }
+}
+
+// ====================================================================
+// Settings and tools
+// ====================================================================
+function pressGroup(attr, value) { for (const b of document.querySelectorAll(`[data-${attr}]`)) b.setAttribute('aria-pressed', String(b.dataset[attr] === String(value))); }
+function setTool(t) { tool = t; pressGroup('tool', t); }
+function setSize(s) { size = s; pressGroup('size', s); }
+function setFly(on) { fly = on; me.vy = 0; document.getElementById('flyBtn').setAttribute('aria-pressed', String(on)); }
+document.getElementById('tools').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.tool) setTool(b.dataset.tool);
+  if (b.dataset.size) setSize(+b.dataset.size);
+  if (b.id === 'flyBtn') setFly(!fly);
+  b.blur();
+});
+const setBtn = document.getElementById('setBtn'), settings = document.getElementById('settings');
+setBtn.onclick = () => { settings.hidden = !settings.hidden; setBtn.setAttribute('aria-expanded', String(!settings.hidden)); };
+settings.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.cell) { S = +b.dataset.cell; pressGroup('cell', S); rebuildWorld(); }
+  if (b.dataset.lines) { lines = +b.dataset.lines; pressGroup('lines', lines); resize(); }
+  if (b.dataset.budget) { budget = +b.dataset.budget; pressGroup('budget', budget); }
+  if (b.id === 'reset') rebuildWorld();
+  if (b.id === 'reseed') { seed = Math.floor(Math.random() * 1000); rebuildWorld(); }
+  if (b.id === 'soft') { soft = !soft; b.setAttribute('aria-pressed', String(soft)); }
+  if (b.id === 'helpBtn') document.getElementById('help').hidden = false;
+  b.blur();
+});
+const help = document.getElementById('help');
+document.getElementById('goBtn').onclick = () => { help.hidden = true; };
+
+function rebuildWorld() {
+  const busy = document.getElementById('busy'); busy.hidden = false;
+  setTimeout(() => {
+    generate(); setupChunks(); buildAll(); placeAll();
+    shells = []; bits = []; booms = []; blasts = 0;
+    busy.hidden = true; readout();
+  }, 30);
+}
+
+const statsEl = document.getElementById('stats');
+if (isTouch) statsEl.classList.add('folded');
+else statsEl.querySelector('.tch-only').hidden = true;
+statsEl.addEventListener('click', () => statsEl.classList.toggle('folded'));
+
+resize();
+const busy = document.getElementById('busy'); busy.hidden = false;
+setTimeout(() => { generate(); setupChunks(); buildAll(); placeAll(); busy.hidden = true; requestAnimationFrame(loop); }, 30);
+</script>

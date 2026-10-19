@@ -229,7 +229,7 @@ usable.
   this spec's shared parts and decide after using the editor. An in-match
   economy would not break the "no currency" non-goal (that covers persistent
   progression), but anything here must still fit two thumbs and a tap.
-- **Height painting.** Default: no. It needs a stored height grid per mission
+- **Height painting.** Superseded by [18-voxel-ground.md](18-voxel-ground.md): the owner wants sculpted ground (canyons, caves, overhangs), and spec 18 does it with voxels. The rest of this item was the old default: no. It needs a stored height grid per mission
   (about 37 KB raw, less as changes from the seed) and co-op sync. Revisit if
   REROLL and pads keep failing to give the ground a mission needs.
 - **Editor in the menu.** Default: URL only until the campaign missions have
