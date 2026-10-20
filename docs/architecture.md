@@ -374,6 +374,7 @@ src/
     mechlab.js     (M2)
     screens.js     briefing, pause, debrief
     debrief.js     objectiveRows, debriefTitle: the debrief's tick-or-cross rows
+    debugMenu.js   the DEBUG tab under ?debug=1: RANGE, CHEATS, JUMP TO, TUNING (M8, spec 19)
   input/
     keyboard.js
     mouse.js
