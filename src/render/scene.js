@@ -3,7 +3,8 @@ import { backingSize } from './look.js';
 import { effectLook, SHAPE_BY_KIND, TUMBLE_BY_KIND } from '../mesh/effects.js';
 import { M as M0, add, makeMatrixArena, frustumPlanes, sphereVisible, boxVisible, clampN, dirOf, mix3, mul, norm, rnd, sub, len, cross, TAU } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
-import { buildTerrainMesh } from '../world/terrainMesh.js';
+import { buildGroundExtras } from '../world/terrainMesh.js';
+import { createGround } from './ground.js';
 import { Builder } from '../mesh/builder.js';
 import { viewYaw } from '../sim/geom.js';
 import { solveKnee, limb } from '../sim/gait.js';
@@ -95,25 +96,32 @@ function inverse3(m) {
 // their IK legs, wrecks, shots, pulses, beams and particles.
 export function createScene(app) {
   const G = app.G, R = app.R, wrap = app.wrap, cv = app.cv, hud = app.hud;
-  // The terrain on the GPU (world/terrainMesh.js: 16 chunks, each with its
-  // box), rebuilt whenever the sim builds a new world. One buffer, the chunks
-  // in rows, so each run of neighbours in view is one draw.
+  // The world on the GPU, rebuilt whenever the sim builds a new one: the voxel
+  // ground (render/ground.js), and what stands on it (world/terrainMesh.js: 16
+  // chunks, each with its box) in one buffer, the chunks in rows, so each run
+  // of neighbours in view is one draw.
+  const ground = createGround(R);
   let world = { buf: null, chunks: [] };
   const RUN = { buf: null, first: 0, count: 0 };
   function uploadWorld() {
     if (world.buf) R.gl.deleteBuffer(world.buf);
-    const chunks = buildTerrainMesh(G.ter, G.pal, G.ter.seed), all = new Builder();
+    const P = G.player, eye = P && G.worldKind === 'match' ? [P.x, 0, P.z] : [0, 0, 0];
+    ground.load(G.ter, G.pal, eye);
+    const chunks = buildGroundExtras(G.ter, G.pal, G.ter.seed), all = new Builder();
     world = { chunks: chunks.map(({ b, ...ch }) => { const first = all.d.length / 9; for (const v of b.d) all.d.push(v); return { ...ch, first, count: b.d.length / 9 }; }) };
-    world.buf = R.upload(all).buf;
+    world.buf = all.d.length ? R.upload(all).buf : null;
   }
   // A chunk is drawn when its box is in view and some of it is nearer than the fog's end.
-  const ID = M0.id();   // the ground is drawn where it is
+  const ID = M0.id(), SUNK = M0.T(0, -2, 0);   // the ground is drawn where it is; its far groups a little lower (render/ground.js)
   function drawWorld(eye) {
+    ground.tick(eye);
+    ground.draw(eye, FOG[1], PLANES, ID, SUNK);
+    if (!world.buf) return;
     RUN.buf = world.buf; RUN.count = 0;
     const cs = world.chunks;
     for (let i = 0; i < cs.length; i++) {   // an index, not for-of: no iterator garbage while this is still cold
       const ch = cs[i], dx = Math.max(ch.lo[0] - eye[0], 0, eye[0] - ch.hi[0]), dz = Math.max(ch.lo[2] - eye[2], 0, eye[2] - ch.hi[2]);
-      if (dx * dx + dz * dz > FOG[1] * FOG[1] || !boxVisible(PLANES, ch.lo, ch.hi)) {
+      if (!ch.count || dx * dx + dz * dz > FOG[1] * FOG[1] || !boxVisible(PLANES, ch.lo, ch.hi)) {
         if (RUN.count) { R.draw(RUN, ID); RUN.count = 0; }
         continue;
       }
@@ -653,5 +661,5 @@ export function createScene(app) {
 
 
   const view = { get W() { return W; }, get H() { return H; }, get dpr() { return dpr; } };
-  return { resize, render, uploadWorld, view, poseWire };
+  return { resize, render, uploadWorld, view, poseWire, groundReady: () => ground.ready(), groundPending: ground.pending };
 }

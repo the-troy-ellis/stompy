@@ -145,6 +145,7 @@ try {
   await page.addInitScript(() => { localStorage.clear(); localStorage.setItem('stompy.camp.mission', '0'); });
   await page.goto(URL_);
   await page.waitForSelector('.mm-title', { timeout: 15000 });
+  await page.evaluate(() => window.__stompy.app.scene.groundReady());
   await page.evaluate(setup);
   await page.waitForTimeout(100);
   const cdp = await page.context().newCDPSession(page);
@@ -185,6 +186,7 @@ try {
     startMatch(G, { name: 'Perf', pal: 'dusk', foes: ['jackal', 'jackal', 'jackal'], intel: '' }, 1234, false, 'kestrel');
     G.kind = 'free'; G.diff = 'normal';
     app.scene.uploadWorld(); app.ui.launch();
+    await app.scene.groundReady();   // the far chunks mesh in the worker; measure the whole ground
     window.requestAnimationFrame = () => 0;
     // The sound samples decode once, as they arrive; let that finish before
     // measuring, or it lands as garbage in whichever scene is running (it
@@ -201,6 +203,7 @@ try {
     const G = window.__stompy.game, app = window.__stompy.app;
     startBench(G);
     app.scene.uploadWorld(); app.ui.launch();
+    await app.scene.groundReady();   // the far chunks mesh in the worker; measure the whole ground
     window.requestAnimationFrame = () => 0;
     return BENCH_SEGS;
   });
@@ -216,6 +219,7 @@ try {
       startMatch(G, { name: 'Perf', pal, weather, foes: ['jackal', 'jackal', 'jackal'], intel: '' }, 1234, false, 'kestrel');
       G.kind = 'free'; G.diff = 'normal';
       app.scene.uploadWorld(); app.ui.launch();
+    await app.scene.groundReady();   // the far chunks mesh in the worker; measure the whole ground
       window.requestAnimationFrame = () => 0;
     }, [pal, weather]);
     await scene(name, 60, 30);
