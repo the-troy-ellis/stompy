@@ -5,6 +5,7 @@ import { M as M0, add, makeMatrixArena, frustumPlanes, sphereVisible, boxVisible
 import { geoOf } from '../data/geo.js';
 import { buildGroundExtras } from '../world/terrainMesh.js';
 import { createGround } from './ground.js';
+import { createFalls } from './falls.js';
 import { Builder } from '../mesh/builder.js';
 import { viewYaw } from '../sim/geom.js';
 import { solveKnee, limb } from '../sim/gait.js';
@@ -100,7 +101,7 @@ export function createScene(app) {
   // ground (render/ground.js), and what stands on it (world/terrainMesh.js: 16
   // chunks, each with its box) in one buffer, the chunks in rows, so each run
   // of neighbours in view is one draw.
-  const ground = createGround(R);
+  const ground = createGround(R), falls = createFalls(R);
   let world = { buf: null, chunks: [] };
   const RUN = { buf: null, first: 0, count: 0 };
   function uploadWorld() {
@@ -114,7 +115,7 @@ export function createScene(app) {
   // A chunk is drawn when its box is in view and some of it is nearer than the fog's end.
   const ID = M0.id(), SUNK = M0.T(0, -2, 0);   // the ground is drawn where it is; its far groups a little lower (render/ground.js)
   function drawWorld(eye) {
-    ground.tick(eye);
+    ground.tick(eye, G.falls);
     ground.draw(eye, FOG[1], PLANES, ID, SUNK);
     if (!world.buf) return;
     RUN.buf = world.buf; RUN.count = 0;
@@ -624,6 +625,7 @@ export function createScene(app) {
 
     R.drawHeat = 0;
     drawWorld(eye);
+    falls.draw(G);   // ground coming down (render/falls.js)
     drawScorches();
     // In the missile camera your own mech is out there too.
     R.drawHeat = 1;

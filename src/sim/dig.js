@@ -1,8 +1,13 @@
-import { DIG, WEAPONS } from '../data/weapons.js';
-import { sceneryNear } from './entities.js';
+import { DIG, CRUSH, WEAPONS } from '../data/weapons.js';
+import { sceneryNear, destroyEntity } from './entities.js';
 import { particle } from './effects.js';
+import { cloneGround, VS, Y0, PX, PY } from '../world/voxels.js';
+import { HALF } from '../world/terrain.js';
+import { feel } from './feel.js';
+import { damage } from './combat.js';
+import { geoOf } from '../data/geo.js';
 
-const { hypot, min, round } = Math;
+const { hypot, min, max, round } = Math;
 
 // Digging in play (docs/specs/18-voxel-ground.md § Digging in play, § Sync).
 // Every blast that digs comes through `dig`: the ground is carved (soft
@@ -13,7 +18,15 @@ const { hypot, min, round } = Math;
 // another pilot's shell explodes here without digging, and their `digs`
 // arrive from the relay. Re-applying a dig changes nothing (carving takes the
 // smaller of the ground and the hole), so each client applies every dig the
-// relay echoes, its own included, in any order.
+// relay echoes, its own included.
+//
+// Falls (§ Falling ground) don't commute with digs, so they are worked out
+// on the confirmed ground: the digs in the relay's order and nothing else.
+// Every client has the same confirmed ground, so every client finds the same
+// falls, a late joiner replaying the room's list too; nothing more goes over
+// the wire. In single player the ground is its own confirmed ground. Online,
+// G.terC is a copy kept in the relay's order, and G.ter is it plus this
+// client's own digs not echoed yet (`G.unechoed`), carved again after a fall.
 
 // Whether this client decides blasts by `m` (a mech, a turret or null for the
 // world): everything in single player; in the arena, your own; in co-op, your
@@ -29,6 +42,14 @@ export const deathDig = m => min(DIG.death * m.ch.scale, DIG.deathMax);
 
 const q = (v, s) => round(v / s) * s;   // on the wire: positions to 0.25 m, radii to 0.5 m
 const NEAR = [];
+const online = G => G.mode === 'mp' || (G.role || 'solo') !== 'solo';
+// The confirmed ground: the ground itself in single player; online a copy
+// made from the fresh ground (before this client's first dig on it).
+function confirmed(G) {
+  if (!online(G)) return G.ter;
+  if (!G.terC || G.terC.of !== G.ter) { G.terC = cloneGround(G.ter); G.terC.of = G.ter; G.unechoed = []; }
+  return G.terC;
+}
 
 // A blast at `p` digging a hole of radius `r`, if this client owns it.
 export function dig(G, p, r, owned = true) {
@@ -36,27 +57,100 @@ export function dig(G, p, r, owned = true) {
   const x = q(p[0], 0.25), y = q(p[1], 0.25), z = q(p[2], 0.25), rr = q(r, 0.5);
   // Nothing within reach below it (a missile popping in the air): nothing to dig, nothing to send.
   if (G.ter.groundBelow(x, y + rr, z, y - rr) <= y - rr) return;
-  applyDig(G, 0, x, y, z, rr);
-  if (G.mode === 'mp' || (G.role || 'solo') !== 'solo') G.pendingDigs.push([0, x, y, z, rr]);
+  if (!online(G)) { confirmDig(G, [0, x, y, z, rr], true); return; }
+  confirmed(G);   // copied before the first dig touches the ground
+  G.ter.dig([x, y, z], rr, DIG.rock);   // ours, at once; confirmed when the relay echoes it
+  settle(G, x, z, rr);
+  G.pendingDigs.push([0, x, y, z, rr]);
+  G.unechoed.push([0, x, y, z, rr]);
 }
 
 // Digs off the wire (the relay's `digs`, or the room's list in `welcome`):
 // [seq, op, x, y, z, r] each, in the relay's order. Anything malformed is skipped.
-export function applyDigList(G, l) {
+// `replay`: the room's list in `welcome`, the past: falls in it land at once, unseen.
+export function applyDigList(G, l, replay = false) {
   if (!Array.isArray(l) || !G.ter) return;
   for (const d of l) {
     if (!Array.isArray(d) || d.length !== 6 || !d.every(Number.isFinite)) continue;
     const [seq, op, x, y, z, r] = d;
-    if (r > 0 && r <= DIG.deathMax) applyDig(G, op, x, y, z, r);
+    if (op === 0 && r > 0 && r <= DIG.deathMax) confirmDig(G, [0, x, y, z, r], !replay);
     if (seq > G.digSeq) G.digSeq = seq;
   }
 }
 
-// Carve and settle what stands there: for a local dig and for one off the wire.
-export function applyDig(G, op, x, y, z, r) {
-  if (op !== 0) return;   // carving is all that play does until construction gear exists
-  G.ter.dig([x, y, z], r, DIG.rock);
+// One dig in the confirmed order: carved, the ground it leaves unheld falls,
+// and what stood there settles. `seen`: the falls are shown coming down.
+function confirmDig(G, e, seen) {
+  const [, x, y, z, r] = e, C = confirmed(G), b = C.dig([x, y, z], r, DIG.rock);
+  const falls = b ? C.islands(b).map(cells => C.fall(cells)) : [];
+  if (C !== G.ter) {
+    const k = G.unechoed.findIndex(u => u[1] === x && u[2] === y && u[3] === z && u[4] === r);
+    if (k >= 0) G.unechoed.splice(k, 1);   // our own, back from the relay
+    G.ter.dig([x, y, z], r, DIG.rock);
+    if (falls.length) {
+      // Where ground fell and landed, ours becomes the confirmed bytes, and
+      // our own digs not echoed yet are carved again on top.
+      for (const f of falls) { const [i0, i1, j0, j1, k0, k1] = f.box; G.ter.copyBox(C, [i0 - 1, i1 + 1, max(j0 - f.drop - 1, 0), j1 + 1, k0 - 1, k1 + 1]); }
+      for (const u of G.unechoed) G.ter.dig([u[1], u[2], u[3]], u[4], DIG.rock);
+    }
+    C.dirty.clear();
+  }
   settle(G, x, z, r);
+  for (const f of falls) startFall(G, f, seen);
+}
+
+// Ground coming down (world/voxels.js fall has already moved it in the
+// grid): G.falls holds it while it is drawn falling (render/scene.js meshes
+// it from its cells); when it lands, the thunk and what it lands on.
+function startFall(G, f, seen) {
+  let sx = 0, sz = 0, lo = Infinity, hi = -Infinity;
+  const cols = new Set();
+  for (const o of f.cells) {
+    const i = o % PX, j = ((o / PX) | 0) % PY, k = (o / (PX * PY)) | 0;
+    sx += i; sz += k; lo = min(lo, j); hi = max(hi, j); cols.add(i + PX * k);
+  }
+  const n = f.cells.length, at = [-HALF + (sx / n) * VS, Y0 + lo * VS, -HALF + (sz / n) * VS];
+  const [i0, i1, , , k0, k1] = f.box, reach = hypot(i1 - i0 + 1, k1 - k0 + 1) * VS / 2;
+  settle(G, at[0], at[2], reach);   // what stood on it: props break, scorches and wrecks drop
+  const fall = { ...f, n, cols, at, top: Y0 + hi * VS, dropM: f.drop * VS, off: 0, vy: 0, reach };
+  if (seen) G.falls.push(fall);
+  else land(G, fall, false);
+}
+// Each frame: the falling ground drops under gravity until it lands.
+export function stepFalls(G, dt) {
+  if (!G.falls.length) return;
+  for (const f of G.falls) {
+    f.vy += 18 * dt; f.off = min(f.dropM, f.off + f.vy * dt);
+    if (f.off >= f.dropM) {
+      f.landed = true; land(G, f, true);
+      const [i0, i1, j0, j1, k0, k1] = f.box;
+      if (f.heap) G.ter.mark([i0, i1, Math.max(j0 - f.drop, 2), j1 - f.drop, k0, k1]);   // the heap shows now (render/ground.js hid it while it fell)
+    }
+  }
+  G.falls = G.falls.filter(f => !f.landed);
+}
+// A fall lands: the mechs under it take the crush (on the client that owns
+// each), props and structures under it break, and the landing thunks.
+function land(G, f, seen) {
+  const under = (x, z) => f.cols.has(round((x + HALF) / VS) + PX * round((z + HALF) / VS));
+  const bottom = f.at[1] - f.dropM, top = f.top - f.dropM;
+  if (seen) {
+    for (const m of G.mechs) {
+      if (!m.alive || !ownsDigs(G, m) || !under(m.x, m.z) || m.y > top || m.y < bottom - VS - 1) continue;   // under it: from a cell below its bottom row to its top
+      damage(G, m, [m.x, m.y + (geoOf(m).legTop + 1) * m.ch.scale, m.z], min(CRUSH.max, CRUSH.perCell * f.n), null);   // to the torso
+    }
+  }
+  const n = sceneryNear(G, f.at[0], f.at[2], f.reach + 8, NEAR);
+  for (let i = 0; i < n; i++) { const e = NEAR[i]; if (e.alive && under(e.x, e.z) && e.y < top + 1) breakProp(G, e, f.at[0] + 0.01, f.at[2]); }
+  if (ownsDigs(G, null)) for (const e of G.entities) if (e.alive && e.kind !== 'nav' && under(e.x, e.z) && e.y < top + 1) destroyEntity(G, e, null);
+  if (!seen) return;
+  const r = G.rng, p = [f.at[0], bottom, f.at[2]], big = f.n >= 40;
+  const near = G.player ? max(0, 1 - hypot(G.player.x - p[0], G.player.z - p[2]) / 160) : 0;
+  feel(G, 'blast', { mech: null, k: near * min(1, 0.3 + f.n / 120), at: p });
+  G.fx.sfx.boom(p, big);
+  const dust = min(40, 6 + f.n);
+  for (let i = 0; i < dust; i++) particle(G, [p[0] + r.range(-1, 1) * f.reach, bottom + 1, p[2] + r.range(-1, 1) * f.reach], [r.range(-4, 4), r.range(1, 5), r.range(-4, 4)], r.range(1.5, 3), r.range(1.5, 3.5), [0.42, 0.36, 0.3], 'smoke');
+  if (!f.heap) for (let i = 0; i < 14; i++) particle(G, [p[0], bottom + 3, p[2]], [r.range(-9, 9), r.range(4, 14), r.range(-9, 9)], r.range(1.2, 2.2), r.range(0.6, 1.4), [0.35, 0.3, 0.26], 'debris', 26);   // a small piece shatters
 }
 
 // What stood in reach of a dig: scorches, wrecks and debris move down onto

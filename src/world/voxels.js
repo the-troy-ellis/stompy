@@ -11,7 +11,8 @@ const { floor, ceil, hypot, max, min } = Math;
 // Bedrock (the bottom two layers) never changes; outside the map is air.
 export const VS = 8, Y0 = -44, NX = (2 * HALF) / VS, NY = 38, NZ = NX;
 export const CS = 16, CX = ceil(NX / CS), CY = ceil(NY / CS), CZ = ceil(NZ / CS);
-const PX = NX + 1, PY = NY + 1, PZ = NZ + 1;
+export const PX = NX + 1, PY = NY + 1, PZ = NZ + 1;
+const STEPS = new Int32Array([1, -1, PX * PY, -PX * PY, PX, -PX]);   // the six face neighbours; down last, so it is tried first
 export const cornerIndex = (i, j, k) => i + PX * (j + PY * k);
 // Density is metres from the surface over DS, so slopes up to ~60° keep their shape between corners.
 export const DS = 2 * VS;
@@ -19,6 +20,10 @@ export const DS = 2 * VS;
 export const SOFT = 6;
 const Q = d => (d <= -1 ? 1 : d >= 1 ? 255 : Math.round(d * 127) + 128);   // never 0, so 128 is the one boundary byte
 const BEDROCK = 1;   // corners j <= 1 stay solid
+// A fill past this many corners is part of the land (held up); an island under SHATTER corners breaks up as it lands.
+export const ISLAND_MAX = 4096, SHATTER = 8;
+const LIST_MAX = 1 << 19;
+let MARK = null, LIST = null, STACK = null;   // the support check's scratch (groundApi islands)
 
 // Builds the ground for a seed and a mission definition. `def.ground` (all
 // optional): { landmarks: [...], strokes: [[op, x, y, z, r], ...], pockets }.
@@ -149,6 +154,76 @@ function groundApi(G) {
       }
     }
     touched(i0, i1, j0, j1, k0, k1);
+    return [i0, i1, j0, j1, k0, k1];
+  }
+  // Falling ground (spec 18 § Falling ground). A solid corner is held up if a
+  // chain of solid corners, face to face, links it to bedrock; a fill that
+  // grows past ISLAND_MAX corners is part of the land and held up too. The
+  // islands: solid corners in `b` (a box of corners, grown by one) that
+  // nothing holds up, as arrays of corner indices, in a fixed order.
+  function islands(b) {
+    const i0 = clampN(b[0] - 1, 1, NX - 1), i1 = clampN(b[1] + 1, 1, NX - 1), j0 = clampN(b[2] - 1, BEDROCK + 1, NY - 1), j1 = clampN(b[3] + 1, BEDROCK + 1, NY - 1);
+    const k0 = clampN(b[4] - 1, 1, NZ - 1), k1 = clampN(b[5] + 1, 1, NZ - 1), out = [];
+    // Typed scratch shared by every ground, no garbage per dig: MARK 1 is in
+    // this fill, 2 held up; LIST is every corner marked, cleared at the end.
+    if (!MARK) { MARK = new Uint8Array(PX * PY * PZ); LIST = new Int32Array(LIST_MAX); STACK = new Int32Array(ISLAND_MAX + 8); }
+    let nl = 0;
+    seeds: for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const s0 = cornerIndex(i, j, k);
+      if (D[s0] <= 128 || MARK[s0]) continue;
+      if (nl > LIST_MAX - ISLAND_MAX - 8) break seeds;   // a huge check: the rest counts as held up
+      const start = nl;
+      let sp = 0, up = false;
+      MARK[s0] = 1; LIST[nl++] = s0; STACK[sp++] = s0;
+      while (sp && !up) {
+        const o = STACK[--sp];
+        for (let d = 0; d < 6; d++) {
+          const n = o + STEPS[d], m = MARK[n];
+          if (m === 2) { up = true; break; }
+          if (m || D[n] <= 128) continue;
+          if (((n / PX) | 0) % PY <= BEDROCK || nl - start >= ISLAND_MAX) { up = true; break; }
+          MARK[n] = 1; LIST[nl++] = n; STACK[sp++] = n;
+        }
+      }
+      if (!up) out.push(LIST.slice(start, nl).sort());
+      for (let q = start; q < nl; q++) MARK[LIST[q]] = 2;
+    }
+    for (let q = 0; q < nl; q++) MARK[LIST[q]] = 0;
+    return out;
+  }
+  // An island comes down: cut out, dropped whole cells straight down to the
+  // first ground under any of its columns, and, unless it is a small one that
+  // shatters (under SHATTER corners), stamped back as a heap. Whole cells, so
+  // every client stamps the same bytes. Returns what the drawing needs: the
+  // cells' bytes as they were, how far (cells), and the boxes it changed.
+  function fall(cells) {
+    const bytes = new Uint8Array(cells.length), low = new Map();
+    let i0 = NX, i1 = 0, j0 = NY, j1 = 0, k0 = NZ, k1 = 0;
+    cells.forEach((o, n) => {
+      bytes[n] = D[o];
+      const i = o % PX, j = ((o / PX) | 0) % PY, k = (o / (PX * PY)) | 0, col = i + PX * k;
+      if (!low.has(col) || j < low.get(col)) low.set(col, j);
+      i0 = min(i0, i); i1 = max(i1, i); j0 = min(j0, j); j1 = max(j1, j); k0 = min(k0, k); k1 = max(k1, k);
+    });
+    for (const o of cells) D[o] = 1;
+    let drop = NY;
+    for (const [col, j] of low) {
+      const i = col % PX, k = (col / PX) | 0;
+      let jj = j - 1;
+      while (jj > 0 && D[cornerIndex(i, jj, k)] <= 128) jj--;
+      drop = min(drop, j - 1 - jj);
+    }
+    const heap = cells.length >= SHATTER && drop > 0, prev = new Uint8Array(cells.length);   // prev: the bytes the heap went over (the renderer hides it until it lands)
+    if (heap) cells.forEach((o, n) => { const t = o - drop * PX; prev[n] = D[t]; if (bytes[n] > D[t]) D[t] = bytes[n]; });
+    touched(i0, i1, max(j0 - drop, BEDROCK + 1), j1, k0, k1);
+    return { cells, bytes, prev, drop, heap, box: [i0, i1, j0, j1, k0, k1] };
+  }
+  // Copy a box of corners from another ground of the same map (net/dig sync:
+  // the confirmed ground's bytes after a fall).
+  function copyBox(from, b) {
+    const [i0, i1, j0, j1, k0, k1] = b;
+    for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) { const o = cornerIndex(i0, j, k); D.set(from.D.subarray(o, o + i1 - i0 + 1), o); }
+    touched(i0, i1, j0, j1, k0, k1);
   }
   // A short fingerprint of the ground (FNV-1a over the bytes): two clients that
   // agree on it have the same ground (the smoke test and the sync tests).
@@ -191,7 +266,8 @@ function groundApi(G) {
   }
   // An editor stroke: [op, x, y, z, r], op 0 carve, 1 build, 2 smooth.
   const stroke = ([op, x, y, z, r]) => (op === 0 ? carve : op === 1 ? build : smooth)([x, y, z], r);
-  return { sample, height, solid, groundBelow, ray, carve, dig, build, smooth, block, stroke, retop, hash };
+  const mark = b => touched(...b);   // mesh a box of corners again (a heap that has landed)
+  return { sample, height, solid, groundBelow, ray, carve, dig, islands, fall, copyBox, mark, build, smooth, block, stroke, retop, hash };
 }
 
 // A landmark, as a distance shape laid onto the ground: positive inside rock.
@@ -252,6 +328,12 @@ function pockets(ground, seed) {
       if (hash(i >> 2, j >> 1, k >> 2) > 0.93) { const o = cornerIndex(i, j, k); D[o] = Q(-0.6); }
     }
   }
+}
+
+// A second ground with the same bytes (the net's confirmed ground, sim/dig.js).
+export function cloneGround(g) {
+  const c = { D: g.D.slice(), top: g.top.slice(), base: g.base, seed: g.seed, flat: g.flat, dirty: new Set(), rev: 0 };
+  return Object.assign(c, groundApi(c));
 }
 
 // What the mesher needs for a block of corners (mesher.js): `dims` of them

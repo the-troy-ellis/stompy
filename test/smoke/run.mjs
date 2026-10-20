@@ -426,6 +426,16 @@ try {
     console.log(`digs: ONE, TWO and THREE (joined after) hold ground ${hashes.map(x => `${x.h} (dig ${x.seq})`).join(', ')}`);
     if (!(hashes.every(x => x.h === hashes[0].h && x.seq === 4))) { failed = true; console.error('FAIL: the ground differs between pilots after digging'); }
     await late.close();
+    // A fall in the fight (#284): the same ball of rock on a stem on both
+    // maps; ONE blows out the stem; both work out the same fall from the
+    // relay's order and end with the same ground.
+    const mush = G => { const h = G.ter.height(40, -40); for (const t of [G.ter, G.terC].filter(Boolean)) { t.block(36, 44, -44, -36, h + 30); t.build([40, h + 40, -40], 14); } return h; };   // on the start's flat ground, the same on every map
+    for (const p of pages) await p.evaluate(src => { const G = window.__stompy.game; window.__mushH = new Function('G', `return (${src})(G)`)(G); }, mush.toString());
+    await pages[0].evaluate(async () => { const { dig } = await import('/src/sim/dig.js'); const G = window.__stompy.game; dig(G, [40, window.__mushH + 8, -40], 7); });
+    await pages[0].waitForTimeout(2500);
+    const fell = await Promise.all(pages.map(p => p.evaluate(() => { const G = window.__stompy.game; return { h: G.ter.hash(), gone: !G.ter.solid(40, window.__mushH + 44, -40), heap: G.ter.solid(40, window.__mushH + 28, -40) }; })));   // the grid, not the drawing: a background tab's fall may still be in the air
+    console.log(`falls: after ONE cut the stem, ${fell.map((x, i) => `${['ONE', 'TWO'][i]} ${x.h} (ball gone from up there ${x.gone}, heap below ${x.heap})`).join(', ')}`);
+    if (!(fell[0].h === fell[1].h && fell.every(x => x.gone && x.heap))) { failed = true; console.error('FAIL: a fall left the pilots with different ground'); }
     await pages[1].waitForTimeout(500);
     await pages[0].screenshot({ path: 'test-results/smoke-arena.png' });
     // The round's end (#187): TWO reports going down to ONE, which reaches the

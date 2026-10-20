@@ -1,4 +1,4 @@
-import { chunkCorners, farCorners, CX, CY, CZ, CS, VS } from '../world/voxels.js';
+import { chunkCorners, farCorners, CX, CY, CZ, CS, CN, VS, PX, PY } from '../world/voxels.js';
 import { HALF } from '../world/terrain.js';
 import { meshChunk, boundsOf } from '../world/mesher.js';
 import { boxVisible } from '../util/math.js';
@@ -49,9 +49,21 @@ export function createGround(R) {
     } catch { workerOk = false; worker = null; }
     return worker;
   }
+  // Ground still falling (sim/dig.js G.falls) is drawn by render/falls.js;
+  // the grid already has its heap where it lands, so near chunks are meshed
+  // with the bytes from before it, until it lands (then they are marked again).
+  let falling = [];
   const corners = id => {
     if (id >= FAR) { const g = id - FAR; return farCorners(ground, (g % GX) * G2, ((g / GX) | 0) * G2, G2); }
-    return chunkCorners(ground, id % CX, ((id / CX) | 0) % CY, (id / (CX * CY)) | 0);
+    const cx = id % CX, cy = ((id / CX) | 0) % CY, cz = (id / (CX * CY)) | 0, c = chunkCorners(ground, cx, cy, cz);
+    for (const f of falling) {
+      if (!f.heap) continue;
+      f.cells.forEach((o, n) => {
+        const t = o - f.drop * PX, i = t % PX - cx * CS + 1, j = ((t / PX) | 0) % PY - cy * CS + 1, k = ((t / (PX * PY)) | 0) - cz * CS + 1;
+        if (i >= 0 && j >= 0 && k >= 0 && i < CN && j < CN && k < CN) c.D[i + CN * (j + CN * k)] = f.prev[n];
+      });
+    }
+    return c;
   };
   function took(id, v, f, box) {
     if (v !== ver[id]) return;   // edited again since: a newer one is on its way
@@ -90,7 +102,8 @@ export function createGround(R) {
 
   // Each frame, before drawing: what the sim dug, what came near, then send or mesh some, then upload.
   let lastEye = [0, 0, 0];
-  function tick(eye) {
+  function tick(eye, falls = []) {
+    falling = falls;
     if (!ground) return;
     lastEye = eye;
     let added = false;
