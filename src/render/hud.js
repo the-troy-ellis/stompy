@@ -1,4 +1,3 @@
-import { cheatsOn } from '../sim/cheats.js';
 import { CHEATS } from '../data/debug.js';
 import { RADAR_RANGE, radarOf, fogOf } from '../data/weather.js';
 import { TAU, clampN, len, rnd, sub } from '../util/math.js';
@@ -427,7 +426,11 @@ export function createHud(app) {
     const full = app.params.has('debug');
     const lines = [`FRAME ${q(0.5).toFixed(1)} ms  P95 ${q(0.95).toFixed(1)} ms`, `DRAWS ${app.R.draws}  CULLED ${app.R.culled || 0}  PARTICLES ${G.parts.length}  MECHS ${G.mechs.length}`];
     if (full) lines.push(`SEED ${G.ter?.seed ?? '-'}  T ${G.time.toFixed(1)}  STATE ${G.state}${app.net.mp() ? `  PING ${app.net.Net.rtt} ms` : ''}`);
-    if (full) { const on = cheatsOn(G, CHEATS); if (on.length) lines.push(G.mode === 'sp' ? `CHEATS: ${on.map(([, l]) => l).join(' · ')}` : 'CHEATS (OFF HERE)'); }   // so a screenshot says how it was made
+    if (full) {   // the cheats that are on, so a screenshot says how it was made; a plain loop: nothing made while none are on
+      let on = '';
+      for (const [k, l] of CHEATS) if (G.cheats?.[k]) on += (on ? ' · ' : '') + l;
+      if (on) lines.push(G.mode === 'sp' ? `CHEATS: ${on}` : 'CHEATS (OFF HERE)');
+    }
     lines.forEach((l, i) => ctx.fillText(l, 12, V.H * 0.5 + i * 13));
     if (full) drawAIDebug();
   }
