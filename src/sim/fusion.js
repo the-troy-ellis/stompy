@@ -7,6 +7,7 @@ import { explode, particle } from './effects.js';
 import { r2 } from '../net/protocol.js';
 import { feel } from './feel.js';
 import { sendFx } from './hitqueue.js';
+import { dig, digOf } from './dig.js';
 
 const { sin, abs, atan2, hypot, min, max } = Math;
 
@@ -96,6 +97,8 @@ export function updatePulses(G, dt) {
     if (pu.target && pu.target.alive) pu.b = center(pu.target);
     if (pu.hit || pu.t < pu.dur) continue;
     pu.hit = true;
+    // The pit: under where it lands (a mech's middle is a few metres up).
+    dig(G, [pu.b[0], G.ter.groundBelow(pu.b[0], pu.b[1], pu.b[2], pu.b[1] - 10), pu.b[2]], digOf('fusion'), !pu.ghost);
     explode(G, pu.b, true); explode(G, add(pu.b, [0, 3, 0]), true);
     for (let i = 0; i < 14; i++) particle(G, add(pu.b, [r.range(-2, 2), r.range(-3, 3), r.range(-2, 2)]), [r.range(-16, 16), r.range(4, 20), r.range(-16, 16)], r.range(0.5, 1.1), r.range(0.8, 2.2), [0.95, 0.85, 1], 'fire');
     G.fx.sfx.fusion(pu.b);

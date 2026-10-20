@@ -1,6 +1,6 @@
 import { add, clampN, dirOf, dot, mul, norm, sub } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
-import { CAT_OF } from '../data/weapons.js';
+import { CAT_OF, DIG } from '../data/weapons.js';
 import { damage, fire } from './combat.js';
 import { explode } from './effects.js';
 import { r2 } from '../net/protocol.js';
@@ -8,6 +8,7 @@ import { knock } from './knock.js';
 import { damageEntity, solid } from './entities.js';
 import { FEEL } from '../data/feel.js';
 import { sendsFx } from './hitqueue.js';
+import { dig } from './dig.js';
 
 const { atan2, hypot, max } = Math;
 
@@ -69,7 +70,9 @@ export function endGuide(G, detonate) {
   const g = G.guide;
   if (!g) return;
   if (detonate) {
-    for (const s of guidedLive(G, g.vid)) { s.life = -1; blast(G, s.p, s.dmg, s.owner, null); explode(G, s.p, false); }
+    const ms = guidedLive(G, g.vid);
+    if (ms.length) dig(G, centroid(ms), DIG.guided, true);   // one crater where you set it off
+    for (const s of ms) { s.life = -1; blast(G, s.p, s.dmg, s.owner, null); explode(G, s.p, false); }
     if (sendsFx(G, G.player)) G.fx.netSend({ t: 'fx', k: 'md', v: g.vid });
   }
   G.guide = null;

@@ -401,6 +401,32 @@ try {
     const twoKit = await pages[1].evaluate(() => window.__stompy.game.player.weapons.map(w => w.type).join(','));
     console.log(`arena: TWO sees ONE fitted as ${fit}; TWO itself carries ${twoKit}`);
     if (!fit || twoKit !== 'laser,laser,ac,lrm,fusion') { failed = true; console.error('FAIL: the arena did not carry the mechlab loadout'); }
+    // The ground dug (spec 18 § Sync, #283): ONE and TWO each dig where they
+    // stand; the relay numbers the digs and echoes them; a pilot who joins
+    // after (THREE) replays the room's list. All three hold the same ground.
+    for (const [i, off] of [[0, 30], [1, -25]]) {
+      await pages[i].evaluate(async off => {
+        const { dig } = await import('/src/sim/dig.js');
+        const G = window.__stompy.game, P = G.player;
+        dig(G, [P.x, G.ter.height(P.x, P.z + off), P.z + off], 6);
+        dig(G, [P.x + 8, G.ter.height(P.x + 8, P.z + off), P.z + off], 4);
+      }, off);
+    }
+    await pages[0].waitForTimeout(800);
+    const late = await ctx.newPage();
+    late.on('pageerror', e => errors.push(`arena THREE: ${e.message}`));
+    await late.goto(URL_);
+    await late.waitForSelector('.mm-title', { timeout: 15000 });
+    await late.click('.feel-panel [data-a="toggle"]');
+    await late.click('[data-sel="mp"]');
+    await late.fill('#callsign', 'THREE');
+    await late.click('[data-a="go"]');
+    await late.waitForFunction(() => window.__stompy?.game?.mode === 'mp' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    const hashes = await Promise.all([...pages, late].map(p => p.evaluate(() => ({ h: window.__stompy.game.ter.hash(), seq: window.__stompy.game.digSeq }))));
+    console.log(`digs: ONE, TWO and THREE (joined after) hold ground ${hashes.map(x => `${x.h} (dig ${x.seq})`).join(', ')}`);
+    if (!(hashes.every(x => x.h === hashes[0].h && x.seq === 4))) { failed = true; console.error('FAIL: the ground differs between pilots after digging'); }
+    await late.close();
+    await pages[1].waitForTimeout(500);
     await pages[0].screenshot({ path: 'test-results/smoke-arena.png' });
     // The round's end (#187): TWO reports going down to ONE, which reaches the
     // limit. Both get the summary; both vote SAME MAP; the next round is on

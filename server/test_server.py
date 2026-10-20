@@ -37,6 +37,13 @@ class Helpers(unittest.TestCase):
         self.assertEqual(relay.clean_hit({"amt": 3, "p": [0, 1, 2], "bm": 1}, 4).get("bm"), 1)
         self.assertNotIn("bm", relay.clean_hit({"amt": 3, "p": [0, 1, 2]}, 4))
 
+    def test_digs_are_checked_rounded_and_clamped(self):
+        clean = relay.clean_digs([[0, 10.1, 2.2, -3.3, 2.6], [0, 0, 0, 0, 99], [1, 0, 0, 0, 2], [0, 5000, 0, 0, 2],
+                                  [0, 0, 0, 0, -1], [0, "x", 0, 0, 2], [0, 1, 999, 1], "junk", [0, 1, 999, 1, 3]])
+        self.assertEqual(clean, [[0, 10.0, 2.25, -3.25, 2.5], [0, 0, 0, 0, 7], [0, 1, 260, 1, 3]])   # r to 7 m; only carving; on the map; y in range
+        self.assertEqual(relay.clean_digs("nope"), [])
+        self.assertEqual(len(relay.clean_digs([[0, 1, 1, 1, 1]] * 500)), relay.DIGS_MAX)
+
     def test_num(self):
         self.assertEqual(relay.num("3.5", 0, 10), 3.5)
         self.assertEqual(relay.num(99, 0, 10), 10)
@@ -183,6 +190,7 @@ class Session(unittest.IsolatedAsyncioTestCase):
             del relay.rooms[code]
         relay.PER_IP = 99   # every test client is 127.0.0.1; the cap has its own test
         relay.arena.update(seed=5, pal="dusk", over=False, mode="ffa", teams=[0, 0], votes={}, round=0)
+        relay.rooms[relay.ARENA].digs, relay.rooms[relay.ARENA].dig_seq = [], 0
         relay.sleep = asyncio.sleep
         self.server = await asyncio.start_server(relay.session, "127.0.0.1", 0, limit=16 * 1024)
         self.port = self.server.sockets[0].getsockname()[1]
@@ -384,6 +392,27 @@ class Session(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await a.recv(), {"t": "note", "k": "lo"})
         await a.send({"t": "s", "ch": "nope", "x": 0, "lo": good})
         self.assertNotIn("lo", await b.recv())
+
+    async def test_digs_are_numbered_echoed_to_everyone_and_kept_for_late_joiners(self):
+        a, wa = await self.join("A")
+        self.assertEqual(wa["digs"], [])
+        b, _ = await self.join("B")
+        await a.recv()   # B joined
+        await a.send({"t": "digs", "l": [[0, 1, 2, 3, 4], [0, 5, 6, 7, 99]]})
+        for c in (a, b):   # the sender gets them back too: one order for everyone
+            m = await c.recv()
+            self.assertEqual((m["t"], m["l"]), ("digs", [[1, 0, 1, 2, 3, 4], [2, 0, 5, 6, 7, 7]]))
+        await b.send({"t": "digs", "l": [[1, 0, 0, 0, 3], [0, 9, 0, 9, 1.2]]})   # building isn't allowed yet
+        for x in (a, b):
+            self.assertEqual((await x.recv())["l"], [[3, 0, 9, 0, 9, 1.0]])
+        c, wc = await self.join("C")
+        self.assertEqual([d[0] for d in wc["digs"]], [1, 2, 3], "a late joiner gets the ground so far, in order")
+        for x in (a, b):
+            self.assertEqual((await x.recv())["t"], "join")
+        relay.rooms[relay.ARENA].digs = [[n, 0, 0, 0, 0, 1] for n in range(relay.DIG_CAP)]
+        await a.send({"t": "digs", "l": [[0, 0, 0, 0, 1]]})
+        self.assertEqual((await b.recv())["t"], "digs", "past the cap a dig is still relayed")
+        self.assertEqual(len(relay.rooms[relay.ARENA].digs), relay.DIG_CAP, "but not kept")
 
     async def test_hit_is_clamped_and_fusion_passes(self):
         a, _ = await self.join("A")

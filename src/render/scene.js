@@ -363,15 +363,16 @@ export function createScene(app) {
   // hug the ground, a slot per scorch. A new one rewrites only its own slot
   // (no garbage, however often missiles land); one draw for them all, with a
   // polygon offset so they sit on the terrain without fighting it.
-  const SC_V = 24, SC_F = SC_V * 9, SC = new Float32Array(SCORCH_MAX * SC_F), SC_IDS = new Int32Array(SCORCH_MAX).fill(-1);
+  const SC_V = 24, SC_F = SC_V * 9, SC = new Float32Array(SCORCH_MAX * SC_F), SC_IDS = new Int32Array(SCORCH_MAX).fill(-1), SC_VER = new Int32Array(SCORCH_MAX);
   const SCORCH_COL = [0.09, 0.08, 0.07], SCORCH_MESH = { buf: null, count: SCORCH_MAX * SC_V };
   let scorchRev = -1;
   function writeScorch(s) {
-    const H = G.ter.height, o = s.slot * SC_F, cy = H(s.x, s.z) + 0.05;
+    // On the ground at the blast (s.y: a crater's floor, a tunnel's), the rim on the first ground below.
+    const ter = G.ter, o = s.slot * SC_F, y0 = s.y ?? ter.height(s.x, s.z), cy = y0 + 0.05;
     for (let k = 0; k < 8; k++) for (let v = 0; v < 3; v++) {
       const q = o + (k * 3 + v) * 9, j = k + v - 1, a = s.yaw + (j / 8) * TAU, r = s.r * (j % 2 ? 0.72 : 1);   // v 0: the middle; 1, 2: the rim
       const x = v === 0 ? s.x : s.x + sin(a) * r, z = v === 0 ? s.z : s.z + cos(a) * r;
-      SC[q] = x; SC[q + 1] = v === 0 ? cy : H(x, z) + 0.05; SC[q + 2] = z;
+      SC[q] = x; SC[q + 1] = v === 0 ? cy : ter.groundBelow(x, y0 + 3, z) + 0.05; SC[q + 2] = z;
       SC[q + 3] = 0; SC[q + 4] = 1; SC[q + 5] = 0;
       SC[q + 6] = SCORCH_COL[0]; SC[q + 7] = SCORCH_COL[1]; SC[q + 8] = SCORCH_COL[2];
     }
@@ -384,8 +385,8 @@ export function createScene(app) {
       gl.bindBuffer(gl.ARRAY_BUFFER, SCORCH_MESH.buf); R.curMesh = null;
       if (!G.scorches.length && SC_IDS.some(i => i >= 0)) { SC.fill(0); SC_IDS.fill(-1); gl.bufferSubData(gl.ARRAY_BUFFER, 0, SC); }   // a new match
       for (const s of G.scorches) {
-        if (SC_IDS[s.slot] === s.id) continue;
-        writeScorch(s); SC_IDS[s.slot] = s.id;
+        if (SC_IDS[s.slot] === s.id && SC_VER[s.slot] === (s.v || 0)) continue;   // s.v: a dig moved it down (sim/dig.js)
+        writeScorch(s); SC_IDS[s.slot] = s.id; SC_VER[s.slot] = s.v || 0;
         gl.bufferSubData(gl.ARRAY_BUFFER, s.slot * SC_F * 4, SC.subarray(s.slot * SC_F, (s.slot + 1) * SC_F));
       }
     }

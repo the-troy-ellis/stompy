@@ -88,7 +88,8 @@ test('after the topple, your view stays where the fall left it, rolled with the 
   while (P.dying) { last = toppleOf(P); stepFor(G, 1 / 60); }
   assert.ok(P.gone && P.fallen, 'the fall is kept');
   const end = toppleOf(P);
-  for (let i = 0; i < 16; i++) assert.ok(Math.abs(end[i] - last[i]) < 0.1, 'the kept fall is where the topple ended');
+  // The rotation to a tenth; the translation a little looser, as the body now lies in its own crater, metres from the origin it turns about.
+  for (let i = 0; i < 16; i++) assert.ok(Math.abs(end[i] - last[i]) < (i >= 12 ? 0.6 : 0.1), 'the kept fall is where the topple ended');
   const rot = (T, v) => { const o = M.apply(T, [0, 0, 0]), p = M.apply(T, v); return [p[0] - o[0], p[1] - o[1], p[2] - o[2]]; };
   for (const dt of [0.1, 1, 0.6]) {   // to just before the debrief (G.endT = 3.2 s from the kill)
     stepFor(G, dt);

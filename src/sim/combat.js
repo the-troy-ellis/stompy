@@ -17,6 +17,7 @@ import { knock } from './knock.js';
 import { hitQueue, sendFx } from './hitqueue.js';
 import { coopDown, coopLives } from './coopRules.js';
 import { damageEntity } from './entities.js';
+import { dig, digOf, deathDig, ownsDigs } from './dig.js';
 
 const { sin, cos } = Math;
 
@@ -160,6 +161,8 @@ export function stepDying(G, dt) {
       const r = G.rng;
       explode(G, center(m), true);
       explode(G, add(center(m), [r.range(-3, 3), 2, r.range(-3, 3)]), false);
+      dig(G, [m.x, m.y, m.z], deathDig(m), ownsDigs(G, m));   // its own client (or the host, for an enemy) digs it; the scorch moves down with it
+      m.y = G.ter.groundBelow(m.x, m.y + 1, m.z);   // into its own crater, behind the fireball (and the wreck lies there)
       // The blast takes the arms off and strips plates; they land with the rest of the debris.
       const c = center(m);
       for (const sec of ['LA', 'RA']) if (m.hp[sec] > 0) { m.hp[sec] = 0; shedSection(G, m, sec, add(c, [r.range(-1, 1), 0, r.range(-1, 1)])); }
@@ -193,7 +196,7 @@ export const WRECK_POPS = 3, WRECK_BURN = 30;
 export function makeWreck(G, m, roll) {
   const r = G.rng, n = 2 + r.int(3), ammo = m.weapons.some(w => w.def.ammo && w.ammo > 0 && !w.dead);
   const pops = Array.from({ length: n }, () => r.range(0.3, WRECK_POPS)).sort((a, b) => a - b);
-  return { x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.partsKey, scale: m.ch.scale, t: 0, roll, pops, bigPop: ammo ? r.range(1, 2) : null, settle: 0 };
+  return { x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.partsKey, scale: m.ch.scale, t: 0, roll, pops, bigPop: ammo ? r.range(1, 2) : null, settle: 0, digs: ownsDigs(G, m) };   // digs: this client digs its cook-off
 }
 
 export function destroy(G, m, src) {
@@ -324,9 +327,10 @@ export function stepShots(G, dt) {
       if (hit.mech && !s.ghost) { damage(G, hit.mech, hit.point, s.dmg, s.owner); onShotHit(G, s, hit.mech, hit.point); }   // ghosts are other pilots' shots: theirs to score
       if (hit.ent && !s.ghost) damageEntity(G, hit.ent, s.dmg, s.owner, hit.point);
       if (s.kind === 'missile' && !s.ghost) blast(G, hit.point, s.dmg, s.owner, hit.mech || hit.ent);
+      dig(G, hit.point, digOf(s.type), !s.ghost);   // ghosts are other pilots' shots: theirs to dig
       explode(G, hit.point, false);
     } else s.p = add(s.p, mul(s.v, dt));
-    if (s.life <= 0 && s.kind === 'missile' && !hit) { if (!s.ghost) blast(G, s.p, s.dmg, s.owner, null); explode(G, s.p, false); }
+    if (s.life <= 0 && s.kind === 'missile' && !hit) { if (!s.ghost) blast(G, s.p, s.dmg, s.owner, null); dig(G, s.p, digOf(s.type), !s.ghost); explode(G, s.p, false); }
   }
   G.shots = G.shots.filter(s => s.life > 0);
 }

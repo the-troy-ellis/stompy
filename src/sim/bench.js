@@ -2,6 +2,7 @@ import { startMatch } from './state.js';
 import { center } from './geom.js';
 import { destroy, fire, loseSection } from './combat.js';
 import { toPolar } from './placement.js';
+import { dig } from './dig.js';
 import { add, clampN, wrapA } from '../util/math.js';
 
 const { sin, cos, atan2, hypot, PI } = Math;
@@ -105,10 +106,10 @@ export function benchStep(G, inp, dt) {
     for (const m of cast) if (m.script.limb) loseSection(G, m, m.script.limb, center(m), P);
   }
   for (const m of cast) if (m.script.dies != null && t >= m.script.dies) { destroy(G, m, P); B.dead++; }
-  // The digs: straight into the ground ahead (the weapons' own digging is #283's; this is the ground's cost).
+  // The digs: straight into the ground ahead, as a blast there would (sim/dig.js).
   while (B.dug < DIGS.length && t >= DIGS[B.dug][0]) {
     const [, d, r] = DIGS[B.dug++], x = P.x + sin(P.yaw) * d, z = P.z + cos(P.yaw) * d;
-    G.ter.carve([x, G.ter.height(x, z), z], r);
+    dig(G, [x, G.ter.height(x, z), z], r);
   }
 
   // You: look about, then the run, then the fight, then turn your back.

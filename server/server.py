@@ -50,7 +50,7 @@ PING_EVERY = 10
 DROP_AFTER = 25           # seconds of silence (a phone that went to sleep)
 MAX_BUFFERED = 256 * 1024 # a client this far behind is dropped, not waited for
 PALETTES = ("dusk", "ice", "volcanic")
-PROTOCOL = 20             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
+PROTOCOL = 21             # src/net/protocol.js PROTOCOL; a hello with another is told to update (a Node test keeps them equal)
 HALF = 96 * 24 / 2        # the map's half width (src/world/terrain.js): positions are clamped to it
 FX_RATE = 40              # weapon effects per second per pilot; more are dropped (a beam flash is per shot, guided updates 15 Hz)
 PER_IP = int(os.environ.get("STOMPY_PER_IP", 8))   # sockets from one address at once (phones and a laptop behind one NAT)
@@ -74,6 +74,10 @@ CODE_LETTERS = "BCDFGHJKLMNPQRSTVWXZ"   # room codes: four of these (no vowels, 
 FROM_HOST = ("es", "ent", "entx", "obj", "over")   # co-op: the host's world, relayed to everyone else
 KEEP = 30                 # seconds a departed pilot's id and score wait for a hello with their token (a dropped phone)
 VOTES = ("next", "same", "mode")   # the round-end vote, in order (a tie goes to the first): next map, same map, the other mode
+DIG_CAP = 4000            # digs a room keeps for late joiners (docs/specs/18-voxel-ground.md § Sync); past it they are still relayed, not kept
+DIG_R_MAX = 7             # the largest battle dig, in metres: bigger ones are clamped to it
+DIGS_MAX = 64             # digs one message may carry (src/net/protocol.js DIGS_MAX); the rest are dropped
+DIG_Y = (-44, 260)        # the ground's height range (src/world/voxels.js): a dig's centre is clamped to it
 LOG_FILE = os.environ.get("STOMPY_LOG")             # also log to this file (appended; rotation is logrotate's job)
 _log_out = None
 
@@ -130,6 +134,8 @@ class Room:
         self.started = False   # co-op: the host has pressed READY
         self.over = None       # co-op: the host's `over`, for anyone who joins after
         self.empty_since = None   # a coded room: when the last pilot left (ROOM_IDLE later, it is collected)
+        self.digs = []         # the ground dug on this map, [seq, op, x, y, z, r] in order, for anyone who joins after
+        self.dig_seq = 0       # the last dig's number
 
 
 def new_arena(mode=None):
@@ -494,6 +500,38 @@ def chassis_or_stock(ch):
     return ch if isinstance(ch, str) and ch in CHASSIS else "kestrel"
 
 
+def clean_digs(raw):
+    """A client's `digs` as [op, x, y, z, r] entries, each checked: op 0
+    (carve: nothing builds until construction gear exists), finite, on the
+    map, r in (0, DIG_R_MAX]; positions to 0.25 m, radii to 0.5 m. At most
+    DIGS_MAX of them; anything else is dropped."""
+    out = []
+    if not isinstance(raw, list):
+        return out
+    for d in raw[:DIGS_MAX]:
+        if not isinstance(d, list) or len(d) != 5 or d[0] != 0:
+            continue
+        x, y, z, r = (num(v, -1e9, 1e9, None) for v in d[1:])
+        if None in (x, y, z, r) or abs(x) > HALF or abs(z) > HALF or not r > 0:
+            continue
+        q = lambda v, step: round(v / step) * step
+        out.append([0, q(x, 0.25), q(max(DIG_Y[0], min(DIG_Y[1], y)), 0.25), q(z, 0.25), q(min(r, DIG_R_MAX), 0.5)])
+    return out
+
+
+def take_digs(room, raw):
+    """Number a client's digs in the room's order and keep them (up to
+    DIG_CAP) for late joiners; the numbered list goes back to everyone."""
+    out = []
+    for d in clean_digs(raw):
+        room.dig_seq += 1
+        entry = [room.dig_seq] + d
+        if len(room.digs) < DIG_CAP:
+            room.digs.append(entry)
+        out.append(entry)
+    return out
+
+
 def clean_state(msg):
     """A state message rebuilt from the fields the game sends, every number
     finite and in range, so nothing malformed reaches the other screens."""
@@ -543,6 +581,7 @@ async def end_round(winner):
         st["mode"] = "tdm" if st["mode"] == "ffa" else "ffa"
     if VOTES[pick] != "same":
         st.update(seed=random.randrange(1, 10**6), pal=random.choice(PALETTES))
+    room.digs = []   # a new round is a fresh map (the same one starts whole again too)
     st.update(over=False, teams=[0, 0], votes={}, round=st["round"] + 1)
     for c in room.players.values():
         c.kills = c.deaths = c.streak = c.best = 0
@@ -589,6 +628,13 @@ def handle_message(c, msg):
         c.ping = int(num(msg.get("rtt"), 0, 9999))
         send(c, {"t": "ping", "n": msg.get("n") if isinstance(msg.get("n"), int) else 0, "ts": int(time.time() * 1000),
                  "pings": {str(p.id): p.ping for p in (c.room or rooms[ARENA]).players.values()}})
+    elif t == "digs":
+        # The ground dug by the blasts this pilot owns: numbered, kept for late
+        # joiners, and echoed to everyone in the room, the sender too (spec 18 § Sync).
+        room = c.room or rooms[ARENA]
+        out = take_digs(room, msg.get("l"))
+        if out:
+            broadcast({"t": "digs", "l": out}, room=room)
     elif t == "kick":
         # The owner's hook (STOMPY_ADMIN in hello): drop a pilot in the same room.
         target = (c.room or rooms[ARENA]).players.get(int(num(msg.get("id"), 0, 99)))
@@ -773,7 +819,7 @@ async def session(reader, writer):
             room.host = c.id   # the first pilot in hosts
         log(f"{'back' if saved else 'join'} {c.id} {c.name} in {room.code} from {ip} ({len(room.players)} there)")
         welcome = {"t": "welcome", "id": c.id, "room": room.code, "kind": room.kind, "host": room.host,
-                   "token": c.token, "resumed": 1 if saved else 0, "scores": scores(room)}
+                   "token": c.token, "resumed": 1 if saved else 0, "scores": scores(room), "digs": room.digs}
         if room.kind == "arena":
             st = room.arena
             welcome.update(seed=st["seed"], pal=st["pal"], mode=st["mode"], limit=limit(room), teams=st["teams"], over=st["over"])
