@@ -260,6 +260,13 @@ digging and its sync, #284 falling ground, #285 the AI in canyons and caves,
 #286 sculpting in the editor. The
 prototype it was measured with: [mockups/voxel-ground.html](mockups/voxel-ground.html).
 
+Tooling alongside it: a DEBUG tab on the main menu under `?debug=1`, with a
+test range (a flat field, the landmark you pick, the foes you pick), cheats
+(BIG DIGS among them, to test digging and falls), jumps to any mission, the
+editor or the bench, and the tuning tables and overlays. Spec:
+[specs/19-debug-menu.md](specs/19-debug-menu.md). Issues: #296 the tab and
+JUMP TO, #297 the test range, #298 cheats, #299 tuning pages and overlays.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
