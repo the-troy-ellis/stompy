@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { createTestGame, stepFor, foes, freeze } from './helpers.js';
 import { WEAPONS, DIG } from '../src/data/weapons.js';
 import { dig, digOf, deathDig, PROP_DROP } from '../src/sim/dig.js';
-import { damage, stepShots } from '../src/sim/combat.js';
+import { damage } from '../src/sim/combat.js';
 import { addEntity } from '../src/sim/entities.js';
 import { makeGround } from '../src/world/voxels.js';
 import { DEATH_BEAT } from '../src/sim/combat.js';
