@@ -21,7 +21,7 @@ export const SOFT = 6;
 const Q = d => (d <= -1 ? 1 : d >= 1 ? 255 : Math.round(d * 127) + 128);   // never 0, so 128 is the one boundary byte
 const BEDROCK = 1;   // corners j <= 1 stay solid
 // A fill past this many corners is part of the land (held up); an island under SHATTER corners breaks up as it lands.
-export const ISLAND_MAX = 4096, SHATTER = 8;
+export const ISLAND_MAX = 4096, SHATTER = 8, TORQUE_GROW = 6;   // TORQUE_GROW: the torque rule's check box, cells around a dig
 const LIST_MAX = 1 << 19;
 let MARK = null, LIST = null, STACK = null;   // the support check's scratch (groundApi islands)
 
@@ -191,6 +191,62 @@ function groundApi(G) {
     for (let q = 0; q < nl; q++) MARK[LIST[q]] = 0;
     return out;
   }
+  // Overhangs that can't hold their weight (spec 18 § the torque rule). In
+  // the box `b` grown by TORQUE_GROW, a solid corner is grounded if solid
+  // corners run straight down from it to bedrock; hanging ones that touch
+  // face to face are one overhang. Its attachments are the grounded corners
+  // it touches; its section, how many columns those are (each solid to
+  // bedrock, so the narrowest slice of what holds it). Its load is the sum
+  // of each corner's reach: how far it sits sideways, in cells, from the
+  // nearest attachment column. It breaks if load > k × section. Returns the
+  // overhangs that break, as cell arrays for `fall`, and `ratios` (load over
+  // section of every overhang looked at, for the tests and tuning).
+  function overhangs(b, k, ratios) {
+    const i0 = clampN(b[0] - TORQUE_GROW, 1, NX - 1), i1 = clampN(b[1] + TORQUE_GROW, 1, NX - 1), j0 = clampN(b[2] - TORQUE_GROW, BEDROCK + 1, NY - 1), j1 = clampN(b[3] + TORQUE_GROW, BEDROCK + 1, NY - 1);
+    const k0 = clampN(b[4] - TORQUE_GROW, 1, NZ - 1), k1 = clampN(b[5] + TORQUE_GROW, 1, NZ - 1), out = [], air = new Map();
+    if (!MARK) { MARK = new Uint8Array(PX * PY * PZ); LIST = new Int32Array(LIST_MAX); STACK = new Int32Array(ISLAND_MAX + 8); }
+    // The first air going up a column from bedrock: under it, the column is grounded.
+    const firstAir = (i, kk) => {
+      const c = i + PX * kk;
+      let v = air.get(c);
+      if (v === undefined) { v = BEDROCK + 1; while (v < NY && D[cornerIndex(i, v, kk)] > 128) v++; air.set(c, v); }
+      return v;
+    };
+    const grounded = o => ((o / PX) | 0) % PY < firstAir(o % PX, (o / (PX * PY)) | 0);
+    let nl = 0;
+    for (let kk = k0; kk <= k1; kk++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const s0 = cornerIndex(i, j, kk);
+      if (D[s0] <= 128 || MARK[s0] || grounded(s0)) continue;
+      if (nl > LIST_MAX - ISLAND_MAX - 8) break;
+      const start = nl, cols = new Set();
+      let sp = 0, big = false;
+      MARK[s0] = 1; LIST[nl++] = s0; STACK[sp++] = s0;
+      while (sp) {
+        const o = STACK[--sp];
+        for (let d = 0; d < 6; d++) {
+          const n = o + STEPS[d];
+          if (MARK[n] || D[n] <= 128) continue;
+          if (grounded(n)) { cols.add(n % PX + PX * ((n / (PX * PY)) | 0)); continue; }
+          if (nl - start >= ISLAND_MAX) { big = true; continue; }   // too big to weigh here: part of the land
+          MARK[n] = 1; LIST[nl++] = n; STACK[sp++] = n;
+        }
+      }
+      if (big || !cols.size) continue;   // no attachments: an island, which the support fill drops
+      const ax = [], az = [];
+      for (const c of cols) { ax.push(c % PX); az.push((c / PX) | 0); }
+      let load = 0;
+      for (let q = start; q < nl; q++) {
+        const o = LIST[q], ci = o % PX, ck = (o / (PX * PY)) | 0;
+        let best = Infinity;
+        for (let a = 0; a < ax.length; a++) { const dx = ci - ax[a], dz = ck - az[a], d2 = dx * dx + dz * dz; if (d2 < best) best = d2; }
+        load += Math.sqrt(best);
+      }
+      ratios?.push(load / cols.size);
+      if (load > k * cols.size) out.push(LIST.slice(start, nl).sort());
+    }
+    for (let q = 0; q < nl; q++) MARK[LIST[q]] = 0;
+    return out;
+  }
   // An island comes down: cut out, dropped whole cells straight down to the
   // first ground under any of its columns, and, unless it is a small one that
   // shatters (under SHATTER corners), stamped back as a heap. Whole cells, so
@@ -267,7 +323,7 @@ function groundApi(G) {
   // An editor stroke: [op, x, y, z, r], op 0 carve, 1 build, 2 smooth.
   const stroke = ([op, x, y, z, r]) => (op === 0 ? carve : op === 1 ? build : smooth)([x, y, z], r);
   const mark = b => touched(...b);   // mesh a box of corners again (a heap that has landed)
-  return { sample, height, solid, groundBelow, ray, carve, dig, islands, fall, copyBox, mark, build, smooth, block, stroke, retop, hash };
+  return { sample, height, solid, groundBelow, ray, carve, dig, islands, overhangs, fall, copyBox, mark, build, smooth, block, stroke, retop, hash };
 }
 
 // A landmark, as a distance shape laid onto the ground: positive inside rock.

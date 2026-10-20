@@ -1,4 +1,4 @@
-import { DIG, CRUSH, WEAPONS } from '../data/weapons.js';
+import { DIG, CRUSH, TORQUE, WEAPONS } from '../data/weapons.js';
 import { sceneryNear, destroyEntity } from './entities.js';
 import { particle } from './effects.js';
 import { cloneGround, VS, Y0, PX, PY } from '../world/voxels.js';
@@ -83,6 +83,12 @@ export function applyDigList(G, l, replay = false) {
 function confirmDig(G, e, seen) {
   const [, x, y, z, r] = e, C = confirmed(G), b = C.dig([x, y, z], r, DIG.rock);
   const falls = b ? C.islands(b).map(cells => C.fall(cells)) : [];
+  // Then what still holds on but hangs too far off what holds it (the torque rule); a break can leave another.
+  for (let n = 0; b && n < TORQUE.rounds; n++) {
+    const breaks = C.overhangs(b, TORQUE.rock);
+    if (!breaks.length) break;
+    for (const cells of breaks) falls.push(C.fall(cells));
+  }
   if (C !== G.ter) {
     const k = G.unechoed.findIndex(u => u[1] === x && u[2] === y && u[3] === z && u[4] === r);
     if (k >= 0) G.unechoed.splice(k, 1);   // our own, back from the relay
