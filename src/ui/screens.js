@@ -15,7 +15,8 @@ import { initFeet } from '../sim/gait.js';
 import { endGuide } from '../sim/missiles.js';
 import { DIFF, DIFF_ORDER } from '../data/ai.js';
 import { SETTINGS, SETTING_KEYS, SETTING_GROUPS, stepSetting } from '../data/settings.js';
-import { fitOf, fitOk, kitLine } from './mechlab.js';
+import { fitOf, fitOk as fitUnder, kitLine } from './mechlab.js';
+import { cheat } from '../sim/cheats.js';
 import { objectiveRows, debriefTitle, missionTitle, missionSpoken, verdict } from './debrief.js';
 import { createDebugMenu } from './debugMenu.js';
 import { recordResult, saveCampaign, restartCampaign, stripSquares, canPlay } from './campaign.js';
@@ -115,6 +116,8 @@ export function createUi(app) {
 
   // ?debug=1 adds the DEBUG tab (ui/debugMenu.js, docs/specs/19-debug-menu.md).
   const dbg = createDebugMenu(app, { startMission, launch, renderMenu });
+  // Under the tonnage budget, or NO WEIGHT LIMIT on (single player; never for the arena or co-op, which check it).
+  const fitOk = k => fitUnder(k) || (cheat(G, 'weight') && prefs.menuSel !== 'mp');
   const MENU = [['campaign', 'CAMPAIGN'], ['free', 'FREE PLAY'], ['mp', 'MULTIPLAYER'], ['settings', 'SETTINGS'], ...(dbg.on ? [['debug', 'DEBUG']] : [])];
 
   function mainMenu(sel = prefs.menuSel, status = '') {
@@ -342,7 +345,7 @@ export function createUi(app) {
       showOverlay(`<h1>${app.net.mp() ? 'MENU' : 'PAUSED'}</h1>
         <div class="panel" style="text-align:center">${app.net.mp() ? 'The match keeps going while you are in here. Tap or click to get back in.' : 'Click to resume.'}</div>
         ${app.net.mp() ? `<div class="panel"><div class="k">SCORES &mdash; FIRST TO ${app.net.Net.limit}</div>${app.net.boardHTML()}</div>` : ''}
-        <div class="panel">${controls()}</div>${options()}
+        ${app.net.mp() ? '' : dbg.pauseHTML()}<div class="panel">${controls()}</div>${options()}
         ${G.tut ? '<button class="go" data-a="skiptut">SKIP TUTORIAL</button>' : ''}
         ${app.net.mp() ? '<button class="go" data-a="leave">LEAVE MATCH</button>' : `<button class="go" data-a="menu">${app.editor ? 'EDITOR' : 'MAIN MENU'}</button>`}`);
     } else { hideOverlay(); wrap.focus(); app.input.syncTouchUI(); app.input.lockPointer(); }
@@ -355,6 +358,7 @@ export function createUi(app) {
     if (a === 'update') { app.update?.(); return; }
     if (a === 'skiptut') { G.tut = null; store.set('tut.done', true); e.target.closest('[data-a]').remove(); return; }   // no more prompts, now or later   // a new version is waiting (ui/pwa.js)
     if (a === 'full') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); return; }
+    if (dbg.cheatClick(e)) return;   // a cheat switch, on the DEBUG tab or in the pause menu
     if (a === 'diff') { cycleDiff(1); e.target.closest('[data-a]').textContent = diffLabel(); return; }
     if (G.state === 'menu' && app.mechlab.click(e)) return;
     if (a === 'fit') { if (!locked(prefs.chassis)) app.mechlab.open(true); return; }
@@ -449,5 +453,5 @@ export function createUi(app) {
   ov.addEventListener('pointerup', endDrag); ov.addEventListener('pointercancel', endDrag);
   const setStatus = t => { const el = $('.status', ov); if (el) el.textContent = t; };
 
-  return { OPTS, MENU, controls, showOverlay, hideOverlay, setStatus, mainMenu, showMech, menuTick, renderMenu, go, launch, debrief, pause, cycleMech, startMission, startSkirmish };
+  return { OPTS, MENU, fitOk, controls, showOverlay, hideOverlay, setStatus, mainMenu, showMech, menuTick, renderMenu, go, launch, debrief, pause, cycleMech, startMission, startSkirmish };
 }

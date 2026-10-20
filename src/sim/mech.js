@@ -1,3 +1,4 @@
+import { cheat } from './cheats.js';
 import { WEATHER } from '../data/weather.js';
 import { add, clampN, mul } from '../util/math.js';
 import { BOUND } from '../world/terrain.js';
@@ -130,7 +131,7 @@ export function stepMech(G, m, dt) {
 
 // Heat, shutdown, cooldowns, springs and legs: the second half of a step.
 function finishStep(G, m, dt) {
-  m.heat = max(0, m.heat - (m.shutdown ? 20 : m.sink ?? m.ch.sink) * dt);
+  m.heat = m === G.player && cheat(G, 'heat') ? 0 : max(0, m.heat - (m.shutdown ? 20 : m.sink ?? m.ch.sink) * dt);   // NO HEAT (sim/cheats.js)
   if (!m.shutdown && m.heat >= 100) {
     m.shutdown = true;
     feel(G, 'shutdown', { mech: m, at: m === G.player ? null : [m.x, m.y, m.z] });

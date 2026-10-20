@@ -1,3 +1,4 @@
+import { cheat } from './cheats.js';
 import { blendPal } from '../data/palettes.js';
 import { tickWeather } from './weather.js';
 import { add, clampN, dirOf, dot, len, mul, norm, sub } from '../util/math.js';
@@ -101,7 +102,10 @@ export function update(G, input, dt) {
       if (m.alive && m.net?.fl) G.cbeams.push({ a: muzzle(m, m.weapons.find(w => w.def.kind === 'fusion')), b: m.net.fl, col: WEAPONS.fusion.col, w: 0.05 + 0.035 * abs(sin(G.time * 37)) });
       continue;
     }
-    if (m.team !== 0 && m.alive && !m.script) { if (m.ai.still) stand(m); else think(G, m, dt); }   // the bench's cast is on a script; a range's target stands
+    if (m.team !== 0 && m.alive && !m.script) {   // the bench's cast is on a script
+      if (m.ai.still || cheat(G, 'freeze')) { stand(m); m.ai.frozen = !m.ai.still; }   // a range's target; FOES FROZEN (sim/cheats.js)
+      else { if (m.ai.frozen) { m.ai.frozen = false; m.ai.aware = true; } think(G, m, dt); }   // unfrozen: awake, and after you
+    }
     if (m.alive) { stepMech(G, m, dt); meleeTick(G, m, dt); }
     if (m.alive && m.beamOn) beamTick(G, m, dt, m === P ? G.aim : m.ai.beamAim);
     else m.beaming = false;

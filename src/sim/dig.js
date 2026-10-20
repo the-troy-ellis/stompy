@@ -1,3 +1,5 @@
+import { cheat } from './cheats.js';
+import { BIG_DIG } from '../data/debug.js';
 import { DIG, CRUSH, TORQUE, WEAPONS } from '../data/weapons.js';
 import { sceneryNear, destroyEntity } from './entities.js';
 import { particle } from './effects.js';
@@ -54,10 +56,12 @@ function confirmed(G) {
 // A blast at `p` digging a hole of radius `r`, if this client owns it.
 export function dig(G, p, r, owned = true) {
   if (!(r > 0) || !owned || !G.ter) return;
+  const big = cheat(G, 'digs');   // BIG DIGS (sim/cheats.js): single player only, so never on the wire
+  if (big) r *= BIG_DIG.scale;
   const x = q(p[0], 0.25), y = q(p[1], 0.25), z = q(p[2], 0.25), rr = q(r, 0.5);
   // Nothing within reach below it (a missile popping in the air): nothing to dig, nothing to send.
   if (G.ter.groundBelow(x, y + rr, z, y - rr) <= y - rr) return;
-  if (!online(G)) { confirmDig(G, [0, x, y, z, rr], true); return; }
+  if (!online(G)) { confirmDig(G, [0, x, y, z, rr], true, big ? 1 : DIG.rock); return; }
   confirmed(G);   // copied before the first dig touches the ground
   G.ter.dig([x, y, z], rr, DIG.rock);   // ours, at once; confirmed when the relay echoes it
   settle(G, x, z, rr);
@@ -80,8 +84,8 @@ export function applyDigList(G, l, replay = false) {
 
 // One dig in the confirmed order: carved, the ground it leaves unheld falls,
 // and what stood there settles. `seen`: the falls are shown coming down.
-function confirmDig(G, e, seen) {
-  const [, x, y, z, r] = e, C = confirmed(G), b = C.dig([x, y, z], r, DIG.rock);
+function confirmDig(G, e, seen, rock = DIG.rock) {
+  const [, x, y, z, r] = e, C = confirmed(G), b = C.dig([x, y, z], r, rock);
   const falls = b ? C.islands(b).map(cells => C.fall(cells)) : [];
   // Then what still holds on but hangs too far off what holds it (the torque rule); a break can leave another.
   for (let n = 0; b && n < TORQUE.rounds; n++) {

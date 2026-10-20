@@ -1,3 +1,4 @@
+import { cheat } from './cheats.js';
 import { add, mul, norm, sub } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { SECT_NAME } from '../data/chassis.js';
@@ -47,10 +48,10 @@ export function scramble(G, t, secs, p) {
   feel(G, 'bolt', { mech: t, k: 1, roll: side, at: t === G.player ? null : p });
 }
 
-// The ?debug=1 INVINCIBLE option (G.invincible, set by the FEEL panel): your
-// own mech takes hits but no damage. Single player only (not the arena or co-op).
+// The DEBUG tab's INVINCIBLE cheat (sim/cheats.js): your own mech takes hits
+// but no damage. Single player only (not the arena or co-op).
 // On the bench (sim/bench.js) nobody does: limbs and kills come off its clock.
-export const invincible = (G, m) => !!G.bench || (!!G.invincible && m === G.player && G.mode === 'sp');
+export const invincible = (G, m) => !!G.bench || (m === G.player && cheat(G, 'god'));
 // Beam damage after this long without any is a new contact: it clangs once.
 export const BEAM_CONTACT_GAP = 0.6;
 
@@ -237,7 +238,7 @@ export function fire(G, m, w, aim, target) {
   const mz = muzzle(m, w);
   const dir = norm(sub(aim, mz));
   w.cd = d.cd; m.heat += d.heat;
-  if (d.ammo) w.ammo--;
+  if (d.ammo && !(m === G.player && cheat(G, 'ammo'))) w.ammo--;   // ENDLESS AMMO (sim/cheats.js)
   if (m === G.player) G.stats.shots += d.count || 1;   // each missile can hit, so each counts (burst rounds count as they fly)
   if (d.kind === 'shell') {
     round(G, m, w, mz, dir);

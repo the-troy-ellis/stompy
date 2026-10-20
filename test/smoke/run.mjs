@@ -119,6 +119,9 @@ try {
   // RANGE: the arch, two foes standing still; LAUNCH puts you on the range facing it.
   await run('debug-range', URL_, async page => {
     await page.click('.feel-panel [data-a="toggle"]');
+    await page.click('[data-dsec="cheats"]');
+    await page.click('[data-dch="digs"]');   // BIG DIGS on
+    await page.screenshot({ path: 'test-results/smoke-debug-cheats.png' });
     await page.click('[data-dsec="range"]');
     await page.screenshot({ path: 'test-results/smoke-debug-range-menu.png' });
     const ground = await page.$eval('[data-drg="ground"] ~ b', b => b.textContent);
@@ -131,6 +134,14 @@ try {
     const r = await page.evaluate(() => { const G = window.__stompy.game, f = G.mechs.filter(m => m.team === 1); return { arch: G.ter.solid(0, 40, 220), foes: f.length, still: f.every(m => m.ai.still), objectives: G.objectives.length }; });
     console.log(`debug range: arch ${r.arch}, ${r.foes} foes standing still ${r.still}, objectives ${r.objectives}`);
     if (!r.arch || r.foes !== 2 || !r.still || r.objectives) { failed = true; console.error(`FAIL: RANGE did not build the arch with two still foes (${JSON.stringify(r)})`); }
+    // The pause menu's DEBUG block shows the cheat on; switch it off from there.
+    await page.keyboard.press('p');
+    await page.waitForSelector('.dbg-pause [data-dch="digs"]', { timeout: 5000 });
+    const before = await page.$eval('.dbg-pause [data-dch="digs"]', b => b.textContent);
+    await page.click('.dbg-pause [data-dch="digs"]');
+    const after = await page.evaluate(() => [document.querySelector('.dbg-pause [data-dch="digs"]').textContent, window.__stompy.game.cheats.digs]);
+    console.log(`debug cheats: pause shows ${before}, then ${after[0]} (G.cheats.digs ${after[1]})`);
+    if (before !== 'BIG DIGS: ON' || after[0] !== 'BIG DIGS: OFF' || after[1] !== false) { failed = true; console.error('FAIL: the pause menu\'s cheat switch'); }
   });
   await run('touch', URL_ + '&touch=1', async page => {
     // Taps, not clicks: a mouse click would switch the game back to mouse mode.

@@ -10,7 +10,7 @@ import { store } from '../util/store.js';
 // how many lines tall it renders, and antialiasing (which reloads the page).
 // It is saved, and ?lines=240&aa=0 in the URL shares a setting. BENCH plays
 // the scripted scene (sim/bench.js, ui/bench.js) and shows its frame times.
-const GOD_KEY = 'debug.invincible';
+// (INVINCIBLE moved to the DEBUG tab's CHEATS, ui/debugMenu.js.)
 
 export function createFeelPanel(app) {
   const el = document.createElement('div');
@@ -23,10 +23,7 @@ export function createFeelPanel(app) {
     Array.isArray(v) ? `${k} ${v.map((x, i) => num(`data-gait="${plan}" data-col="${k}" data-idx="${i}"`, x)).join(' ')}` : `${k} ${num(`data-gait="${plan}" data-col="${k}"`, v)}`).join(' ')}</td></tr>`).join('');
   const look = app.R.look;
   const presets = LOOK_PRESETS.map(n => `<button data-lines="${n}">${n || 'NATIVE'}</button>`).join('');
-  // INVINCIBLE: your mech takes hits but no damage (sim/combat.js invincible; single player only). Saved.
-  app.G.invincible = !!store.get(GOD_KEY, false);
-  el.innerHTML = `<div class="feel-head"><b>FEEL</b> <button data-a="toggle">hide</button> <button data-a="copy">COPY</button> <button data-a="bench">BENCH</button>
-    <label class="feel-god"><input type="checkbox" data-a="god" ${app.G.invincible ? 'checked' : ''}> INVINCIBLE</label></div>
+  el.innerHTML = `<div class="feel-head"><b>FEEL</b> <button data-a="toggle">hide</button> <button data-a="copy">COPY</button> <button data-a="bench">BENCH</button></div>
     <div class="feel-body"><div class="feel-look"><b>LOOK</b> lines <input type="range" min="0" max="720" step="10" data-look="lines" value="${look.lines}">
       <input type="number" min="0" max="2160" step="10" data-look="lines" value="${look.lines}"> <span class="feel-res"></span><br>${presets}
       <label><input type="checkbox" data-look="aa" ${look.aa ? 'checked' : ''}> antialias (reloads)</label></div><table><tr><th></th>${FEEL_COLS.map(c => `<th>${c}</th>`).join('')}</tr>${rows}${extra}${gaitRows}</table><textarea class="feel-out" hidden></textarea></div>`;
@@ -40,7 +37,6 @@ export function createFeelPanel(app) {
   };
   requestAnimationFrame(() => requestAnimationFrame(showRes));
   el.addEventListener('change', e => {
-    if (e.target.dataset.a === 'god') { app.G.invincible = e.target.checked; store.set(GOD_KEY, app.G.invincible); return; }
     if (e.target.dataset.look !== 'aa') return;
     look.aa = e.target.checked; store.set(LOOK_KEY, look);
     location.reload();   // the GL context's antialiasing is fixed when it is made
