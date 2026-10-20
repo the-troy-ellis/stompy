@@ -35,6 +35,8 @@ export function createGround(R) {
   const mesh = new Array(FAR + GX * GZ).fill(null), ver = new Int32Array(FAR + GX * GZ), waiting = new Uint8Array(FAR + GX * GZ);
   const newPart = () => ({ buf: null, count: 0, first: 0, lo: null, hi: null, dirty: false });
   const groups = Array.from({ length: GX * GZ }, () => ({ near: newPart(), far: newPart(), wanted: false, left: 0 }));
+  // The far meshes share a buffer per row of groups, so neighbours drawn far are one draw.
+  const rows = Array.from({ length: GZ }, () => ({ buf: null, dirty: false }));
 
   function startWorker() {
     if (worker || !workerOk) return worker;
@@ -56,7 +58,7 @@ export function createGround(R) {
     if (waiting[id]) { waiting[id] = 0; if (id < FAR) groups[chunkGroup(id)].left--; }
     mesh[id] = box ? { f, lo: box[0], hi: box[1] } : null;
     const gr = groups[jobGroup(id)];
-    (id >= FAR ? gr.far : gr.near).dirty = true;
+    if (id >= FAR) rows[((id - FAR) / GX) | 0].dirty = true; else gr.near.dirty = true;
   }
   function meshHere(id) {
     const c = corners(id), f = meshChunk(c.D, c.T, c.dims, c.o, c.s, pal);
@@ -74,7 +76,8 @@ export function createGround(R) {
   function load(g, p, eye = [0, 0, 0]) {
     ground = g; pal = plain(p); world++; inFlight = 0;
     mesh.fill(null); ver.fill(0); waiting.fill(0); queue = [];
-    for (const gr of groups) { gr.wanted = false; gr.left = 0; gr.near.dirty = gr.far.dirty = true; }
+    for (const gr of groups) { gr.wanted = false; gr.left = 0; gr.near.dirty = true; }
+    for (const row of rows) row.dirty = true;
     if (startWorker()) worker.postMessage({ pal });
     for (let gi = 0; gi < groups.length; gi++) {
       const d = groupDist(gi, eye);
@@ -148,25 +151,50 @@ export function createGround(R) {
     gl.bufferData(gl.ARRAY_BUFFER, all, gl.STATIC_DRAW);
     R.curMesh = null;   // the renderer's bound-buffer cache is stale now
   }
+  // A row's far meshes end to end; each group's part points into it.
+  function fillRow(gz) {
+    const row = rows[gz];
+    row.dirty = false;
+    let len = 0;
+    for (let gx = 0; gx < GX; gx++) { const m = mesh[FAR + gx + GX * gz]; if (m) len += m.f.length; }
+    const all = new Float32Array(len);
+    let o = 0;
+    for (let gx = 0; gx < GX; gx++) {
+      const m = mesh[FAR + gx + GX * gz], part = groups[gx + GX * gz].far;
+      part.first = o / 9; part.count = m ? m.f.length / 9 : 0;
+      if (m) { all.set(m.f, o); o += m.f.length; part.lo = m.lo; part.hi = m.hi; }
+    }
+    if (!row.buf) row.buf = gl.createBuffer();
+    for (let gx = 0; gx < GX; gx++) groups[gx + GX * gz].far.buf = row.buf;
+    gl.bindBuffer(gl.ARRAY_BUFFER, row.buf);
+    gl.bufferData(gl.ARRAY_BUFFER, all, gl.STATIC_DRAW);
+    R.curMesh = null;
+  }
   function upload() {
     for (let gi = 0; gi < groups.length; gi++) {
       const gr = groups[gi];
       if (gr.near.dirty && !gr.left) fill(gr.near, CHUNKS_OF[gi]);   // all its chunks at once, or the far one meanwhile
-      if (gr.far.dirty) fill(gr.far, [FAR + gi]);
     }
+    for (let gz = 0; gz < GZ; gz++) if (rows[gz].dirty) fillRow(gz);
   }
 
   // Each group in view and nearer than the fog's end, near or far. Far ones
   // are drawn `Mfar` (a couple of metres down), so where one overlaps its
   // near neighbour it stays under it: no gap and no seam at the change.
+  const RUN = { buf: null, first: 0, count: 0 };
   function draw(eye, fogEnd, planes, M, Mfar) {
+    RUN.count = 0;
     for (let gi = 0; gi < groups.length; gi++) {
       const gr = groups[gi], d = groupDist(gi, eye);
-      if (d > fogEnd) continue;
       const near = d < LOD_AT && gr.wanted && !gr.left && !gr.near.dirty, part = near || !gr.far.count ? gr.near : gr.far;
-      if (!part.count || !boxVisible(planes, part.lo, part.hi)) continue;
-      R.draw(part, part === gr.near ? M : Mfar);
+      if (d > fogEnd || !part.count || !boxVisible(planes, part.lo, part.hi)) continue;
+      if (part === gr.near) { R.draw(part, M); continue; }
+      // Far: one draw for each run of row neighbours.
+      if (RUN.count && RUN.buf === part.buf && RUN.first + RUN.count === part.first) { RUN.count += part.count; continue; }
+      if (RUN.count) R.draw(RUN, Mfar);
+      RUN.buf = part.buf; RUN.first = part.first; RUN.count = part.count;
     }
+    if (RUN.count) R.draw(RUN, Mfar);
   }
 
   // Resolves when everything wanted is meshed and uploaded (the perf harness and the smoke test wait on it).

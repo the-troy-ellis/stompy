@@ -76,19 +76,30 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   bench-walk 13/14 15.0k · run 11/29 15.4k · fight 49/70 16.1k ·
 //   deaths 70/76 16.3k · wrecks 69/89 16.5k · away 27/82 15.3k · rain 8.7k ·
 //   snow 3.7k · dust 3.2k (their fog is short).
+// After #281 (the ground as voxels, spec 18: 8 m cells, 256 m groups, far
+//   groups past 300 m in 16 m cells, a row of far groups one buffer drawn in
+//   runs): the ground is 23-43k triangles in 8-11 draws, where the height map
+//   was 11-16k in 1-3. menu 12/12 32.7k · free-start 19/19 42.5k ·
+//   bench-walk 23/25 43.3k · run 23/37 40.7k · fight 59/80 41.0k ·
+//   deaths 79/85 39.3k · wrecks 79/98 39.5k · away 37/89 41.1k ·
+//   dig 15/16 38.7k (new: three blasts rebuild their chunks in the worker) ·
+//   rain 18 31.3k · snow 16 23.3k · dust 12 18.0k. Spec 18 allows 70k
+//   ground triangles. Rain's garbage measured 88-96 KB (the worker's results
+//   arriving land in whichever scene is running).
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
-  menu:           { meanDraws: 4, peakDraws: 4, tris: 13000, allocKB: 32 },   // 26 to 32 (27-29 measured, plus ~15%) with the terrain chunks: the menu's 60 frames are too few for drawWorld to be optimized, so its sums box (~1-2 KB); in play it is, and free-start is unchanged
-  'free-start':   { meanDraws: 8, peakDraws: 8, tris: 13500, allocKB: 115 },
-  'bench-walk':   { meanDraws: 15, peakDraws: 15, tris: 17500, allocKB: 145 },
-  'bench-run':    { meanDraws: 11, peakDraws: 31, tris: 18000, allocKB: 115 },
-  'bench-fight':  { meanDraws: 56, peakDraws: 81, tris: 18500, allocKB: 215 },
-  'bench-deaths': { meanDraws: 79, peakDraws: 87, tris: 19000, allocKB: 190 },
-  'bench-wrecks': { meanDraws: 79, peakDraws: 101, tris: 19000, allocKB: 140 },
-  'bench-away':   { meanDraws: 29, peakDraws: 92, tris: 18000, allocKB: 95 },
-  rain:           { meanDraws: 9, peakDraws: 9, tris: 10000, allocKB: 90 },   // free-start in a downpour: one more draw (the rain), no more garbage
-  snow:           { meanDraws: 11, peakDraws: 11, tris: 4500, allocKB: 90 },   // and in snow
-  dust:           { meanDraws: 11, peakDraws: 11, tris: 4000, allocKB: 90 },   // and in a dust storm (2,500 grains)
+  menu:           { meanDraws: 14, peakDraws: 14, tris: 38000, allocKB: 38 },   // the menu's 60 frames are too few for drawWorld to be optimized, so its sums box a little
+  'free-start':   { meanDraws: 22, peakDraws: 22, tris: 49000, allocKB: 125 },
+  'bench-walk':   { meanDraws: 27, peakDraws: 29, tris: 50000, allocKB: 150 },
+  'bench-run':    { meanDraws: 27, peakDraws: 43, tris: 47000, allocKB: 120 },
+  'bench-fight':  { meanDraws: 68, peakDraws: 92, tris: 47500, allocKB: 220 },
+  'bench-deaths': { meanDraws: 91, peakDraws: 98, tris: 45500, allocKB: 195 },
+  'bench-wrecks': { meanDraws: 91, peakDraws: 113, tris: 45500, allocKB: 145 },
+  'bench-away':   { meanDraws: 43, peakDraws: 102, tris: 47500, allocKB: 100 },
+  'bench-dig':    { meanDraws: 18, peakDraws: 19, tris: 44500, allocKB: 80 },   // three digs: the main thread only copies corners out and uploads what comes back
+  rain:           { meanDraws: 21, peakDraws: 21, tris: 36000, allocKB: 110 },   // free-start in a downpour: one more draw (the rain), no more garbage
+  snow:           { meanDraws: 19, peakDraws: 19, tris: 27000, allocKB: 95 },   // and in snow
+  dust:           { meanDraws: 14, peakDraws: 14, tris: 21000, allocKB: 90 },   // and in a dust storm (2,500 grains)
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;
