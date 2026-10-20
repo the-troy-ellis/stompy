@@ -97,6 +97,10 @@ function confirmDig(G, e, seen) {
   }
   settle(G, x, z, r);
   for (const f of falls) startFall(G, f, seen);
+  if (G.nav) {   // the AI's map looks at the ground here again (ai/nav.js)
+    G.nav.mark(x, z, r);
+    for (const f of falls) { const [i0, i1, , , k0, k1] = f.box; G.nav.mark(-HALF + (i0 + i1) / 2 * VS, -HALF + (k0 + k1) / 2 * VS, Math.max(i1 - i0, k1 - k0) * VS / 2 + VS); }
+  }
 }
 
 // Ground coming down (world/voxels.js fall has already moved it in the
