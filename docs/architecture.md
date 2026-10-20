@@ -325,6 +325,7 @@ src/
     math.js        scalars, vec3, M (matrices), chain, seeded RNG
     store.js       localStorage wrapper
     dom.js         $, esc
+    version.js     VERSION: the package version, commit and date the build stamps in (`0.1.0 · 9c5c03f · OCT 20`)
   data/
     weapons.js     WEAPONS, CATS, CAT_OF, CAT_LABEL, CAT_KEY
     chassis.js     CHASSIS, MECH_ORDER, MECH_INFO, hardpoints (M2)
