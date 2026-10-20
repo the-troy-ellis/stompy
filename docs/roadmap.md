@@ -237,6 +237,29 @@ guns), quads crawl (slowest, biggest, and hills don't slow them).
 
 Spec: [specs/16-body-plans.md](specs/16-body-plans.md).
 
+## M8 — Voxel ground
+
+Goal: the ground is something to fight over and through. Canyons with steep
+walls, tunnels and caves, arches and overhangs; explosions dig craters, and
+mission authors sculpt the ground in the editor.
+
+- The ground becomes a grid of 8 m cells, meshed in chunks off the main
+  thread, with today's hills as its base.
+- Mechs, feet, shots and sight use 3D ground questions (what's under me,
+  what's in the way); falling into a dug hole is the existing landing.
+- Digging in play, with radii the owner set (battle mechs dig; construction
+  mechs, later, dig more), synced as `dig` messages (PROTOCOL 21).
+- Unsupported ground falls: overhangs and arches come down when their
+  support is blown out, landing as heaps or shattering.
+- The AI turns along walls and finds its way through tunnels.
+- DIG, BUILD and SMOOTH brushes and landmarks in the editor.
+
+Spec: [specs/18-voxel-ground.md](specs/18-voxel-ground.md) (approved). Issues, in
+order: #281 the ground as voxels, #282 mechs and shots on 3D ground, #283
+digging and its sync, #284 falling ground, #285 the AI in canyons and caves,
+#286 sculpting in the editor. The
+prototype it was measured with: [mockups/voxel-ground.html](mockups/voxel-ground.html).
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
