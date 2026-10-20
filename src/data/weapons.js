@@ -64,6 +64,13 @@ export const DIG = { death: 5, deathMax: 7, cookOff: 7, guided: 4, rock: 0.5 };
 // corner of ground that fell, to the torso, at most `max`. The owner's
 // defaults, to try in the bench.
 export const CRUSH = { perCell: 3, max: 40 };
+// The torque rule (spec 18 § Overhangs that can't hold their weight): an
+// overhang breaks when its load (each corner's reach from what holds it, in
+// cells) is over `rock` × its section (the columns holding it). Measured:
+// an arch on both legs 26, a mesa's 24 m lip 35, a ball on a whole pillar
+// 22 stand; an arch on one leg 110, a thinned pillar 84 break. `rounds`: a
+// break can leave a new overhang, checked again this many times a dig.
+export const TORQUE = { rock: 50, rounds: 4 };
 
 // Three fire controls, one per kind of weapon: lasers are energy (no ammo,
 // lots of heat), the autocannon is ballistic, LRMs are missiles.

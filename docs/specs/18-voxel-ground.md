@@ -257,6 +257,32 @@ the ground and, later, for buildings made of cells (see below).
   over. Nothing in this rule changes for that; the material table grows by
   a row.
 
+#### As built in #293
+
+- **K is 50, not 12.** The rule's numbers come out larger than the
+  estimate. Measured load over section:
+
+  | Case | Load over section | Must |
+  |---|---|---|
+  | a ball on a whole pillar | 22 | hold |
+  | the default arch on both legs | 26 | hold |
+  | the default mesa's 24 m lip | 35 | hold |
+  | a tunnel's roof | 38 | hold |
+  | a pillar thinned to a few columns | 84 | break |
+  | the arch on one leg | 110 | break |
+
+  Cave roofs are about 1. K = 50 sits between the two groups with margin
+  both ways. It is `TORQUE.rock` in `data/weapons.js`, and
+  `test/torque.test.js` pins the cases.
+- **The section is the number of attachment columns.** Each is solid to
+  bedrock by definition, so that count is the narrowest slice. Thinning a
+  pillar takes columns away.
+- **Landmarks are rock.** The soft top is measured from the ground as built,
+  so below an arch's or a mesa's top 6 m battle blasts dig half their
+  radius. A leg needs many big blasts, which is the point, but at 8 m cells
+  a 3.5 m hole often misses every corner. Whether arches should be easier to
+  cut is a balance call for later.
+
 ### Construction mechs (later, not in this spec)
 
 Their mechs, tools and names come after this spec, with their own. This spec
