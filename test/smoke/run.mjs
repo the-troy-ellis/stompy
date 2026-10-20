@@ -116,6 +116,22 @@ try {
     await page.waitForFunction(() => window.__stompy.game.kind === 'bench' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
     console.log(`debug tab: MISSION picker at ${mis + 1}; BENCH started`);
   });
+  // RANGE: the arch, two foes standing still; LAUNCH puts you on the range facing it.
+  await run('debug-range', URL_, async page => {
+    await page.click('.feel-panel [data-a="toggle"]');
+    await page.click('[data-dsec="range"]');
+    await page.screenshot({ path: 'test-results/smoke-debug-range-menu.png' });
+    const ground = await page.$eval('[data-drg="ground"] ~ b', b => b.textContent);
+    if (ground !== 'ARCH') await page.click('[data-drg="ground"][data-d="1"]');
+    await page.click('[data-drg="foes"][data-d="1"]');   // NONE -> STANDING STILL
+    await page.click('[data-drg="n"][data-d="1"]');
+    await page.click('[data-a="go"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'range' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    await page.waitForTimeout(1500);
+    const r = await page.evaluate(() => { const G = window.__stompy.game, f = G.mechs.filter(m => m.team === 1); return { arch: G.ter.solid(0, 40, 220), foes: f.length, still: f.every(m => m.ai.still), objectives: G.objectives.length }; });
+    console.log(`debug range: arch ${r.arch}, ${r.foes} foes standing still ${r.still}, objectives ${r.objectives}`);
+    if (!r.arch || r.foes !== 2 || !r.still || r.objectives) { failed = true; console.error(`FAIL: RANGE did not build the arch with two still foes (${JSON.stringify(r)})`); }
+  });
   await run('touch', URL_ + '&touch=1', async page => {
     // Taps, not clicks: a mouse click would switch the game back to mouse mode.
     await page.tap('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way, as on desktop

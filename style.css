@@ -224,6 +224,12 @@ html, body {
   .fp-picks .mm-pick { flex-wrap: wrap; gap: 0 6px; margin: 1px 0; }
   .fp-picks .mm-pick span { width: 100%; font-size: 10px; line-height: 1.2; }
   .fp-picks .mm-pick b { min-width: 9ch; }
+  /* The DEBUG tab's RANGE: its section row is already there, so no blurb, and STANDING STILL on one line. */
+  .mm-detail .dbg-blurb { display: none; }
+  .dbg-secs { margin: 2px 0 4px; }
+  .dbg-range .mm-pick { gap: 0 2px; flex-wrap: wrap; }
+  .dbg-range .mm-pick b { white-space: nowrap; min-width: 0; font-size: 10px; }
+  .mm-items.five .mm-item { white-space: nowrap; }
   /* MULTIPLAYER: callsign, relay and colour in less height, so JOIN ARENA stays on screen. */
   .mm-detail .lobby-row { margin: 4px 0; }
   .mm-detail .relay-at { margin: 0 0 4px; }
@@ -364,6 +370,7 @@ html, body {
 .vote .go.on { outline: 3px solid #fc3; color: #fc3; }
 .mp-kind .opt.on, .mm-detail .opt.on { color: #fc3; border-color: #fc3; }
 .mp-kind { gap: 6px; margin: 4px 0; }
+.dbg-range .mm-pick { margin: 2px 0; }   /* the DEBUG tab's six range pickers under its section row: tighter, so LAUNCH fits a 640-tall window */
 .mp-kind i { width: 10px; }
 .coop-picks .mm-pick b { min-width: 0; }
 @media (max-height: 500px) {

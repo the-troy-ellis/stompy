@@ -7,7 +7,7 @@ import { geoOf } from '../data/geo.js';
 import { center, eyeOf, muzzle, rayHit, viewYaw } from './geom.js';
 import { stepMech } from './mech.js';
 import { gait } from './gait.js';
-import { think } from './ai.js';
+import { think, stand } from './ai.js';
 import { groupPass } from './ai/group.js';
 import { stepBursts, stepShots, stepDying, WRECK_BURN, WRECK_SETTLE } from './combat.js';
 import { beamTick, coolArmour, remoteBeam } from './beams.js';
@@ -101,7 +101,7 @@ export function update(G, input, dt) {
       if (m.alive && m.net?.fl) G.cbeams.push({ a: muzzle(m, m.weapons.find(w => w.def.kind === 'fusion')), b: m.net.fl, col: WEAPONS.fusion.col, w: 0.05 + 0.035 * abs(sin(G.time * 37)) });
       continue;
     }
-    if (m.team !== 0 && m.alive && !m.script) think(G, m, dt);   // the bench's cast is on a script
+    if (m.team !== 0 && m.alive && !m.script) { if (m.ai.still) stand(m); else think(G, m, dt); }   // the bench's cast is on a script; a range's target stands
     if (m.alive) { stepMech(G, m, dt); meleeTick(G, m, dt); }
     if (m.alive && m.beamOn) beamTick(G, m, dt, m === P ? G.aim : m.ai.beamAim);
     else m.beaming = false;
