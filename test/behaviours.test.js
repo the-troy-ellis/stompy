@@ -11,7 +11,7 @@ import { BEHAVIOUR as B } from '../src/data/ai.js';
 const { hypot } = Math;
 const place = (G, m, x, z, yaw) => { Object.assign(m, { x, z, yaw }); initFeet(G, m); };
 // A block of terrain `h` high over x in (lo, hi), the length of the map.
-const wall = (G, lo, hi, h) => { const base = G.ter.height; G.ter = { ...G.ter, height: (x, z) => (x > lo && x < hi ? h : base(x, z)) }; };
+const wall = (G, lo, hi, h) => G.ter.block(lo, hi, -1150, 1150, h, 1);   // a 45° ridge of rock the length of the map, as steep as the hills get
 const immortal = P => { P.hp.T = 1e9; P.max.T = 1e9; };
 // Step one frame at a time with a hook, for tests that script a condition.
 function frames(G, seconds, hook) {

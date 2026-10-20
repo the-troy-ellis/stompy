@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Particles, spawn, stepParticles, listParticles, PARTICLE_CAP } from '../src/sim/particles.js';
 import { createTestGame, stepFor } from './helpers.js';
 
-const game = (cap = 8) => ({ parts: new Particles(cap), rng: { next: () => 0.5 }, ter: { height: () => 0 } });
+const game = (cap = 8) => ({ parts: new Particles(cap), rng: { next: () => 0.5 }, ter: { height: () => 0, solid: (x, y) => y < 0 } });   // level ground at 0
 const near = (a, b, eps = 1e-5) => assert.ok(Math.abs(a - b) < eps, `${a} vs ${b}`);
 
 test('spawning copies what it is given; the pool counts with length', () => {
@@ -22,7 +22,7 @@ test('a step ages, drags smoke, drops by gravity, bounces debris off the ground 
   stepParticles(G, 0.1);
   const [smoke, debris] = listParticles(G);
   near(smoke.life, 0.9); near(smoke.v[0], 2 * (1 - 0.06)); near(smoke.p[0], 2 * 0.94 * 0.1);
-  near(debris.p[1], 0, 1e-6); near(debris.v[1], -(-10 - 2) * 0.35);
+  near(debris.p[1], 0.05, 1e-6); near(debris.v[1], -(-10 - 2) * 0.35);   // into the ground: back to where it was, bouncing
   near(smoke.spin - Math.PI, 0.3);   // spawned at 0.5 * TAU, +3/s
 });
 

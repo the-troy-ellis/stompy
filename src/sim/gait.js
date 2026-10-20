@@ -14,12 +14,12 @@ const { sin, cos, abs, min, hypot, PI } = Math;
 // lands half a stride ahead of where the body will be at touchdown -- so
 // feet never slide, and faster walking just means quicker steps.
 
-// Where foot i would stand, `ahead` units along the heading.
+// Where foot i would stand, `ahead` units along the heading: the first ground below the hip.
 export function restFoot(G, m, i, ahead = 0) {
   const s = m.ch.scale, leg = geoOf(m).legs[i], c = cos(m.yaw), sn = sin(m.yaw);
   const lx = leg.fx * s, lz = leg.fz * s + ahead;
   const x = m.x + c * lx + sn * lz, z = m.z - sn * lx + c * lz;
-  return [x, G.ter.height(x, z), z];
+  return [x, G.ter.groundBelow(x, m.y + geoOf(m).hip * s, z), z];   // from the hip: a foot in a tunnel stands on its floor, not its roof
 }
 export function initFeet(G, m) {
   m.feet = geoOf(m).legs.map((_, i) => ({ pos: restFoot(G, m, i), from: null, lifted: false, yaw: m.yaw }));
@@ -78,7 +78,9 @@ export function strideOf(m, pace, sw) {
 }
 
 export function gait(G, m, dt) {
-  const gp = gaitOf(m), s = m.ch.scale, pace = min(1, abs(m.speed) / (m.maxSpeed ?? m.ch.speed)), crouch = -gp.crouch * s * pace;
+  // The legs go as fast as the body does: against a wall (mech.js) that's its slide, not its throttle.
+  const v = m.walled ? m.slide : m.speed;
+  const gp = gaitOf(m), s = m.ch.scale, pace = min(1, abs(v) / (m.maxSpeed ?? m.ch.speed)), crouch = -gp.crouch * s * pace;
   const g0 = geoOf(m), legOk = i => m.hp[g0.legs[i].hx > 0 ? 'LL' : 'RL'] > 0;
   // No legs left: the hull sits on the ground, the torso still turns and fires.
   if (m.hp.LL <= 0 && m.hp.RL <= 0) {
@@ -104,12 +106,12 @@ export function gait(G, m, dt) {
   const g = geoOf(m), sw = swingNow(m, pace), D = strideOf(m, pace, sw);
   const swingOf = i => { const u = (((m.cyc - g.legs[i].ph) % 1 + 1) % 1) / sw; return u < 1 ? u : null; };
   const before = g.legs.map((_, i) => swingOf(i));
-  const moving = abs(m.speed) > 0.3 || dyaw > 1e-4;
+  const moving = abs(v) > 0.3 || dyaw > 1e-4;
   // Stopped mid-stride: finish the step on the clock rather than freeze with a foot up.
-  const adv = moving ? (abs(m.speed) * dt + dyaw * 2.5 * s) / D : (before.some(u => u != null) ? dt / 0.6 : 0);
+  const adv = moving ? (abs(v) * dt + dyaw * 2.5 * s) / D : (before.some(u => u != null) ? dt / 0.6 : 0);
   m.cyc = (m.cyc + min(adv, 0.2)) % 1;
 
-  const dir = abs(m.speed) > 0.3 ? Math.sign(m.speed) : 0;
+  const dir = abs(v) > 0.3 ? Math.sign(v) : 0;
   // The hull: sunk by the crouch, dipped by the last footfall (a quick drop
   // and a slower recovery), raised over a swinging leg; the hips shift over
   // the planted foot and turn with the stride.

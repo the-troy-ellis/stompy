@@ -75,8 +75,11 @@ export function stepParticles(G, dt) {
     }
     P.pos[i3] += P.vel[i3] * dt; P.pos[i3 + 1] += P.vel[i3 + 1] * dt; P.pos[i3 + 2] += P.vel[i3 + 2] * dt;
     if (k === DEBRIS) {
-      const g = G.ter.height(P.pos[i3], P.pos[i3 + 2]);
-      if (P.pos[i3 + 1] < g) { P.pos[i3 + 1] = g; P.vel[i3] *= 0.5; P.vel[i3 + 1] *= -0.35; P.vel[i3 + 2] *= 0.5; }
+      // Into rock (a floor, a wall or a roof): back out to where it was and bounce off.
+      if (G.ter.solid(P.pos[i3], P.pos[i3 + 1], P.pos[i3 + 2])) {
+        P.pos[i3] -= P.vel[i3] * dt; P.pos[i3 + 1] -= P.vel[i3 + 1] * dt; P.pos[i3 + 2] -= P.vel[i3 + 2] * dt;
+        P.vel[i3] *= 0.5; P.vel[i3 + 1] *= -0.35; P.vel[i3 + 2] *= 0.5;
+      }
     }
     P.spin[i] += dt * 3;
   }

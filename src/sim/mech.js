@@ -9,11 +9,25 @@ import { WALK } from '../data/walk.js';
 import { tryStomp } from './melee.js';
 import { voice } from './voice.js';
 import { JETS_CLIMB, JETS_FUEL } from '../data/systems.js';
+import { geoOf } from '../data/geo.js';
 
 const { sin, cos, min, max } = Math;
 
 // How fast a push dies out, per second: an impulse of v m/s moves the mech about v / PUSH_DECAY metres.
 export const PUSH_DECAY = 2.5;
+
+// The highest rise a mech walks up without a jump, times its scale (spec 18):
+// anything taller is a wall.
+export const STEP = 1.5;
+// Where a mech stands at (x, z): the first ground below its step.
+export const groundUnder = (G, m, x = m.x, z = m.z) => G.ter.groundBelow(x, m.y + STEP * m.ch.scale, z);
+// How far into rock a mech's body would be at (x, z), moving along (dx, dz):
+// the density at its step (a wall), at its chest a body's radius ahead, and
+// at its head (a roof too low for it). Above 0 is in rock.
+export function rockAt(G, m, x, z, dx, dz) {
+  const g = geoOf(m), s = m.ch.scale, ter = G.ter, y = m.y, R = g.radius * s;
+  return max(ter.sample(x, y + STEP * s, z), ter.sample(x + dx * R, y + g.torsoY * s, z + dz * R), ter.sample(x, y + g.height * s * 0.95, z));
+}
 
 // A grade (rise over run) as a speed factor: uphill slow, downhill a touch quick.
 export const gradeFactor = grade => clampN(grade > 0 ? 1 - grade * WALK.slopeUp : 1 - grade * WALK.slopeDown, WALK.slopeMin, WALK.slopeMax);
@@ -25,7 +39,7 @@ export const grips = m => m.ch.legs === 'quad';
 export function slopeFactor(G, m) {
   if (grips(m)) return 1;
   const fx = sin(m.yaw), fz = cos(m.yaw);
-  return gradeFactor((G.ter.height(m.x + fx * 2, m.z + fz * 2) - G.ter.height(m.x - fx * 2, m.z - fz * 2)) / 4);
+  return gradeFactor((groundUnder(G, m, m.x + fx * 2, m.z + fz * 2) - groundUnder(G, m, m.x - fx * 2, m.z - fz * 2)) / 4);
 }
 
 // Touchdown dust: a puff under the feet, and for a hard landing (force over
@@ -54,8 +68,18 @@ export function stepMech(G, m, dt) {
   const target = !m.alive || m.shutdown ? 0 : m.throttle * maxS;
   m.speed += clampN(target - m.speed, -11 * dt, 7 * dt);
   const push = m.push || (m.push = [0, 0]);
-  m.x = clampN(m.x + (sin(m.yaw) * m.speed + push[0]) * dt, -BOUND, BOUND);
-  m.z = clampN(m.z + (cos(m.yaw) * m.speed + push[1]) * dt, -BOUND, BOUND);
+  // Walls: each axis moves only if the body fits there, so a mech slides
+  // along a wall it meets at an angle. One already in rock (a roof dug lower,
+  // a step up under a low ceiling) may only move to where it is less so.
+  const x0 = m.x, z0 = m.z, nx = clampN(m.x + (sin(m.yaw) * m.speed + push[0]) * dt, -BOUND, BOUND), nz = clampN(m.z + (cos(m.yaw) * m.speed + push[1]) * dt, -BOUND, BOUND);
+  const here = rockAt(G, m, x0, z0, 0, 0), fits = r => r <= 0 || r < here;
+  let walled = false;
+  if (nx !== x0 && !fits(rockAt(G, m, nx, z0, Math.sign(nx - x0), 0))) { walled = true; push[0] = 0; } else m.x = nx;
+  if (nz !== z0 && !fits(rockAt(G, m, m.x, nz, 0, Math.sign(nz - z0)))) { walled = true; push[1] = 0; } else m.z = nz;
+  // Against a wall the legs walk only as fast as the body goes (gait.js reads
+  // `slide`), so planted feet stay put; the throttle's speed is kept for when it's clear.
+  m.walled = walled;
+  m.slide = walled && dt > 0 ? Math.sign(m.speed) * Math.hypot(m.x - x0, m.z - z0) / dt : m.speed;
   const keep = max(0, 1 - PUSH_DECAY * dt);   // a push carries about PUSH_DECAY^-1 of its speed in metres
   push[0] *= keep; push[1] *= keep;
   // Skidding: dust streaks behind the feet while the push is strong.
@@ -65,7 +89,7 @@ export function stepMech(G, m, dt) {
       [-push[0] * 0.3 + r.range(-1, 1), r.range(1, 2.5), -push[1] * 0.3 + r.range(-1, 1)], r.range(0.5, 0.9), r.range(0.6, 1.1) * m.ch.scale, mul(G.pal.low, 0.8), 'smoke');
   }
 
-  const ground = G.ter.height(m.x, m.z);
+  const ground = groundUnder(G, m);
   // Jets by the JUMP JETS level: none at 0, stock at 1, more fuel and climb at 2.
   const jl = m.jets ?? 1, jets = jl > 0 && m.jetting && m.fuel > 0 && !m.shutdown && m.alive;
   if (jets) {
@@ -75,6 +99,8 @@ export function stepMech(G, m, dt) {
     if (r.chance(0.6)) particle(G, add([m.x, m.y + 1.5, m.z], [r.range(-1, 1), 0, r.range(-1, 1)]), [r.range(-1, 1), -8, r.range(-1, 1)], 0.35, 0.7, [1, 0.6, 0.2], 'fire');
   } else m.fuel = min(1, m.fuel + dt * 0.12);
   m.vy -= 18 * dt;
+  // A ceiling: the jets push the head into rock no further.
+  if (m.vy > 0 && G.ter.solid(m.x, m.y + geoOf(m).height * m.ch.scale + m.vy * dt, m.z)) m.vy = 0;
   m.y += m.vy * dt;
   if (m.air) {
     m.airT = (m.airT || 0) + dt;

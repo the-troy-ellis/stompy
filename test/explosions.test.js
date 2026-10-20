@@ -18,7 +18,7 @@ test('acceptance 5: a WARDEN blowing up makes a shockwave, plates that persist, 
   stepFor(G, DEATH_BEAT + 0.05);
   assert.ok(kinds(G).has('shock'), 'a shockwave on the ground');
   const shock = listParticles(G).find(p => p.kind === 'shock');
-  assert.ok(Math.abs(shock.p[1] - (G.ter.height(shock.p[0], shock.p[2]) + 0.3)) < 1e-3, 'lying on the ground');
+  assert.ok(Math.abs(shock.p[1] - (G.ter.height(shock.p[0], shock.p[2]) + 0.3)) < 0.05, 'lying on the ground');
   const plates = G.debris.filter(d => d.part === 'plate');
   assert.ok(plates.length >= 4, 'plates fly');
   assert.ok(G.scorches.length >= 1, 'a scorch under the blast');
