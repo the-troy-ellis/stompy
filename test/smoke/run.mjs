@@ -31,6 +31,8 @@ try {
   await run('desktop', URL_ + '&lock', async page => {   // &lock: the locks a fresh save has, which ?debug=1 would open
     // FIT: cycle the left arm, see the preview mech change, go overweight, reset, back.
     await page.click('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way
+    const tabs = await page.evaluate(() => [...document.querySelectorAll('[data-sel]')].map(b => b.dataset.sel).join(','));
+    if (tabs !== 'campaign,free,mp,settings') { failed = true; console.error(`FAIL: &lock should show the player's four tabs (${tabs})`); }
     await page.click('[data-a="fit"]');
     await page.waitForSelector('.lab-row');
     await page.click('[data-lab="hp"][data-id="la"][data-d="1"]');
@@ -99,6 +101,20 @@ try {
     const won = await page.evaluate(() => /MISSION COMPLETE/.test(document.querySelector('.mech-overlay').textContent));
     console.log(`desktop: debrief reached, won=${won}`);
     if (!won) { failed = true; console.error('FAIL: debrief did not show MISSION COMPLETE'); }
+  });
+  // The DEBUG tab (docs/specs/19-debug-menu.md): a fresh debug run opens on it; JUMP TO -> BENCH plays the bench.
+  await run('debug-tab', URL_, async page => {
+    const seen = await page.evaluate(() => [[...document.querySelectorAll('[data-sel]')].map(b => b.dataset.sel).join(','), document.querySelector('.mm-item.on')?.dataset.sel]);
+    console.log(`debug tab: tabs ${seen[0]}, opened on ${seen[1]}`);
+    if (seen[0] !== 'campaign,free,mp,settings,debug' || seen[1] !== 'debug') { failed = true; console.error(`FAIL: ?debug=1 should show a DEBUG tab and open on it (${seen})`); }
+    await page.click('.feel-panel [data-a="toggle"]');
+    await page.click('[data-dsec="jump"]');
+    await page.click('[data-dmis="1"]');
+    const mis = await page.evaluate(() => window.__stompy.app.prefs.mission);
+    await page.screenshot({ path: 'test-results/smoke-debug-tab.png' });
+    await page.click('[data-dj="bench"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'bench' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    console.log(`debug tab: MISSION picker at ${mis + 1}; BENCH started`);
   });
   await run('touch', URL_ + '&touch=1', async page => {
     // Taps, not clicks: a mouse click would switch the game back to mouse mode.

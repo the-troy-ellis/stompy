@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ready: the owner picked a fifth DEBUG tab, with all four sections |
+| Status | in progress: #296 (the tab and JUMP TO) built; the owner picked a fifth DEBUG tab, with all four sections |
 | Milestone | M8 (tooling; it does not change the game for players) |
 | Size | M (split into four issues; see the end) |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md) (the test grounds, digs, nav); [13-thunk.md](13-thunk.md) (the FEEL table); [14-look-and-performance.md](14-look-and-performance.md) (LOOK, the bench, the frame readout); [15-mission-editor.md](15-mission-editor.md) (the editor it jumps to) |
@@ -143,6 +143,18 @@ The overlays are drawn on the HUD canvas, like the AI labels.
 - `&lock` (the smoke test's way to see a new player's menu) hides the DEBUG
   tab, so the smoke test still sees the player's menu.
 - `?debug=1&bench=1` still goes straight into the bench.
+
+### As built in #296
+
+- The tab is `src/ui/debugMenu.js`; `screens.js` asks it for its page,
+  its LAUNCH label and its clicks. RANGE, CHEATS and TUNING say "Not built
+  yet." until #297 to #299, and have no LAUNCH button.
+- JUMP TO's LAUNCH plays the picked mission; EDITOR, BENCH and TUTORIAL
+  AGAIN go on a tap. The section picked is saved (`debug.sec`); the first
+  debug run opens on the tab (`debug.seen`).
+- On a phone held sideways five tabs push LAUNCH off a 360-tall screen, so
+  there they sit in two columns.
+- The pause menu's DEBUG block comes with its first contents, in #298.
 
 ## Code touchpoints
 

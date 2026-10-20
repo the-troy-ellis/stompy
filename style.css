@@ -290,6 +290,7 @@ html, body {
   .mm-title { font-size: 38px; -webkit-text-stroke: 2px #3a0d06; text-shadow: 3px 3px 0 #7a1d10; margin-bottom: 2px; }
   .mm-item { font-size: 16px; padding: 3px 0 3px 22px; }
   .mm-item.on::before { font-size: 13px; top: 5px; }
+  .mm-items.five { display: grid; grid-template-columns: auto auto; column-gap: 12px; }   /* ?debug=1's fifth tab: two columns, so LAUNCH stays on screen */
   .mm-detail { font-size: 10.5px; }
   .mm-launch { font-size: 18px; padding: 8px 24px; box-shadow: 3px 3px 0 #7a1d10; }
   .mm-select { min-width: 210px; padding: 6px 10px 8px; }

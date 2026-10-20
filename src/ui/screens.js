@@ -17,6 +17,7 @@ import { DIFF, DIFF_ORDER } from '../data/ai.js';
 import { SETTINGS, SETTING_KEYS, SETTING_GROUPS, stepSetting } from '../data/settings.js';
 import { fitOf, fitOk, kitLine } from './mechlab.js';
 import { objectiveRows, debriefTitle, missionTitle, missionSpoken, verdict } from './debrief.js';
+import { createDebugMenu } from './debugMenu.js';
 import { recordResult, saveCampaign, restartCampaign, stripSquares, canPlay } from './campaign.js';
 import { VOICE } from '../data/voice.js';
 import { newTutorial } from '../sim/tutorial.js';
@@ -110,9 +111,11 @@ export function createUi(app) {
   function showOverlay(html, cls = '') { ov.innerHTML = html; ov.className = 'mech-overlay' + (cls ? ' ' + cls : ''); ov.hidden = false; }
   function hideOverlay() { ov.hidden = true; ov.className = 'mech-overlay'; }
 
-  /* ----- the main menu: Campaign / Free Play / Multiplayer / Settings, and your mech ----- */
+  /* ----- the main menu: Campaign / Free Play / Multiplayer / Settings (and DEBUG), and your mech ----- */
 
-  const MENU = [['campaign', 'CAMPAIGN'], ['free', 'FREE PLAY'], ['mp', 'MULTIPLAYER'], ['settings', 'SETTINGS']];
+  // ?debug=1 adds the DEBUG tab (ui/debugMenu.js, docs/specs/19-debug-menu.md).
+  const dbg = createDebugMenu(app, { startMission, launch, renderMenu });
+  const MENU = [['campaign', 'CAMPAIGN'], ['free', 'FREE PLAY'], ['mp', 'MULTIPLAYER'], ['settings', 'SETTINGS'], ...(dbg.on ? [['debug', 'DEBUG']] : [])];
 
   function mainMenu(sel = prefs.menuSel, status = '') {
     if (app.editor) { app.editor.back(); return; }   // opened with ?edit=1: the menu is the editor (ui/editor.js)
@@ -158,6 +161,7 @@ export function createUi(app) {
   }
 
   function menuDetail(status) {
+    if (prefs.menuSel === 'debug') return dbg.detail();
     if (prefs.menuSel === 'campaign') {
       const d = missionDef(prefs.mission), p = PALS[d.pal];
       const all = missionFoes(d);   // waves are hostiles too
@@ -229,12 +233,12 @@ export function createUi(app) {
     const bar = (label, f) => `<span>${label}</span><i><b style="width:${Math.round(f * 100)}%"></b></i>`;
     const shut = locked(prefs.chassis), heavy = !shut && !fitOk(prefs.chassis), lab = app.mechlab.fit.open && !shut;
     const mpLabel = prefs.mpKind !== 'coop' ? ['JOIN ARENA', 'CREATE', 'JOIN'][prefs.arenaPick] : prefs.coopJoin ? 'JOIN' : 'HOST';
-    const launchLabel = shut ? 'LOCKED' : heavy ? 'OVERWEIGHT' : { campaign: 'LAUNCH', free: 'LAUNCH', mp: mpLabel }[prefs.menuSel];
+    const launchLabel = shut ? 'LOCKED' : heavy ? 'OVERWEIGHT' : { campaign: 'LAUNCH', free: 'LAUNCH', mp: mpLabel, debug: dbg.goLabel() }[prefs.menuSel];
     showOverlay(`
       <div class="mm">${app.update ? '<button class="mm-update" data-a="update">UPDATED · RELOAD</button>' : ''}
         <div class="mm-left">
           <div class="mm-title">STOMPY</div>
-          ${lab ? `<div class="mm-detail mm-lab">${app.mechlab.html()}</div>` : `<nav class="mm-items">${MENU.map(([k, label]) => `<button class="mm-item${k === prefs.menuSel ? ' on' : ''}" data-sel="${k}">${label}</button>`).join('')}</nav>
+          ${lab ? `<div class="mm-detail mm-lab">${app.mechlab.html()}</div>` : `<nav class="mm-items${MENU.length > 4 ? ' five' : ''}">${MENU.map(([k, label]) => `<button class="mm-item${k === prefs.menuSel ? ' on' : ''}" data-sel="${k}">${label}</button>`).join('')}</nav>
           <div class="mm-detail">${menuDetail(status)}</div>`}
           ${launchLabel ? `<button class="mm-launch" data-a="go"${heavy || shut ? ' disabled' : ''}>${launchLabel}</button>` : ''}
         </div>
@@ -256,6 +260,7 @@ export function createUi(app) {
     if (!fitOk(prefs.chassis)) return;   // OVERWEIGHT: fix it in FIT first
     if (prefs.menuSel === 'campaign') { startMission(prefs.mission); launch(); }
     else if (prefs.menuSel === 'free') { startSkirmish(); launch(); }
+    else if (prefs.menuSel === 'debug') dbg.go();
     else if (prefs.menuSel === 'mp') {
       // The public arena, a private one (its mode), co-op (open a room for the
       // picked mission), or any room by its code.
@@ -372,6 +377,7 @@ export function createUi(app) {
       const sel = e.target.closest('[data-sel]')?.dataset.sel, md = e.target.closest('[data-mech]'), fp = e.target.closest('[data-fp]');
       if (sel) { const wasMp = prefs.menuSel === 'mp'; prefs.menuSel = sel; store.set('menu.sel', sel); if (wasMp !== (sel === 'mp')) showMech(); renderMenu(); return; }
       if (md) { cycleMech(+md.dataset.mech); return; }
+      if (prefs.menuSel === 'debug' && dbg.click(e)) return;
       const mis = e.target.closest('[data-mis]');
       if (mis) { const n = +mis.dataset.mis; if (canPlay(camp, n, unlockAll)) { prefs.mission = n; renderMenu(); } return; }
       // MULTIPLAYER: the arena or co-op, host or join, and the host's mission (from the campaign strip).
