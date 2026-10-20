@@ -210,6 +210,53 @@ so a fight can bring both down.
 - **Buildings** keep the rule above: one whose ground falls away settles onto
   the new ground or breaks. They don't hold ground up in this spec.
 
+### Overhangs that can't hold their weight (the torque rule)
+
+Added after #284, at the owner's request. The fall rule holds ground up
+while any chain of rock reaches bedrock, so an arch with one leg left
+stands. The owner wants weight to matter: if enough mass hangs far enough
+off to one side of what holds it, it breaks off. The rule is the same for
+the ground and, later, for buildings made of cells (see below).
+
+- **When:** after each confirmed dig and each fall, in a check box: the
+  dug box grown by 6 cells each way, clamped to the grid. Like the support
+  fill, it runs on the confirmed ground in the relay's order, so every
+  client finds the same breaks and nothing new goes over the wire.
+- **Grounded and hanging:** in the box, a solid corner is *grounded* if
+  solid corners run straight down from it to the box's floor or to
+  bedrock. A solid corner that isn't is *hanging*. Hanging corners that
+  touch face to face are one *overhang*.
+- **Where it's held:** an overhang's *attachments* are the grounded corners
+  it touches face to face. Its *support* is those attachments' columns, from
+  the attachment down to the box's floor. The support's *section* is the
+  fewest solid corners it has at any one height: its narrowest slice, so
+  thinning a pillar weakens what it holds.
+- **The load:** each corner of the overhang counts its mass (1, or its
+  material's, below) times its *reach*: how far it sits sideways, in cells,
+  from the nearest attachment column. The overhang's load is the sum.
+- **The check:** the overhang holds if `load ≤ K × section`, where K is the
+  material's strength. If it doesn't hold, it breaks: the overhang is cut
+  from its attachments and falls as an island, with the same drop, heap or
+  shatter, thunk, crush and riders as § Falling ground. A break can leave a
+  new overhang behind, so the check runs again on what's left, up to 4
+  rounds a dig.
+- **Starting numbers** (balance, to tweak after play): rock K = 12. The tests
+  pin what that must give:
+  - a 9 m-thick arch (the default) stands on both legs;
+  - with one leg blown out, its crown breaks off at the other leg and falls;
+  - a mesa's 24 m lip (the default) holds;
+  - a ball of rock on a pillar stands until blasts thin the pillar's
+    section, then snaps off at the pillar.
+- **Cost:** the check box is at most 25 × 25 × 25 corners, scanned with the
+  support fill's typed scratch arrays: under 1 ms a dig on the bench's
+  `bench-dig` segment.
+- **Buildings (a later spec):** today's structures are one body with hit
+  points, so they have no shape to weigh. Once buildings are made of cells
+  with a building material (its own mass and K), this rule brings them down
+  too: shoot out a corner column and the floors hanging off the rest tip
+  over. Nothing in this rule changes for that; the material table grows by
+  a row.
+
 ### Construction mechs (later, not in this spec)
 
 Their mechs, tools and names come after this spec, with their own. This spec
@@ -487,7 +534,8 @@ round-trips it, and `check` gains the three problems above.
    written above it, as the existing ones are.
 10. `docs/architecture.md` states the new invariant and lists `dig`/`digs`
     and `fall` under PROTOCOL 21.
-11. Blowing out an arch's leg drops the rest of the arch. The pieces under 8
+11. Blowing out an arch's leg drops the rest of the arch (by the torque rule,
+    § Overhangs that can't hold their weight; filed as #293). The pieces under 8
     cells shatter, and the larger ones land as heaps in the grid, with the
     landing's thunk. A mech under one takes the crush hit; a mech standing
     on one rides it down. The flood fill costs under 1 ms on the bench's
@@ -535,6 +583,10 @@ round-trips it, and `check` gains the three problems above.
 
 The prototype's 10 ms worst chunk on a phone is why the worker is part of the
 spec, not an option.
+
+- `test/torque.test.js`: the arch on both legs stands; on one leg its
+  crown breaks off; the mesa lip holds; a pillar snaps when thinned; a break
+  that leaves a new overhang checks again; two clients find the same breaks.
 
 ## Open questions
 
@@ -584,3 +636,5 @@ spec, not an option.
    re-marking after digs and falls.
 6. **Sculpting in the editor.** #286. Brushes, landmarks, slice, the `ground`
    block in `missionIO`, the new problems.
+7. **Overhangs that can't hold their weight.** #293. The torque rule after
+   digs and falls, rock's K, the tests above; criterion 11.
