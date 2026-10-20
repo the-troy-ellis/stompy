@@ -19,8 +19,8 @@ Rules that are easy to miss:
   after the fact. See the tone guide in `docs/vision.md`.
 - Feel is the top pillar: thunk. Footfalls, hits, landings and punches must
   be felt (camera, body squash/wobble, sub-bass). See `docs/specs/13-thunk.md`.
-- Keep the invariants in `docs/architecture.md` (feet never slide, terrain
-  height matches the mesh, melt belongs to the target, heat 100/45, shooter
+- Keep the invariants in `docs/architecture.md` (feet never slide, ground
+  queries match the mesh, melt belongs to the target, heat 100/45, shooter
   scores and victim applies in the arena, audio only after a gesture).
 - Names are the owner's, picked after seeing the thing. Use stable keys in
   code, put display names only in `src/data/names.js`, ship placeholders,

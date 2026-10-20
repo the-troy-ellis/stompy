@@ -39,6 +39,8 @@ test('bench: nobody takes damage; limbs and kills come off the script', () => {
   assert.equal(warden.hp.T, warden.max.T, 'and nothing else');
   assert.ok(G.stats.shots > 10 && G.stats.taken > 50, 'and the guns did fire');
   assert.equal(G.state, 'play', 'nothing to win: the match never ends itself');
+  assert.equal(G.bench.dug, 3, 'and the ground was dug three times');
+  assert.ok(G.ter.dirty.size > 0, 'which leaves chunks to mesh again');
 });
 
 test('bench: the cast walks in the open and never into each other', () => {

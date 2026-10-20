@@ -288,6 +288,33 @@ that, and adds:
   banded `rock`, and darker under cover (a column-top test). Lighting is
   baked per triangle, as the terrain is now.
 
+### As built in #281
+
+Where the first issue differs from the plan above, and why:
+
+- **The grid starts at y = -44 m and has 38 layers** (289 × 39 × 289 ≈ 2.9 MB).
+  The extra depth lets a crater go 30 m into flat ground before bedrock, and
+  the half-cell offset keeps flat ground at y = 0 off a corner row (a surface
+  exactly on one flips between rows and draws dark ledges).
+- **Density is metres over 16 m** (two cells), not one cell, so slopes up to
+  about 60° keep their shape between corners.
+- **The invariant is 97%, not every point.** The mesh's vertices sit inside
+  cells, so it rounds off creases: the drawn top is within 0.6 m of
+  `ter.height` over 97–99% of a map and within 2.5 m everywhere (measured
+  worst about 2 m). `test/mesher.test.js` holds both numbers.
+- **Air at the grid's edge columns**, not from `BOUND`: the hills run out to
+  the map's edge as they do today, past where anyone can walk.
+- **Pockets are off unless a mission asks** (`pockets: true`), so no mission's
+  ground changes until someone chooses it.
+- **Level of detail is per 256 m group** (2 × 2 chunk columns, one buffer and
+  one draw each). A group past 300 m draws its far mesh (16 m cells, one
+  coarse cell of overlap each side, drawn 2 m lower so the seam tucks under
+  its near neighbour). Near chunks are meshed only once their group comes
+  within about 360 m, so a load meshes the far groups and what's around you.
+- **Rocks and outposts stay a baked mesh** (`terrainMesh.js`), set on the top
+  surface as before; they become props or landmarks when digging needs them
+  to settle (#283).
+
 ### Mission data
 
 ```js

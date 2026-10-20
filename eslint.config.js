@@ -6,6 +6,7 @@ const browserGlobals = {
   matchMedia: 'readonly', addEventListener: 'readonly', screen: 'readonly', setTimeout: 'readonly', clearTimeout: 'readonly',
   WebSocket: 'readonly', Audio: 'readonly', AudioContext: 'readonly', speechSynthesis: 'readonly',
   SpeechSynthesisUtterance: 'readonly', console: 'readonly', Promise: 'readonly', URLSearchParams: 'readonly',
+  URL: 'readonly', Worker: 'readonly',
 };
 const nodeGlobals = { process: 'readonly', console: 'readonly', URL: 'readonly', setTimeout: 'readonly', performance: 'readonly' };
 
@@ -20,6 +21,11 @@ export default [
     // The service worker runs in its own scope, not the page's.
     files: ['src/sw.js'],
     languageOptions: { globals: { self: 'readonly', caches: 'readonly', fetch: 'readonly', URL: 'readonly', Promise: 'readonly' } },
+  },
+  {
+    // The ground's mesher worker (render/ground.js starts it).
+    files: ['src/render/groundWorker.js'],
+    languageOptions: { globals: { self: 'readonly' } },
   },
   {
     // The simulation and its data know nothing about the page: no DOM, no GL,

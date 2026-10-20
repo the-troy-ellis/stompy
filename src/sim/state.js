@@ -1,7 +1,8 @@
 import { CHASSIS } from '../data/chassis.js';
 import { palAt } from '../data/palettes.js';
 import { makeWeather } from '../data/weather.js';
-import { makeTerrain, BOUND } from '../world/terrain.js';
+import { BOUND } from '../world/terrain.js';
+import { makeGround } from '../world/voxels.js';
 import { makeRng } from './rng.js';
 import { Particles } from './particles.js';
 import { nullFx } from './fx.js';
@@ -60,7 +61,7 @@ export function resetMatch(G, { def, seed, pal, terrainOpts }) {
   G.pal = palAt(biome, r ? r[0] : def.time);
   G.palRamp = r ? { from: palAt(biome, r[0]), to: palAt(biome, r[1]), secs: r[2] } : null;
   G.weather = makeWeather(def.weather, seed);   // fog, radar and wind (data/weather.js)
-  G.ter = makeTerrain(seed, { ...terrainOpts, zones: flatZones(def) });
+  G.ter = makeGround(seed, { ...terrainOpts, zones: flatZones(def) }, def);   // the voxel ground (world/voxels.js)
   G.worldKind = 'match';
   G.mechs = []; G.entities = []; G.scenery = []; G.sceneryGrid = null; G.waves = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts.clear(); G.debris = []; G.scorches = []; G.scorchId = 0; G.scorchRev++; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear(); G.pendingEHits.clear();
   G.target = null; G.aimMech = null; G.flash = 0; G.shake = 0; G.kick = 0; G.bob = null; G.bobIn = null; G.whiteFlash = 0; G.zoom = false; G.endT = 0; G.time = 0; G.frame = 0; G.beamOnAt = null; G.bench = null;   // bench: sim/bench.js sets it after; beamOnAt: the last beam hit on you (sim/combat.js), on this clock

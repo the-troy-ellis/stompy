@@ -16,7 +16,9 @@ await rm('dist', { recursive: true, force: true });
 await mkdir('dist', { recursive: true });
 // An ES module with code splitting: the mission editor (`?edit=1`) is its own
 // chunk, loaded by import() only when asked for (docs/specs/15-mission-editor.md).
-await build({ entryPoints: { stompy: 'src/main.js' }, bundle: true, minify: true, format: 'esm', splitting: true, target: ['es2020'],
+// The ground's mesher worker is an entry of its own (render/ground.js starts it
+// as dist/groundWorker.js; docs/specs/18-voxel-ground.md).
+await build({ entryPoints: { stompy: 'src/main.js', groundWorker: 'src/render/groundWorker.js' }, bundle: true, minify: true, format: 'esm', splitting: true, target: ['es2020'],
   outdir: 'dist', chunkNames: 'chunks/[name]-[hash]', sourcemap: true, legalComments: 'none', logLevel: 'info',
   define: { __PWA__: 'true', __VERSION__: JSON.stringify(version), ...(relay ? { __RELAY_DEFAULT__: JSON.stringify(relay) } : {}) } });
 // The built page: the bundle instead of the modules, and what makes it an app

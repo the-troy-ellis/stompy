@@ -22,6 +22,7 @@ export const BENCH_SEGS = [
   { key: 'deaths', to: 19 },  // three die, a beat apart
   { key: 'wrecks', to: 22 },  // the two left fight on over the burning wrecks
   { key: 'away', to: 25 },    // everyone stops; you turn your back on it all (culling)
+  { key: 'dig', to: 29 },     // three blasts dig the ground in front of you: the chunks rebuild (spec 18)
 ];
 export const BENCH_END = BENCH_SEGS[BENCH_SEGS.length - 1].to;
 export const benchSeg = t => (BENCH_SEGS.find(s => t < s.to) || BENCH_SEGS[BENCH_SEGS.length - 1]).key;
@@ -35,6 +36,8 @@ const CAST = [
   { type: 'sniper1', c: [50, 145], r: 18, way: 1, thr: 0.8, dies: 17.8 },
 ];
 const LIMBS_AT = 15.5;
+// The digs: when, how far ahead of you, how big (a THUNDERCLAP's, a FUSION's, a cook-off's: spec 18's table).
+const DIGS = [[25.5, 45, 4], [26.5, 70, 6], [27.5, 95, 7]];
 // Who you shoot, first one standing.
 const ORDER = ['puncher', 'warden', 'jackal', 'sniper1', 'light1'];
 
@@ -53,7 +56,7 @@ export function startBench(G) {
   startMatch(G, BENCH_DEF, BENCH_SEED, false, BENCH_CHASSIS);
   G.kind = 'bench'; G.diff = 'normal';
   G.mechs.filter(m => m.team).forEach((m, i) => { m.script = CAST[i]; });
-  G.bench = { seg: 'walk', done: false, lost: false, dead: 0 };
+  G.bench = { seg: 'walk', done: false, lost: false, dead: 0, dug: 0 };
 }
 
 const turnTo = (m, yaw, dt) => { m.yaw += clampN(wrapA(yaw - m.yaw), -m.ch.turn * dt, m.ch.turn * dt); };
@@ -102,6 +105,11 @@ export function benchStep(G, inp, dt) {
     for (const m of cast) if (m.script.limb) loseSection(G, m, m.script.limb, center(m), P);
   }
   for (const m of cast) if (m.script.dies != null && t >= m.script.dies) { destroy(G, m, P); B.dead++; }
+  // The digs: straight into the ground ahead (the weapons' own digging is #283's; this is the ground's cost).
+  while (B.dug < DIGS.length && t >= DIGS[B.dug][0]) {
+    const [, d, r] = DIGS[B.dug++], x = P.x + sin(P.yaw) * d, z = P.z + cos(P.yaw) * d;
+    G.ter.carve([x, G.ter.height(x, z), z], r);
+  }
 
   // You: look about, then the run, then the fight, then turn your back.
   P.pitch = -0.02;

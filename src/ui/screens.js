@@ -9,7 +9,7 @@ import { PALS, palAt } from '../data/palettes.js';
 import { missionDef, missionFoes, FP_MAPS, FP_MIXES, FP_WEATHER, FP_TIMES, fpWeather, pickFoes } from '../data/missions.js';
 import { MP_COLORS } from '../data/colors.js';
 import { MODE_NAMES } from './lobby.js';
-import { makeTerrain } from '../world/terrain.js';
+import { makeGround } from '../world/voxels.js';
 import { newMech, startMatch, foeType } from '../sim/state.js';
 import { initFeet } from '../sim/gait.js';
 import { endGuide } from '../sim/missiles.js';
@@ -125,7 +125,7 @@ export function createUi(app) {
     if (G.worldKind !== 'menu') {
       G.worldKind = 'menu';
       G.pal = palAt('dusk'); G.palRamp = null;
-      G.ter = makeTerrain(3);
+      G.ter = makeGround(3);
       app.scene.uploadWorld();
     }
     G.shots = []; G.beams = []; G.cbeams = []; G.parts.clear(); G.wrecks = []; G.msgs = [];
