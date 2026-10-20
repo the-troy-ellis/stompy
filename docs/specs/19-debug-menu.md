@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress: #296 (the tab and JUMP TO) and #297 (the test range) built; the owner picked a fifth DEBUG tab, with all four sections |
+| Status | in progress: #296 (the tab and JUMP TO), #297 (the test range) and #298 (cheats) built; the owner picked a fifth DEBUG tab, with all four sections |
 | Milestone | M8 (tooling; it does not change the game for players) |
 | Size | M (split into four issues; see the end) |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md) (the test grounds, digs, nav); [13-thunk.md](13-thunk.md) (the FEEL table); [14-look-and-performance.md](14-look-and-performance.md) (LOOK, the bench, the frame readout); [15-mission-editor.md](15-mission-editor.md) (the editor it jumps to) |
@@ -174,6 +174,26 @@ The overlays are drawn on the HUD canvas, like the AI labels.
 - Foes stand at ±35°, ±47°, ±59°, … on the 200 m arc, alternating sides.
 - On a phone held sideways the RANGE page drops its blurb, and the pickers
   sit closer together, so LAUNCH stays on screen down to 667 × 375.
+
+### As built in #298
+
+- `G.cheats` is set by `ui/debugMenu.js` from the saved `debug.cheats`.
+  It is empty without `?debug=1`. The FEEL panel's old INVINCIBLE setting
+  carries over once, and its checkbox is gone. `sim/cheats.js`'s
+  `cheat(G, key)` is true only in single player.
+- INVINCIBLE, NO HEAT and ENDLESS AMMO cover your own mech only. NO HEAT
+  sets your heat to 0 every frame, so the fusion cannon's overload no
+  longer keeps you shut down.
+- BIG DIGS doubles the radius in `sim/dig.js` `dig()` and digs rock like
+  soft ground. It covers every dig in single player, yours and the foes'.
+  Measured: four BIG BONKER hits up an arch's leg drop its crown.
+- FOES FROZEN reuses `stand()`. A foe frozen this way wakes, aware of
+  you, once the switch goes off.
+- NO WEIGHT LIMIT lets LAUNCH go over the budget on every tab but
+  MULTIPLAYER. The tonnage bar shows amber and says NO WEIGHT LIMIT
+  instead of OVERWEIGHT.
+- The pause menu's DEBUG block comes first, above the controls, so a phone
+  doesn't have to scroll to it. It isn't shown in the arena.
 
 ## Code touchpoints
 

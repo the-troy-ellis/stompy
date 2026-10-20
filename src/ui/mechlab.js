@@ -47,10 +47,10 @@ export function createMechlab(app) {
     const hpRows = ch.hardpoints.map((h, i) => row(i, `${SECT_NAME[h.loc].toUpperCase()} · ${CAT_LABEL[h.cat]}`,
       lo.hp[h.id] ? WEAPONS[lo.hp[h.id]].name : 'EMPTY', `data-lab="hp" data-id="${h.id}"`));
     const sysRows = systemsFor(prefs.chassis).map((s, j) => row(ch.hardpoints.length + j, SYSTEMS[s].label, SYSTEMS[s].show(lo.sys[s]), `data-lab="sys" data-id="${s}"`));
-    const f = v.tons / ch.tons, col = v.ok ? (f >= 1 ? 'amber' : '') : 'red';
+    const f = v.tons / ch.tons, free = !v.ok && app.ui.fitOk?.(k), col = v.ok ? (f >= 1 ? 'amber' : '') : free ? 'amber' : 'red';   // NO WEIGHT LIMIT: amber, not red
     return `<div class="mm-label">FIT · ${esc(ch.name)}</div>
       <div class="lab">${hpRows.join('')}<div class="lab-gap"></div>${sysRows.join('')}</div>
-      <div class="lab-tons ${col}"><i><b style="width:${Math.round(Math.min(1, f) * 100)}%"></b></i><span>${v.tons} / ${ch.tons} t${v.ok ? '' : ' · OVERWEIGHT'}</span></div>
+      <div class="lab-tons ${col}"><i><b style="width:${Math.round(Math.min(1, f) * 100)}%"></b></i><span>${v.tons} / ${ch.tons} t${v.ok ? '' : free ? ' · NO WEIGHT LIMIT' : ' · OVERWEIGHT'}</span></div>
       <div class="mm-stats lab-stats">${bar('FIREPOWER', st.firepower / 25)}${bar('HEAT', (st.heatBalance + 30) / 40)}${bar('SPEED', st.speed / 22)}${bar('ARMOUR', st.armour / 300)}</div>
       <div class="opts lab-actions"><button class="opt" data-lab="reset">RESET</button><button class="opt" data-lab="back">BACK</button></div>`;
   }

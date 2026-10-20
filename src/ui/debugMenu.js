@@ -5,6 +5,7 @@ import { CHASSIS, MECH_ORDER } from '../data/chassis.js';
 import { RANGE_GROUNDS, RANGE_FOES, RANGE_MAX, rangeDef } from '../data/range.js';
 import { startMatch } from '../sim/state.js';
 import { fitOf } from './mechlab.js';
+import { CHEATS } from '../data/debug.js';
 import { STRIP } from './campaign.js';
 import { missionTitle } from './debrief.js';
 
@@ -14,7 +15,7 @@ import { missionTitle } from './debrief.js';
 // The menu (ui/screens.js) asks it for its page, its GO label, and gives it
 // the clicks it doesn't know.
 export const SECTIONS = [['range', 'RANGE'], ['cheats', 'CHEATS'], ['jump', 'JUMP TO'], ['tuning', 'TUNING']];
-const SEC_KEY = 'debug.sec', SEEN_KEY = 'debug.seen', RANGE_KEY = 'debug.range';
+const SEC_KEY = 'debug.sec', SEEN_KEY = 'debug.seen', RANGE_KEY = 'debug.range', CHEATS_KEY = 'debug.cheats';
 const WHICH = ['mix', ...MECH_ORDER];   // MIX is Free Play's mixed bag
 const TIME_NAMES = { day: 'NORMAL', dawn: 'DAWN', night: 'NIGHT' };
 
@@ -25,6 +26,9 @@ export function createDebugMenu(app, ui) {
   // The first debug run opens the menu on this tab; after that, the last tab, as always.
   if (on && !store.get(SEEN_KEY, false)) { prefs.menuSel = 'debug'; store.set(SEEN_KEY, true); }
   if (!on && prefs.menuSel === 'debug') prefs.menuSel = 'campaign';
+  // The cheats (sim/cheats.js), saved; the FEEL panel's old INVINCIBLE switch carries over.
+  app.G.cheats = on ? { god: !!store.get('debug.invincible', false), ...store.get(CHEATS_KEY, {}) } : {};
+  const cheatsHTML = () => `<div class="opts">${CHEATS.map(([k, l]) => `<button class="opt${app.G.cheats[k] ? ' on' : ''}" data-dch="${k}">${l}: ${app.G.cheats[k] ? 'ON' : 'OFF'}</button>`).join('')}</div>`;
 
   // The range's picks, saved: indices into their lists, and how many foes.
   const rg = { ground: 1, foes: 0, n: 1, which: 0, time: 0, weather: 0, ...store.get(RANGE_KEY, {}) };
@@ -46,7 +50,7 @@ export function createDebugMenu(app, ui) {
     range: () => `<p class="dbg-blurb">A flat field. Pick a thing to break. Pick who shows up.</p>
       <div class="fp-picks dbg-range">${pick('ground', 'GROUND', RANGE_GROUNDS[rg.ground].label)}${pick('foes', 'FOES', RANGE_FOES[rg.foes][1])}${rg.foes ? pick('n', 'HOW MANY', rg.n) + pick('which', 'WHICH', WHICH[rg.which] === 'mix' ? 'MIX' : CHASSIS[WHICH[rg.which]].name) : ''}
       ${pick('time', 'TIME', TIME_NAMES[FP_TIMES[rg.time]])}${pick('weather', 'WEATHER', FP_WEATHER[rg.weather].toUpperCase())}</div>`,
-    cheats: () => '<p class="dim">Not built yet.</p>',
+    cheats: () => `<p>Single player only. The arena does not care.</p>${cheatsHTML()}`,
     tuning: () => '<p class="dim">Not built yet.</p>',
     // Any mission (all open under ?debug=1); GO plays it. The rest go on a tap.
     jump: () => `<div class="mm-pick"><span>MISSION</span><button data-dmis="-1">◀</button><b>${esc(missionTitle(prefs.mission + 1, missionDef(prefs.mission).name))}</b><button data-dmis="1">▶</button></div>
@@ -55,6 +59,18 @@ export function createDebugMenu(app, ui) {
 
   return {
     on,
+    // The pause menu's DEBUG block in a debug run: the cheats, switched as you play.
+    pauseHTML: () => (on ? `<div class="panel dbg-pause"><div class="k">DEBUG</div>${cheatsHTML()}</div>` : ''),
+    // A cheat switch, in the tab or the pause menu: true if it was one.
+    cheatClick(e) {
+      const c = e.target.closest('[data-dch]');
+      if (!on || !c) return false;
+      const k = c.dataset.dch, v = (app.G.cheats[k] = !app.G.cheats[k]);
+      store.set(CHEATS_KEY, app.G.cheats);
+      c.classList.toggle('on', v); c.textContent = `${CHEATS.find(([x]) => x === k)[1]}: ${v ? 'ON' : 'OFF'}`;
+      if (k === 'weight' && app.G.state === 'menu') ui.renderMenu();   // LAUNCH and the tonnage bar change with it
+      return true;
+    },
     detail: () => `<div class="mm-pick mp-kind dbg-secs">${SECTIONS.map(([k, l]) => opt(k, l)).join('')}</div>${pages[sec]()}`,
     goLabel: () => (sec === 'jump' || sec === 'range' ? 'LAUNCH' : null),
     go() { if (sec === 'jump') { ui.startMission(prefs.mission); ui.launch(); } else if (sec === 'range') startRange(); },
