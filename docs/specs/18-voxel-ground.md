@@ -332,6 +332,30 @@ Where the first issue differs from the plan above, and why:
 - **Debris particles** that move into rock step back and bounce, so they bounce
   off walls and roofs as well as floors.
 
+### As built in #283
+
+- **One way in:** every blast that digs goes through `sim/dig.js`. It digs
+  the hit point for shells and missiles (each missile its own `dig`), one
+  4 m crater at the middle of a guided volley set off by hand, the FUSION
+  pit under where the pulse lands, a death at the mech's feet, and a cook-off
+  under the wreck. A missile popping in the air digs nothing and sends
+  nothing.
+- **Materials:** soft ground is the top 6 m of the ground as built
+  (`SOFT`); under it the rock band digs to half the radius (`DIG.rock`).
+  Each corner's hole depends only on where it is, so digs stay order-free.
+- **What stood there:** scorches, wrecks and lying debris move down onto the
+  dug ground. A mission's structures settle and never break from a dig; the
+  host decides when they break. A scenery prop settles into up to 3 m
+  (`PROP_DROP`) and breaks past that, toppling away from the blast. A dying
+  mech drops into its own crater behind the fireball.
+- **The wire:** no unechoed re-carve is needed yet. Without falls every dig
+  commutes, so each client applies every echo, its own included. Falls
+  (#284) bring in the relay's order. Past the 4,000-dig cap the relay still
+  echoes digs but doesn't keep them, so a late joiner on such a map misses
+  the newest.
+- **`build` and `kind: 'tool'`** are reserved in `data/weapons.js`'s
+  comment; nothing uses them yet.
+
 ### Mission data
 
 ```js

@@ -23,6 +23,8 @@ import { stepTurrets } from './turrets.js';
 import { tickCoopRespawn } from './coopRules.js';
 import { tickTutorial } from './tutorial.js';
 import { benchStep } from './bench.js';
+import { dig } from './dig.js';
+import { DIG } from '../data/weapons.js';
 
 const { sin, abs, min, max, hypot, cos } = Math;
 
@@ -144,7 +146,7 @@ export function update(G, input, dt) {
       explode(G, p, false);
       for (let i = 0; i < 4; i++) particle(G, p, [rng.range(-2, 2), rng.range(2, 5), rng.range(-2, 2)], rng.range(1.5, 2.5), rng.range(1.2, 2.2) * w.scale, [0.2, 0.19, 0.18], 'smoke');
     }
-    if (w.bigPop != null && w.t >= w.bigPop) { w.bigPop = null; explode(G, [w.x, w.y + 2 * w.scale, w.z], true); }
+    if (w.bigPop != null && w.t >= w.bigPop) { w.bigPop = null; dig(G, [w.x, w.y, w.z], DIG.cookOff, w.digs); explode(G, [w.x, w.y + 2 * w.scale, w.z], true); }
     if (w.t < WRECK_BURN && rng.chance(dt * 5)) particle(G, [w.x + rng.range(-2, 2), w.y + 2, w.z + rng.range(-2, 2)], [rng.range(-0.5, 0.5), rng.range(3, 5), rng.range(-0.5, 0.5)], rng.range(2, 3.5), rng.range(1, 2.2), [0.18, 0.17, 0.17], 'smoke');
   }
   for (const m of G.msgs) m.t -= dt;

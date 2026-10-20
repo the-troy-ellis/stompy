@@ -15,6 +15,8 @@ const PX = NX + 1, PY = NY + 1, PZ = NZ + 1;
 export const cornerIndex = (i, j, k) => i + PX * (j + PY * k);
 // Density is metres from the surface over DS, so slopes up to ~60° keep their shape between corners.
 export const DS = 2 * VS;
+// The soft ground over the rock band: this deep under the ground as built (digging: spec 18).
+export const SOFT = 6;
 const Q = d => (d <= -1 ? 1 : d >= 1 ? 255 : Math.round(d * 127) + 128);   // never 0, so 128 is the one boundary byte
 const BEDROCK = 1;   // corners j <= 1 stay solid
 
@@ -38,6 +40,7 @@ export function makeGround(seed, opts = {}, def = {}) {
   for (const l of g.landmarks || []) landmark(ground, l);
   if (g.pockets) pockets(ground, seed);
   for (const s of g.strokes || []) ground.stroke(s);
+  ground.base = ground.top.slice();   // the tops as built: digging measures the rock band from these
   ground.dirty.clear();   // a fresh ground is built whole; only edits after this rebuild chunks
   return ground;
 }
@@ -130,6 +133,30 @@ function groundApi(G) {
     touched(i0, i1, j0, j1, k0, k1);
   }
   const carve = (p, r) => shape(p, r, (d, dist) => min(d, (dist - r) / DS));
+  // A blast's dig (spec 18 § Digging in play): soft ground, the top SOFT
+  // metres of the ground as built, goes to radius r; the rock band under it
+  // only to r × `rock` (battle weapons: half); bedrock not at all. Each corner's
+  // hole depends only on where it is, so digs still give the same bytes in any order.
+  function dig(p, r, rock = 0.5) {
+    const [i0, i1, j0, j1, k0, k1] = box(p, r);
+    if (i0 > i1 || j0 > j1 || k0 > k1) return;
+    const base = G.base;
+    for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
+      const soft = base[i + PX * k] - SOFT;
+      for (let j = j0; j <= j1; j++) {
+        const y = Y0 + j * VS, o = cornerIndex(i, j, k), dist = hypot(-HALF + i * VS - p[0], y - p[1], -HALF + k * VS - p[2]);
+        D[o] = Q(min((D[o] - 128) / 127, (dist - (y >= soft ? r : r * rock)) / DS));
+      }
+    }
+    touched(i0, i1, j0, j1, k0, k1);
+  }
+  // A short fingerprint of the ground (FNV-1a over the bytes): two clients that
+  // agree on it have the same ground (the smoke test and the sync tests).
+  function hash() {
+    let h = 0x811c9dc5;
+    for (let n = 0; n < D.length; n++) { h ^= D[n]; h = Math.imul(h, 0x01000193); }
+    return (h >>> 0).toString(16).padStart(8, '0');
+  }
   const build = (p, r) => shape(p, r, (d, dist) => max(d, (r - dist) / DS));
   // Smooth: each corner in reach eases toward the mean of its six neighbours (read from a copy).
   function smooth(p, r) {
@@ -164,7 +191,7 @@ function groundApi(G) {
   }
   // An editor stroke: [op, x, y, z, r], op 0 carve, 1 build, 2 smooth.
   const stroke = ([op, x, y, z, r]) => (op === 0 ? carve : op === 1 ? build : smooth)([x, y, z], r);
-  return { sample, height, solid, groundBelow, ray, carve, build, smooth, block, stroke, retop };
+  return { sample, height, solid, groundBelow, ray, carve, dig, build, smooth, block, stroke, retop, hash };
 }
 
 // A landmark, as a distance shape laid onto the ground: positive inside rock.

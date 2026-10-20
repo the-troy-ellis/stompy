@@ -75,11 +75,11 @@ export function hitSparks(G, m, p, sec, amt) {
 // one slot of its buffer, not the lot; G.scorchRev counts changes. The yaw
 // comes from the place, not the RNG, so a scorch changes nothing else.
 export const SCORCH_MAX = 64;
-export function scorch(G, x, z, r) {
+export function scorch(G, x, z, r, y) {
   for (const s of G.scorches) if (s.r >= r * 0.8 && Math.hypot(s.x - x, s.z - z) < s.r * 0.6) return;
   if (G.scorches.length >= SCORCH_MAX) G.scorches.shift();
   const id = G.scorchId++;
-  G.scorches.push({ x, z, r, yaw: ((x * 12.9898 + z * 78.233) % TAU + TAU) % TAU, id, slot: id % SCORCH_MAX });
+  G.scorches.push({ x, z, r, y, yaw: ((x * 12.9898 + z * 78.233) % TAU + TAU) % TAU, id, slot: id % SCORCH_MAX });   // y: the ground at the blast (undefined: the top)
   G.scorchRev++;
 }
 // The shockwave: a flat ring on the ground that races out and dithers away
@@ -90,7 +90,7 @@ export function explode(G, p, big) {
   const gy = G.ter ? G.ter.groundBelow(p[0], p[1] + 0.5, p[2], p[1] - SHOCK_HEIGHT - 1) : -Infinity;   // the ground under the blast, if it's near
   if (p[1] - gy < SHOCK_HEIGHT) {
     particle(G, [p[0], gy + 0.3, p[2]], [0, 0, 0], SHOCK_LIFE, big ? SHOCK_SIZE.big : SHOCK_SIZE.small, [0.95, 0.86, 0.66], 'shock', 0, 0);
-    scorch(G, p[0], p[2], big ? 4.5 : 1.8);
+    scorch(G, p[0], p[2], big ? 4.5 : 1.8, gy);
   }
   for (let i = 0; i < n; i++) {
     const v = mul(norm([r.range(-1, 1), r.range(-0.2, 1), r.range(-1, 1)]), r.range(3, 14) * s);

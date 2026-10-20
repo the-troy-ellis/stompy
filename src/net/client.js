@@ -16,7 +16,8 @@ import { voice } from '../sim/voice.js';
 import { beamMult } from '../sim/beams.js';
 import { launchPulse } from '../sim/fusion.js';
 import { SEND_HZ } from '../sim/missiles.js';
-import { hit, batchMessages, hello, ping as pingMsg, ready as readyMsg, team as teamMsg, vote as voteMsg, roundStats, stateMessage, PING_EVERY } from './protocol.js';
+import { hit, batchMessages, hello, ping as pingMsg, ready as readyMsg, team as teamMsg, vote as voteMsg, roundStats, stateMessage, digsMsg, DIGS_MAX, PING_EVERY } from './protocol.js';
+import { applyDigList } from '../sim/dig.js';
 import { coopNote, lobbyHTML, lobbyHead, lobbyRows } from '../ui/lobby.js';
 import { summaryHTML, summaryRows, voteCount, voteOf } from '../ui/summary.js';
 import { fitOf } from '../ui/mechlab.js';
@@ -216,6 +217,7 @@ export function createNet(app) {
         setScores(m.scores);
         if (inPlace) { G.player.netId = Net.id; sendState(); msg(G, 'RECONNECTED'); }
         else startArena(m.seed, m.pal, !(back && m.scores?.find(p => p.id === m.id)?.ready));   // into the lobby: READY spawns you
+        applyDigList(G, m.digs);   // the round's ground so far: everything dug before we came
         G.roundOver = !!m.over;
         break;
       }
@@ -269,6 +271,7 @@ export function createNet(app) {
         }
         break;
       case 'fx': netFx(m); break;
+      case 'digs': applyDigList(G, m.l); break;   // the ground dug, by whoever owned each blast (sim/dig.js); our own come back too, and change nothing
       case 'hit':
         if (!G.player.alive) break;
         // A fusion discharge isn't damage: it's the frame shaking apart.
@@ -332,7 +335,7 @@ export function createNet(app) {
     Net.token = typeof m.token === 'string' ? m.token : null;
     setScores(m.scores);
     if (back) { G.player.netId = Net.id; sendState(); msg(G, 'RECONNECTED'); return; }
-    if (m.started) { startCoopMission(); return; }
+    if (m.started) { startCoopMission(); applyDigList(G, m.digs); return; }
     G.mode = 'coop'; G.lobby = true; Net.readied = false;
     app.input.exitLock();
     showLobby();
@@ -459,6 +462,7 @@ export function createNet(app) {
   function flushHits() {
     for (const [to, q] of G.pendingHits) if (!mate(to)) for (const m of batchMessages(q, (amt, x) => hit(to, amt, q.p, false, x))) netSend(m);   // friendly fire is off (the relay drops it too)
     G.pendingHits.clear();
+    if (G.pendingDigs.length) netSend(digsMsg(G.pendingDigs.splice(0, DIGS_MAX)));   // what we dug (sim/dig.js), with the hits
   }
 
   // The arena's per-frame housekeeping: respawn timer, spawn shield, state cadence.
