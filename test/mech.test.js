@@ -55,6 +55,6 @@ test('jump jets lift the mech, burn fuel and heat, and landing jolts the cockpit
   assert.ok(P.fuel < 1);   // (jet heat is 10/s, exactly what a KESTREL sinks, so heat stays at 0)
   stepFor(G, 4);
   assert.equal(P.air, false);
-  assert.ok(Math.abs(P.y) < 1e-6);
+  assert.ok(Math.abs(P.y) < 0.05);   // on the voxel ground, to a few cm
   assert.equal(G.fx.calls('sfx.land').length, 1);
 });

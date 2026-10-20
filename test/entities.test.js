@@ -24,7 +24,7 @@ test('a vehicle drives its waypoints at its speed and stops at the last one', ()
   assert.ok(Math.abs(v.z - 16) < 1, `after 2 s at 8 m/s it should be 16 m on (${v.z.toFixed(1)})`);
   stepFor(G, 20);
   assert.ok(v.arrived && hypot(v.x - 160, v.z - 60) < 3.5, `ended at ${v.x.toFixed(1)}, ${v.z.toFixed(1)}`);
-  assert.ok(Math.abs(v.y - G.ter.height(v.x, v.z)) < 1e-9, 'it sits on the ground');
+  assert.ok(Math.abs(v.y - G.ter.height(v.x, v.z)) < 0.05, 'it sits on the ground');
 });
 
 test('a convoy stops behind a mech in its path and resumes when the mech moves', () => {

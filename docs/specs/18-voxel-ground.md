@@ -315,6 +315,23 @@ Where the first issue differs from the plan above, and why:
   surface as before; they become props or landmarks when digging needs them
   to settle (#283).
 
+### As built in #282
+
+- **Walls** are three density samples a frame: at the step (1.5 m × scale),
+  at the chest a body's radius ahead, and at the head. Each axis moves only
+  if they're clear, so a mech slides along a wall. A mech already in rock (a
+  step up under a low roof) may move only to where it is less so. Against a
+  wall the legs walk at the body's real speed (`m.slide`), so planted feet
+  stay put; the throttle's speed is kept for when it's clear.
+- **Cover and ridges** (`ai/behaviours.js`) skip a spot whose straight line
+  climbs steeper than 1.6 (about 58°; the steepest hills are about 50°). The
+  nav grid that walks round cliffs is #285.
+- **`ter.block(x0, x1, z0, z1, top, grade)`** raises a block of rock with
+  sheer or sloping sides. Tests use it for their walls and ridges, which used
+  to be faked by replacing `height`.
+- **Debris particles** that move into rock step back and bounce, so they bounce
+  off walls and roofs as well as floors.
+
 ### Mission data
 
 ```js

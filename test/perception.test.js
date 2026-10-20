@@ -10,7 +10,7 @@ import { PERCEPTION, DIFF, DIFF_ORDER } from '../src/data/ai.js';
 
 // A wall `h` high over x in (lo, hi), running the length of the map, on
 // otherwise flat ground. Nobody in these tests walks through it.
-function wall(G, lo, hi, h = 60) { const base = G.ter.height; G.ter = { ...G.ter, height: (x, z) => (x > lo && x < hi ? h : base(x, z)) }; }
+function wall(G, lo, hi, h = 60) { G.ter.block(lo, hi, -1150, 1150, h); }   // a ridge of rock the length of the map
 const place = (G, m, x, z, yaw) => { Object.assign(m, { x, z, yaw }); initFeet(G, m); };
 const { atan2, hypot, abs } = Math;
 

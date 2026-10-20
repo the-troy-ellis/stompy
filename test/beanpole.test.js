@@ -14,7 +14,7 @@ import { BEHAVIOUR as B } from '../src/data/ai.js';
 
 const { hypot } = Math;
 const ch = CHASSIS.sniper1;
-const wall = (G, lo, hi, h) => { const base = G.ter.height; G.ter = { ...G.ter, height: (x, z) => (x > lo && x < hi ? h : base(x, z)) }; };
+const wall = (G, lo, hi, h) => G.ter.block(lo, hi, -1150, 1150, h, 1);   // a 45° ridge of rock the length of the map, as steep as the hills get
 
 test('BEANPOLE (sniper1): the spec numbers, tall legs and a narrow stance, a placeholder name, selectable', () => {
   assert.equal(NAMES.chassis.sniper1, 'BEANPOLE');
@@ -35,7 +35,7 @@ test('BEANPOLE (sniper1): the spec numbers, tall legs and a narrow stance, a pla
 test('after three shots from one spot it picks a ridge at least 60 m away', () => {
   const G = createTestGame({ foes: ['sniper1'] });
   const P = G.player, e = foes(G)[0];
-  wall(G, 100, 140, 25);   // a plateau east of the player, the length of the map
+  wall(G, 100, 200, 25);   // a plateau east of the player, the length of the map
   const first = findRidge(G, e, P);
   Object.assign(e, { x: first.x, z: first.z }); initFeet(G, e); e.ai.aware = true;
   const ctx = { P, dist: hypot(P.x - e.x, P.z - e.z), toYaw: 0 };

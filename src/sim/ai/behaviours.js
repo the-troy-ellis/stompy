@@ -20,12 +20,22 @@ const { sin, cos, atan2, abs, hypot, min, PI } = Math;
 const towards = (e, x, z) => atan2(x - e.x, z - e.z);
 const inMap = v => clampN(v, -BOUND + 40, BOUND - 40);
 // How far away a spot is, in flat metres' worth of walking: a climb costs a
-// walker its slope penalty; a crawler doesn't care (spec 16).
+// walker its slope penalty; a crawler doesn't care (spec 16). Infinity if a
+// cliff on the straight line there is too steep to walk up (spec 18: real
+// paths are the nav grid's, #285).
 export function travel(G, e, x, z) {
   const d = hypot(x - e.x, z - e.z);
-  if (grips(e) || d < 1) return d;
+  if (d < 1) return d;
+  const n = Math.ceil(d / 4);
+  for (let k = 0, h = G.ter.height(e.x, e.z); k < n; k++) {
+    const f = (k + 1) / n, h2 = G.ter.height(e.x + (x - e.x) * f, e.z + (z - e.z) * f);
+    if (h2 - h > CLIFF * d / n) return Infinity;
+    h = h2;
+  }
+  if (grips(e)) return d;
   return d / gradeFactor((G.ter.height(x, z) - G.ter.height(e.x, e.z)) / d);
 }
+const CLIFF = 1.6;   // a climb steeper than this (rise over run, ~58°) is a wall: the steepest hills are ~50°
 
 // Strafe side and its timer, shared by everything that orbits.
 export function strafeTick(G, e, dt) {
@@ -77,6 +87,7 @@ export function findCover(G, e, target) {
     const a = k * PI / 4, x = inMap(e.x + sin(a) * d), z = inMap(e.z + cos(a) * d);
     if (!blocked(G, eyeAt(G, e, x, z), tc)) continue;
     const t = travel(G, e, x, z);
+    if (t === Infinity) continue;
     if (!best || t < best.d) best = { x, z, d: t };
     if (best.d <= B.coverDists[0]) return best;   // the nearest ring, and no climb: nothing beats it
   }
@@ -115,6 +126,7 @@ export function findRidge(G, e, target, avoid = null) {
     if (avoid && hypot(x - avoid.x, z - avoid.z) < B.relocateAway) continue;   // somewhere it has not just been shooting from
     if (blocked(G, eyeAt(G, e, x, z), tc)) continue;
     const d = travel(G, e, x, z);
+    if (d === Infinity) continue;
     if (!best || d < best.d) best = { x, z, d };
   }
   return best;

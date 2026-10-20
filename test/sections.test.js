@@ -20,7 +20,7 @@ test('a destroyed arm falls off as one piece that lands, lies still, and is gone
   stepFor(G, 3);
   const d = limbs[0];
   assert.ok(d.landed, 'still in the air');
-  assert.ok(Math.abs(d.p[1] - 0.4 * e.ch.scale) < 1e-6, `rests at ${d.p[1]}`);
+  assert.ok(Math.abs(d.p[1] - 0.4 * e.ch.scale) < 0.05, `rests at ${d.p[1]}`);
   stepFor(G, DEBRIS_LIFE);
   assert.equal(G.debris.filter(d => d.part !== 'plate').length, 0);
 });

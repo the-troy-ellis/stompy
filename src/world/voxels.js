@@ -20,8 +20,9 @@ const BEDROCK = 1;   // corners j <= 1 stay solid
 
 // Builds the ground for a seed and a mission definition. `def.ground` (all
 // optional): { landmarks: [...], strokes: [[op, x, y, z, r], ...], pockets }.
+// `opts.height(x, z)` replaces the hills (tests: a ramp, a ridge).
 export function makeGround(seed, opts = {}, def = {}) {
-  const base = makeTerrain(seed, opts), D = new Uint8Array(PX * PY * PZ), top = new Float32Array(PX * PZ);
+  const base = opts.height ? { height: opts.height } : makeTerrain(seed, opts), D = new Uint8Array(PX * PY * PZ), top = new Float32Array(PX * PZ);
   const g = def.ground || {};
   // The base: "height minus y" in cells, so a flat pad's top lands exactly on its height.
   for (let k = 0; k < PZ; k++) for (let i = 0; i < PX; i++) {
@@ -50,11 +51,10 @@ function groundApi(G) {
     if (fy <= 0) return 1;
     if (fx < 0 || fz < 0 || fx >= NX || fz >= NZ || fy >= NY) return -1;
     const i = fx | 0, j = fy | 0, k = fz | 0, u = fx - i, v = fy - j, w = fz - k;
-    const o = cornerIndex(i, j, k), oy = o + PX, oz = o + PX * PY, oyz = oz + PX;
-    const c = idx => (D[idx] - 128) / 127;
-    const a = (c(o) * (1 - u) + c(o + 1) * u) * (1 - v) + (c(oy) * (1 - u) + c(oy + 1) * u) * v;
-    const b = (c(oz) * (1 - u) + c(oz + 1) * u) * (1 - v) + (c(oyz) * (1 - u) + c(oyz + 1) * u) * v;
-    return a * (1 - w) + b * w;
+    const o = cornerIndex(i, j, k), oy = o + PX, oz = o + PX * PY, oyz = oz + PX;   // plain numbers, no closures: this runs thousands of times a frame
+    const a = (D[o] * (1 - u) + D[o + 1] * u) * (1 - v) + (D[oy] * (1 - u) + D[oy + 1] * u) * v;
+    const b = (D[oz] * (1 - u) + D[oz + 1] * u) * (1 - v) + (D[oyz] * (1 - u) + D[oyz + 1] * u) * v;
+    return ((a * (1 - w) + b * w) - 128) / 127;
   }
   // The top surface under the sky, blended between the four corner columns.
   // The mesh (mesher.js) is the same surface, smoothed: the two agree within
@@ -65,32 +65,36 @@ function groundApi(G) {
     return (top[o] * (1 - u) + top[o + 1] * u) * (1 - w) + (top[o + PX] * (1 - u) + top[o + PX + 1] * u) * w;
   }
   const solid = (x, y, z) => sample(x, y, z) > 0;
-  // The first surface going down from y (what a foot under an overhang stands on).
-  function groundBelow(x, y, z) {
+  // The first surface going down from y (what a foot under an overhang
+  // stands on), or `lo` if there is none above it. Above the top surface the
+  // march starts just over it, so the open ground costs a few samples.
+  function groundBelow(x, y, z, lo = Y0) {
     if (sample(x, y, z) > 0) return y;
-    const step = VS / 4;
-    for (let yy = y - step; yy > Y0; yy -= step) {
+    const step = VS / 4, h = height(x, z);
+    let yy = y - step;
+    if (y > h + 2 * step && sample(x, h + step, z) <= 0) yy = h + step;
+    for (; yy > lo; yy -= step) {
       if (sample(x, yy, z) > 0) {
         let a = yy, b = yy + step;
         for (let n = 0; n < 7; n++) { const m = (a + b) / 2; if (sample(x, m, z) > 0) a = m; else b = m; }
         return (a + b) / 2;
       }
     }
-    return Y0;
+    return lo;
   }
-  // Where a ray first meets rock (distance along d), or null.
+  // Where a ray first meets rock (distance along d), or null. The arrays are
+  // read once into plain numbers: shots and sight lines run this all frame.
   function ray(o, d, maxT) {
-    const step = VS / 2;
-    let prev = 0;
-    for (let t = min(step, maxT); ; t = min(t + step, maxT)) {
-      if (sample(o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t) > 0) {
-        let a = prev, b = t;
-        for (let n = 0; n < 8; n++) { const m = (a + b) / 2; if (sample(o[0] + d[0] * m, o[1] + d[1] * m, o[2] + d[2] * m) > 0) b = m; else a = m; }
+    const ox = +o[0], oy = +o[1], oz = +o[2], dx = +d[0], dy = +d[1], dz = +d[2], step = VS / 2, n = ceil(maxT / step);
+    for (let k = 1; k <= n; k++) {
+      const t = k === n ? maxT : k * step;
+      if (sample(ox + dx * t, oy + dy * t, oz + dz * t) > 0) {
+        let a = (k - 1) * step, b = t;
+        for (let q = 0; q < 8; q++) { const m = (a + b) / 2; if (sample(ox + dx * m, oy + dy * m, oz + dz * m) > 0) b = m; else a = m; }
         return b;
       }
-      if (t >= maxT) return null;
-      prev = t;
     }
+    return null;
   }
   // One corner column's top: the highest crossing from rock to air, in metres.
   function topOf(i, k) {
@@ -144,9 +148,23 @@ function groundApi(G) {
     }
     touched(i0, i1, j0, j1, k0, k1);
   }
+  // A block of rock from the bottom up to `top`, between x0..x1 and z0..z1,
+  // its sides sheer or, with `grade`, sloping in at that rise over run (tests'
+  // walls, ridges and plateaus).
+  function block(x0, x1, z0, z1, top, grade = Infinity) {
+    const i0 = clampN(floor((x0 + HALF) / VS) - 1, 1, NX - 1), i1 = clampN(ceil((x1 + HALF) / VS) + 1, 1, NX - 1);
+    const k0 = clampN(floor((z0 + HALF) / VS) - 1, 1, NZ - 1), k1 = clampN(ceil((z1 + HALF) / VS) + 1, 1, NZ - 1);
+    const j1 = clampN(ceil((top - Y0) / VS) + 2, BEDROCK + 1, NY - 1);
+    for (let k = k0; k <= k1; k++) for (let j = BEDROCK + 1; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const x = -HALF + i * VS, y = Y0 + j * VS, z = -HALF + k * VS, o = cornerIndex(i, j, k);
+      const side = min(x - x0, x1 - x, z - z0, z1 - z), d = grade === Infinity ? min(top - y, side) : min(top - y, side * grade - y) / Math.hypot(1, grade);
+      D[o] = Q(max((D[o] - 128) / 127, d / DS));
+    }
+    touched(i0, i1, BEDROCK + 1, j1, k0, k1);
+  }
   // An editor stroke: [op, x, y, z, r], op 0 carve, 1 build, 2 smooth.
   const stroke = ([op, x, y, z, r]) => (op === 0 ? carve : op === 1 ? build : smooth)([x, y, z], r);
-  return { sample, height, solid, groundBelow, ray, carve, build, smooth, stroke, retop };
+  return { sample, height, solid, groundBelow, ray, carve, build, smooth, block, stroke, retop };
 }
 
 // A landmark, as a distance shape laid onto the ground: positive inside rock.

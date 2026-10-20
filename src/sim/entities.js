@@ -114,7 +114,7 @@ export function stepEntities(G, dt) {
     e.speed = e.blocked ? 0 : e.cruise;
     const step = min(d, e.speed * dt);
     e.x += fx * step; e.z += fz * step;
-    e.y = G.ter.height(e.x, e.z);
+    e.y = G.ter.groundBelow(e.x, e.y + 2, e.z);   // the road under it, through a tunnel too
   }
 }
 function ahead(G, e, fx, fz) {

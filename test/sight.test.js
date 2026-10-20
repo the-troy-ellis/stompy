@@ -1,6 +1,7 @@
 // Line of sight over the terrain (docs/specs/15-mission-editor.md § Tests):
 // a foe on a ridge sees more than the same foe in a gully, and the AI and the
 // editor ask the same question.
+import { makeGround } from '../src/world/voxels.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sightGrid, blocked } from '../src/sim/sight.js';
@@ -9,7 +10,7 @@ import { createTestGame } from './helpers.js';
 
 // A ridge running north-south through x = 0, 60 m high, and a gully beside it.
 const ridge = (x, z) => 60 * Math.exp(-(x * x) / (2 * 90 * 90)) - 25 * Math.exp(-((x - 260) ** 2) / (2 * 40 * 40)) + 0 * z;
-const G = { ter: { height: ridge } };
+const G = { ter: makeGround(1, { height: ridge }) };
 const eye = (x, z) => [x, ridge(x, z) + 7, z];
 const share = cells => cells.filter(c => c.seen).length / cells.length;
 
@@ -31,7 +32,7 @@ test('the AI sees the player by the same test', () => {
   e.x = P.x + 200; e.z = P.z; e.y = 0;
   assert.equal(canSee(g, e, P), true);
   assert.equal(blocked(g, [0, 5, 0], [200, 5, 0]), false);
-  g.ter.height = (x, z) => (Math.abs(x - P.x - 100) < 10 ? 40 : 0) + 0 * z;   // a wall between them
+  g.ter.block(P.x + 90, P.x + 110, -1150, 1150, 40);   // a wall between them
   assert.equal(canSee(g, e, P), false);
   assert.equal(blocked(g, [P.x, 5, 0], [P.x + 200, 5, 0]), true);
 });

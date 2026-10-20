@@ -7,7 +7,7 @@ import { PROFILES, planFor } from '../src/sim/ai/profiles.js';
 import { harass, holdLine, useCover, coverWhenHot } from '../src/sim/ai/behaviours.js';
 
 const place = (G, m, x, z, yaw) => { Object.assign(m, { x, z, yaw }); initFeet(G, m); };
-const wall = (G, lo, hi, h) => { const base = G.ter.height; G.ter = { ...G.ter, height: (x, z) => (x > lo && x < hi ? h : base(x, z)) }; };
+const wall = (G, lo, hi, h) => G.ter.block(lo, hi, -1150, 1150, h, 1);   // a 45° ridge of rock the length of the map, as steep as the hills get
 
 test('every chassis names a profile that exists, and the three M1 chassis read differently', () => {
   for (const [key, ch] of Object.entries(CHASSIS)) assert.ok(PROFILES[ch.ai?.profile], `${key} has no profile`);

@@ -25,9 +25,10 @@ export function stepDebris(G, dt) {
     d.t += dt;
     if (!d.landed) {
       d.v[1] -= 18 * dt;
+      const was = d.p[1];
       d.p = add(d.p, mul(d.v, dt));
       for (let i = 0; i < 3; i++) d.rot[i] += d.spin[i] * dt;
-      const g = G.ter.height(d.p[0], d.p[2]) + 0.4 * d.scale;
+      const g = G.ter.groundBelow(d.p[0], was, d.p[2]) + 0.4 * d.scale;   // the first ground under where it was: a tunnel's floor, not the hill over it
       if (d.p[1] <= g) {
         d.p[1] = g;
         if (!d.bounced && -d.v[1] > 3) { d.bounced = true; d.v = [d.v[0] * 0.5, -d.v[1] * 0.3, d.v[2] * 0.5]; d.spin = mul(d.spin, 0.4); }
@@ -86,7 +87,7 @@ export function scorch(G, x, z, r) {
 export const SHOCK_LIFE = 0.4, SHOCK_HEIGHT = 10, SHOCK_SIZE = { big: 26, small: 9 };
 export function explode(G, p, big) {
   const r = G.rng, n = big ? 34 : 10, s = big ? 1.6 : 0.7;
-  const gy = G.ter ? G.ter.height(p[0], p[2]) : -Infinity;
+  const gy = G.ter ? G.ter.groundBelow(p[0], p[1] + 0.5, p[2], p[1] - SHOCK_HEIGHT - 1) : -Infinity;   // the ground under the blast, if it's near
   if (p[1] - gy < SHOCK_HEIGHT) {
     particle(G, [p[0], gy + 0.3, p[2]], [0, 0, 0], SHOCK_LIFE, big ? SHOCK_SIZE.big : SHOCK_SIZE.small, [0.95, 0.86, 0.66], 'shock', 0, 0);
     scorch(G, p[0], p[2], big ? 4.5 : 1.8);

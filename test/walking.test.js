@@ -1,3 +1,4 @@
+import { makeGround } from '../src/world/voxels.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestGame, stepFor, input, foes, freeze } from './helpers.js';
@@ -5,7 +6,7 @@ import { slopeFactor } from '../src/sim/mech.js';
 import { travel } from '../src/sim/ai/behaviours.js';
 import { WALK } from '../src/data/walk.js';
 
-const ramp = (G, grade) => { const base = G.ter.height; G.ter = { ...G.ter, height: (x, z) => base(x, z) + z * grade }; };
+const ramp = (G, grade) => { const base = G.ter.height; G.ter = makeGround(1, { height: (x, z) => base(x, z) + z * grade }); };
 
 test('a climb is slow and a descent a little quick; the flat is the flat', () => {
   const run = (grade, yaw) => {
@@ -21,9 +22,9 @@ test('a climb is slow and a descent a little quick; the flat is the flat', () =>
   assert.ok(up < flat * 0.6, `uphill ${up} vs flat ${flat}`);
   assert.ok(down > flat * 1.05 && down <= flat * WALK.slopeMax + 0.01, `downhill ${down} vs flat ${flat}`);
   const G = createTestGame(); ramp(G, 0.2);
-  assert.ok(Math.abs(slopeFactor(G, G.player) - 0.5) < 1e-6, 'a 20% grade costs half');
+  assert.ok(Math.abs(slopeFactor(G, G.player) - 0.5) < 0.02, 'a 20% grade costs half');   // read off the voxel ground: within a few cm
   G.player.yaw = Math.PI;
-  assert.ok(Math.abs(slopeFactor(G, G.player) - 1.15) < 1e-6);
+  assert.ok(Math.abs(slopeFactor(G, G.player) - 1.15) < 0.01);
 });
 
 test('a landing digs the feet in: the run comes off and the legs are held for a beat', () => {
