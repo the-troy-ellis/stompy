@@ -353,6 +353,12 @@ Where the first issue differs from the plan above, and why:
   (#284) bring in the relay's order. Past the 4,000-dig cap the relay still
   echoes digs but doesn't keep them, so a late joiner on such a map misses
   the newest.
+- **Small guns barely mark the ground** (the owner's call after play). At
+  8 m cells a hole smaller than a cell is mostly averaged away in the mesh:
+  an LRM missile lowers the drawn ground about 0.1 m, an AUTOCANNON shell
+  0.25 m and a THUNDERCLAP bolt 0.8 m, though `ter.height` drops more.
+  Deaths, cook-offs and FUSION make the craters you see (about 4.5 m).
+  Digging small blasts as wider dishes was measured and turned down.
 - **`build` and `kind: 'tool'`** are reserved in `data/weapons.js`'s
   comment; nothing uses them yet.
 

@@ -186,7 +186,10 @@ export function createGround(R) {
     RUN.count = 0;
     for (let gi = 0; gi < groups.length; gi++) {
       const gr = groups[gi], d = groupDist(gi, eye);
-      const near = d < LOD_AT && gr.wanted && !gr.left && !gr.near.dirty, part = near || !gr.far.count ? gr.near : gr.far;
+      // Near once its chunks have been uploaded; while a dig's chunks are being
+      // meshed again the old buffer stays up (drawing the far one meanwhile
+      // made the ground twitch), and the new one replaces it whole.
+      const near = d < LOD_AT && gr.wanted && gr.near.count > 0, part = near || !gr.far.count ? gr.near : gr.far;
       if (d > fogEnd || !part.count || !boxVisible(planes, part.lo, part.hi)) continue;
       if (part === gr.near) { R.draw(part, M); continue; }
       // Far: one draw for each run of row neighbours.
