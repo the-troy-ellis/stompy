@@ -288,7 +288,7 @@ export function createUi(app) {
     app.audio.loadSamples();
     app.input.lockPointer();
     app.input.syncWeaponButtons();
-    app.audio.say(G.kind === 'campaign' ? `${missionSpoken(prefs.mission + 1, G.def.name)} Systems online.` : G.kind === 'edit' || G.kind === 'bench' ? 'Systems online.' : 'Free play. Systems online.', true);
+    app.audio.say(G.kind === 'campaign' ? `${missionSpoken(prefs.mission + 1, G.def.name)} Systems online.` : G.kind === 'edit' || G.kind === 'bench' ? 'Systems online.' : G.kind === 'range' ? 'Range open. Systems online.' : 'Free play. Systems online.', true);
   }
 
   function debrief() {
@@ -423,6 +423,7 @@ export function createUi(app) {
     if (a === 'next') { prefs.mission++; startMission(prefs.mission); launch(); }
     else if (a === 'retry') { startMission(prefs.mission); launch(); }
     else if (a === 'again' && G.kind === 'edit') app.editor.play();   // the editor's mission again, as it is now
+    else if (a === 'again' && G.kind === 'range') dbg.again();   // the DEBUG tab's range (ui/debugMenu.js)
     else if (a === 'again') { startSkirmish(); launch(); }
     else if (G.state === 'play' && G.paused) pause(false);
   });

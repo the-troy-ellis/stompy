@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress: #296 (the tab and JUMP TO) built; the owner picked a fifth DEBUG tab, with all four sections |
+| Status | in progress: #296 (the tab and JUMP TO) and #297 (the test range) built; the owner picked a fifth DEBUG tab, with all four sections |
 | Milestone | M8 (tooling; it does not change the game for players) |
 | Size | M (split into four issues; see the end) |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md) (the test grounds, digs, nav); [13-thunk.md](13-thunk.md) (the FEEL table); [14-look-and-performance.md](14-look-and-performance.md) (LOOK, the bench, the frame readout); [15-mission-editor.md](15-mission-editor.md) (the editor it jumps to) |
@@ -155,6 +155,25 @@ The overlays are drawn on the HUD canvas, like the AI labels.
 - On a phone held sideways five tabs push LAUNCH off a 360-tall screen, so
   there they sit in two columns.
 - The pause menu's DEBUG block comes with its first contents, in #298.
+
+### As built in #297
+
+- `src/data/range.js` has the grounds as mission-shaped `ground` defs and
+  `rangeDef()`, which makes the match's def. The range is a match of kind
+  `range` on flat ground with `objectives: []`. A match with no objectives
+  at all never ends on its own (`sim/objectives.js`); dying still goes to
+  the debrief, whose AGAIN builds the same range afresh.
+- CAVE: a cave's mouth sits at the ground's height where it is laid, so the
+  cave's mesa is set back 90 m and its mouth stands on the flat in front of
+  it, 90 m deep.
+- PILLAR is editor build strokes (7 m balls): a 3 × 3 column to 40 m and a
+  64 m slab of them at 44 m. It holds under the torque rule until thinned.
+- STANDING STILL foes carry `still` in their def, which sets `e.ai.still`;
+  `sim/update.js` calls `stand()` for them instead of `think()`. #298's
+  FOES FROZEN can use the same flag.
+- Foes stand at ±35°, ±47°, ±59°, … on the 200 m arc, alternating sides.
+- On a phone held sideways the RANGE page drops its blurb, and the pickers
+  sit closer together, so LAUNCH stays on screen down to 667 × 375.
 
 ## Code touchpoints
 

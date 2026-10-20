@@ -154,6 +154,7 @@ export function tickObjectives(G) {
     if (r) o.state = r;
   }
   tickWaves(G);
+  if (!G.objectives.length) return;   // none at all (the test range): nothing ends it but you
   const main = G.objectives.filter(o => !o.def.secondary), held = o => o.state === 'done' || (o.def.type === 'protect' && o.state === 'active');
   if (main.some(o => o.state === 'failed')) {
     G.state = 'over'; G.endT = 3.2; G.won = false;

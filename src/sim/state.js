@@ -73,7 +73,8 @@ export function resetMatch(G, { def, seed, pal, terrainOpts }) {
 // A single-player match: the player at the origin, the foes on a ring.
 // A foe is a chassis key, or { type, at: [bearing°, dist], face: bearing°,
 // aware, profile } to place it, point it, wake it (or not) and give it a
-// fighting style other than its chassis's (ai/profiles.js).
+// fighting style other than its chassis's (ai/profiles.js); `still` keeps
+// it standing where it is, a target (the DEBUG tab's range).
 export const foeType = f => (typeof f === 'string' ? f : f.type);
 export function startMatch(G, def, seed, gentle, chassis, { partsKey, terrainOpts, loadout } = {}) {
   resetMatch(G, { def, seed, terrainOpts });
@@ -94,6 +95,7 @@ export function startMatch(G, def, seed, gentle, chassis, { partsKey, terrainOpt
     const e = newMech(G, s.type, 1, x, z, s.face != null ? -s.face * Math.PI / 180 : atan2(-x, -z) + rng.range(-1, 1));
     e.ai.aware = s.aware ?? (i === 0 && gentle ? false : rng.chance(0.3));
     if (s.profile) { e.ai.plan = PROFILES[s.profile](e); e.ai.profile = s.profile; }
+    if (s.still) e.ai.still = true;   // the test range's STANDING STILL (data/range.js): never wakes or moves
     G.mechs.push(e);
   });
   initObjectives(G, def);

@@ -30,6 +30,9 @@ export function preyOf(G, e) {
   return (e.ai.prey = cur || G.player);
 }
 
+// A foe that only stands there (e.ai.still: the test range): no throttle, no jets, no shots.
+export function stand(e) { e.throttle = 0; e.jetting = false; }
+
 // One enemy, one frame. State lives in e.ai.
 export function think(G, e, dt) {
   const P = preyOf(G, e), r = G.rng;
