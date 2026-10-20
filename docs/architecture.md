@@ -165,7 +165,11 @@ numbers it in the room's order, keeps it (up to 4,000 a map) and sends `digs
 included. Carving takes the smaller of the ground and the hole, so applying
 a dig twice, or digs in another order, gives the same ground: every client
 applies every echo. `welcome` carries the room's list as `digs` for a pilot
-who joins later; a new round starts a new list. A smoke test checks that
+who joins later; a new round starts a new list. Falling ground (#284) sends
+nothing: each client applies the digs to a confirmed copy of the ground in
+the relay's order, and the support check on it finds the same falls
+everywhere (`sim/dig.js`); the local ground is that plus its own digs not yet
+echoed. A smoke test checks that
 two pilots and a late joiner end with the same ground hash.
 
 Team deathmatch on the wire: the server drops a `hit` between teammates (the

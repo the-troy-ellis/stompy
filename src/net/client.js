@@ -217,7 +217,7 @@ export function createNet(app) {
         setScores(m.scores);
         if (inPlace) { G.player.netId = Net.id; sendState(); msg(G, 'RECONNECTED'); }
         else startArena(m.seed, m.pal, !(back && m.scores?.find(p => p.id === m.id)?.ready));   // into the lobby: READY spawns you
-        applyDigList(G, m.digs);   // the round's ground so far: everything dug before we came
+        applyDigList(G, m.digs, true);   // the round's ground so far: everything dug (and fallen) before we came
         G.roundOver = !!m.over;
         break;
       }
@@ -335,7 +335,7 @@ export function createNet(app) {
     Net.token = typeof m.token === 'string' ? m.token : null;
     setScores(m.scores);
     if (back) { G.player.netId = Net.id; sendState(); msg(G, 'RECONNECTED'); return; }
-    if (m.started) { startCoopMission(); applyDigList(G, m.digs); return; }
+    if (m.started) { startCoopMission(); applyDigList(G, m.digs, true); return; }
     G.mode = 'coop'; G.lobby = true; Net.readied = false;
     app.input.exitLock();
     showLobby();

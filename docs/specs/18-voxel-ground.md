@@ -362,6 +362,36 @@ Where the first issue differs from the plan above, and why:
 - **`build` and `kind: 'tool'`** are reserved in `data/weapons.js`'s
   comment; nothing uses them yet.
 
+### As built in #284
+
+- **No `fall` message.** Every client works out the same falls itself. Digs
+  are applied to a *confirmed* ground (`G.terC`) strictly in the relay's
+  order, and the support check runs on it after each one. Everyone's
+  confirmed bytes are the same, so everyone finds the same islands and the
+  same drops, a late joiner replaying the room's list too. `G.ter` is the
+  confirmed ground plus this client's own digs not echoed yet. After a fall,
+  the boxes it touched are copied from the confirmed ground and those digs
+  are carved again, so the two never drift apart. `PROTOCOL` stays 21.
+- **Cells are corners.** The support fill runs over solid corners, face to
+  face, from the dug box plus one. It stops at bedrock or past 4,096 corners.
+  Islands drop whole cells (8 m), so every client stamps the same bytes. A
+  piece under 8 corners shatters into debris and isn't stamped.
+- **The heap is in the grid at once; the drawing catches up.** Later digs
+  must apply after the fall on every client, so the grid has the heap from
+  the moment the piece breaks off. The renderer meshes the chunks it lands in
+  with the bytes from before until it lands (`render/ground.js`), and draws
+  the piece itself falling with a slight tumble (`render/falls.js`). Mechs
+  feel the heap at once: a rider drops onto it, and a mech under it is
+  crushed when the piece lands.
+- **Crush:** `CRUSH` in `data/weapons.js` (3 per corner, at most 40), to the
+  torso, applied by the client that owns the mech. Props under it break, and
+  structures under it are destroyed by the host.
+- **An arch with one leg left stands.** The rule is the chain to bedrock, so
+  an arch is held up while either leg is. Bring down both and the crown falls
+  (at 8 m cells an arch thinner than about 7 m breaks into pieces). Criterion
+  11's "one leg drops the rest" would need a span rule on top; not in this
+  issue.
+
 ### Mission data
 
 ```js

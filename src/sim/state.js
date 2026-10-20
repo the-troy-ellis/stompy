@@ -24,7 +24,7 @@ const { sin, cos, atan2 } = Math;
 export function createGame({ fx = nullFx, touchUI = false, seed = 1 } = {}) {
   return {
     state: 'brief', paused: false, mode: 'sp', kind: 'free', worldKind: null,
-    mechs: [], entities: [], scenery: [], sceneryGrid: null, scorches: [], scorchId: 0, scorchRev: 0, shots: [], beams: [], cbeams: [], parts: new Particles(), debris: [], wrecks: [], msgs: [], pulses: [], pendingHits: new Map(), pendingEHits: new Map(), pendingDigs: [], digSeq: 0, role: 'solo',
+    mechs: [], entities: [], scenery: [], sceneryGrid: null, scorches: [], scorchId: 0, scorchRev: 0, shots: [], beams: [], cbeams: [], parts: new Particles(), debris: [], wrecks: [], msgs: [], pulses: [], pendingHits: new Map(), pendingEHits: new Map(), pendingDigs: [], digSeq: 0, falls: [], role: 'solo',
     eye: [0, 0, 0], view: [0, 0, 1], aim: [0, 0, 100], aimMech: null, lock: false, VP: null,
     flash: 0, shake: 0, kick: 0, whiteFlash: 0, lastTwist: 0, hitMark: 0,
     touchUI, touchTwist: 0, zoom: false, target: null, endT: 0, time: 0, frame: 0, clock: 0,
@@ -63,7 +63,7 @@ export function resetMatch(G, { def, seed, pal, terrainOpts }) {
   G.weather = makeWeather(def.weather, seed);   // fog, radar and wind (data/weather.js)
   G.ter = makeGround(seed, { ...terrainOpts, zones: flatZones(def) }, def);   // the voxel ground (world/voxels.js)
   G.worldKind = 'match';
-  G.mechs = []; G.entities = []; G.scenery = []; G.sceneryGrid = null; G.waves = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts.clear(); G.debris = []; G.scorches = []; G.scorchId = 0; G.scorchRev++; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear(); G.pendingEHits.clear(); G.pendingDigs = []; G.digSeq = 0;
+  G.mechs = []; G.entities = []; G.scenery = []; G.sceneryGrid = null; G.waves = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts.clear(); G.debris = []; G.scorches = []; G.scorchId = 0; G.scorchRev++; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear(); G.pendingEHits.clear(); G.pendingDigs = []; G.digSeq = 0; G.falls = []; G.unechoed = []; G.terC = null;
   G.target = null; G.aimMech = null; G.flash = 0; G.shake = 0; G.kick = 0; G.bob = null; G.bobIn = null; G.whiteFlash = 0; G.zoom = false; G.endT = 0; G.time = 0; G.frame = 0; G.beamOnAt = null; G.bench = null;   // bench: sim/bench.js sets it after; beamOnAt: the last beam hit on you (sim/combat.js), on this clock
   G.death = null; G.coopRespawn = null; G.lastKill = null; G.guide = null; G.mDown = false; G.won = false; G.roundOver = false; G.hitMark = 0; G.voice = null;
   G.stats = { shots: 0, hits: 0, dealt: 0, taken: 0, kills: 0 };

@@ -23,7 +23,7 @@ import { stepTurrets } from './turrets.js';
 import { tickCoopRespawn } from './coopRules.js';
 import { tickTutorial } from './tutorial.js';
 import { benchStep } from './bench.js';
-import { dig } from './dig.js';
+import { dig, stepFalls } from './dig.js';
 import { DIG } from '../data/weapons.js';
 
 const { sin, abs, min, max, hypot, cos } = Math;
@@ -135,6 +135,7 @@ export function update(G, input, dt) {
   const rng = G.rng;
   stepParticles(G, dt);
   stepDebris(G, dt);
+  stepFalls(G, dt);   // ground coming down (sim/dig.js)
   for (const w of G.wrecks) {
     w.t += dt;
     w.settle = min(1, w.t / WRECK_SETTLE);   // it rocks and sinks for a moment after it lands

@@ -60,6 +60,10 @@ export const WEAPONS = {
 // `cookOff`, a guided volley set off by hand `guided` where it was. On rock,
 // battle digs reach `rock` of their radius.
 export const DIG = { death: 5, deathMax: 7, cookOff: 7, guided: 4, rock: 0.5 };
+// Falling ground landing on a mech (spec 18 § Falling ground): `perCell` per
+// corner of ground that fell, to the torso, at most `max`. The owner's
+// defaults, to try in the bench.
+export const CRUSH = { perCell: 3, max: 40 };
 
 // Three fire controls, one per kind of weapon: lasers are energy (no ammo,
 // lots of heat), the autocannon is ballistic, LRMs are missiles.
