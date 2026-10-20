@@ -37,7 +37,7 @@ export function canSee(G, e, P) {
 // A fresh fix on the player: where they are and how they are moving.
 export function spot(G, e, P) {
   const a = e.ai;
-  a.belief = { x: P.x, z: P.z, vx: Math.sin(P.yaw) * P.speed, vz: Math.cos(P.yaw) * P.speed, at: G.time };
+  a.belief = { x: P.x, y: P.y, z: P.z, vx: Math.sin(P.yaw) * P.speed, vz: Math.cos(P.yaw) * P.speed, at: G.time };   // y: a tunnel's floor, not the hill over it (ai/nav.js)
   a.lastSeen = G.time;
   if (a.aware) return;
   // First sight: a beat before it reacts, shorter on harder settings.

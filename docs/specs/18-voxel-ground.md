@@ -392,6 +392,29 @@ Where the first issue differs from the plan above, and why:
   11's "one leg drops the rest" would need a span rule on top; not in this
   issue.
 
+### As built in #285
+
+- **The nav grid** (`sim/ai/nav.js`): 32 m squares, made per ground at first
+  use and square by square as they are asked for (the whole map is about
+  50 ms if every square is). A square holds every floor found in its corner
+  columns with 9 m of headroom: a mesa's top and the tunnel under it are two
+  floors. Floors within a cell of each other are one, kept where it is
+  nearest the square's middle. Links between neighbouring floors are walked
+  in 4 m steps on the ground: no rise steeper than 1.6, headroom all the
+  way. Drops are fine, so links go one way. Squares past `BOUND` have no
+  floors.
+- **Using it:** a foe walks straight while the way is open (`walkable`, the
+  first 160 m). When it isn't, the foe follows an A* path, made again every 3
+  s or when the goal moves 40 m. This applies to wandering, searching, and
+  closing on someone past 120 m. Nearer, the fight's own steering and the
+  feelers do it.
+- **Feelers:** 12 m ahead. If that is a wall, the foe takes the nearest open
+  heading, trying first the side it turned to last time, so it follows a
+  canyon wall.
+- **Beliefs keep a height** (`y`), so a foe chasing into a tunnel aims for its
+  floor, not the hill over it.
+- Digs and falls mark the squares near them to look at again.
+
 ### Mission data
 
 ```js

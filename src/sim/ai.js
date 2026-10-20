@@ -7,12 +7,14 @@ import { canPunch, meleePress, meleeTarget } from './melee.js';
 import { perceive } from './ai/perception.js';
 import { keepRange, steer, strafeTick } from './ai/behaviours.js';
 import { planFor } from './ai/profiles.js';
+import { routeYaw, feelers } from './ai/nav.js';
 import { decideFire } from './ai/fire.js';
 import { PERCEPTION as K } from '../data/ai.js';
 import { revealing } from './waves.js';
 import { pilotsOf } from './hitqueue.js';
 
 const { atan2, hypot, PI } = Math;
+const ROUTE_FROM = 120;   // m: nearer than this, the fight's own steering and the feelers get round things
 
 // The pilot an enemy fights: you; or, in a co-op game you host, the nearest
 // pilot alive, keeping the one it has unless another is much closer
@@ -43,7 +45,7 @@ export function think(G, e, dt) {
   let moveYaw, thr = 1;
   if (!e.ai.aware) {
     if (!e.ai.wp || hypot(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z) < 30) e.ai.wp = [clampN(e.x + r.range(-250, 250), -BOUND, BOUND), clampN(e.z + r.range(-250, 250), -BOUND, BOUND)];
-    moveYaw = atan2(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z); thr = 0.5;
+    moveYaw = routeYaw(G, e, e.ai.wp[0], G.ter.height(e.ai.wp[0], e.ai.wp[1]), e.ai.wp[1]) ?? atan2(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z); thr = 0.5;
   } else if (e.ai.state === 'search') {
     // Lost contact: go to where they were last seen, then poke around it.
     const b = e.ai.belief;
@@ -51,7 +53,7 @@ export function think(G, e, dt) {
       const first = !e.ai.wp && hypot(b.x - e.x, b.z - e.z) > 25;
       e.ai.wp = first ? [b.x, b.z] : [clampN(b.x + r.range(-K.searchRadius, K.searchRadius), -BOUND, BOUND), clampN(b.z + r.range(-K.searchRadius, K.searchRadius), -BOUND, BOUND)];
     }
-    moveYaw = atan2(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z); thr = 0.7;
+    moveYaw = routeYaw(G, e, e.ai.wp[0], b.y ?? G.ter.height(e.ai.wp[0], e.ai.wp[1]), e.ai.wp[1]) ?? atan2(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z); thr = 0.7;
   } else {
     strafeTick(G, e, dt);
     // The player's reach, skin to skin: stay out of it unless they are shut
@@ -67,9 +69,13 @@ export function think(G, e, dt) {
     else {
       const out = steer(G, e, { P, tx, tz, dist, toYaw, seen, reachP, reachE }, dt, plan);
       moveYaw = out.moveYaw; thr = out.thr; jets = out.jets;
+      // Closing on someone far off, with a mesa or a canyon wall between: the nav's way round (ai/nav.js).
+      if (thr > 0 && dist > ROUTE_FROM && Math.abs(wrapA(moveYaw - toYaw)) < 0.8) moveYaw = routeYaw(G, e, tx, seen ? P.y : G.ter.height(tx, tz), tz) ?? moveYaw;
     }
     e.jetting = jets;
   }
+  // A wall right ahead: turn along it.
+  if (e.throttle > 0 || thr > 0) moveYaw = feelers(G, e, moveYaw);
   e.yaw += clampN(wrapA(moveYaw - e.yaw), -e.ch.turn * dt, e.ch.turn * dt);
   e.throttle = thr;
   if (!e.ai.aware) { e.twist *= 1 - dt; return; }
