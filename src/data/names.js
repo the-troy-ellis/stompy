@@ -2,17 +2,17 @@
 // keys; the owner names things after seeing them, so renaming is a change
 // here and nowhere else (docs/workflow.md, "Naming things").
 export const NAMES = {
-  chassis: { kestrel: 'KESTREL', jackal: 'JACKAL', warden: 'WARDEN', puncher: 'PURPLE PUNCHER', light1: 'PIPSQUEAK', sniper1: 'BEANPOLE', digger: 'BIG SCOOPER' },   // BIG SCOOPER is the owner's, confirmed   // light1, sniper1: placeholders until the owner picks   // PURPLE PUNCHER is the owner's, confirmed
-  // ppc and the rest of M2's weapons carry placeholder names until the owner picks (docs/workflow.md § Naming).
-  weapons: { laser: 'LG LASER', mlaser: 'MED LASER', ac: 'AUTOCANNON', lrm: 'LRM-10', fusion: 'FUSION CANNON', ppc: 'THUNDERCLAP', plaser: 'PEPPER LASER', srm: 'FIRECRACKERS', gauss: 'BIG BONKER', mg: 'PEASHOOTER', flamer: 'TOASTER' },
+  chassis: { kestrel: 'BARRY', jackal: 'SKEDADDLE', warden: 'SLOWPOKE', puncher: 'PURPLE PUNCHER', light1: 'BIG TROUBLE', sniper1: 'LONG LARRY', digger: 'BIG SCOOPER' },   // every one the owner's, confirmed
+  // Every one the owner's, confirmed (docs/workflow.md § Naming).
+  weapons: { laser: 'BIG ZAPPER', mlaser: 'LIL ZAPPER', ac: 'BIG BOOMER', lrm: 'ANGRY BEES', fusion: 'OOPS BUTTON', ppc: 'ANGRY ZAPPER', plaser: 'BLINKY', srm: 'FIRECRACKERS', gauss: 'BIG BONKER', mg: 'RATATAT', flamer: 'TOASTER' },
   // What the menu says about each selectable mech, in the board-book voice (docs/vision.md § Tone guide).
   roles: {
-    kestrel: { role: 'IT DOES A LITTLE OF EVERYTHING.', kit: '2x LG LASER · AUTOCANNON · LRM-10 · FUSION', fire: 0.75 },
-    jackal: { role: 'IT RUNS FAST. IT BREAKS FAST.', kit: '2x MED LASER · FUSION', fire: 0.35 },
-    warden: { role: 'FOUR LEGS. SLOW. DOES NOT STOP.', kit: 'LG LASER · AUTOCANNON · LRM-10 · FUSION', fire: 0.85 },
-    puncher: { role: 'IT PUNCHES.', kit: 'AUTOCANNON · FIRECRACKERS · FUSION · FISTS', fire: 0.45 },
-    light1: { role: 'IT IS SMALL. IT IS RUDE.', kit: 'FIRECRACKERS · MED LASER · PEASHOOTER · FUSION', fire: 0.4 },
-    sniper1: { role: 'LONG LEGS. LONG GUN.', kit: 'BIG BONKER · THUNDERCLAP · MED LASER · FUSION', fire: 0.7 },
+    kestrel: { role: 'IT DOES A LITTLE OF EVERYTHING.', kit: '2x BIG ZAPPER · BIG BOOMER · ANGRY BEES · OOPS BUTTON', fire: 0.75 },
+    jackal: { role: 'IT RUNS FAST. IT BREAKS FAST.', kit: '2x LIL ZAPPER · OOPS BUTTON', fire: 0.35 },
+    warden: { role: 'FOUR LEGS. SLOW. DOES NOT STOP.', kit: 'BIG ZAPPER · BIG BOOMER · ANGRY BEES · OOPS BUTTON', fire: 0.85 },
+    puncher: { role: 'IT PUNCHES.', kit: 'BIG BOOMER · FIRECRACKERS · OOPS BUTTON · FISTS', fire: 0.45 },
+    light1: { role: 'IT IS SMALL. IT IS RUDE.', kit: 'FIRECRACKERS · LIL ZAPPER · RATATAT · OOPS BUTTON', fire: 0.4 },
+    sniper1: { role: 'LONG LEGS. LONG GUN.', kit: 'BIG BONKER · ANGRY ZAPPER · LIL ZAPPER · OOPS BUTTON', fire: 0.7 },
     digger: { role: 'IT DIGS.', kit: 'TWO BUCKETS · A HOPPER', fire: 0.05 },   // the BIG SCOOPER (the owner's name); role and kit lines are placeholders
   },
   // Campaign missions by key. Act I's are the owner's, picked after seeing them (docs/workflow.md § Naming).

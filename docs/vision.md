@@ -116,7 +116,7 @@ Stompy wants.
 | Silhouettes and animation | Giant fists, a torso that rears back to punch, a mech that sits down when both legs go | Faces, eyes that blink, anything cutesy |
 | Physics | Squash on landing, wobble when hit, knockback that sends a JACKAL skidding | Ragdolls, slapstick that breaks readability |
 | Cockpit voice | Flat delivery of absurd facts, after the fact: `Target punched.` | Quips during warnings the player must act on; jokes about the player's death that land before the debrief |
-| Mission names and briefs | Names in the same silly register as the hardware (the owner's Act I: LIL SNOOZERS, TOWER TOPPLER, HELPLESS LIL BUDDIES, FOUR LEGS BAD). Briefs in the board-book voice (below): `Four little trucks drive down the valley. JACKALs come to catch them. Keep two trucks safe.` | Sober war-film titles; long sentences; winking asides |
+| Mission names and briefs | Names in the same silly register as the hardware (the owner's Act I: LIL SNOOZERS, TOWER TOPPLER, HELPLESS LIL BUDDIES, FOUR LEGS BAD). Briefs in the board-book voice (below): `Four little trucks drive down the valley. SKEDADDLEs come to catch them. Keep two trucks safe.` | Sober war-film titles; long sentences; winking asides |
 | HUD | `OVERWEIGHT`, `PUNCH` | Jokes in instruments that must be read in half a second |
 | Debrief | A one-word verdict line (`STOMPED.` / `SQUASHED.`) above the numbers | Prose |
 
