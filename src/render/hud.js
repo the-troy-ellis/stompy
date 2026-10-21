@@ -22,6 +22,7 @@ import { TUT } from '../data/tutorial.js';
 const LAG_MS = 200;   // a round trip to the relay past this shows LAG (docs/specs/10-internet-play.md § Latency)
 
 const { sin, cos, atan2, min, max, PI, random, hypot, floor } = Math;
+const NO_CATS = [];
 const FUSION_NO_TARGET = `${WEAPONS.fusion.name}: NO TARGET`;   // made once
 
 // The compass tape's label for a heading in degrees: a cardinal letter on
@@ -831,7 +832,7 @@ export function createHud(app) {
       ctx.fillStyle = '#031203'; ctx.fillRect(wx + 150, wy - 3, 40, 6);
       ctx.fillStyle = full ? AMBER : GREEN; ctx.fillRect(wx + 150, wy - 3, 40 * ore / CONSTRUCT.hopper, 6);
     }
-    for (const cat of CATS) {
+    for (const cat of G.touchUI ? NO_CATS : CATS) {   // on touch the fire buttons show this (input/input.js fireStatus)
       const ws = P.weapons.filter(w => CAT_OF[w.type] === cat);
       if (!ws.length) continue;
       const live = ws.filter(w => !w.dead), firingNow = !!G.input?.held[cat];

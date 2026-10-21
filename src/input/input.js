@@ -44,7 +44,33 @@ export function createInput(app) {
       const btn = $(`[data-t="${c}"]`, tui);
       if (!btn) continue;
       btn.hidden = !(P.weapons.some(w => CAT_OF[w.type] === c) || (c === 'missile' && build));
-      if (c === 'missile') btn.textContent = build ? 'BUILD' : 'MISSILE';
+      if (c === 'missile') btn.firstChild.textContent = build ? 'BUILD' : 'MISSILE';
+    }
+  }
+  // Each fire button shows its weapons' state (touch only; the HUD's weapon
+  // list is off there): a dark pie that sweeps away as they recharge, the
+  // OOPS BUTTON's scan filling it bright, the ammo left, and dim red when
+  // they are all gone or empty. A style is written only when it changes.
+  const fireLast = {}, fireBtn = {};
+  function fireStatus() {
+    const P = G.player;
+    for (const c of CATS) {
+      const btn = fireBtn[c] || (fireBtn[c] = $(`[data-t="${c}"]`, tui));   // found once
+      if (!btn || btn.hidden) continue;
+      let cd = 0, ammo = -1, live = 0;
+      for (const w of P.weapons) {
+        if (CAT_OF[w.type] !== c || w.dead) continue;
+        live++;
+        if (w.def.cd) cd = Math.max(cd, w.cd / w.def.cd);
+        if (w.def.ammo) ammo = Math.max(ammo, 0) + w.ammo;
+      }
+      const scan = c === 'fusion' && P.fusion?.on && P.fusion.mech ? Math.min(1, P.fusion.t / P.weapons.find(w => w.def.kind === 'fusion').def.scan) : 0;
+      const gone = P.weapons.some(w => CAT_OF[w.type] === c) && (!live || ammo === 0);
+      const q = Math.round(Math.min(1, cd) * 48), s = Math.round(scan * 48), L = fireLast[c] || (fireLast[c] = { q: -1, s: -1, ammo: -2, gone: null });
+      if (q !== L.q) { L.q = q; btn.style.setProperty('--cd', q / 48); }
+      if (s !== L.s) { L.s = s; btn.style.setProperty('--scan', s / 48); }
+      if (ammo !== L.ammo) { L.ammo = ammo; btn.lastChild.textContent = ammo >= 0 ? String(ammo) : ''; }
+      if (gone !== L.gone) { L.gone = gone; btn.classList.toggle('gone', gone); }
     }
   }
 
@@ -358,7 +384,7 @@ export function createInput(app) {
     return inp;
   }
 
-  Object.assign(self, { keys, held, clearHeld, isHeld, snapshot: snapshotInput, pollPad, lockPointer, exitLock, locked, syncTouchUI, releaseFingers, syncWeaponButtons,
+  Object.assign(self, { keys, held, clearHeld, isHeld, snapshot: snapshotInput, pollPad, lockPointer, exitLock, locked, syncTouchUI, releaseFingers, syncWeaponButtons, fireStatus,
     get missileTap() { return missileTap; }, set missileTap(v) { missileTap = v; } });
   return self;
 }

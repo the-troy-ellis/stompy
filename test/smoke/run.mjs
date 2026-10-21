@@ -271,7 +271,7 @@ try {
     await page.tap('[data-dj="base"]');
     await page.waitForFunction(() => window.__stompy.game.kind === 'base' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
     await page.waitForTimeout(300);
-    const btns = () => page.evaluate(() => Object.fromEntries(['missile', 'energy', 'ballistic', 'fusion'].map(c => { const b = document.querySelector(`[data-t="${c}"]`); return [c, b.hidden ? '-' : b.textContent]; })));
+    const btns = () => page.evaluate(() => Object.fromEntries(['missile', 'energy', 'ballistic', 'fusion'].map(c => { const b = document.querySelector(`[data-t="${c}"]`); return [c, b.hidden ? '-' : b.firstChild.textContent]; })));
     const dig = await btns();
     const box = await (await page.$('[data-t="tgt"]')).boundingBox(), cdp = await page.context().newCDPSession(page), pt = [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }];
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt }); await page.waitForTimeout(800);   // a real finger, held

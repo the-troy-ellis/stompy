@@ -70,10 +70,10 @@ function start(root) {
         <button class="tcompass" data-t="centre" aria-label="Torso back over the legs"></button>
         <div class="tcluster">
           <button class="tbtn" data-t="tgt">TGT</button>
-          <button class="tbtn tfire t-fusion" data-t="fusion">FUSION</button>
-          <button class="tbtn tfire t-missile" data-t="missile">MISSILE</button>
-          <button class="tbtn tfire t-energy" data-t="energy">ENERGY</button>
-          <button class="tbtn tfire t-ballistic" data-t="ballistic">BALLISTIC</button>
+          <button class="tbtn tfire t-fusion" data-t="fusion"><span class="tlabel">FUSION</span><i class="tammo"></i></button>
+          <button class="tbtn tfire t-missile" data-t="missile"><span class="tlabel">MISSILE</span><i class="tammo"></i></button>
+          <button class="tbtn tfire t-energy" data-t="energy"><span class="tlabel">ENERGY</span><i class="tammo"></i></button>
+          <button class="tbtn tfire t-ballistic" data-t="ballistic"><span class="tlabel">BALLISTIC</span><i class="tammo"></i></button>
         </div>
       </div>
       <div class="mech-overlay"></div>
@@ -145,6 +145,7 @@ function start(root) {
     } else quiet();
     app.scene.render();
     app.hud.draw();
+    if (G.touchUI && G.state === 'play') app.input.fireStatus();   // the fire buttons' pies and ammo (input/input.js)
     if (G.bench && G.state === 'play') app.bench.record(ts, performance.now() - t0);
   };
 
