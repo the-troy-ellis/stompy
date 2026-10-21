@@ -16,8 +16,8 @@ const { hypot } = Math;
 const ch = CHASSIS.sniper1;
 const wall = (G, lo, hi, h) => G.ter.block(lo, hi, -1150, 1150, h, 1);   // a 45° ridge of rock the length of the map, as steep as the hills get
 
-test('BEANPOLE (sniper1): the spec numbers, tall legs and a narrow stance, a placeholder name, selectable', () => {
-  assert.equal(NAMES.chassis.sniper1, 'BEANPOLE');
+test('LONG LARRY (sniper1): the spec numbers, tall legs and a narrow stance, the owner\'s name, selectable', () => {
+  assert.equal(NAMES.chassis.sniper1, 'LONG LARRY');
   assert.equal(NAMES.roles.sniper1.role, 'LONG LEGS. LONG GUN.');
   assert.ok(MECH_ORDER.includes('sniper1'));
   assert.equal(ch.speed, 13); assert.equal(ch.turn, 0.9); assert.equal(ch.sink, 11); assert.equal(ch.scale, 1);

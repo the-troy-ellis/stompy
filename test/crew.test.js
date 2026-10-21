@@ -41,7 +41,7 @@ test('SWAP goes round the crew in order; the one you left is parked', () => {
   assert.equal(G.player, kes);
   frame(G, { swap: true });
   assert.equal(G.player, you, 'and back round');
-  assert.deepEqual(G.fx.calls('say').map(c => c.args[0]).slice(-3), [`${CHASSIS.digger.name}.`, 'KESTREL.', 'KESTREL.'], 'the voice says whose cockpit you are in');
+  assert.deepEqual(G.fx.calls('say').map(c => c.args[0]).slice(-3), [`${CHASSIS.digger.name}.`, `${CHASSIS.kestrel.name}.`, `${CHASSIS.kestrel.name}.`], 'the voice says whose cockpit you are in');
 });
 
 test('a parked mech stands still, even with its throttle up, and still takes hits', () => {
