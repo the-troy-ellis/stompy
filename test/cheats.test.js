@@ -50,25 +50,46 @@ test('BIG DIGS: a dig takes out more, through the rock band', () => {
   const plain = createTestGame(), big = createTestGame();
   big.cheats = { digs: true };
   dig(plain, [0, -8, 0], 3.5); dig(big, [0, -8, 0], 3.5);
-  assert.ok(plain.ter.solid(0, -13, 0) && !big.ter.solid(0, -13, 0), `twice the radius (${BIG_DIG.scale}x), and rock digs like soft ground`);
+  assert.ok(plain.ter.solid(0, -13, 0) && !big.ter.solid(0, -13, 0), `${BIG_DIG.scale}x the radius, and rock digs like soft ground`);
   assert.notEqual(plain.ter.hash(), big.ter.hash());
 });
 
-test('BIG DIGS: a few BIG BONKER hits cut an arch\'s leg, and the crown falls', () => {
+// Shots from the test range's start at an arch leg 220 m out: each digs where
+// it meets the rock, as a shell does, so a hole has to keep getting deeper.
+function shootLeg(G, type, max) {
+  const a = polar([0, 220]), from = [0, 6, 0];
+  let n = 0;
+  while (n < max && !G.falls.length) {
+    const to = [a.x - 44, [6, 10, 14][n % 3], a.z], d = to.map((v, i) => v - from[i]), L = Math.hypot(...d), dir = d.map(v => v / L);
+    const t = G.ter.ray(from, dir, L + 60);
+    if (t == null) break;
+    dig(G, from.map((v, i) => v + dir[i] * t), digOf(type)); n++;
+  }
+  return n;
+}
+const archGame = () => {
   const G = createTestGame();
   for (const e of foes(G)) { e.x = 900; e.z = 900; }
-  G.ter = makeGround(1, { flat: true }, { ground: { landmarks: [{ kind: 'arch', at: [0, 300] }] } });
-  G.cheats = { digs: true };
-  const a = polar([0, 300]);
-  let shots = 0;
-  for (const [dx, y] of [[46, 6], [46, 14], [46, 22], [40, 10], [52, 10], [40, 20]]) {   // up the leg, then either side of it
-    if (G.falls.length) break;
-    dig(G, [a.x + dx, y, a.z], digOf('gauss')); shots++;
+  G.ter = makeGround(1, { flat: true }, { ground: { landmarks: [{ kind: 'arch', at: [0, 220] }] } });
+  return G;
+};
+
+test('BIG DIGS: a few AUTOCANNON or BIG BONKER hits on an arch\'s leg bring the crown down', () => {
+  for (const [type, most] of [['ac', 6], ['gauss', 4]]) {
+    const G = archGame();
+    G.cheats = { digs: true };
+    const n = shootLeg(G, type, 20);
+    assert.ok(G.falls.length >= 1 && n <= most, `${type}: it broke after ${n} hits (at most ${most})`);
+    stepFor(G, 4);
+    const c = polar([0, 220]);
+    assert.ok(!G.ter.solid(c.x, 40, c.z), `${type}: the crown is down`);
   }
-  assert.ok(G.falls.length >= 1, `it broke after ${shots} hits`);
-  assert.ok(shots <= 6);
-  stepFor(G, 4);
-  assert.ok(!G.ter.solid(a.x, 40, a.z), 'the crown is down');
+});
+
+test('without BIG DIGS, the AUTOCANNON only marks an arch (small guns barely mark rock)', () => {
+  const G = archGame();
+  shootLeg(G, 'ac', 30);
+  assert.equal(G.falls.length, 0);
 });
 
 test('FOES FROZEN: foes stand still; switched off, they wake and come for you', () => {

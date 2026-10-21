@@ -105,7 +105,7 @@ numbers). They live in `G.cheats`, so the sim reads one place:
 | NO HEAT | firing adds no heat, so you never shut down from heat |
 | ENDLESS AMMO | firing takes no ammo |
 | NO WEIGHT LIMIT | FIT allows any loadout, however heavy; the tonnage bar still shows the weight, in amber instead of red |
-| BIG DIGS | every dig ignores the rock band and digs at `BIG_DIG.scale` (2) times its radius, so a blast takes out 8 times as much ground. Death digs too |
+| BIG DIGS | every dig ignores the rock band and digs at `BIG_DIG.scale` (3) times its radius, so a blast takes out 27 times as much ground. Death digs too |
 | FOES FROZEN | every foe stands still, as in STANDING STILL; turning it off wakes them |
 
 `BIG_DIG` lives in `src/data/debug.js`, not in `data/weapons.js`: it is a
@@ -184,9 +184,16 @@ The overlays are drawn on the HUD canvas, like the AI labels.
 - INVINCIBLE, NO HEAT and ENDLESS AMMO cover your own mech only. NO HEAT
   sets your heat to 0 every frame, so the fusion cannon's overload no
   longer keeps you shut down.
-- BIG DIGS doubles the radius in `sim/dig.js` `dig()` and digs rock like
+- BIG DIGS triples the radius in `sim/dig.js` `dig()` and digs rock like
   soft ground. It covers every dig in single player, yours and the foes'.
-  Measured: four BIG BONKER hits up an arch's leg drop its crown.
+  It was 2× at first, but the owner's AUTOCANNON shots at an arch did
+  nothing. At 2× a 2.5 m shell digs 5 m, less than a cell (8 m), so after
+  a dent or two the next solid corner was out of reach and the hole
+  stopped. At 3× (7.5 m), real hits from the range's start (each digging
+  where it meets the rock) drop an arch's crown in 3 AUTOCANNON or 3 BIG
+  BONKER hits, and FIRECRACKERS in 5. A single LRM missile (1.5 m, 4.5 m
+  here) still only marks it. Without BIG DIGS, 200 AUTOCANNON hits on a
+  leg change the ground twice.
 - FOES FROZEN reuses `stand()`. A foe frozen this way wakes, aware of
   you, once the switch goes off.
 - NO WEIGHT LIMIT lets LAUNCH go over the budget on every tab but

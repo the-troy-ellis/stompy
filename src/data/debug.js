@@ -9,5 +9,7 @@ export const CHEATS = [
   ['digs', 'BIG DIGS'],
   ['freeze', 'FOES FROZEN'],
 ];
-// BIG DIGS: every dig at `scale` times its radius, through the rock band as if it were soft.
-export const BIG_DIG = { scale: 2 };
+// BIG DIGS: every dig at `scale` times its radius, through the rock band as if
+// it were soft. 3, so an AUTOCANNON shell (2.5 m, 7.5 m here) digs further than
+// a cell (8 m) reaches and keeps going: at 2 its holes stalled on rock.
+export const BIG_DIG = { scale: 3 };
