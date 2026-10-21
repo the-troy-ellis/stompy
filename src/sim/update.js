@@ -1,5 +1,6 @@
 import { cheat } from './cheats.js';
 import { swap } from './crew.js';
+import { buildTrigger, stepBase } from './base.js';
 import { blendPal } from '../data/palettes.js';
 import { tickWeather } from './weather.js';
 import { add, clampN, dirOf, dot, len, mul, norm, sub } from '../util/math.js';
@@ -94,7 +95,8 @@ export function update(G, input, dt) {
   fusionTick(G, P, dt, armed && input.held.fusion && !G.guide);
   if (armed && input.held.energy && !G.guide) fireCat(G, 'energy');   // energy weapons that are not beams (bolts); beams skip themselves
   if (armed && input.held.ballistic) fireCat(G, 'ballistic');
-  missileTrigger(G, armed && (input.held.missile || input.missileTap));
+  if (P.ch.tools) buildTrigger(G, P, armed && input.held.missile);   // a digger's missile button is BUILD (sim/base.js)
+  else missileTrigger(G, armed && (input.held.missile || input.missileTap));
   if (G.guide) steerVolley(G, dt);
 
   groupPass(G, dt);
@@ -129,6 +131,7 @@ export function update(G, input, dt) {
     }
   }
   stepEntities(G, dt);
+  stepBase(G, dt);
   // A co-op guest doesn't run the world: the host's turrets, objectives and
   // waves arrive over the wire (docs/specs/09-coop.md).
   if (G.role !== 'guest') { stepTurrets(G, dt); if (!G.bench) tickObjectives(G); }   // the bench has nothing to win

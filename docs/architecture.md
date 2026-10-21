@@ -334,7 +334,7 @@ src/
     missions.js    MISSIONS, missionDef, objective definitions (M3)
     range.js       the DEBUG tab's test range: grounds, foe arc, rangeDef (M8, spec 19)
     debug.js       the DEBUG tab's cheat keys and labels, BIG_DIG (M8, spec 19)
-    construct.js   CONSTRUCT: the digger's bucket, hopper and ore per rock corner (M9, spec 20)
+    construct.js   CONSTRUCT: the bucket, hopper, ore, the base's prices and times; BUILDINGS (M9, spec 20)
     colors.js      MP_COLORS
     names.js       every display name, keyed; the only place a name lives
   world/
@@ -354,6 +354,7 @@ src/
     combat.js      sectionHit, damage, destroy, fire, blast
     cheats.js      cheat(G, key): the DEBUG tab's cheats, single player only (M8, spec 19)
     crew.js        G.crew, swap(G), park, nextCrew: the mechs you drive and SWAP between (M9, spec 20)
+    base.js        the base: silo, unloading, BUILD (footprint, placeFactory), the factory's queue (M9, spec 20)
     beams.js       melt, beamTick, coolArmour
     fusion.js      fusionTick, fusionFire, pulses
     missiles.js    missile steering, guide state (no camera code)

@@ -2,7 +2,7 @@ import { esc } from '../util/dom.js';
 import { store } from '../util/store.js';
 import { missionDef, FP_MIXES, FP_WEATHER, FP_TIMES, fpWeather, pickFoes } from '../data/missions.js';
 import { CHASSIS, MECH_ORDER } from '../data/chassis.js';
-import { RANGE_GROUNDS, RANGE_FOES, RANGE_MAX, RANGE_CREW, rangeDef } from '../data/range.js';
+import { RANGE_GROUNDS, RANGE_FOES, RANGE_MAX, RANGE_CREW, RANGE_BASE, rangeDef } from '../data/range.js';
 import { startMatch } from '../sim/state.js';
 import { fitOf } from './mechlab.js';
 import { CHEATS } from '../data/debug.js';
@@ -31,13 +31,13 @@ export function createDebugMenu(app, ui) {
   const cheatsHTML = () => `<div class="opts">${CHEATS.map(([k, l]) => `<button class="opt${app.G.cheats[k] ? ' on' : ''}" data-dch="${k}">${l}: ${app.G.cheats[k] ? 'ON' : 'OFF'}</button>`).join('')}</div>`;
 
   // The range's picks, saved: indices into their lists, and how many foes.
-  const rg = { ground: 1, foes: 0, n: 1, which: 0, time: 0, weather: 0, crew: 0, ...store.get(RANGE_KEY, {}) };
-  const LISTS = { ground: RANGE_GROUNDS.length, foes: RANGE_FOES.length, which: WHICH.length, time: FP_TIMES.length, weather: FP_WEATHER.length, crew: RANGE_CREW.length };
+  const rg = { ground: 1, foes: 0, n: 1, which: 0, time: 0, weather: 0, crew: 0, base: 0, ...store.get(RANGE_KEY, {}) };
+  const LISTS = { ground: RANGE_GROUNDS.length, foes: RANGE_FOES.length, which: WHICH.length, time: FP_TIMES.length, weather: FP_WEATHER.length, crew: RANGE_CREW.length, base: RANGE_BASE.length };
   const pick = (k, label, value) => `<div class="mm-pick"><span>${label}</span><button data-drg="${k}" data-d="-1">◀</button><b>${value}</b><button data-drg="${k}" data-d="1">▶</button></div>`;
   function startRange() {
     const G = app.G, w = WHICH[rg.which], R = Math.random;
     const foes = w === 'mix' ? pickFoes(FP_MIXES[0], rg.n, R) : Array(rg.n).fill(w);
-    const def = rangeDef({ ground: RANGE_GROUNDS[rg.ground].key, foes, mode: RANGE_FOES[rg.foes][0], weather: fpWeather(FP_WEATHER[rg.weather], 'dusk', R), time: FP_TIMES[rg.time], crew: RANGE_CREW[rg.crew] });
+    const def = rangeDef({ ground: RANGE_GROUNDS[rg.ground].key, foes, mode: RANGE_FOES[rg.foes][0], weather: fpWeather(FP_WEATHER[rg.weather], 'dusk', R), time: FP_TIMES[rg.time], crew: RANGE_CREW[rg.crew], base: RANGE_BASE[rg.base][0] });
     G.diff = prefs.diff;
     startMatch(G, def, 1 + Math.floor(R() * 1e5), false, prefs.chassis, { terrainOpts: { flat: true }, loadout: fitOf(prefs.chassis) });
     G.kind = 'range';
@@ -49,7 +49,7 @@ export function createDebugMenu(app, ui) {
   const pages = {
     range: () => `<p class="dbg-blurb">A flat field. Pick a thing to break. Pick who shows up.</p>
       <div class="fp-picks dbg-range">${pick('ground', 'GROUND', RANGE_GROUNDS[rg.ground].label)}${pick('foes', 'FOES', RANGE_FOES[rg.foes][1])}${rg.foes ? pick('n', 'HOW MANY', rg.n) + pick('which', 'WHICH', WHICH[rg.which] === 'mix' ? 'MIX' : CHASSIS[WHICH[rg.which]].name) : ''}
-      ${pick('time', 'TIME', TIME_NAMES[FP_TIMES[rg.time]])}${pick('weather', 'WEATHER', FP_WEATHER[rg.weather].toUpperCase())}${pick('crew', 'CREW', RANGE_CREW[rg.crew] === 'none' ? 'JUST YOU' : `+ ${CHASSIS[RANGE_CREW[rg.crew]].name}`)}</div>`,
+      ${pick('time', 'TIME', TIME_NAMES[FP_TIMES[rg.time]])}${pick('weather', 'WEATHER', FP_WEATHER[rg.weather].toUpperCase())}${pick('crew', 'CREW', RANGE_CREW[rg.crew] === 'none' ? 'JUST YOU' : `+ ${CHASSIS[RANGE_CREW[rg.crew]].name}`)}${pick('base', 'BASE', RANGE_BASE[rg.base][1])}</div>`,
     cheats: () => `<p>Single player only. The arena does not care.</p>${cheatsHTML()}`,
     tuning: () => '<p class="dim">Not built yet.</p>',
     // Any mission (all open under ?debug=1); GO plays it. The rest go on a tap.

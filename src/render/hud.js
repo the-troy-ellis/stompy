@@ -476,15 +476,42 @@ export function createHud(app) {
       ctx.fillStyle = `rgba(0,0,0,${0.45 * k})`; ctx.fillRect(0, 0, V.W, V.H);   // the picture drops out...
       for (let i = 0; i < 28; i++) { ctx.fillStyle = `rgba(${150 + (i * 53) % 100},${170 + (i * 31) % 80},150,${0.75 * k})`; ctx.fillRect(0, ((i * 0.618 + G.time * 7) % 1) * V.H, V.W, 2 + (i % 5) * 4 * k); }   // ...under bands of static
     }
-    if (!c || c.length < 2) return;
     ctx.font = '10px "Lucida Console", monospace'; ctx.textAlign = 'right';
+    // The base (spec 20 § Two buildings): what the silo holds, and what the factory is up to.
+    const b = G.base;
+    let y0 = L.crew.y;
+    if (b) {
+      const f = b.factory;
+      ctx.fillStyle = b.silo.alive ? AMBER : '#622';
+      ctx.fillText(`ORE ${b.ore}  SALVAGE ${b.salvage}`, L.crew.x, y0); y0 += 12;
+      if (f) {
+        ctx.fillStyle = !f.alive ? '#622' : GREEN;
+        ctx.fillText(!f.alive ? 'FACTORY DOWN' : f.prog < 1 ? `FACTORY ${Math.floor(f.prog * 100)}%` : f.job != null ? `NEW MECH ${Math.ceil(CONSTRUCT.mechTime - f.job)} s` : 'FACTORY', L.crew.x, y0);
+        y0 += 12;
+      }
+      if (G.buildAt) drawFootprint(G.buildAt);
+    }
+    if (!c || c.length < 2) return;
     c.forEach((m, i) => {
-      const y = L.crew.y + i * 12, me = m === G.player, f = m.alive ? Math.max(0, m.hp.T / m.max.T) : 0;
+      const y = y0 + i * 12, me = m === G.player, f = m.alive ? Math.max(0, m.hp.T / m.max.T) : 0;
       ctx.fillStyle = !m.alive ? '#622' : me ? AMBER : GREEN;
       ctx.fillText(`${me ? '▶ ' : ''}${m.ch.name}`, L.crew.x - 34, y);
       ctx.fillStyle = '#031203'; ctx.fillRect(L.crew.x - 30, y - 6, 30, 5);
       ctx.fillStyle = !m.alive ? '#622' : f < 0.35 ? RED : me ? AMBER : GREEN; ctx.fillRect(L.crew.x - 30, y - 6, 30 * f, 5);
     });
+  }
+  // BUILD held (sim/base.js): the factory's footprint on the ground, green where it can go, red where not,
+  // and why not at the crosshair.
+  function drawFootprint(f) {
+    const r = f.r, s = Math.sin(f.yaw), c = Math.cos(f.yaw), pts = [[-r, -r], [r, -r], [r, r], [-r, r]].map(([u, v]) => {
+      const x = f.x + u * c + v * s, z = f.z - u * s + v * c;
+      return project([x, G.ter.height(x, z) + 0.5, z]);
+    });
+    const col = f.why ? RED : GREEN;
+    if (pts.every(Boolean)) { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.stroke(); ctx.lineWidth = 1; }
+    ctx.textAlign = 'center'; ctx.fillStyle = col;
+    ctx.fillText(f.why === 'ore' ? `BUILD · ${CONSTRUCT.factory} ORE` : f.why === 'room' ? 'NO ROOM' : f.why === 'built' ? 'BUILT' : `BUILD · ${CONSTRUCT.factory} ORE`, V.W / 2, V.H * 0.5 + 34);
+    ctx.textAlign = 'right';
   }
   const sway = makeSway();
   let lastSwayAt = 0;

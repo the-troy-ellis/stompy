@@ -60,7 +60,7 @@ export function meleeTarget(G, m) {
   const E = G.entities, n = sceneryNear(G, m.x, m.z, reach, NEAR);
   for (let i = 0; i < E.length + n; i++) {   // indexed, far ones rejected squared: see pushOutOfEntities
     const e = i < E.length ? E[i] : NEAR[i - E.length];
-    if (!solid(e)) continue;
+    if (!solid(e) || (def.bucket && e.team === m.team)) continue;   // a digger's bucket leaves its own base alone
     const dx = e.x - m.x, dz = e.z - m.z, far = reach + e.radius;
     if (dx * dx + dz * dz > far * far) continue;
     const d = Math.sqrt(dx * dx + dz * dz) - e.radius;

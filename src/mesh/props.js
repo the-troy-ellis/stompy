@@ -165,6 +165,36 @@ const BUILD = {
     b.cyl(chain(M.T(-0.3, 0.22, -0.25), M.RX(-0.3), M.RZ(0.3), M.S(0.36, 0.4, 0.36)), C.ice, 5, 0);
     box(b, 0, 0, 0, 1.3, 0.05, 1.1, C.iceDeep, M.RY(0.5), 0.8, 0.8);
   },
+  // Build and fight (spec 20): the base's silo, a tall steel bin with hazard
+  // bands and a cone roof on legs, a chute down to a striped pad in front
+  // where the digger tips its hopper.
+  silo: b => {
+    box(b, 0, 0, 0.55, 1.5, 0.04, 0.9, C.pad);
+    for (const x of [-0.4, 0.4]) box(b, x, 0.04, 0.95, 0.3, 0.01, 0.12, C.hazard);
+    b.cyl(chain(M.T(0, 0.45, -0.2), M.S(1.0, 0.9, 1.0)), C.steel, 6);
+    b.cyl(chain(M.T(0, 0.7, -0.2), M.S(1.04, 0.08, 1.04)), C.hazard, 6);
+    b.cyl(chain(M.T(0, 0.96, -0.2), M.S(1.0, 0.12, 1.0)), C.steel, 6, 0.15);
+    box(b, 0, 0.3, 0.28, 0.2, 0.1, 0.5, C.dark, M.RX(0.5));
+  },
+  siloWreck: b => {
+    box(b, 0, 0, 0.55, 1.5, 0.04, 0.9, C.char);
+    b.cyl(chain(M.T(0, 0.12, -0.2), M.S(1.0, 0.24, 1.0)), C.char, 8);
+    box(b, 0.2, 0.05, -0.1, 0.5, 0.1, 1.1, C.ash, M.RY(0.7), 0.6, 1);
+  },
+  // The factory: a long shed with a saw-tooth roof, a big door in front with
+  // hazard stripes over it, a chimney, and a pad where the new mech walks out.
+  factory: b => {
+    box(b, 0, 0, 0, 1.9, 0.6, 1.5, C.concrete);
+    for (let i = 0; i < 3; i++) b.cube(chain(M.T(-0.6 + i * 0.6, 0.68, 0), M.RZ(0.35), M.S(0.55, 0.2, 1.5)), C.steel);   // the saw teeth, each tipped in place
+    box(b, 0, 0, 0.76, 0.8, 0.46, 0.04, C.dark);                                                          // the door
+    for (let i = 0; i < 4; i++) b.cube(chain(M.T(-0.3 + i * 0.2, 0.51, 0.77), M.RZ(0.6), M.S(0.08, 0.06, 0.03)), C.hazard);
+    box(b, 0.7, 0.6, -0.5, 0.16, 0.4, 0.16, C.rust);                                                       // the chimney
+  },
+  factoryWreck: b => {
+    box(b, 0, 0, 0, 1.9, 0.18, 1.5, C.char);
+    box(b, -0.4, 0.18, 0.1, 0.9, 0.08, 0.7, C.ash, M.RY(0.3));
+    box(b, 0.7, 0, -0.5, 0.16, 0.3, 0.16, C.char);
+  },
 };
 export const PROP_KEYS = Object.keys(BUILD);
 // Props that scale up with the radius rather than the height.
