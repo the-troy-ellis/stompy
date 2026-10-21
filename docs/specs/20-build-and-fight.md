@@ -188,7 +188,7 @@ mech within 120 m of them, or you. Each raid is a mission wave
 
 ### As built in #308
 
-- **The digger** (`CHASSIS.digger`, placeholder name DIGGER, role
+- **The digger** (`CHASSIS.digger`, the owner named it BIG SCOOPER; role
   `IT DIGS.`) is safety yellow with black hazard stripes, an open hopper on
   its back, an exhaust stack, short thick legs and two buckets (the `fist`
   part, so they swing like PURPLE PUNCHER's fists and take turns). `tools`:
@@ -196,7 +196,7 @@ mech within 120 m of them, or you. Each raid is a mission wave
   `names.js`.
 - **Where you get it:** it isn't in the selector yet. `?debug=1` offers it
   after the fighting chassis (`PILOTABLE`). MULTIPLAYER refuses it with
-  `DIGGERS STAY HOME. PICK ANOTHER MECH.` The foe rosters (contracts, Free
+  `THE BIG SCOOPER STAYS HOME. PICK ANOTHER MECH.` The foe rosters (contracts, Free
   Play's mixes) still use the fighting chassis only.
 - **The bite** (`BUCKET_MELEE`, `bucketBite` in `sim/melee.js`, `bite` in
   `sim/dig.js`):
