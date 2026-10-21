@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress: #308 (the digger) built; the owner picked the two arms (build and mine, defend and conquer), a base that is a mech factory, swapping mechs mid-mission, and starting with the smallest version that proves the loop |
+| Status | in progress: #308 (the digger) and #310 (the crew and SWAP) built; the owner picked the two arms (build and mine, defend and conquer), a base that is a mech factory, swapping mechs mid-mission, and starting with the smallest version that proves the loop |
 | Milestone | M9 (proposed; after M8) |
 | Size | L (split into five issues; see the end) |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md) (digging, building, falling, the torque rule); [03-objectives.md](03-objectives.md) (structures, waves, protect); [05-ai.md](05-ai.md) (foes that go for a target); [12-melee.md](12-melee.md) (the punch the bucket rides on); [16-body-plans.md](16-body-plans.md) (a new body); [19-debug-menu.md](19-debug-menu.md) (where it is tried first) |
@@ -216,6 +216,25 @@ mech within 120 m of them, or you. Each raid is a mission wave
   can't be taken online yet anyway.
 - **HUD:** shows `HOPPER` or `HOPPER FULL`, the count and a bar where the
   weapon list goes.
+
+### As built in #310
+
+- **`sim/crew.js`:**
+  - `G.crew` is you, then a mission's `crew: [{ type, at, face }]`, parked where they stand. A match without one is a crew of one, so nothing changes for the rest of the game.
+  - `swap(G)` moves `G.player` to the next live crew mech. It parks the one you leave (no throttle, no jets, no beam) and clears your target and any missile you were guiding. The voice says the new mech's name, and its caption shows it.
+  - `update.js` makes a parked mech `stand()` every frame, like the range's still foes. It coasts to a stop and stays put.
+  - SWAP is ignored in the arena.
+- **Deaths:** when the mech you're in dies and another crew mech is standing, it's `MECH DESTROYED`, not the end. The next live one is yours after `HANDOVER` (2.2 s). With none left, the mission is lost as before.
+- **Foes:** in single player with a crew, foes go for the nearest live crew mech (`preyOf`, the way a co-op host's foes pick a pilot). A parked mech gets attacked.
+- **Controls:**
+  - Q on the keyboard.
+  - The gamepad's D-pad right.
+  - TGT held 0.45 s on touch. With a crew, a tap on TGT picks the next target on release; without one, it picks on the press, as before.
+  - The controls tables say so.
+- **HUD:**
+  - **Crew strip:** with two or more mechs, a line each with its torso's health. The one you're in is amber and marked ▶, and a dead one is dark red. It sits under HOSTILES on desktop, and left of the radar on a phone, where it clears the buttons.
+  - **Swap wipe:** a 0.3 s static wipe follows a swap.
+- **The range:** the test range gets a CREW picker (JUST YOU, + KESTREL, + the digger) to try it before FIRST FACTORY.
 
 ## Code touchpoints
 

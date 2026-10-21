@@ -27,6 +27,12 @@ export function createInput(app) {
   // shorter than a frame (a slow phone, a quick thumb) still fires.
   let missileTap = false;
   let punchTap = false;   // a press, consumed by the next snapshot
+  // SWAP (sim/crew.js, spec 20): Q, the pad's D-pad right, or TGT held on touch. With a
+  // crew, TGT picks the next target on release and swaps if held SWAP_HOLD; without one,
+  // it picks on the press, as it always has.
+  let swapTap = false, tgtTimer = null;
+  const SWAP_HOLD = 450;   // ms
+  const hasCrew = () => (G.crew?.length || 0) > 1;
 
   // Only show fire buttons for the kinds of weapon this mech carries.
   function syncWeaponButtons() {
@@ -77,7 +83,7 @@ export function createInput(app) {
     if (cat && !G.touchUI) held[cat] = false;
   });
 
-  const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX', 'KeyC', 'KeyJ', 'KeyT', 'KeyR', 'KeyF', 'KeyZ', 'KeyP', 'KeyE', 'KeyL', 'Space',
+  const GAME_KEYS = new Set(['KeyQ', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX', 'KeyC', 'KeyJ', 'KeyT', 'KeyR', 'KeyF', 'KeyZ', 'KeyP', 'KeyE', 'KeyL', 'Space',
     'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyG', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
   // Keys are taken at the document: hiding the overlay drops focus to <body>,
   // and pointer lock doesn't move it back.
@@ -110,6 +116,7 @@ export function createInput(app) {
     if (KEY_FOR.missile.includes(e.code)) missileTap = true;
     if (e.code === 'KeyT') { if (G.spectate) nextSpectate(G); else cycleTarget(G); }   // spectating: the next pilot
     if (e.code === 'KeyE') punchTap = true;
+    if (e.code === 'KeyQ') swapTap = true;
     if (e.code === 'KeyR' && G.aimMech && G.aimMech.team !== 0) { G.target = G.aimMech; app.audio.sfx.beep(); }
     if (e.code === 'KeyF') alpha(G);
     if (e.code === 'KeyZ') G.zoom = !G.zoom;
@@ -180,6 +187,11 @@ export function createInput(app) {
   function touchButton(name, down, el) {
     el?.classList.toggle('on', down);
     if (CATS.includes(name)) { held[name] = down; if (down && name === 'missile') missileTap = true; }
+    if (name === 'tgt' && hasCrew() && !G.spectate) {   // with a crew: tap for the next target, hold to SWAP
+      if (down) tgtTimer = setTimeout(() => { tgtTimer = null; swapTap = true; }, SWAP_HOLD);
+      else if (tgtTimer) { clearTimeout(tgtTimer); tgtTimer = null; cycleTarget(G); }
+      return;
+    }
     if (!down) return;
     if (name === 'centre') centreTap = true;
     else if (name === 'tgt') { if (G.spectate) nextSpectate(G); else cycleTarget(G); }
@@ -300,6 +312,7 @@ export function createInput(app) {
       if (G.spectate) orbitSpectate(G, pad.axes.twist * 2.5 * dt, -pad.axes.pitch * 2 * dt * (prefs.invert ? -1 : 1));   // waiting to respawn: look around
       if (p.missile) missileTap = true;
       if (p.punch) punchTap = true;
+      if (p.swap) swapTap = true;
       if (p.target) { if (G.spectate) nextSpectate(G); else cycleTarget(G); }
       if (p.zoom) G.zoom = !G.zoom;
       if (p.lights) toggleLights();
@@ -332,9 +345,9 @@ export function createInput(app) {
       twist: (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0) + (G.touchTwist || 0) + (gp ? gp.axes.twist * aim : 0),
       pitch: (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0) + (G.touchPitch || 0) + (gp ? gp.axes.pitch * aim * (prefs.invert ? -1 : 1) : 0),
       centre: !!keys.KeyC || !!gp?.hold.centre, centreTap, jets: !!keys.KeyJ || !!gp?.hold.jets,
-      held: Object.fromEntries(CATS.map(c => [c, isHeld(c) || !!gp?.hold[c]])), missileTap, punch: punchTap,
+      held: Object.fromEntries(CATS.map(c => [c, isHeld(c) || !!gp?.hold[c]])), missileTap, punch: punchTap, swap: swapTap,
     };
-    missileTap = false; punchTap = false; centreTap = false;
+    missileTap = false; punchTap = false; centreTap = false; swapTap = false;
     return inp;
   }
 

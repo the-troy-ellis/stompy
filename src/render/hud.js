@@ -2,6 +2,7 @@ import { VERSION } from '../util/version.js';
 const VERSION_LINE = `v${VERSION}`;   // made once: the readout runs every frame
 import { CHEATS } from '../data/debug.js';
 import { CONSTRUCT } from '../data/construct.js';
+import { SWAP_WIPE } from '../sim/crew.js';
 import { RADAR_RANGE, radarOf, fogOf } from '../data/weather.js';
 import { TAU, clampN, len, rnd, sub } from '../util/math.js';
 import { WEAPONS, CATS, CAT_OF, CAT_LABEL, CAT_KEY } from '../data/weapons.js';
@@ -228,6 +229,7 @@ export function createHud(app) {
         throttle: { x: V.W * 0.9 - 26, y: top, h: dash - 30 },
         target: { x: V.W * 0.1 + 8, y: 48 },
         hostiles: { x: V.W * 0.965 - 10, y: 20 },
+        crew: { x: V.W * 0.965 - 10, y: 34 },   // spec 20's crew strip: under HOSTILES
         compass: { w: min(340, V.W * 0.5) },
       };
     }
@@ -241,6 +243,7 @@ export function createHud(app) {
       throttle: { x: 14, y: V.H - 196, h: 120 },
       target: { x: tgtX, y: 10 },   // right of the pause and zoom buttons
       hostiles: { x: V.W - 14, y: 2 * r + 34 + 56 },   // under the weapon list, clear of the compass
+      crew: { x: V.W - 2 * r - 30, y: 20 },   // left of the radar, clear of the buttons below
       compass: { w: max(120, min(340, V.W * 0.5, V.W - 2 * (tgtX + 150 + 8))) },   // narrower on a phone: clear of the target box
     };
   }
@@ -461,6 +464,27 @@ export function createHud(app) {
       if (a.ridge) line(at(a.ridge.x, a.ridge.z), '#c8f');
       if (a.wp && (!a.aware || a.state === 'search')) line(at(a.wp[0], a.wp[1]), DIM);
     }
+  }
+  // The crew strip (spec 20 § Swapping mechs): with more than one mech to
+  // drive, a line each under HOSTILES, the one you are in amber and marked,
+  // a dead one dark red, each with its torso's health. And after a SWAP the
+  // cockpit's static wipe: bands of noise that clear in SWAP_WIPE seconds.
+  function drawCrew(L) {
+    const c = G.crew;
+    if (G.swapT != null && G.time - G.swapT < SWAP_WIPE) {
+      const k = 1 - (G.time - G.swapT) / SWAP_WIPE;
+      ctx.fillStyle = `rgba(0,0,0,${0.45 * k})`; ctx.fillRect(0, 0, V.W, V.H);   // the picture drops out...
+      for (let i = 0; i < 28; i++) { ctx.fillStyle = `rgba(${150 + (i * 53) % 100},${170 + (i * 31) % 80},150,${0.75 * k})`; ctx.fillRect(0, ((i * 0.618 + G.time * 7) % 1) * V.H, V.W, 2 + (i % 5) * 4 * k); }   // ...under bands of static
+    }
+    if (!c || c.length < 2) return;
+    ctx.font = '10px "Lucida Console", monospace'; ctx.textAlign = 'right';
+    c.forEach((m, i) => {
+      const y = L.crew.y + i * 12, me = m === G.player, f = m.alive ? Math.max(0, m.hp.T / m.max.T) : 0;
+      ctx.fillStyle = !m.alive ? '#622' : me ? AMBER : GREEN;
+      ctx.fillText(`${me ? '▶ ' : ''}${m.ch.name}`, L.crew.x - 34, y);
+      ctx.fillStyle = '#031203'; ctx.fillRect(L.crew.x - 30, y - 6, 30, 5);
+      ctx.fillStyle = !m.alive ? '#622' : f < 0.35 ? RED : me ? AMBER : GREEN; ctx.fillRect(L.crew.x - 30, y - 6, 30 * f, 5);
+    });
   }
   const sway = makeSway();
   let lastSwayAt = 0;
@@ -791,6 +815,7 @@ export function createHud(app) {
     ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'right'; ctx.fillStyle = DIM;
     ctx.fillText(app.net.mp() ? `${app.net.tdm() ? '' : `PILOTS ${app.net.Net.info.size}  `}FIRST TO ${app.net.Net.limit}` : `HOSTILES ${left}`, L.hostiles.x, L.hostiles.y);
     if (app.net.mp()) drawArenaHUD(L);
+    drawCrew(L);
     drawTutorial(L);
     if ((app.net.mp() || G.mode === 'coop') && app.net.Net.rtt > LAG_MS) {   // a slow line to the relay: say so, small
       const tw = L.compass.w;

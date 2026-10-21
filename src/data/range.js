@@ -32,6 +32,8 @@ export const RANGE_GROUNDS = [
   { key: 'all', label: 'ALL OF THEM', ground: { landmarks: [{ kind: 'arch', at: [0, 300], face: 0 }, { kind: 'mesa', at: [72, 300] }, ...tunnel(144, 300), ...cave(216, 300)], strokes: pillar([288, 300]) } },
 ];
 export const RANGE_FOES = [['none', 'NONE'], ['still', 'STANDING STILL'], ['awake', 'AWAKE']];
+// A second mech for your crew, parked 30 m to your side, to try SWAP (spec 20): none, or this chassis.
+export const RANGE_CREW = ['none', 'kestrel', 'digger'];
 export const RANGE_MAX = 8, RANGE_ARC = 200;
 
 // Where foe i of n stands: on the arc, alternately left and right of the
@@ -40,12 +42,13 @@ export const rangeSpot = i => [(i % 2 ? -1 : 1) * (35 + 12 * (i >> 1)), RANGE_AR
 
 // The match def for a range: the picked ground, `foes` (chassis keys, already
 // picked), STANDING STILL or AWAKE, and Free Play's weather and time.
-export function rangeDef({ ground = 'flat', foes = [], mode = 'none', weather = 'clear', time = 'day' } = {}) {
+export function rangeDef({ ground = 'flat', foes = [], mode = 'none', weather = 'clear', time = 'day', crew = 'none' } = {}) {
   const g = RANGE_GROUNDS.find(r => r.key === ground) || RANGE_GROUNDS[0];
   return {
     name: 'Range', pal: 'dusk', intel: '', weather, time,
     ground: g.ground,
     objectives: [],   // nothing to win: the range stays open (sim/objectives.js)
+    crew: crew === 'none' ? [] : [{ type: crew, at: [90, 30], face: 0 }],
     foes: mode === 'none' ? [] : foes.map((type, i) => ({ type, at: rangeSpot(i), aware: mode === 'awake', still: mode === 'still' })),
   };
 }

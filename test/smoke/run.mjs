@@ -159,6 +159,22 @@ try {
     console.log(`digger: ${menu[1]} (FIT shown ${menu[2]}); three bites into the mesa, ${r.ore} ore, ${r.guns} guns`);
     if (menu[0] !== 'digger' || menu[1] !== 'IT DIGS.' || menu[2] || !(r.ore > 0) || r.guns) { failed = true; console.error(`FAIL: the digger (${menu}, ${JSON.stringify(r)})`); }
   });
+  // The crew and SWAP (spec 20, #310): a range with a digger parked beside you; Q swaps into it and back.
+  await run('crew', URL_, async page => {
+    await page.click('.feel-panel [data-a="toggle"]');
+    await page.click('[data-sel="debug"]'); await page.click('[data-dsec="range"]');
+    for (let i = 0; i < 4 && (await page.$eval('[data-drg="crew"] ~ b', b => b.textContent)) === 'JUST YOU'; i++) await page.click('[data-drg="crew"][data-d="1"]');
+    await page.click('[data-a="go"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'range' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    const first = await page.evaluate(() => [window.__stompy.game.player.type, window.__stompy.game.crew.length]);
+    await page.keyboard.press('q'); await page.waitForTimeout(400);
+    const second = await page.evaluate(() => { const G = window.__stompy.game; return [G.player === G.crew[1], G.crew[0].parked]; });
+    await page.screenshot({ path: 'test-results/smoke-crew.png' });
+    await page.keyboard.press('q'); await page.waitForTimeout(300);
+    const third = await page.evaluate(() => window.__stompy.game.player === window.__stompy.game.crew[0]);
+    console.log(`crew: ${first[1]} in the crew; in ${first[0]}, Q -> the other ${second[0]} (the first parked ${second[1]}), Q -> back ${third}`);
+    if (first[1] !== 2 || !second[0] || !second[1] || !third) { failed = true; console.error(`FAIL: SWAP (${first}, ${second}, ${third})`); }
+  });
   await run('touch', URL_ + '&touch=1', async page => {
     // Taps, not clicks: a mouse click would switch the game back to mouse mode.
     await page.tap('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way, as on desktop

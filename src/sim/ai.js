@@ -21,8 +21,9 @@ const ROUTE_FROM = 120;   // m: nearer than this, the fight's own steering and t
 // (PREY_SWITCH), so it doesn't flip between two at the same range.
 export const PREY_SWITCH = 0.7;
 export function preyOf(G, e) {
-  if (G.role !== 'host') return G.player;   // solo and guests: no list to build every frame
-  const pilots = pilotsOf(G);
+  const crew = G.role !== 'host' && G.crew && G.crew.length > 1;   // solo with a crew (spec 20): the nearest of them
+  if (G.role !== 'host' && !crew) return G.player;   // solo and guests: no list to build every frame
+  const pilots = crew ? G.crew : pilotsOf(G);
   const d = m => hypot(m.x - e.x, m.z - e.z);
   let cur = e.ai.prey && e.ai.prey.alive && pilots.includes(e.ai.prey) ? e.ai.prey : null, best = null;
   for (const m of pilots) if (m.alive && (!best || d(m) < d(best))) best = m;

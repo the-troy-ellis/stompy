@@ -1,4 +1,5 @@
 import { cheat } from './cheats.js';
+import { swap } from './crew.js';
 import { blendPal } from '../data/palettes.js';
 import { tickWeather } from './weather.js';
 import { add, clampN, dirOf, dot, len, mul, norm, sub } from '../util/math.js';
@@ -33,7 +34,7 @@ const { sin, abs, min, max, hypot, cos } = Math;
 // `turn` is a rate (-1..1, the keys); `turnBy` is radians the touch aim drag
 // asked for, paid out at the legs' own turn rate (G.turnByUsed says how much).
 // `thr` is a gamepad's stick on the throttle (-1..1): W and S at that share.
-export const noInput = () => ({ thrUp: false, thrDown: false, stop: false, thr: 0, turn: 0, turnBy: 0, twist: 0, pitch: 0, centre: false, centreTap: false, jets: false,
+export const noInput = () => ({ swap: false, thrUp: false, thrDown: false, stop: false, thr: 0, turn: 0, turnBy: 0, twist: 0, pitch: 0, centre: false, centreTap: false, jets: false,
   held: { energy: false, ballistic: false, missile: false, fusion: false }, missileTap: false, punch: false });
 
 // One frame of the whole simulation. `input` is a snapshot (see noInput);
@@ -47,6 +48,9 @@ export function update(G, input, dt) {
   G.frame = (G.frame || 0) + 1;
   if (G.bench) input = benchStep(G, noInput(), dt);   // ?debug=1's scripted scene drives everyone (sim/bench.js)
   G.input = input;
+  // SWAP (sim/crew.js): into the next live crew mech; and after the one you were in died, the next one is yours.
+  if (G.handover != null && G.time >= G.handover) { G.handover = null; swap(G); }
+  else if (input.swap && !G.paused && G.state === 'play' && G.mode !== 'mp') swap(G);
   const P = G.player;
   if (P.alive && !P.shutdown && !G.paused) {
     if (input.thrUp) P.throttle = min(1, P.throttle + dt * 0.9);
@@ -102,6 +106,7 @@ export function update(G, input, dt) {
       if (m.alive && m.net?.fl) G.cbeams.push({ a: muzzle(m, m.weapons.find(w => w.def.kind === 'fusion')), b: m.net.fl, col: WEAPONS.fusion.col, w: 0.05 + 0.035 * abs(sin(G.time * 37)) });
       continue;
     }
+    if (m.parked && m !== P && m.alive) stand(m);   // a crew mech you left: it stands (sim/crew.js)
     if (m.team !== 0 && m.alive && !m.script) {   // the bench's cast is on a script
       if (m.ai.still || cheat(G, 'freeze')) { stand(m); m.ai.frozen = !m.ai.still; }   // a range's target; FOES FROZEN (sim/cheats.js)
       else { if (m.ai.frozen) { m.ai.frozen = false; m.ai.aware = true; } think(G, m, dt); }   // unfrozen: awake, and after you

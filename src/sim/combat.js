@@ -1,4 +1,5 @@
 import { cheat } from './cheats.js';
+import { nextCrew, HANDOVER } from './crew.js';
 import { add, mul, norm, sub } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { SECT_NAME } from '../data/chassis.js';
@@ -216,6 +217,12 @@ export function destroy(G, m, src) {
     // Co-op with company: down, not out; back at the start soon (sim/coopRules.js).
     G.fx.netSend(died(src?.netId, m.lastHitMelee));
     coopDown(G);
+    return;
+  }
+  if (m === G.player && nextCrew(G)) {
+    // A crew mech is still standing (spec 20): it's yours after a beat (update.js), not the end.
+    G.handover = G.time + HANDOVER;
+    msg(G, 'MECH DESTROYED', '#f44');
     return;
   }
   if (m === G.player) {

@@ -8,7 +8,7 @@
 //   Right stick  torso twist and pitch (and steers guided missiles)
 //   RT energy · LT missiles (tap, or hold to fly) · RB ballistic · LB fusion
 //   A jump · B centre torso · X next target · Y zoom · right stick click punch
-//   D-pad up lights · D-pad down stop · Start pause · Back pause (the menu is on it)
+//   D-pad up lights · D-pad down stop · D-pad right SWAP (spec 20) · Start pause · Back pause (the menu is on it)
 const { abs, hypot, min, sign } = Math;
 
 export const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, BACK: 8, START: 9, LS: 10, RS: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
@@ -42,7 +42,7 @@ export function readPad(gp, before = []) {
     jets: held[PAD.A], centre: held[PAD.B],
   };
   const pressed = {
-    missile: press('LT'), target: press('X'), zoom: press('Y'), punch: press('RS'), lights: press('UP'), stop: press('DOWN'),
+    missile: press('LT'), target: press('X'), zoom: press('Y'), punch: press('RS'), lights: press('UP'), stop: press('DOWN'), swap: press('RIGHT'),
     start: press('START'), back: press('BACK'),
     // Menus: the D-pad (or the left stick, see input.js) moves, A presses, B goes back.
     a: press('A'), b: press('B'), up: press('UP'), down: press('DOWN'), left: press('LEFT'), right: press('RIGHT'),
