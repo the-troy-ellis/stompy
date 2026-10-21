@@ -189,7 +189,12 @@ digger's hopper line stays). Each fire button shows its weapons: a dark pie
 that sweeps away clockwise as they recharge, the OOPS BUTTON's 3 s scan
 filling it bright, the ammo left under its label, and dim red when they are
 all destroyed or out of ammo (`input/input.js` `fireStatus`, CSS
-`conic-gradient`; a style is written only when it changes). All of it stops the moment the
+`conic-gradient`; a style is written only when it changes).
+
+**No target panel** (the owner's call, to see how it plays): the corner box
+with the target's name, range, speed, closing rate and damage blocks is
+gone. The only thing by the target's brackets is its distance (`256 m`);
+the brackets still turn red on a lock. All of it stops the moment the
 reactor trips, which is the point: the quiet after is the shutdown.
 
 ### Audio layer

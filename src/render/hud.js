@@ -134,7 +134,7 @@ export function createHud(app) {
   // side shows in time (held still, from behind and a little to one side,
   // with REDUCED MOTION), each section's lines in its damage colour. A
   // section that's gone is gone. (x, y) is the top centre of a box `u` units across: the same
-  // footprint as the old box diagram, which stays for the target panel.
+  // footprint as the old box diagram (the fallback before a pose exists).
   // WIRE_HALF: the box's half-width in u, wider than the old box diagram's 4.4: a spinning WARDEN is as wide as it is tall.
   const WIRE_HALF = 6, WIRE_YAW = 0.3, WIRE_SPIN = TAU / 16, WIRE_TILT = 0.2, ct = Math.cos(WIRE_TILT), st = Math.sin(WIRE_TILT);   // SPIN: once round in 16 s
   // Whole pixels: small integers reach the canvas unboxed, so the lines make no garbage.
@@ -278,22 +278,20 @@ export function createHud(app) {
         radar: { x: V.W / 2, y: V.H - dash / 2 + 4, r: dash * 0.4 },
         ring: ringLayout(V.W * 0.1 + 12 + dash * 0.4, V.H - dash / 2 - 6, dash * 0.38),   // your own mech, heat, jets and throttle (drawRing)
         weapons: { x: min(V.W * 0.62, V.W * 0.9 - 26 - 200), y: top + 4 },   // the list is 190 wide: never into the throttle (HUD SCALE)
-        target: { x: V.W * 0.1 + 8, y: 48 },
         hostiles: { x: V.W * 0.965 - 10, y: 20 },
         crew: { x: V.W * 0.965 - 10, y: 34 },   // spec 20's crew strip: under HOSTILES
         compass: { w: min(340, V.W * 0.5) },
       };
     }
-    const r = clampN(V.H * 0.12, 30, 46), tgtX = 132 / V.s;   // the target box keeps right of the pause and zoom buttons, which don't scale
+    const r = clampN(V.H * 0.12, 30, 46), btnX = 132 / V.s;   // the right edge of the pause and zoom buttons, which don't scale
     return {
       frame: false, dash: 0, viewBottom: V.H,
       radar: { x: V.W - r - 14, y: r + 12, r },
       ring: ringLayout(18 + 54, 112 + 54, 54),
       weapons: { x: V.W - 205, y: 2 * r + 34 },
-      target: { x: tgtX, y: 10 },   // right of the pause and zoom buttons
       hostiles: { x: V.W - 14, y: 2 * r + 34 + 56 },   // under the weapon list, clear of the compass
       crew: { x: V.W - 2 * r - 30, y: 20 },   // left of the radar, clear of the buttons below
-      compass: { w: max(120, min(340, V.W * 0.5, V.W - 2 * (tgtX + 150 + 8))) },   // narrower on a phone: clear of the target box
+      compass: { w: max(120, min(340, V.W * 0.5, V.W - 2 * (btnX + 8))) },   // narrower on a phone: clear of the buttons
     };
   }
 
@@ -322,7 +320,7 @@ export function createHud(app) {
     const text = c[G.padActive ? 'pad' : G.touchUI ? 'touch' : 'kb'], W = V.W, vb = L.viewBottom;
     const at = {
       throttle: [L.ring.x, L.frame ? L.ring.y - L.ring.r - 26 : L.ring.y + L.ring.r + 30], weapons: [L.weapons.x + 60, L.weapons.y - (L.frame ? 34 : 14)], heat: [L.ring.x, L.frame ? L.ring.y - L.ring.r - 26 : L.ring.y + L.ring.r + 30],
-      target: [L.target.x + 60, L.target.y + 34], compass: [W / 2, vb * 0.3], centre: [W / 2, vb * 0.64],
+      target: [W / 2, vb * 0.74], compass: [W / 2, vb * 0.3], centre: [W / 2, vb * 0.64],
     }[c.at] || [W / 2, vb * 0.64];
     ctx.font = 'bold 15px "Lucida Console", monospace'; ctx.textAlign = 'center';
     const w = ctx.measureText(text).width, x = clampN(at[0], w / 2 + 10, W - w / 2 - 10), y = clampN(at[1], 20, V.H - 12);
@@ -470,7 +468,7 @@ export function createHud(app) {
   // calls, particles. On with the FRAME TIME setting (for playtests on real
   // phones), or ?debug=1's FRAME TIME overlay (on unless switched off), which
   // adds the build, the seed, the state and the cheats.
-  let lastFrameAt = 0, stopAt = null, rangeMemo = { t: null, r: 0, at: 0, rate: 0 };
+  let lastFrameAt = 0, stopAt = null;
   // The readout's text is made DEBUG_EVERY frames (four times a second), not
   // every frame: it was most of a frame's garbage (#315). The frame times
   // sit in a ring, sorted in a scratch copy when the text is made.
@@ -722,7 +720,8 @@ export function createHud(app) {
       ctx.stroke(); ctx.lineWidth = 1;
     }
 
-    // Target brackets (gone while a bolt has the HUD scrambled).
+    // Target brackets (gone while a bolt has the HUD scrambled), the distance over them. There is no
+    // target panel: the owner took it out to see how it plays.
     const scr = P.scramble > 0, t = scr ? null : G.target, sees = sightLine(G);
     if (t && t.alive && hypot(t.x - P.x, t.z - P.z) < sees) {
       const a = project([t.x, t.y + 8.2 * t.ch.scale, t.z]), b = project([t.x, t.y, t.z]);
@@ -736,7 +735,7 @@ export function createHud(app) {
         ctx.stroke(); ctx.lineWidth = 1;
         ctx.fillStyle = G.lock ? RED : AMBER;
         ctx.textAlign = 'center';
-        ctx.fillText(G.lock ? 'LOCK' : t.remote ? app.net.pilotName(t.netId) : t.ch.name, a[0], y0 - 8);
+        ctx.fillText(fmtDist(hypot(t.x - P.x, t.z - P.z)), a[0], y0 - 8);   // the one thing by it: how far (red brackets: locked)
       }
       // Autocannon lead: a small diamond where a shell fired now would meet it, while it is moving and in range.
       const ac = P.weapons.find(w => w.def.kind === 'shell' && !w.dead && (w.ammo == null || w.ammo > 0));
@@ -862,30 +861,6 @@ export function createHud(app) {
     }
 
     layer('hud');
-    // Target panel.
-    if (t && t.alive) {
-      const px = L.target.x, py = L.target.y, pw = 150, ph = 92;
-      ctx.fillStyle = 'rgba(0,20,0,.6)'; ctx.fillRect(px, py, pw, ph);
-      ctx.strokeStyle = DIM; ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
-      ctx.textAlign = 'left'; ctx.fillStyle = AMBER;
-      ctx.fillText(`TGT ${t.remote ? app.net.pilotName(t.netId) : t.ch.name}`, px + 6, py + 10);
-      ctx.fillStyle = GREEN;
-      const rng = hypot(t.x - P.x, t.z - P.z);
-      // Closing rate, smoothed: the number that tells you whether to lead or to run.
-      if (rangeMemo.t !== t || G.time - rangeMemo.at > 1) rangeMemo = { t, r: rng, at: G.time, rate: 0 };
-      else if (G.time > rangeMemo.at) { const inst = (rng - rangeMemo.r) / (G.time - rangeMemo.at); rangeMemo.rate += (inst - rangeMemo.rate) * 0.15; rangeMemo.r = rng; rangeMemo.at = G.time; }
-      ctx.fillText(`RNG ${Math.round(rng)}m`, px + 6, py + 24);
-      ctx.fillText(t.shutdown ? 'SHUTDOWN' : `${Math.round(t.speed * 5.4)} KPH`, px + 6, py + 38);
-      const rate = rangeMemo.rate;
-      ctx.fillStyle = Math.abs(rate) < 1 ? DIM : GREEN;
-      ctx.fillText(Math.abs(rate) < 1 ? 'HOLDING' : `${rate < 0 ? 'CLOSING' : 'OPENING'} ${Math.round(Math.abs(rate))} m/s`, px + 6, py + 52);
-      if (t.kind) {   // a structure: one bar of what is left
-        const bx = px + pw - 26, by = py + 14, bh = 64, f = Math.max(0, t.hp / t.max);
-        ctx.strokeStyle = DIM; ctx.strokeRect(bx + 0.5, by + 0.5, 11, bh);
-        ctx.fillStyle = f > 0.5 ? GREEN : f > 0.25 ? AMBER : RED; ctx.fillRect(bx + 2, by + 2 + (bh - 3) * (1 - f), 8, (bh - 3) * f);
-      } else mechDiagram(t, px + pw - 32, py + 14, 6);
-    }
-
     // Objectives: a line each under the compass (secondaries dimmer), a marker
     // where each one is (clamped to the edge when off-screen) and a blip on the radar.
     // (A mission with no objectives listed is the old ELIMINATE, which HOSTILES already counts.)
