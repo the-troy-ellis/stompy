@@ -193,6 +193,21 @@ try {
     console.log(`base: silo up ${r.silo}; BUILD showed the footprint (why ${preview}); factory ${r.prog}, ore left ${r.ore}`);
     if (!r.silo || preview !== null || r.prog !== 1 || r.ore !== 40) { failed = true; console.error(`FAIL: the base (${preview}, ${JSON.stringify(r)})`); }
   });
+  // Raids (spec 20, #311): the range's SILO AND A RAID, the raid brought forward; it is called and walks on going for the base.
+  await run('raid', URL_, async page => {
+    await page.click('.feel-panel [data-a="toggle"]');
+    await page.click('[data-sel="debug"]'); await page.click('[data-dsec="range"]');
+    for (let i = 0; i < 3 && (await page.$eval('[data-drg="base"] ~ b', b => b.textContent)) !== 'SILO AND A RAID'; i++) await page.click('[data-drg="base"][data-d="1"]');
+    await page.click('[data-a="go"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'range' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    await page.evaluate(() => { const G = window.__stompy.game; G.waves[0].due = G.time + 4; });
+    await page.waitForFunction(() => window.__stompy.game.mechs.some(m => m.team === 1), null, { timeout: 10000 });
+    await page.waitForTimeout(1500);
+    const r = await page.evaluate(() => { const G = window.__stompy.game, f = G.mechs.filter(m => m.team === 1); return { n: f.length, raid: f.every(m => m.ai.raid), silo: G.base.silo.alive }; });
+    await page.screenshot({ path: 'test-results/smoke-raid.png' });
+    console.log(`raid: ${r.n} raiders, all raiding ${r.raid}, silo up ${r.silo}`);
+    if (r.n !== 2 || !r.raid || !r.silo) { failed = true; console.error(`FAIL: the raid (${JSON.stringify(r)})`); }
+  });
   await run('touch', URL_ + '&touch=1', async page => {
     // Taps, not clicks: a mouse click would switch the game back to mouse mode.
     await page.tap('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way, as on desktop

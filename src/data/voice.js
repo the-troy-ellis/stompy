@@ -21,6 +21,7 @@ export const VOICE = {
   updated: ['Objective updated.'],   // a waiting objective starts
   convoyHit: ['Convoy under fire.'],
   convoyLost: ['Convoy lost.'],
+  keepHit: ['Silo hit.'],   // the base's silo is shot at (spec 20; a warning, so flat)
   structureDown: ['Structure destroyed.', 'Structure destroyed. It was in the way.'],
   extracted: ['Extraction point reached.', 'Extraction point reached. Nobody is here.'],
 };

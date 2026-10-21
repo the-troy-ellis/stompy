@@ -12,6 +12,7 @@ import { decideFire } from './ai/fire.js';
 import { PERCEPTION as K } from '../data/ai.js';
 import { revealing } from './waves.js';
 import { pilotsOf } from './hitqueue.js';
+import { raidTarget } from './raid.js';
 
 const { atan2, hypot, PI } = Math;
 const ROUTE_FROM = 120;   // m: nearer than this, the fight's own steering and the feelers get round things
@@ -43,6 +44,8 @@ export function think(G, e, dt) {
   const bp = perceive(G, e, P, dt), seen = !!e.ai.seen;
   const truck = e.ai.aware && convoyTarget(G, e, P);   // an escort mission: the trucks are the point
   if (truck) return attackConvoy(G, e, truck, dt);
+  const building = e.ai.raid && raidTarget(G, e);   // a raid: the base is the point (spec 20)
+  if (building) return attackConvoy(G, e, building, dt);
   const tx = bp ? bp[0] : P.x, tz = bp ? bp[1] : P.z;
   const dx = tx - e.x, dz = tz - e.z, dist = hypot(dx, dz);
   const toYaw = atan2(dx, dz);
@@ -123,8 +126,8 @@ function entrance(G, e, P, dt) {
   e.twist += clampN(wrapA(clampN(wrapA(toYaw - e.yaw), -1.9, 1.9) - e.twist), -2 * dt, 2 * dt);
   e.ai.seen = true;
 }
-// Close to a firing range on the truck, strafing, and shoot it. Trucks don't
-// shoot back, so there is nothing to hide from.
+// Close to a firing range on the truck (or a raid's building), strafing, and
+// shoot it. Trucks and buildings don't shoot back, so there is nothing to hide from.
 function attackConvoy(G, e, v, dt) {
   strafeTick(G, e, dt);
   const dx = v.x - e.x, dz = v.z - e.z, dist = hypot(dx, dz), toYaw = atan2(dx, dz);

@@ -47,7 +47,12 @@ Mission definitions gain `objectives: [...]`, each one of:
 { type: 'escort', convoy: 'c1', to: 'nav_exit', minAlive: 2, label: 'CONVOY' }
 { type: 'extract', at: 'nav_lz', within: 180 }          // seconds, optional
 { type: 'protect', targets: ['store'], minAlive: 2, label: 'TANK' }   // keep them standing
+{ type: 'keep', targets: ['silo'], label: 'SILO' }      // the base stands (spec 20)
 ```
+
+KEEP (spec 20's base) is PROTECT with every target needed and a voice line
+when one is hit (`Silo hit.`). A wave may carry `raid: true` (spec 20 § Raids
+go for buildings).
 
 PROTECT (added for mission 10's storage tanks) fails the moment fewer than
 `minAlive` (default: all) of its targets stand, and otherwise holds until the

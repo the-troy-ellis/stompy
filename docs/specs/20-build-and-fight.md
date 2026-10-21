@@ -249,13 +249,23 @@ mech within 120 m of them, or you. Each raid is a mission wave
 - **Going up:** the factory rises over 6 s (`prog`, its height growing with it), its door toward you. The voice says `Factory up.`
 - **The queue:** once up, the factory starts a mech whenever the silo holds 50 ore and 30 salvage, and takes them.
   - 30 s later a stock KESTREL stands on its pad, parked, and joins `G.crew`. The voice says `New mech ready.`
-  - Salvage only comes in with #311. Until then a mech can't be built in play.
+  - Salvage comes from wrecks (#311, below).
 - **HUD:**
   - The crew column shows `ORE n  SALVAGE n` (amber; dark red if the silo is down).
   - The factory's state shows as `FACTORY 40%`, `NEW MECH 12 s`, `FACTORY` or `FACTORY DOWN`.
 - **The bucket:** it no longer bites or punches its own side's buildings.
 - **Meshes:** the silo (a steel bin with hazard bands and a cone roof, a chute to a striped pad) and the factory (a concrete shed with a saw-tooth roof, a striped door and a chimney) are props with wrecks, under 120 triangles each.
 - **Trying it:** the test range gets a BASE picker (NONE, SILO).
+
+### As built in #311
+
+- **Where:** `sim/raid.js` (the call, the target, salvage), with hooks in `waves.js`, `ai.js`, `objectives.js` and `combat.js`.
+- **A raid:** any mission wave with `raid: true` (`{ at, from, foes, raid: true }`). Its foes get `ai.raid`.
+  - Three seconds out (`WAVE_WARN`) the voice calls it in place of `Reinforcements inbound.`: `Raid west. Two JACKALs.` The side comes from the wave's bearing (0 north, 90 east); a ring or a nav point says `Raid inbound.` The count is the wave after difficulty.
+- **What a raider goes for** (`raidTarget`): a live crew mech within 120 m means it fights as usual (the nearest crew mech, `preyOf`). Otherwise it goes for the nearest standing building, the silo or the factory, closing to range and shooting it the way escort foes shoot trucks (`attackConvoy`). With no building left, it comes for you.
+- **Salvage:** with a base, a foe's wreck carries `salvage` by chassis (`CONSTRUCT.salvage`). Any live crew mech within 8 m (times the wreck's scale) sends it to the silo, once. For the mech you're in, the voice says `Salvage in.` and `SALVAGE IN` shows. The wreck stays. Without a base, wrecks are worth nothing.
+- **`keep`:** `{ type: 'keep', targets: ['silo'], label: 'SILO' }`. It fails the moment one of its targets falls and is held, like `protect`, until the rest of the mission is won. The voice says `Silo hit.` when one is shot at, at most every 12 s. The HUD reads `KEEP SILO UP`. The base is set up before the objectives so a `keep` finds the silo, and the editor's problems strip knows a base brings a silo.
+- **Trying it:** the range's BASE picker gets SILO AND A RAID: the silo, and two JACKALs from the west after 20 s.
 
 ## Code touchpoints
 
