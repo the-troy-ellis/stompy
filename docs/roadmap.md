@@ -267,6 +267,18 @@ editor or the bench, and the tuning tables and overlays. Spec:
 [specs/19-debug-menu.md](specs/19-debug-menu.md). Issues: #296 the tab and
 JUMP TO, #297 the test range, #298 cheats, #299 tuning pages and overlays.
 
+## M9 — Build and fight (the smallest loop)
+
+Goal: the second arm, build and mine, as one mission that proves the loop.
+You dig ore with a construction mech, haul it to a silo, place a factory
+that turns ore and salvage into a new KESTREL, swap between your mechs, and
+hold the silo through three raids. Single player; every loop has room to
+grow (the spec's § Room to grow).
+
+Spec: [specs/20-build-and-fight.md](specs/20-build-and-fight.md). Issues:
+#308 the digger and its bucket, #309 the base (silo and factory), #310 the
+crew and SWAP, #311 raids and salvage, #312 the FIRST FACTORY mission.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):

@@ -39,6 +39,13 @@ If one of them blocks you, raise it in the issue, do not route around it.
   a dozen weapons, three biomes plus night and weather, LAN and co-op
   multiplayer, and eventually internet rooms. Not a MechWarrior clone with a
   200-hour mechlab.
+- **Two arms:** build and mine, defend and conquer. Military mechs and
+  construction mechs, side by side. Your base is a small mech factory:
+  buildings make mech parts, and mining and salvage bring in what they need.
+  You swap between your mechs mid-mission. Grown from the smallest loop
+  outward ([specs/20-build-and-fight.md](specs/20-build-and-fight.md)).
+  The construction look is toy trucks of our own (safety yellow, hazard
+  stripes, fat wheels), never a real brand.
 - **Feel:** balanced, with chunk. Keep heat, per-section damage, independent
   legs and torso, slow heavies. On top of that every action gets big, tactile
   feedback: footfalls, recoil, knockback, squash, wobble, crunch. Never add a
