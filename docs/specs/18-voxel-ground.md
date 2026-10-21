@@ -397,9 +397,10 @@ Where the first issue differs from the plan above, and why:
   wall the legs walk at the body's real speed (`m.slide`), so planted feet
   stay put; the throttle's speed is kept for when it's clear.
 - **The cockpit clears rock** (added after a phone playtest of spec 20's
-  digger). Two more samples sit 0.8 m (`CAB_CLEAR`) in front of the eye,
-  along where the torso faces: one level with it, one 0.4 m above. A mech
-  stops before its view goes into rock. Without them, the bucket's
+  digger). For the mech you are in, one more sample sits 0.8 m
+  (`CAB_CLEAR`) in front of the eye, along where the torso faces, 0.24 m
+  above it. It stops before its view goes into rock. Other mechs have no
+  view to keep clear, and skip it (each sample boxes a number: perf). Without them, the bucket's
   chest-height bite left a pocket whose roof was at eye height; the chest
   fit, so the mech walked in and the camera saw the inside of the ground.
 - **Cover and ridges** (`ai/behaviours.js`) skip a spot whose straight line
