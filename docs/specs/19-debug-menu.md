@@ -202,6 +202,33 @@ The overlays are drawn on the HUD canvas, like the AI labels.
 - The pause menu's DEBUG block comes first, above the controls, so a phone
   doesn't have to scroll to it. It isn't shown in the arena.
 
+### As built in #299
+
+- `src/ui/tuning.js` replaces `ui/feelPanel.js`; the floating panel is
+  gone. TUNING has four pages, FEEL, GAIT, LOOK and OVERLAYS, the page
+  picked saved (`debug.tune`). The same block sits in the pause menu's
+  DEBUG block under the cheats. Its clicks never count as "click to
+  resume", and keys typed into it don't reach the mech.
+- FEEL and GAIT are the old tables, one per page, live as before; each has
+  COPY, which gives both as one JSON (FEEL with GAIT inside). The tables
+  scroll in a box 42% of the screen tall, so a phone keeps the rest of the
+  menu. LOOK is the old row: lines, presets, antialias (reloads).
+- Overlays are saved (`debug.overlays`). FRAME TIME and AI LABELS start
+  on, as they were; NAV and DIGS AND FALLS start off. Without `?debug=1`
+  the SETTINGS switch FRAME TIME still shows the readout.
+- NAV: within 160 m, a white dot for each floor of each 32 m square, and a
+  line for each link the nav has already worked out (it works links out
+  only when a route asks), white if walkable and red if not.
+  `sim/ai/nav.js` hands the HUD its `floorsOf` and `links`.
+- DIGS AND FALLS reads `G.digLog`, which `sim/dig.js` fills only while the
+  switch is on (null otherwise, one check a dig). Each dig is logged as its
+  box, each fall as its cells' box where it came from, and each overhang the
+  torque rule weighed with its load, section and middle
+  (`world/voxels.js` `overhangs(b, k, ratios, weighed)`). The last 10 s
+  are drawn: boxes green, the weighed ones as `load / section`, amber if
+  it held and red if it broke.
+- BENCH stays on JUMP TO; the bench no longer folds a panel away.
+
 ## Code touchpoints
 
 - `src/ui/debugMenu.js` (new): the DEBUG tab's HTML and clicks, and the

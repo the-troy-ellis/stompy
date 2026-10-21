@@ -371,6 +371,7 @@ export function createUi(app) {
     if (a === 'skiptut') { G.tut = null; store.set('tut.done', true); e.target.closest('[data-a]').remove(); return; }   // no more prompts, now or later   // a new version is waiting (ui/pwa.js)
     if (a === 'full') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); return; }
     if (dbg.cheatClick(e)) return;   // a cheat switch, on the DEBUG tab or in the pause menu
+    if (dbg.tune?.click(e)) return;   // TUNING's pages and overlays, there too (ui/tuning.js)
     if (a === 'diff') { cycleDiff(1); e.target.closest('[data-a]').textContent = diffLabel(); return; }
     if (G.state === 'menu' && app.mechlab.click(e)) return;
     if (a === 'fit') { if (!locked(prefs.chassis)) app.mechlab.open(true); return; }
@@ -454,9 +455,13 @@ export function createUi(app) {
     showMech(); renderMenu();
   }
   ov.addEventListener('input', e => {
+    if (dbg.tune?.input(e)) return;
     if (e.target.matches('.callsign')) { prefs.mpName = e.target.value.toUpperCase().slice(0, 12); store.set('mp.name', prefs.mpName); }
     if (e.target.matches('.relay')) { prefs.relay = e.target.value.trim(); store.set('net.relay', prefs.relay); const at = $('.relay-at', ov); if (at) at.textContent = relayLine(); }
   });
+  ov.addEventListener('change', e => { dbg.tune?.change(e); });
+  // Numbers typed into TUNING must not drive the mech or pause the game.
+  ov.addEventListener('keydown', e => { if (e.target.closest?.('.dbg-tune')) e.stopPropagation(); });
   // Drag anywhere off the menu panel to turn the mech round.
   ov.addEventListener('pointerdown', e => {
     if (G.state !== 'menu' || e.target.closest('button, input, a, .mm-left, .mm-select')) return;

@@ -22,7 +22,6 @@ try {
   }, [chassis, hp, key, !!process.env.SHOOT_SOLO]);
   await page.reload();
   await page.waitForSelector('.mm-title');
-  await page.click('.feel-panel [data-a="toggle"]');
   await page.click('[data-sel="free"]');
   await page.click('[data-a="go"]');
   await page.waitForFunction(() => window.__stompy?.game?.state === 'play');

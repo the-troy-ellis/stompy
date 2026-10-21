@@ -19,7 +19,6 @@ try {
   const page = await browser.newPage({ viewport: { width: 1024, height: 640 } });
   await page.goto(`http://localhost:${PORT}/?debug=1&unlock`);
   await page.waitForSelector('.mm-title');
-  await page.click('.feel-panel [data-a="toggle"]');
   for (const [pal, time, D] of SHOTS) {
     await page.evaluate(async ([pal, time, D, ROW]) => {
       const { startMatch } = await import('/src/sim/state.js');

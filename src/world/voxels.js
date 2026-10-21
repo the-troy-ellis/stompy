@@ -203,8 +203,10 @@ function groundApi(G) {
   // of each corner's reach: how far it sits sideways, in cells, from the
   // nearest attachment column. It breaks if load > k × section. Returns the
   // overhangs that break, as cell arrays for `fall`, and `ratios` (load over
-  // section of every overhang looked at, for the tests and tuning).
-  function overhangs(b, k, ratios) {
+  // section of every overhang looked at, for the tests and tuning). `weighed`
+  // (the debug overlay's, sim/dig.js) gets each one's load, section, whether
+  // it broke, and its middle in metres.
+  function overhangs(b, k, ratios, weighed) {
     const i0 = clampN(b[0] - TORQUE_GROW, 1, NX - 1), i1 = clampN(b[1] + TORQUE_GROW, 1, NX - 1), j0 = clampN(b[2] - TORQUE_GROW, BEDROCK + 1, NY - 1), j1 = clampN(b[3] + TORQUE_GROW, BEDROCK + 1, NY - 1);
     const k0 = clampN(b[4] - TORQUE_GROW, 1, NZ - 1), k1 = clampN(b[5] + TORQUE_GROW, 1, NZ - 1), out = [], air = new Map();
     if (!MARK) { MARK = new Uint8Array(PX * PY * PZ); LIST = new Int32Array(LIST_MAX); STACK = new Int32Array(ISLAND_MAX + 8); }
@@ -245,6 +247,12 @@ function groundApi(G) {
         load += Math.sqrt(best);
       }
       ratios?.push(load / cols.size);
+      if (weighed) {
+        let sx = 0, sy = 0, sz = 0;
+        for (let q = start; q < nl; q++) { const o = LIST[q]; sx += o % PX; sy += ((o / PX) | 0) % PY; sz += (o / (PX * PY)) | 0; }
+        const n = nl - start;
+        weighed.push({ load, section: cols.size, broke: load > k * cols.size, x: -HALF + sx / n * VS, y: Y0 + sy / n * VS, z: -HALF + sz / n * VS });
+      }
       if (load > k * cols.size) out.push(LIST.slice(start, nl).sort());
     }
     for (let q = 0; q < nl; q++) MARK[LIST[q]] = 0;

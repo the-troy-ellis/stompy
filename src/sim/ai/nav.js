@@ -109,7 +109,7 @@ export function makeNav(ter) {
       if (hit(a) || hit(b)) links.delete(k);
     }
   }
-  return { ter, path, mark, floorsAt: (x, z) => fl(square(x, z)), square };
+  return { ter, path, mark, floorsAt: (x, z) => fl(square(x, z)), square, floorsOf: fl, links };   // floorsOf and links: the NAV overlay (render/hud.js)
 }
 
 // The nav for this match's ground, made at first use.
