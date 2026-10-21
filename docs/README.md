@@ -82,7 +82,9 @@ If one of them blocks you, raise it in the issue, do not route around it.
   mech, weapon or mission visible ends with candidates and screenshots for
   the owner to pick from. Confirmed so far: PURPLE PUNCHER, BIG SCOOPER (the
   digger), BARRY (was KESTREL), SKEDADDLE (was JACKAL), SLOWPOKE (was
-  WARDEN), BIG TROUBLE (was PIPSQUEAK), LONG LARRY (was BEANPOLE) and Act I's missions (LIL SNOOZERS, TOWER TOPPLER, HELPLESS LIL BUDDIES, FOUR LEGS BAD);
+  WARDEN), BIG TROUBLE (was PIPSQUEAK), LONG LARRY (was BEANPOLE), every weapon (BIG ZAPPER, LIL ZAPPER, BIG
+  BOOMER, ANGRY BEES, OOPS BUTTON, ANGRY ZAPPER, BLINKY, FIRECRACKERS, BIG
+  BONKER, RATATAT, TOASTER) and Act I's missions (LIL SNOOZERS, TOWER TOPPLER, HELPLESS LIL BUDDIES, FOUR LEGS BAD);
   every other name in these docs is a placeholder. See the naming rules in
   [workflow.md](workflow.md).
 - **Hosting:** undecided. The plan recommends GitHub Pages for the static site

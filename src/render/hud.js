@@ -20,6 +20,7 @@ import { TUT } from '../data/tutorial.js';
 const LAG_MS = 200;   // a round trip to the relay past this shows LAG (docs/specs/10-internet-play.md § Latency)
 
 const { sin, cos, atan2, min, max, PI, random, hypot, floor } = Math;
+const FUSION_NO_TARGET = `${WEAPONS.fusion.name}: NO TARGET`;   // made once
 
 // The compass tape's label for a heading in degrees: a cardinal letter on
 // the quarters, otherwise the heading in tens (030, 120...) as two digits.
@@ -405,7 +406,7 @@ export function createHud(app) {
     ctx.fillStyle = WHITE; ctx.textAlign = 'left';
     const lx = G.touchUI ? 70 : 20;
     ctx.fillText('MSL CAM   IR / WHT-HOT', lx, 22);
-    ctx.fillText(`LRM ${g.n}/${WEAPONS.lrm.count}`, lx, 38);
+    ctx.fillText(`${WEAPONS.lrm.name} ${g.n}/${WEAPONS.lrm.count}`, lx, 38);
     ctx.textAlign = 'right';
     const rx = G.touchUI ? V.W - 120 : V.W - 20;
     ctx.fillText(`ALT ${Math.round(g.pos[1] - G.ter.height(g.pos[0], g.pos[2]))}m`, rx, 22);
@@ -592,7 +593,7 @@ export function createHud(app) {
       const slip = fs.slipping && floor(performance.now() / 90) % 2;
       ctx.strokeStyle = slip ? AMBER : '#c8f'; ctx.beginPath(); ctx.arc(ch[0], ch[1], 30, -PI / 2, -PI / 2 + TAU * p); ctx.stroke();
       ctx.lineWidth = 1; ctx.textAlign = 'center'; ctx.fillStyle = fs.slipping ? AMBER : '#c8f';
-      if (!fs.mech) ctx.fillText('FUSION: NO TARGET', ch[0], ch[1] + 46);
+      if (!fs.mech) ctx.fillText(FUSION_NO_TARGET, ch[0], ch[1] + 46);
       else if (fs.slipping) ctx.fillText(`LOCK SLIPPING -- ${Math.floor(p * 100)}%`, ch[0], ch[1] + 46);
       else {
         const hz = (37.4 + (fs.mech.netId || 3) * 4.19 + (1 - p) * rnd(-20, 20)).toFixed(2);
