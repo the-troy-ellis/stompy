@@ -3,7 +3,7 @@ import { store } from '../util/store.js';
 import { clampN } from '../util/math.js';
 import { normalRelay } from '../net/relay.js';
 import { CATS, CAT_OF } from '../data/weapons.js';
-import { CHASSIS, MECH_ORDER, MECH_INFO } from '../data/chassis.js';
+import { CHASSIS, MECH_ORDER, MECH_INFO, PILOTABLE } from '../data/chassis.js';
 import { NAMES } from '../data/names.js';
 import { PALS, palAt } from '../data/palettes.js';
 import { missionDef, missionFoes, FP_MAPS, FP_MIXES, FP_WEATHER, FP_TIMES, fpWeather, pickFoes } from '../data/missions.js';
@@ -251,7 +251,7 @@ export function createUi(app) {
             <div class="mm-role${shut ? ' locked' : ''}">${shut ? NAMES.locked(ch.unlock) : info.role}</div>
             <div class="mm-kit">${kitLine(prefs.chassis)}</div>
             <div class="mm-stats">${bar('SPEED', ch.speed / maxSpeed)}${bar('ARMOR', hpSum(prefs.chassis) / maxHp)}${bar('FIREPOWER', info.fire)}</div>
-            ${lab || shut ? '' : '<button class="opt mm-fit" data-a="fit">FIT</button>'}
+            ${lab || shut || ch.tools ? '' : '<button class="opt mm-fit" data-a="fit">FIT</button>'}
           </div>
         </div>
       </div>`, 'menu');
@@ -267,6 +267,7 @@ export function createUi(app) {
       // The public arena, a private one (its mode), co-op (open a room for the
       // picked mission), or any room by its code.
       const coop = prefs.mpKind === 'coop';
+      if (CHASSIS[prefs.chassis].tools) { setStatus('DIGGERS STAY HOME. PICK ANOTHER MECH.'); return; }   // single player only (spec 20)
       if (coop ? prefs.coopJoin : prefs.arenaPick === 2) {
         prefs.roomCode = ($('.room', ov)?.value || prefs.roomCode).trim().toUpperCase().slice(0, 4);
         if (prefs.roomCode.length !== 4) { setStatus('TYPE THE ROOM CODE: FOUR LETTERS'); return; }
@@ -432,7 +433,8 @@ export function createUi(app) {
   });
 
   function cycleMech(d) {
-    prefs.chassis = MECH_ORDER[(MECH_ORDER.indexOf(prefs.chassis) + d + MECH_ORDER.length) % MECH_ORDER.length];
+    const order = dbg.on ? PILOTABLE : MECH_ORDER;   // ?debug=1 also offers the digger (data/chassis.js)
+    prefs.chassis = order[(order.indexOf(prefs.chassis) + d + order.length) % order.length];
     store.set('mech.chassis', prefs.chassis);
     app.mechlab.fit.row = 0;
     if (locked(prefs.chassis)) app.mechlab.fit.open = false;   // nothing to fit on a silhouette

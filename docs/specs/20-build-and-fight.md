@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ready: the owner picked the two arms (build and mine, defend and conquer), a base that is a mech factory, swapping mechs mid-mission, and starting with the smallest version that proves the loop |
+| Status | in progress: #308 (the digger) built; the owner picked the two arms (build and mine, defend and conquer), a base that is a mech factory, swapping mechs mid-mission, and starting with the smallest version that proves the loop |
 | Milestone | M9 (proposed; after M8) |
 | Size | L (split into five issues; see the end) |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md) (digging, building, falling, the torque rule); [03-objectives.md](03-objectives.md) (structures, waves, protect); [05-ai.md](05-ai.md) (foes that go for a target); [12-melee.md](12-melee.md) (the punch the bucket rides on); [16-body-plans.md](16-body-plans.md) (a new body); [19-debug-menu.md](19-debug-menu.md) (where it is tried first) |
@@ -124,7 +124,7 @@ applies):
 |---|---|---|
 | `bucket` | 6 m | The digger's bite (a radius). It digs rock at full size, as BIG DIGS does: a construction tool, not a battle blast |
 | `hopper` | 40 ore | What the digger carries |
-| `orePerCorner` | 1 | Ore per rock corner the bite turns to air (rock = below the soft band, spec 18) |
+| `orePerCorner` | 4 | Ore per rock corner the bite turns to air (rock = below the soft band, spec 18) |
 | `factory` | 60 ore | The factory's price |
 | `buildTime` | 6 s | The factory going up |
 | `mechCost` | { ore: 50, salvage: 30 } | One fighting mech from the factory |
@@ -185,6 +185,37 @@ mech within 120 m of them, or you. Each raid is a mission wave
   ground or air), the bucket digs and gives nothing.
 - **Single player only:** no network message changes, so no `PROTOCOL`
   bump. Co-op and the arena come later (§ Room to grow).
+
+### As built in #308
+
+- **The digger** (`CHASSIS.digger`, placeholder name DIGGER, role
+  `IT DIGS.`) is safety yellow with black hazard stripes, an open hopper on
+  its back, an exhaust stack, short thick legs and two buckets (the `fist`
+  part, so they swing like PURPLE PUNCHER's fists and take turns). `tools`:
+  no guns and no fusion cannon, so FIT is hidden. Its kit line comes from
+  `names.js`.
+- **Where you get it:** it isn't in the selector yet. `?debug=1` offers it
+  after the fighting chassis (`PILOTABLE`). MULTIPLAYER refuses it with
+  `DIGGERS STAY HOME. PICK ANOTHER MECH.` The foe rosters (contracts, Free
+  Play's mixes) still use the fighting chassis only.
+- **The bite** (`BUCKET_MELEE`, `bucketBite` in `sim/melee.js`, `bite` in
+  `sim/dig.js`):
+  - With no mech or structure in reach, the bucket casts two rays from its
+    height along the view. The first is nearly level, for a wall or a mesa
+    face (mining). The second is tipped well down, for the floor (a pit).
+  - It bites where the ray hits, half a bucket *into* the rock. Centred on
+    the surface, a 6 m bite often reached no solid corner, since corners are
+    8 m apart.
+  - A mech in reach is shoved instead, and nothing is dug.
+- **Ore:** `voxels.js` `dig` takes a `tally` and counts the corners under the
+  soft band it turns from solid to air. A 6 m bite in solid rock turns two to
+  four, so `orePerCorner` is 4: about four bites fill the 40-ore hopper. A
+  bite into a mesa's face often turns one corner. Bites in either order give
+  the same ground and the same ore.
+- **Online,** a bite is a plain synced dig with no ore, though the digger
+  can't be taken online yet anyway.
+- **HUD:** shows `HOPPER` or `HOPPER FULL`, the count and a bar where the
+  weapon list goes.
 
 ## Code touchpoints
 

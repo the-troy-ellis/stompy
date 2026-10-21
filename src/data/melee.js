@@ -10,6 +10,13 @@ export const FIST_MELEE = {
   dmg: 30, reach: 14, arc: 25 * Math.PI / 180, windup: 0.45, recover: 0.9, cd: 2, heat: 4, knock: 22,
   stompDmg: 18, stompKnock: 14, stompAir: 0.6, fists: true,
 };
+// The digger's buckets (docs/specs/20-build-and-fight.md § The digger): a
+// slow scoop that bites the ground in front (sim/dig.js bite) and still
+// shoves a mech it lands on, a little. Two buckets, taking turns like fists.
+export const BUCKET_MELEE = {
+  dmg: 6, reach: 11, arc: 35 * Math.PI / 180, windup: 0.5, recover: 0.7, cd: 1.2, heat: 1, knock: 14,
+  stompDmg: 6, stompKnock: 6, stompAir: 0.6, fists: true, bucket: true,
+};
 // A mech with fists punches with whichever arm it still has, at full
 // strength; with both arms gone it falls back to the shove.
 export const meleeOf = m => {

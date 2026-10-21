@@ -1,5 +1,5 @@
 import { NAMES } from './names.js';
-import { FIST_MELEE } from './melee.js';
+import { FIST_MELEE, BUCKET_MELEE } from './melee.js';
 
 // Hit points per section: T(orso), L/R A(rm), L/R L(eg). Losing the torso kills.
 // `legs` names a body plan in geo.js; `pref` is the AI's preferred range,
@@ -55,11 +55,24 @@ export const CHASSIS = {
     tons: 50, frame: 21.5, systems: { sinks: 0, armour: 0, jets: 0 }, sysMax: { jets: 1 }, unlock: 8,
     hardpoints: [{ id: 'ra', loc: 'RA', cat: 'ballistic', stock: 'gauss' }, { id: 'la', loc: 'LA', cat: 'energy', stock: 'ppc' },
       { id: 't1', loc: 'T', cat: 'energy', stock: 'mlaser' }] },
+  // The digger (docs/specs/20-build-and-fight.md): a construction mech. No
+  // guns and no fusion cannon (`tools`): two buckets that dig rock into the
+  // hopper on its back (`hopper`, data/construct.js), short thick legs, wide
+  // and slow. Not in the selector yet: ?debug=1 offers it (PILOTABLE), and
+  // never for the arena or co-op.
+  digger: { name: NAMES.chassis.digger, legs: 'forward', style: 'digger', speed: 9, turn: 0.7, sink: 10, scale: 1.15, pref: 30, acc0: 0.03, ai: { profile: 'brawler' },
+    hp: { T: 90, LA: 40, RA: 40, LL: 50, RL: 50 }, col: [0.93, 0.72, 0.12], acc: [0.13, 0.13, 0.14],
+    geo: { hip: 3.9, l1: 2.1, l2: 1.9, stride: [2.6, 3.2], girth: 1.5, radius: 3.0, height: 8.2, armX: 2.75, armY: 1.0, eye: [0, 2.5, 1.7], acY: 0.8, rackY: 2.6 },
+    melee: BUCKET_MELEE, tools: true, hopper: true,
+    tons: 40, frame: 40, systems: { sinks: 0, armour: 0, jets: 0 }, sysMax: { jets: 0, sinks: 0, armour: 0, knuckles: 0 },
+    hardpoints: [] },
 };
 
 // The selectable mechs, in selector order. Locked ones are in the list too:
 // the selector shows them as silhouettes, and they cannot launch.
 export const MECH_ORDER = ['kestrel', 'jackal', 'warden', 'light1', 'sniper1', 'puncher'];
+// What ?debug=1's selector also offers: the construction mechs, not yet in a mission of their own.
+export const PILOTABLE = [...MECH_ORDER, 'digger'];
 export const isUnlocked = (key, cleared) => (CHASSIS[key]?.unlock || 0) <= cleared;
 // A locked chassis on show: a near-black silhouette, except the one that
 // stays purple (on purpose: it is the game's set piece).

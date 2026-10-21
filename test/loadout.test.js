@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestGame, stepFor, input, foes } from './helpers.js';
-import { CHASSIS, HPK } from '../src/data/chassis.js';
+import { CHASSIS, HPK, MECH_ORDER } from '../src/data/chassis.js';
 import { WEAPONS } from '../src/data/weapons.js';
 import { SYSTEMS } from '../src/data/systems.js';
 import { stockLoadout, validate, tonsOf, stats, weaponList, applyLoadout, choicesFor } from '../src/sim/loadout.js';
@@ -18,7 +18,7 @@ const BEFORE = {
 };
 
 test('the stock loadout is exactly what each chassis always carried, and uses about 85% of its budget', () => {
-  for (const k of Object.keys(CHASSIS)) {
+  for (const k of MECH_ORDER) {   // the fighting chassis; the digger has its own test below
     const lo = stockLoadout(k), v = validate(k, lo);
     assert.deepEqual(weaponList(k, lo), BEFORE[k], k);
     assert.ok(v.ok, `${k} stock is over budget`);

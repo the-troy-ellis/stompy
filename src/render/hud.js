@@ -1,6 +1,7 @@
 import { VERSION } from '../util/version.js';
 const VERSION_LINE = `v${VERSION}`;   // made once: the readout runs every frame
 import { CHEATS } from '../data/debug.js';
+import { CONSTRUCT } from '../data/construct.js';
 import { RADAR_RANGE, radarOf, fogOf } from '../data/weather.js';
 import { TAU, clampN, len, rnd, sub } from '../util/math.js';
 import { WEAPONS, CATS, CAT_OF, CAT_LABEL, CAT_KEY } from '../data/weapons.js';
@@ -678,10 +679,18 @@ export function createHud(app) {
     bar(lx + 18, 'JJ', P.fuel, '#3cf');
     ctx.globalAlpha = 1;
 
-    // Right: weapons.
+    // Right: weapons (a digger has none: its hopper, how full, instead; spec 20).
     const wx = L.weapons.x;
     let wy = L.weapons.y;
     ctx.textAlign = 'left';
+    if (P.ch.hopper) {
+      const ore = P.ore || 0, full = ore >= CONSTRUCT.hopper;
+      ctx.fillStyle = full ? AMBER : GREEN;
+      ctx.fillText(full ? 'HOPPER FULL' : 'HOPPER', wx, wy);
+      ctx.fillText(String(ore).padStart(3), wx + 118, wy);
+      ctx.fillStyle = '#031203'; ctx.fillRect(wx + 150, wy - 3, 40, 6);
+      ctx.fillStyle = full ? AMBER : GREEN; ctx.fillRect(wx + 150, wy - 3, 40 * ore / CONSTRUCT.hopper, 6);
+    }
     for (const cat of CATS) {
       const ws = P.weapons.filter(w => CAT_OF[w.type] === cat);
       if (!ws.length) continue;
