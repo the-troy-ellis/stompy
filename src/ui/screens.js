@@ -19,11 +19,10 @@ import { fitOf, fitOk as fitUnder, kitLine } from './mechlab.js';
 import { cheat } from '../sim/cheats.js';
 import { objectiveRows, debriefTitle, missionTitle, missionSpoken, verdict } from './debrief.js';
 import { createDebugMenu } from './debugMenu.js';
+import { VERSION } from '../util/version.js';
 import { recordResult, saveCampaign, restartCampaign, stripSquares, canPlay } from './campaign.js';
 import { VOICE } from '../data/voice.js';
 import { newTutorial } from '../sim/tutorial.js';
-/* global __VERSION__ */
-const VERSION = typeof __VERSION__ === 'string' ? __VERSION__ : 'dev';   // the build's package.json version; `dev` unbuilt
 
 const { sin, max, random, floor } = Math;
 

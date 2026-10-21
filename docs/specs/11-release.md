@@ -29,6 +29,9 @@ in one command.
   `https` or `localhost`.
 - An "update available" moment: the voice says nothing; the menu shows a dim
   `UPDATED · RELOAD` line that reloads on tap.
+- Which build is running shows in the SETTINGS footer and on the `?debug=1`
+  readout: the version, then the commit and its date the build stamps in
+  (`v0.1.0 · 9c5c03f · OCT 20`, #304), to check a cached phone against GitHub.
 
 As shipped (#226):
 - **Icons:** `scripts/icons.mjs` draws them in plain Node rather than in
