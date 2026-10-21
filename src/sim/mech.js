@@ -23,11 +23,16 @@ export const STEP = 1.5;
 // Where a mech stands at (x, z): the first ground below its step.
 export const groundUnder = (G, m, x = m.x, z = m.z) => G.ter.groundBelow(x, m.y + STEP * m.ch.scale, z);
 // How far into rock a mech's body would be at (x, z), moving along (dx, dz):
-// the density at its step (a wall), at its chest a body's radius ahead, and
-// at its head (a roof too low for it). Above 0 is in rock.
+// the density at its step (a wall), at its chest a body's radius ahead, at
+// its head (a roof too low for it), and just in front of its cockpit's eye,
+// level and a little above, so the view never goes into rock (a pocket the
+// bucket dug at chest height has its roof at eye height). Above 0 is in rock.
+export const CAB_CLEAR = 0.8;   // m in front of the eye that stay clear: the near plane (0.5 m) and its corners
 export function rockAt(G, m, x, z, dx, dz) {
   const g = geoOf(m), s = m.ch.scale, ter = G.ter, y = m.y, R = g.radius * s;
-  return max(ter.sample(x, y + STEP * s, z), ter.sample(x + dx * R, y + g.torsoY * s, z + dz * R), ter.sample(x, y + g.height * s * 0.95, z));
+  const a = m.yaw + (m.twist || 0), f = g.eye[2] * s + CAB_CLEAR, ex = x + sin(a) * f, ez = z + cos(a) * f, ey = y + (g.torsoY + g.eye[1]) * s;
+  return max(ter.sample(x, y + STEP * s, z), ter.sample(x + dx * R, y + g.torsoY * s, z + dz * R), ter.sample(x, y + g.height * s * 0.95, z),
+    ter.sample(ex, ey, ez), ter.sample(ex, ey + CAB_CLEAR * 0.5, ez));
 }
 
 // A grade (rise over run) as a speed factor: uphill slow, downhill a touch quick.
