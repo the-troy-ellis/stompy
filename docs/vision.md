@@ -15,6 +15,12 @@ PURPLE PUNCHER. It is allowed to be funny.
   "kill everything": knock down structures, survive a timer, protect a convoy,
   reach an extraction point. After mission twelve, open contracts continue
   procedurally.
+- **Two arms: build and mine, defend and conquer.** Military mechs fight;
+  construction mechs dig ore out of the voxel ground and put up a small mech
+  factory that turns ore and salvage into new mechs. Raids come for the
+  factory, and you swap between your mechs to dig, build and defend. It grows
+  from the smallest loop (one digger, a silo, a factory, a raid) outward:
+  [specs/20-build-and-fight.md](specs/20-build-and-fight.md).
 - **Six chassis** across light, medium, heavy and assault, each with a
   distinct body plan, silhouette, role and personality. The three that exist
   (KESTREL, JACKAL, WARDEN) plus three new ones, among them PURPLE PUNCHER,
