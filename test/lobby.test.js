@@ -7,7 +7,7 @@ import * as P from '../src/net/protocol.js';
 test('the lobby lists each pilot with chassis, ping and whether they are in, under the mode, map and limit', () => {
   const html = lobbyHTML({ pilots: [{ id: 1, name: 'TROY', color: 0, ch: 'kestrel', ping: 23, ready: 1 }, { id: 2, name: '<B>', color: 1, ch: 'puncher', ping: 0, ready: 0 }], me: 1, mode: 'ffa', pal: 'ice', limit: 10 });
   assert.match(html, /FREE-FOR-ALL · GLACIER · FIRST TO 10/);
-  assert.match(html, /TROY<\/td>\s*<td>KESTREL<\/td>\s*<td class="dim">23 ms<\/td>\s*<td>IN<\/td>/);
+  assert.match(html, /TROY<\/td>\s*<td>BARRY<\/td>\s*<td class="dim">23 ms<\/td>\s*<td>IN<\/td>/);
   assert.match(html, /PURPLE PUNCHER/);
   assert.match(html, /&lt;B&gt;/, 'callsigns are escaped');
   assert.match(html, /--<\/td>\s*<td><span class="dim">HERE/);

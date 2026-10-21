@@ -2,7 +2,7 @@
 // keys; the owner names things after seeing them, so renaming is a change
 // here and nowhere else (docs/workflow.md, "Naming things").
 export const NAMES = {
-  chassis: { kestrel: 'KESTREL', jackal: 'JACKAL', warden: 'WARDEN', puncher: 'PURPLE PUNCHER', light1: 'PIPSQUEAK', sniper1: 'BEANPOLE', digger: 'BIG SCOOPER' },   // BIG SCOOPER is the owner's, confirmed   // light1, sniper1: placeholders until the owner picks   // PURPLE PUNCHER is the owner's, confirmed
+  chassis: { kestrel: 'BARRY', jackal: 'SKEDADDLE', warden: 'SLOWPOKE', puncher: 'PURPLE PUNCHER', light1: 'PIPSQUEAK', sniper1: 'BEANPOLE', digger: 'BIG SCOOPER' },   // the owner's, confirmed: BARRY, SKEDADDLE, SLOWPOKE, PURPLE PUNCHER, BIG SCOOPER   // light1, sniper1: placeholders until the owner picks
   // ppc and the rest of M2's weapons carry placeholder names until the owner picks (docs/workflow.md § Naming).
   weapons: { laser: 'LG LASER', mlaser: 'MED LASER', ac: 'AUTOCANNON', lrm: 'LRM-10', fusion: 'FUSION CANNON', ppc: 'THUNDERCLAP', plaser: 'PEPPER LASER', srm: 'FIRECRACKERS', gauss: 'BIG BONKER', mg: 'PEASHOOTER', flamer: 'TOASTER' },
   // What the menu says about each selectable mech, in the board-book voice (docs/vision.md § Tone guide).
