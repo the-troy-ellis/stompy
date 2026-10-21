@@ -403,6 +403,12 @@ Where the first issue differs from the plan above, and why:
   view to keep clear, and skip it (each sample boxes a number: perf). Without them, the bucket's
   chest-height bite left a pocket whose roof was at eye height; the chest
   fit, so the mech walked in and the camera saw the inside of the ground.
+- **And the camera keeps its own guard** (the next phone playtest: turning
+  against a dug face still did it; turning isn't a move, so the walk never
+  checks it). Each frame, if the eye or rock 0.7 m ahead of it (straight on,
+  at either edge of the view, or above) is solid, `render/scene.js`
+  `clearEye` slides the eye back along the line to the body's middle until
+  it is clear. That covers turns, twists and ground falling round you.
 - **Cover and ridges** (`ai/behaviours.js`) skip a spot whose straight line
   climbs steeper than 1.6 (about 58°; the steepest hills are about 50°). The
   nav grid that walks round cliffs is #285.

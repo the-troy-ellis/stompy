@@ -95,6 +95,32 @@ function inverse3(m) {
 
 // Everything drawn in 3D: the camera per state, sky, terrain, mechs with
 // their IK legs, wrecks, shots, pulses, beams and particles.
+// The cockpit's eye, kept out of rock. Walking into rock is stopped in the
+// sim (sim/mech.js rockAt's cab sample), but turning against a face the
+// bucket dug, a twist, or ground coming down round you can still bring rock
+// up to the eye; the near plane (0.5 m) would cut into it and show the inside
+// of the ground. So: if the eye, or rock EYE_CLEAR ahead of it (straight on,
+// to either edge of the view, or above), is solid, the eye slides back along
+// the line to the body's middle until it is clear. Usually the first test
+// passes and nothing is made.
+export const EYE_CLEAR = 0.7;
+function eyeClear(ter, x, y, z, d, rx, rz) {
+  const c = EYE_CLEAR;
+  return ter.sample(x, y, z) <= 0 && ter.sample(x + d[0] * c, y + d[1] * c, z + d[2] * c) <= 0
+    && ter.sample(x + d[0] * 0.5 + rx * c, y + d[1] * 0.5, z + d[2] * 0.5 + rz * c) <= 0
+    && ter.sample(x + d[0] * 0.5 - rx * c, y + d[1] * 0.5, z + d[2] * 0.5 - rz * c) <= 0
+    && ter.sample(x + d[0] * 0.5, y + d[1] * 0.5 + c * 0.5, z + d[2] * 0.5) <= 0;
+}
+export function clearEye(ter, eye, dir, bx, by, bz) {
+  const rl = Math.hypot(dir[0], dir[2]) || 1, rx = dir[2] / rl, rz = -dir[0] / rl;   // the view's right, level
+  if (eyeClear(ter, eye[0], eye[1], eye[2], dir, rx, rz)) return eye;
+  for (let k = 1; k <= 8; k++) {
+    const t = k / 8, x = eye[0] + (bx - eye[0]) * t, y = eye[1] + (by - eye[1]) * t, z = eye[2] + (bz - eye[2]) * t;
+    if (eyeClear(ter, x, y, z, dir, rx, rz)) return [x, y, z];
+  }
+  return [bx, by, bz];
+}
+
 export function createScene(app) {
   const G = app.G, R = app.R, wrap = app.wrap, cv = app.cv, hud = app.hud;
   // The world on the GPU, rebuilt whenever the sim builds a new one: the voxel
@@ -569,6 +595,7 @@ export function createScene(app) {
       const fall = P.dying || P.fallen;
       const lurch = (P.surge || 0) * P.ch.scale * (G.reducedMotion ? FEEL.view.reducedScale : 1);   // and lurches with each step
       eye = add(G.eye, [Math.sin(P.yaw) * lurch, -drop * 0.35 - (P.squash ? P.squash.x * 2 : 0) - (P.sag ? P.sag.x : 0) - (fall ? fall.drop || 0 : 0), Math.cos(P.yaw) * lurch]); dir = dirOf(yaw, pitch - drop * 0.016);
+      if (G.ter && !fall) eye = clearEye(G.ter, eye, dir, P.x, P.y + geoOf(P).torsoY * P.ch.scale, P.z);   // never see the inside of the ground
       // Going down: the view goes with the body, turned by the same topple
       // (so a fall to the side rolls the horizon), and stays there once it's
       // down until the debrief (P.fallen; spec 13 § Death).

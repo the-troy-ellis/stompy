@@ -128,3 +128,21 @@ test('walking into a pocket the bucket dug, the cockpit stops short of its roof'
   assert.ok(P.ore > 0, `it dug: ${P.ore} ore`);
   assert.equal(worst, Infinity, `rock ${worst.toFixed(1)} m in front of the eye`);
 });
+
+test('turning against a face the bucket dug, the view still never shows the inside of the ground', async () => {
+  // Turning isn't a move, so the walk's cab sample doesn't see it: the
+  // camera's own guard (render/scene.js clearEye) slides the eye back into the body.
+  const { clearEye } = await import('../src/render/scene.js');
+  const G = world([MESA], 0, polar([0, 400]).z - 80 - 12, 0, 'digger'), P = G.player;
+  let raw = 0, seen = 0;
+  for (let t = 0; t < 20; t += 0.1) {
+    stepFor(G, 0.1, input({ thrUp: true, punch: Math.round(t * 10) % 7 === 0, turn: t > 6 ? 1 : 0 }));
+    const e = eyeOf(P), a = P.yaw + P.twist, d = [Math.sin(a) * Math.cos(P.pitch), Math.sin(P.pitch), Math.cos(a) * Math.cos(P.pitch)];
+    const near = q => G.ter.solid(q[0], q[1], q[2]) || G.ter.solid(q[0] + d[0] * 0.6, q[1] + d[1] * 0.6, q[2] + d[2] * 0.6);
+    if (near(e)) raw++;
+    if (near(clearEye(G.ter, e, d, P.x, P.y + geoOf(P).torsoY * P.ch.scale, P.z))) seen++;
+  }
+  assert.ok(P.ore > 0, 'it dug');
+  assert.ok(raw > 0, 'the turn did bring rock up to the cab (the case this guards)');
+  assert.equal(seen, 0, 'and the guarded eye never had rock in front of it');
+});
