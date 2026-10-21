@@ -1,3 +1,5 @@
+import { VERSION } from '../util/version.js';
+const VERSION_LINE = `v${VERSION}`;   // made once: the readout runs every frame
 import { cheatsOn } from '../sim/cheats.js';
 import { CHEATS } from '../data/debug.js';
 import { RADAR_RANGE, radarOf, fogOf } from '../data/weather.js';
@@ -426,6 +428,7 @@ export function createHud(app) {
     ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'left'; ctx.fillStyle = '#9f9';
     const full = app.params.has('debug');
     const lines = [`FRAME ${q(0.5).toFixed(1)} ms  P95 ${q(0.95).toFixed(1)} ms`, `DRAWS ${app.R.draws}  CULLED ${app.R.culled || 0}  PARTICLES ${G.parts.length}  MECHS ${G.mechs.length}`];
+    if (full) lines.push(VERSION_LINE);   // which build: a cached phone checked against GitHub
     if (full) lines.push(`SEED ${G.ter?.seed ?? '-'}  T ${G.time.toFixed(1)}  STATE ${G.state}${app.net.mp() ? `  PING ${app.net.Net.rtt} ms` : ''}`);
     if (full) { const on = cheatsOn(G, CHEATS); if (on.length) lines.push(G.mode === 'sp' ? `CHEATS: ${on.map(([, l]) => l).join(' · ')}` : 'CHEATS (OFF HERE)'); }   // so a screenshot says how it was made
     lines.forEach((l, i) => ctx.fillText(l, 12, V.H * 0.5 + i * 13));

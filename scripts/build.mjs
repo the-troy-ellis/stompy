@@ -2,6 +2,7 @@
 // Development needs none of this; index.html loads src/main.js directly.
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
+import { execSync } from 'node:child_process';
 import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { normalRelay } from '../src/net/relay.js';
 import { iconFiles } from './icons.mjs';
@@ -10,6 +11,15 @@ import { iconFiles } from './icons.mjs';
 // (docs/specs/10-internet-play.md); ?relay= and the RELAY field still win.
 const relay = process.env.RELAY_DEFAULT || '';
 const { version } = JSON.parse(await readFile('package.json', 'utf8'));   // shown in the settings footer
+// Which build this is (the settings footer and the ?debug=1 readout): the
+// short commit and its date, `9c5c03f · OCT 20`, so a cached phone can be
+// checked against GitHub. Without git, just the version.
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+let stamp = '';
+try {
+  const [sha, day] = execSync('git log -1 --format=%h%n%cs', { encoding: 'utf8' }).trim().split('\n'), [, m, d] = day.split('-');
+  stamp = `${sha} · ${MONTHS[+m - 1]} ${+d}`;
+} catch { /* not a git checkout */ }
 if (relay && !normalRelay(relay, true)) { console.error(`RELAY_DEFAULT is not a relay address: ${relay}`); process.exit(1); }
 
 await rm('dist', { recursive: true, force: true });
@@ -20,7 +30,7 @@ await mkdir('dist', { recursive: true });
 // as dist/groundWorker.js; docs/specs/18-voxel-ground.md).
 await build({ entryPoints: { stompy: 'src/main.js', groundWorker: 'src/render/groundWorker.js' }, bundle: true, minify: true, format: 'esm', splitting: true, target: ['es2020'],
   outdir: 'dist', chunkNames: 'chunks/[name]-[hash]', sourcemap: true, legalComments: 'none', logLevel: 'info',
-  define: { __PWA__: 'true', __VERSION__: JSON.stringify(version), ...(relay ? { __RELAY_DEFAULT__: JSON.stringify(relay) } : {}) } });
+  define: { __PWA__: 'true', __VERSION__: JSON.stringify(stamp ? `${version} · ${stamp}` : version), ...(relay ? { __RELAY_DEFAULT__: JSON.stringify(relay) } : {}) } });
 // The built page: the bundle instead of the modules, and what makes it an app
 // (docs/specs/11-release.md § PWA): the manifest and an icon for iOS.
 const html = (await readFile('index.html', 'utf8'))
@@ -41,4 +51,4 @@ const cacheKey = hash.digest('hex').slice(0, 12), sw = await readFile('src/sw.js
 const swLine = "const VERSION = 'dev', FILES = [];";
 if (!sw.includes(swLine)) { console.error(`src/sw.js lost its line: ${swLine}`); process.exit(1); }
 await writeFile('dist/sw.js', sw.replace(swLine, `const VERSION = '${cacheKey}', FILES = ${JSON.stringify(files)};`));
-console.log(`built dist/ v${version} (${files.length} files cached as ${cacheKey})${relay ? ` (relay ${relay})` : ''}`);
+console.log(`built dist/ v${version}${stamp ? ` · ${stamp}` : ''} (${files.length} files cached as ${cacheKey})${relay ? ` (relay ${relay})` : ''}`);
