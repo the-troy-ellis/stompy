@@ -22,6 +22,7 @@ function resultText(G, o) {
     case 'escort': return `ESCORT ${label(d.label || 'CONVOY')} ${o.home ?? 0}/${d.minAlive ?? 1} HOME`;
     case 'extract': return d.within != null ? `EXTRACT IN ${fmtClock(d.within)}` : 'EXTRACT';
     case 'protect': return `PROTECT ${label(d.label || 'TARGETS')} ${o.alive ?? o.targets?.length ?? 0}/${o.total ?? o.targets?.length ?? 0}`;
+    case 'keep': return `KEEP ${label(d.label || 'TARGETS')} UP`;
     default: return d.type.toUpperCase();
   }
 }

@@ -1,5 +1,6 @@
 import { cheat } from './cheats.js';
 import { nextCrew, HANDOVER } from './crew.js';
+import { salvageOf } from './raid.js';
 import { add, mul, norm, sub } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { SECT_NAME } from '../data/chassis.js';
@@ -198,7 +199,7 @@ export const WRECK_POPS = 3, WRECK_BURN = 30;
 export function makeWreck(G, m, roll) {
   const r = G.rng, n = 2 + r.int(3), ammo = m.weapons.some(w => w.def.ammo && w.ammo > 0 && !w.dead);
   const pops = Array.from({ length: n }, () => r.range(0.3, WRECK_POPS)).sort((a, b) => a - b);
-  return { x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.partsKey, scale: m.ch.scale, t: 0, roll, pops, bigPop: ammo ? r.range(1, 2) : null, settle: 0, digs: ownsDigs(G, m) };   // digs: this client digs its cook-off
+  return { x: m.x, y: m.y, z: m.z, yaw: m.yaw, type: m.partsKey, scale: m.ch.scale, t: 0, roll, pops, bigPop: ammo ? r.range(1, 2) : null, settle: 0, digs: ownsDigs(G, m), salvage: salvageOf(G, m) };   // digs: this client digs its cook-off
 }
 
 export function destroy(G, m, src) {

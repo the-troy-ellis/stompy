@@ -4,6 +4,7 @@ import { polar } from './placement.js';
 import { spawnWave, waveFoes, WAVE_WARN } from './waves.js';
 import { allDown, coopLives } from './coopRules.js';
 import { pilotsOf } from './hitqueue.js';
+import { raidLine } from './raid.js';
 export { polar, flatZones } from './placement.js';
 
 // Mission objectives (docs/specs/03-objectives.md § State machine). A mission
@@ -21,6 +22,9 @@ export { polar, flatZones } from './placement.js';
 //   { type: 'protect', targets: ['store'], minAlive: 2, label: 'TANK' }
 //                                     keep minAlive of those entities standing; it goes with
 //                                     another objective (it is done when the mission is won)
+//   { type: 'keep', targets: ['silo'], label: 'SILO' }
+//                                     every one of them stands (spec 20's base); held like
+//                                     protect, and the voice says when it is hit
 // (A mission with `prefer: 'convoy'` sends its enemies after the trucks; ai.js.)
 // Any objective may wait for another: `after: n`
 // (its index) holds it until that one is done, and its clock starts then.
@@ -81,6 +85,16 @@ const TYPES = {
       if (o.alive < (o.def.minAlive ?? o.total)) return 'failed';
     },
   },
+  // The base must stand: failed the moment one falls, held until the mission
+  // is won. `Silo hit.` when it is shot at (no more than every KEEP_WARN_EVERY s).
+  keep: {
+    init: (G, d) => ({ targets: G.entities.filter(e => e.tags.some(t => d.targets.includes(t))), warned: -Infinity }),
+    tick(G, o) {
+      o.total = o.targets.length; o.alive = o.targets.filter(e => e.alive).length;
+      if (o.alive < o.total) return 'failed';
+      if (o.targets.some(e => e.lastHitAt > o.warned + KEEP_WARN_EVERY)) { o.warned = G.time; voice(G, 'keepHit'); }
+    },
+  },
   // The clock runs from the mission start; each wave is called in WAVE_WARN
   // seconds before it arrives (waves at the very start just arrive).
   survive: {
@@ -88,7 +102,7 @@ const TYPES = {
     tick(G, o) {
       const t = G.time - o.start;
       for (const w of o.waves) {
-        if (!w.warned && t >= w.at - WAVE_WARN) { w.warned = true; voice(G, 'inbound'); }
+        if (!w.warned && t >= w.at - WAVE_WARN) { w.warned = true; callWave(G, w); }
         if (!w.spawned && t >= w.at) { w.spawned = true; spawnWave(G, waveFoes(G, w.foes), w); }
       }
       o.left = Math.max(0, o.def.seconds - t);
@@ -107,12 +121,19 @@ export function objectivePoint(G, o) {
   if (o.state !== 'active') return null;
   const P = G.player, near = list => list.reduce((b, e) => (!b || Math.hypot(e.x - P.x, e.z - P.z) < Math.hypot(b.x - P.x, b.z - P.z) ? e : b), null);
   const at = e => e && [e.x, e.y + (e.height || 0) / 2 + 2, e.z];
-  if (o.def.type === 'destroy' || o.def.type === 'protect') return at(near(o.targets.filter(e => e.alive)));
+  if (o.def.type === 'destroy' || o.def.type === 'protect' || o.def.type === 'keep') return at(near(o.targets.filter(e => e.alive)));
   if (o.def.type === 'escort') { const n = o.nav, live = o.vehicles.filter(v => v.alive); return at(live.reduce((b, v) => (!b || Math.hypot(v.x - n.x, v.z - n.z) < Math.hypot(b.x - n.x, b.z - n.z) ? v : b), null)); }
   if (o.def.type === 'extract') return at(o.nav);
   return null;
 }
 export const CONVOY_WARN_EVERY = 12;
+export const KEEP_WARN_EVERY = 12;
+// A wave three seconds out: "Reinforcements inbound.", or a raid's own call,
+// which says where from and what (raid.js).
+function callWave(G, w) {
+  if (w.raid) G.fx.say(raidLine(w, waveFoes(G, w.foes)), true);
+  else voice(G, 'inbound');
+}
 
 export function initObjectives(G, def) {
   for (const s of def.entities || []) addEntity(G, { ...s, ...polar(s.at), path: s.path?.map(p => { const q = polar(p); return [q.x, q.z]; }) });
@@ -130,7 +151,7 @@ function tickWaves(G) {
     if (w.spawned) continue;
     if (w.due == null && w.when && (G.objectives[w.when.obj]?.done ?? 0) >= w.when.done) w.due = G.time + WAVE_WARN;
     if (w.due == null) continue;
-    if (!w.warned && G.time >= w.due - WAVE_WARN) { w.warned = true; voice(G, 'inbound'); }
+    if (!w.warned && G.time >= w.due - WAVE_WARN) { w.warned = true; callWave(G, w); }
     if (G.time >= w.due) { w.spawned = true; spawnWave(G, waveFoes(G, w.foes), w); }
   }
 }
@@ -155,13 +176,13 @@ export function tickObjectives(G) {
   }
   tickWaves(G);
   if (!G.objectives.length) return;   // none at all (the test range): nothing ends it but you
-  const main = G.objectives.filter(o => !o.def.secondary), held = o => o.state === 'done' || (o.def.type === 'protect' && o.state === 'active');
+  const main = G.objectives.filter(o => !o.def.secondary), guard = o => o.def.type === 'protect' || o.def.type === 'keep', held = o => o.state === 'done' || (guard(o) && o.state === 'active');
   if (main.some(o => o.state === 'failed')) {
     G.state = 'over'; G.endT = 3.2; G.won = false;
     voice(G, 'failed', {}, true, 600);
   } else if (main.every(held)) {
     G.state = 'over'; G.endT = 3.5; G.won = true;
-    for (const o of G.objectives) if (o.def.type === 'protect' && o.state === 'active') o.state = 'done';
+    for (const o of G.objectives) if (guard(o) && o.state === 'active') o.state = 'done';
     voice(G, 'complete', {}, true, 1400);
   }
 }

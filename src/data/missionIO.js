@@ -186,7 +186,7 @@ export function check(def, names = NAMES.missions) {
   const ids = new Map();
   for (const e of ents) if (e.id != null) ids.set(e.id, (ids.get(e.id) || 0) + 1);
   for (const [id, n] of ids) if (n > 1) add(`entities.${id}`, `Two things are called ${id}.`);
-  const has = id => ids.has(id), tagged = t => ents.filter(e => (e.tags || []).includes(t));
+  const has = id => ids.has(id), tagged = t => (def.base && t === 'silo' ? [def.base] : ents.filter(e => (e.tags || []).includes(t)));   // a base brings its silo (spec 20)
   const entId = (e, i) => `entities.${e.id ?? i}`;
   // Each entity's display name and its number among those with the same one, as "TRUCK 2".
   const seen = new Map(), title = new Map();
@@ -198,7 +198,7 @@ export function check(def, names = NAMES.missions) {
 
   objs.forEach((o, n) => {
     const id = `objectives.${n}`, name = `${upper(o.type)}${o.label ? ` ${o.label}` : ''}`;
-    if (o.type === 'destroy' || o.type === 'protect') {
+    if (o.type === 'destroy' || o.type === 'protect' || o.type === 'keep') {
       for (const t of o.targets || []) if (!tagged(t).length) add(id, `${name} has nothing tagged ${t}.`);
       if (!(o.targets || []).length) add(id, `${name} has no targets.`);
     }
