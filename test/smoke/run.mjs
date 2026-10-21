@@ -232,6 +232,23 @@ try {
     console.log(`first-factory: in the ${start[0]}, crew ${start[1]}, ${start[2]} ore; dug ${dug}; unloaded (hopper ${unloaded[0]}, silo ${unloaded[1]}); factory ${prog}; Q -> ${now}`);
     if (start[0] !== 'digger' || start[1] !== 2 || !(dug > 0) || unloaded[0] !== 0 || !(unloaded[1] > start[2]) || prog !== 1 || now !== 'kestrel') { failed = true; console.error('FAIL: the base mission'); }
   });
+  // SWAP on touch (spec 20): the digger shows BUILD and no guns; TGT held swaps into the KESTREL, whose fire buttons appear.
+  await run('touch-swap', URL_ + '&touch=1', async page => {
+    await page.tap('.feel-panel [data-a="toggle"]');
+    await page.tap('[data-sel="debug"]'); await page.tap('[data-dsec="jump"]');
+    await page.tap('[data-dj="base"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'base' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    await page.waitForTimeout(300);
+    const btns = () => page.evaluate(() => Object.fromEntries(['missile', 'energy', 'ballistic', 'fusion'].map(c => { const b = document.querySelector(`[data-t="${c}"]`); return [c, b.hidden ? '-' : b.textContent]; })));
+    const dig = await btns();
+    const tgt = await page.$('[data-t="tgt"]'), box = await tgt.boundingBox(), at = { clientX: box.x + box.width / 2, clientY: box.y + box.height / 2, pointerId: 7, pointerType: 'touch', bubbles: true };
+    await tgt.dispatchEvent('pointerdown', at); await page.waitForTimeout(700); await tgt.dispatchEvent('pointerup', at);
+    await page.waitForTimeout(300);
+    const kes = await btns(), now = await page.evaluate(() => window.__stompy.game.player.type);
+    await page.screenshot({ path: 'test-results/smoke-touch-swap.png' });
+    console.log(`touch-swap: digger ${JSON.stringify(dig)}; TGT held -> ${now} ${JSON.stringify(kes)}`);
+    if (dig.missile !== 'BUILD' || dig.energy !== '-' || now !== 'kestrel' || kes.missile !== 'MISSILE' || kes.energy === '-') { failed = true; console.error('FAIL: touch buttons after SWAP'); }
+  });
   await run('touch', URL_ + '&touch=1', async page => {
     // Taps, not clicks: a mouse click would switch the game back to mouse mode.
     await page.tap('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way, as on desktop

@@ -34,11 +34,17 @@ export function createInput(app) {
   const SWAP_HOLD = 450;   // ms
   const hasCrew = () => (G.crew?.length || 0) > 1;
 
-  // Only show fire buttons for the kinds of weapon this mech carries.
+  // Only show fire buttons for the kinds of weapon this mech carries. A
+  // digger's MISSILE button is BUILD (sim/base.js), shown where there is a
+  // base. Run again whenever the mech you are in changes (SWAP, spec 20).
+  let buttonsFor = null;
   function syncWeaponButtons() {
+    const P = (buttonsFor = G.player), build = !!(P.ch.tools && G.base);
     for (const c of CATS) {
       const btn = $(`[data-t="${c}"]`, tui);
-      if (btn) btn.hidden = !G.player.weapons.some(w => CAT_OF[w.type] === c);
+      if (!btn) continue;
+      btn.hidden = !(P.weapons.some(w => CAT_OF[w.type] === c) || (c === 'missile' && build));
+      if (c === 'missile') btn.textContent = build ? 'BUILD' : 'MISSILE';
     }
   }
 
@@ -338,6 +344,7 @@ export function createInput(app) {
   // What the sim sees this frame, from the keyboard, the mouse buttons, the touch controls and a gamepad.
   function snapshotInput() {
     G.turnByUsed = 0;
+    if (G.player !== buttonsFor) syncWeaponButtons();   // swapped into another mech: its buttons
     const gp = pad && !G.spectate ? pad : null, aim = gp ? prefs.padSens * PAD_AIM * (G.zoom ? 0.4 : 1) : 0;
     const inp = {
       thrUp: !!keys.KeyW, thrDown: !!keys.KeyS, stop: !!keys.KeyX, thr: gp ? gp.axes.thr : 0,
