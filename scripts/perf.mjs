@@ -86,6 +86,12 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   rain 18 31.3k · snow 16 23.3k · dust 12 18.0k. Spec 18 allows 70k
 //   ground triangles. Rain's garbage measured 88-96 KB (the worker's results
 //   arriving land in whichever scene is running).
+// After #315 (the ?debug readout made its text four times a second, not
+//   every frame, and kept its frame times in a ring; the compass tape's
+//   labels made once): allocKB menu 33 · free-start 104 · walk 123 ·
+//   run 95 · fight 180 · deaths 164 · wrecks 112 · away 73 · dig 53 ·
+//   rain 76 · snow 76 · dust 74 (dust was 89-94, on its 90 KB budget).
+//   Budgets left where they were.
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
   menu:           { meanDraws: 14, peakDraws: 14, tris: 38000, allocKB: 38 },   // the menu's 60 frames are too few for drawWorld to be optimized, so its sums box a little
