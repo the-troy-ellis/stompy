@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress: #308 (the digger) and #310 (the crew and SWAP) built; the owner picked the two arms (build and mine, defend and conquer), a base that is a mech factory, swapping mechs mid-mission, and starting with the smallest version that proves the loop |
+| Status | in progress: #308 (the digger), #310 (the crew and SWAP) and #309 (the base) built; the owner picked the two arms (build and mine, defend and conquer), a base that is a mech factory, swapping mechs mid-mission, and starting with the smallest version that proves the loop |
 | Milestone | M9 (proposed; after M8) |
 | Size | L (split into five issues; see the end) |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md) (digging, building, falling, the torque rule); [03-objectives.md](03-objectives.md) (structures, waves, protect); [05-ai.md](05-ai.md) (foes that go for a target); [12-melee.md](12-melee.md) (the punch the bucket rides on); [16-body-plans.md](16-body-plans.md) (a new body); [19-debug-menu.md](19-debug-menu.md) (where it is tried first) |
@@ -235,6 +235,27 @@ mech within 120 m of them, or you. Each raid is a mission wave
   - **Crew strip:** with two or more mechs, a line each with its torso's health. The one you're in is amber and marked ▶, and a dead one is dark red. It sits under HOSTILES on desktop, and left of the radar on a phone, where it clears the buttons.
   - **Swap wipe:** a 0.3 s static wipe follows a swap.
 - **The range:** the test range gets a CREW picker (JUST YOU, + KESTREL, + the digger) to try it before FIRST FACTORY.
+
+### As built in #309
+
+- **Where:** `sim/base.js`, with the numbers and building shapes in `data/construct.js` (`BUILDINGS`).
+- **The silo:** a mission with `base: { silo: [bearing°, dist] }` gets a silo entity (team 0, 600 hp), facing the map's centre, and `G.base = { ore, salvage, silo, factory }` with 20 ore.
+  - A crew mech carrying ore within 14 m of the silo's pad (in front of it) empties into it. For the mech you're in, the voice says `Ore in.` and `ORE IN` shows.
+- **BUILD:** the missile button while you drive a `tools` mech (the digger), in `update.js`. Held, the footprint shows.
+  - It's a 24 m square whose near edge is 14 m in front of you, drawn on the ground in green, or red with `NO ROOM`.
+  - Under it sits `BUILD · 60 ORE`.
+  - Let go, and the factory goes there for 60 ore.
+- **The footprint check:** ground within ±2 m across 25 samples, no mech on it, no building on it.
+- **Going up:** the factory rises over 6 s (`prog`, its height growing with it), its door toward you. The voice says `Factory up.`
+- **The queue:** once up, the factory starts a mech whenever the silo holds 50 ore and 30 salvage, and takes them.
+  - 30 s later a stock KESTREL stands on its pad, parked, and joins `G.crew`. The voice says `New mech ready.`
+  - Salvage only comes in with #311. Until then a mech can't be built in play.
+- **HUD:**
+  - The crew column shows `ORE n  SALVAGE n` (amber; dark red if the silo is down).
+  - The factory's state shows as `FACTORY 40%`, `NEW MECH 12 s`, `FACTORY` or `FACTORY DOWN`.
+- **The bucket:** it no longer bites or punches its own side's buildings.
+- **Meshes:** the silo (a steel bin with hazard bands and a cone roof, a chute to a striped pad) and the factory (a concrete shed with a saw-tooth roof, a striped door and a chimney) are props with wrecks, under 120 triangles each.
+- **Trying it:** the test range gets a BASE picker (NONE, SILO).
 
 ## Code touchpoints
 

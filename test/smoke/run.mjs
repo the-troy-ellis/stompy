@@ -175,6 +175,24 @@ try {
     console.log(`crew: ${first[1]} in the crew; in ${first[0]}, Q -> the other ${second[0]} (the first parked ${second[1]}), Q -> back ${third}`);
     if (first[1] !== 2 || !second[0] || !second[1] || !third) { failed = true; console.error(`FAIL: SWAP (${first}, ${second}, ${third})`); }
   });
+  // The base (spec 20, #309): the digger, a silo; BUILD held then let go puts the factory up.
+  await run('base', URL_, async page => {
+    await page.click('.feel-panel [data-a="toggle"]');
+    for (let i = 0; i < 8 && (await page.evaluate(() => window.__stompy.app.prefs.chassis)) !== 'digger'; i++) await page.click('[data-mech="1"]');
+    await page.click('[data-sel="debug"]'); await page.click('[data-dsec="range"]');
+    for (let i = 0; i < 8 && (await page.$eval('[data-drg="ground"] ~ b', b => b.textContent)) !== 'FLAT'; i++) await page.click('[data-drg="ground"][data-d="1"]');
+    for (let i = 0; i < 3 && (await page.$eval('[data-drg="base"] ~ b', b => b.textContent)) !== 'SILO'; i++) await page.click('[data-drg="base"][data-d="1"]');
+    await page.click('[data-a="go"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'range' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    await page.evaluate(() => { const G = window.__stompy.game; G.base.ore = 100; G.player.yaw = Math.PI; G.player.twist = 0; });
+    await page.keyboard.down('Space'); await page.waitForTimeout(400);
+    const preview = await page.evaluate(() => window.__stompy.game.buildAt && window.__stompy.game.buildAt.why);
+    await page.keyboard.up('Space'); await page.waitForTimeout(7500);
+    const r = await page.evaluate(() => { const b = window.__stompy.game.base; return { silo: b.silo.alive, ore: b.ore, prog: b.factory?.prog }; });
+    await page.screenshot({ path: 'test-results/smoke-base.png' });
+    console.log(`base: silo up ${r.silo}; BUILD showed the footprint (why ${preview}); factory ${r.prog}, ore left ${r.ore}`);
+    if (!r.silo || preview !== null || r.prog !== 1 || r.ore !== 40) { failed = true; console.error(`FAIL: the base (${preview}, ${JSON.stringify(r)})`); }
+  });
   await run('touch', URL_ + '&touch=1', async page => {
     // Taps, not clicks: a mouse click would switch the game back to mouse mode.
     await page.tap('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way, as on desktop
