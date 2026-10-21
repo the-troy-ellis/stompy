@@ -8,6 +8,7 @@ import { fitOf } from './mechlab.js';
 import { CHEATS } from '../data/debug.js';
 import { STRIP } from './campaign.js';
 import { missionTitle } from './debrief.js';
+import { createTuning } from './tuning.js';
 
 // The main menu's DEBUG tab (docs/specs/19-debug-menu.md), there only with
 // ?debug=1 (and not with &lock, the smoke test's fresh-save menu). Four
@@ -28,6 +29,7 @@ export function createDebugMenu(app, ui) {
   if (!on && prefs.menuSel === 'debug') prefs.menuSel = 'campaign';
   // The cheats (sim/cheats.js), saved; the FEEL panel's old INVINCIBLE switch carries over.
   app.G.cheats = on ? { god: !!store.get('debug.invincible', false), ...store.get(CHEATS_KEY, {}) } : {};
+  const tune = on ? createTuning(app) : null;   // TUNING's pages and the overlays (ui/tuning.js)
   const cheatsHTML = () => `<div class="opts">${CHEATS.map(([k, l]) => `<button class="opt${app.G.cheats[k] ? ' on' : ''}" data-dch="${k}">${l}: ${app.G.cheats[k] ? 'ON' : 'OFF'}</button>`).join('')}</div>`;
 
   // The range's picks, saved: indices into their lists, and how many foes.
@@ -51,7 +53,7 @@ export function createDebugMenu(app, ui) {
       <div class="fp-picks dbg-range">${pick('ground', 'GROUND', RANGE_GROUNDS[rg.ground].label)}${pick('foes', 'FOES', RANGE_FOES[rg.foes][1])}${rg.foes ? pick('n', 'HOW MANY', rg.n) + pick('which', 'WHICH', WHICH[rg.which] === 'mix' ? 'MIX' : CHASSIS[WHICH[rg.which]].name) : ''}
       ${pick('time', 'TIME', TIME_NAMES[FP_TIMES[rg.time]])}${pick('weather', 'WEATHER', FP_WEATHER[rg.weather].toUpperCase())}${pick('crew', 'CREW', RANGE_CREW[rg.crew] === 'none' ? 'JUST YOU' : `+ ${CHASSIS[RANGE_CREW[rg.crew]].name}`)}${pick('base', 'BASE', RANGE_BASE[rg.base][1])}</div>`,
     cheats: () => `<p>Single player only. The arena does not care.</p>${cheatsHTML()}`,
-    tuning: () => '<p class="dim">Not built yet.</p>',
+    tuning: () => tune.html(),
     // Any mission (all open under ?debug=1); GO plays it. The rest go on a tap.
     jump: () => `<div class="mm-pick"><span>MISSION</span><button data-dmis="-1">◀</button><b>${esc(missionTitle(prefs.mission + 1, missionDef(prefs.mission).name))}</b><button data-dmis="1">▶</button></div>
       <div class="opts"><button class="opt" data-dj="editor">EDITOR</button><button class="opt" data-dj="bench">BENCH</button><button class="opt" data-dj="tut">TUTORIAL AGAIN</button><button class="opt" data-dj="base">${esc(BASE_MISSION.name)}</button></div>`,
@@ -59,8 +61,10 @@ export function createDebugMenu(app, ui) {
 
   return {
     on,
-    // The pause menu's DEBUG block in a debug run: the cheats, switched as you play.
-    pauseHTML: () => (on ? `<div class="panel dbg-pause"><div class="k">DEBUG</div>${cheatsHTML()}</div>` : ''),
+    // The pause menu's DEBUG block in a debug run: the cheats, switched as you
+    // play, and TUNING's pages (edits apply on resume, or at once).
+    pauseHTML: () => (on ? `<div class="panel dbg-pause"><div class="k">DEBUG</div>${cheatsHTML()}${tune.html()}</div>` : ''),
+    tune,
     // A cheat switch, in the tab or the pause menu: true if it was one.
     cheatClick(e) {
       const c = e.target.closest('[data-dch]');

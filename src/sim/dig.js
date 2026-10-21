@@ -99,16 +99,34 @@ export function applyDigList(G, l, replay = false) {
   }
 }
 
+// The DIGS AND FALLS overlay's log (?debug=1, ui/tuning.js, drawn by
+// render/hud.js): each dig's box, each fall's box where it came from, and
+// each overhang the torque rule weighed. G.digLog is null unless the overlay
+// is on, so it costs nothing then; it keeps the last DIG_LOG_S seconds.
+export const DIG_LOG_S = 10;
+function logDig(G, e) {
+  const L = G.digLog;
+  e.t = G.time;
+  while (L.length && (L[0].t < G.time - DIG_LOG_S || L[0].t > G.time)) L.shift();   // old, or from a match before this one
+  L.push(e);
+}
+
 // One dig in the confirmed order: carved, the ground it leaves unheld falls,
 // and what stood there settles. `seen`: the falls are shown coming down.
 function confirmDig(G, e, seen, rock = DIG.rock, tally = null) {
   const [, x, y, z, r] = e, C = confirmed(G), b = C.dig([x, y, z], r, rock, tally);
   const falls = b ? C.islands(b).map(cells => C.fall(cells)) : [];
   // Then what still holds on but hangs too far off what holds it (the torque rule); a break can leave another.
+  const weighed = G.digLog ? [] : null;
   for (let n = 0; b && n < TORQUE.rounds; n++) {
-    const breaks = C.overhangs(b, TORQUE.rock);
+    const breaks = C.overhangs(b, TORQUE.rock, null, weighed);
     if (!breaks.length) break;
     for (const cells of breaks) falls.push(C.fall(cells));
+  }
+  if (G.digLog) {
+    logDig(G, { kind: 'dig', box: [x - r, y - r, z - r, x + r, y + r, z + r] });
+    for (const w of weighed) logDig(G, { kind: 'weigh', ...w });
+    for (const f of falls) { const [i0, i1, j0, j1, k0, k1] = f.box; logDig(G, { kind: 'fall', box: [-HALF + i0 * VS, Y0 + j0 * VS, -HALF + k0 * VS, -HALF + i1 * VS, Y0 + j1 * VS, -HALF + k1 * VS] }); }
   }
   if (C !== G.ter) {
     const k = G.unechoed.findIndex(u => u[1] === x && u[2] === y && u[3] === z && u[4] === r);

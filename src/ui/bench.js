@@ -14,8 +14,6 @@ export function createBench(app) {
   let acc = 0, prevTs = 0, rows = null;
 
   function start() {
-    const fp = document.querySelector('.feel-panel .feel-body');   // the FEEL table folds away: the scene wants the whole view
-    if (fp && !fp.hidden) document.querySelector('.feel-panel [data-a="toggle"]')?.click();
     startBench(G);
     app.scene.uploadWorld(); app.ui.launch();
     acc = 0; prevTs = 0;

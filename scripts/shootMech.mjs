@@ -22,7 +22,7 @@ try {
     await page.evaluate(k => localStorage.setItem('stompy.mech.chassis', JSON.stringify(k)), key);
     await page.reload();
     await page.waitForSelector('.mm-title');
-    await page.addStyleTag({ content: '.feel-panel, .perf { display: none !important; }' });
+    await page.addStyleTag({ content: '.perf { display: none !important; }' });
     await page.evaluate(() => { const G = window.__stompy.game; G.menuDrag = true; G.showYaw = 0.55; });   // hold it three-quarters on
     await page.waitForTimeout(1200);
     await page.screenshot({ path: out(name) });
@@ -36,7 +36,6 @@ try {
   await page.evaluate(() => localStorage.setItem('stompy.mech.chassis', JSON.stringify('kestrel')));
   await page.reload();
   await page.waitForSelector('.mm-title');
-  await page.click('.feel-panel [data-a="toggle"]');
   await page.click('[data-sel="free"]');
   await page.click('[data-a="go"]');
   await page.waitForFunction(() => window.__stompy?.game?.state === 'play');

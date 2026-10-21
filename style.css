@@ -314,19 +314,17 @@ html, body {
   .mm-right { justify-content: center; padding: 0 0 calc(14px + env(safe-area-inset-bottom)); }
 }
 
-/* ---------- ?debug=1: the FEEL panel ---------- */
-.feel-panel {
-  position: absolute; right: 8px; top: 48px; z-index: 4; max-height: 70vh; overflow: auto;
-  background: rgba(0, 10, 0, .85); border: 1px solid #2a7a2a; color: #9f9;
-  font: 10px "Lucida Console", "Courier New", monospace; padding: 4px 6px;
-}
-.feel-head { display: flex; gap: 6px; align-items: center; }
-.feel-panel button { font: inherit; background: #031; color: #9f9; border: 1px solid #5f5; padding: 1px 6px; cursor: pointer; }
-.feel-panel table { border-collapse: collapse; margin-top: 4px; }
-.feel-panel th { text-align: left; padding: 1px 4px; color: #fc3; font-weight: normal; }
-.feel-panel td { padding: 0 1px; }
-.feel-panel input { width: 40px; font: inherit; background: #010a01; color: #9f9; border: 1px solid #1a4a1a; }
-.feel-out { display: block; width: 100%; height: 120px; margin-top: 4px; font: inherit; background: #010a01; color: #9f9; border: 1px solid #1a4a1a; }
+/* ---------- ?debug=1: TUNING's pages (ui/tuning.js), on the DEBUG tab and in the pause menu ---------- */
+.dbg-tune { font: 10px "Lucida Console", "Courier New", monospace; color: #9f9; text-align: left; margin-top: 4px; }
+.dbg-tune-pages { margin: 2px 0 4px; }
+.dbg-tune-scroll { max-height: 42vh; overflow: auto; }   /* the feel table is wider and taller than a phone */
+.dbg-tune button:not(.opt) { font: inherit; background: #031; color: #9f9; border: 1px solid #5f5; padding: 1px 6px; cursor: pointer; }
+.dbg-tune table { border-collapse: collapse; }
+.dbg-tune th { text-align: left; padding: 1px 4px; color: #fc3; font-weight: normal; }
+.dbg-tune td { padding: 0 1px; white-space: nowrap; }
+.dbg-tune input[type=number] { width: 40px; font: inherit; background: #010a01; color: #9f9; border: 1px solid #1a4a1a; }
+.dbg-tune-row { margin-top: 4px; }
+.dbg-tune-out { display: block; width: 100%; height: 120px; margin-top: 4px; font: inherit; background: #010a01; color: #9f9; border: 1px solid #1a4a1a; }
 /* Debrief objective rows: a tick or a cross each, optional ones dimmer. */
 .objs { margin: 6px 0 2px; }
 .obj b { display: inline-block; width: 1.4em; }
@@ -336,11 +334,11 @@ html, body {
 .obj i { font-style: normal; font-size: 10px; color: #6a6; letter-spacing: 1px; }
 /* The 3D view at a low resolution, scaled up with hard pixel edges (render/look.js). */
 .mech-gl.pixelated { image-rendering: crisp-edges; image-rendering: pixelated; }
-.feel-look { margin: 4px 0; line-height: 1.9; }
-.feel-look input[type=range] { width: 160px; vertical-align: middle; }
-.feel-look input[type=number] { width: 48px; }
-.feel-look button { margin-right: 2px; }
-.feel-res { color: #fc3; }
+.dbg-tune-look { margin: 4px 0; line-height: 1.9; }
+.dbg-tune-look input[type=range] { width: 160px; vertical-align: middle; }
+.dbg-tune-look input[type=number] { width: 48px; }
+.dbg-tune-look button { margin-right: 2px; }
+.dbg-tune-res { color: #fc3; }
 /* The campaign strip: twelve squares, done / current / locked, the selected one ringed. */
 .verdict { font: bold 26px "Lucida Console", monospace; letter-spacing: 2px; margin: 6px 0 2px; }
 .verdict.ok { color: #fc3; } .verdict.no { color: #f66; }

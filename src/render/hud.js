@@ -10,6 +10,8 @@ import { MP_COLORS, hudPalette } from '../data/colors.js';
 import { HUD_SCALES } from '../data/settings.js';
 import { center, leadPoint, viewYaw } from '../sim/geom.js';
 import { objectivePoint } from '../sim/objectives.js';
+import { navOf, SQ } from '../sim/ai/nav.js';
+import { DIG_LOG_S } from '../sim/dig.js';
 import { MELT_MAX, beamMult } from '../sim/beams.js';
 import { HEAT, hotFrac, FEEL } from '../data/feel.js';
 import { makeSpring, stepSpring } from '../util/spring.js';
@@ -420,8 +422,9 @@ export function createHud(app) {
   }
 
   // The frame-time readout: median and 95th percentile over the last 2 s, draw
-  // calls, particles. On with ?debug=1 or the FRAME TIME setting (for playtests
-  // on real phones); ?debug=1 adds the seed, the state and the AI overlay.
+  // calls, particles. On with the FRAME TIME setting (for playtests on real
+  // phones), or ?debug=1's FRAME TIME overlay (on unless switched off), which
+  // adds the build, the seed, the state and the cheats.
   let lastFrameAt = 0, stopAt = null, rangeMemo = { t: null, r: 0, at: 0, rate: 0 };
   // The readout's text is made DEBUG_EVERY frames (four times a second), not
   // every frame: it was most of a frame's garbage (#315). The frame times
@@ -449,7 +452,51 @@ export function createHud(app) {
     const full = app.params.has('debug');
     if (debugTick-- <= 0 || !lines.length) { debugTick = DEBUG_EVERY; debugLines(full); }
     for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], 12, V.H * 0.5 + i * 13);
-    if (full) drawAIDebug();
+  }
+  // ?debug=1's overlays (ui/tuning.js § OVERLAYS), each drawn only while its switch is on.
+  // A box's twelve edges, from its corners [x0, y0, z0, x1, y1, z1].
+  function wireBox(b, col) {
+    const c = [];
+    for (let i = 0; i < 8; i++) c.push(project([b[i & 1 ? 3 : 0], b[i & 2 ? 4 : 1], b[i & 4 ? 5 : 2]]));
+    ctx.strokeStyle = col; ctx.beginPath();
+    for (let i = 0; i < 8; i++) for (const bit of [1, 2, 4]) if (!(i & bit) && c[i] && c[i | bit]) { ctx.moveTo(c[i][0], c[i][1]); ctx.lineTo(c[i | bit][0], c[i | bit][1]); }
+    ctx.stroke();
+  }
+  // NAV (sim/ai/nav.js): within NAV_SHOW of you, a dot per floor of each
+  // square, and a line per link the nav has worked out, white if a mech walks
+  // it and red if not.
+  const NAV_SHOW = 160;
+  function drawNavDebug() {
+    const nav = navOf(G), P = G.player, near = (x, z) => hypot(x - P.x, z - P.z) <= NAV_SHOW;
+    ctx.lineWidth = 1;
+    for (const [key, ok] of nav.links) {
+      const [a, fa, b, fb] = key.split('.').map(Number), A = nav.floorsOf(a)[fa], B = nav.floorsOf(b)[fb];
+      if (!A || !B || !near(A.x, A.z)) continue;
+      const p = project([A.x, A.y + 0.5, A.z]), q = project([B.x, B.y + 0.5, B.z]);
+      if (!p || !q) continue;
+      ctx.strokeStyle = ok ? 'rgba(255,255,255,0.7)' : 'rgba(255,60,60,0.8)';
+      ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke();
+    }
+    ctx.fillStyle = '#fff';
+    for (let x = P.x - NAV_SHOW; x <= P.x + NAV_SHOW; x += SQ) for (let z = P.z - NAV_SHOW; z <= P.z + NAV_SHOW; z += SQ) {
+      if (!near(x, z)) continue;
+      for (const f of nav.floorsAt(x, z)) { const p = project([f.x, f.y + 0.5, f.z]); if (p) ctx.fillRect(p[0] - 2, p[1] - 2, 4, 4); }
+    }
+  }
+  // DIGS AND FALLS (sim/dig.js G.digLog): the last 10 s of digs and falls,
+  // boxed in green; each overhang the torque rule weighed, as load / section,
+  // amber if it held and red if it broke.
+  function drawDigDebug() {
+    const log = G.digLog;
+    if (!log) return;
+    ctx.lineWidth = 1; ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'center';
+    for (const e of log) {
+      if (G.time - e.t > DIG_LOG_S || e.t > G.time) continue;
+      if (e.kind !== 'weigh') { wireBox(e.box, e.kind === 'fall' ? '#9f9' : '#5f5'); continue; }
+      const p = project([e.x, e.y, e.z]);
+      if (p) { ctx.fillStyle = e.broke ? RED : AMBER; ctx.fillText(`${Math.round(e.load)} / ${e.section}`, p[0], p[1]); }
+    }
+    ctx.textAlign = 'right';
   }
   // The enemies' minds (docs/specs/05-ai.md § Debug view): the label over each
   // head, a square where it believes you are with a line to it (red), a line
@@ -529,7 +576,9 @@ export function createHud(app) {
     setLook();
     ctx.setTransform(app.scene.view.dpr * V.s, 0, 0, app.scene.view.dpr * V.s, 0, 0);
     ctx.clearRect(0, 0, V.W, V.H);
-    if (app.params.has('debug') || app.prefs.frameTime) drawDebug();
+    const ov = app.overlays;   // ?debug=1's switches (ui/tuning.js); none without it
+    if (ov ? ov.frame : app.prefs.frameTime) drawDebug();
+    if (ov && G.state !== 'menu' && G.VP) { if (ov.ai) drawAIDebug(); if (ov.nav) drawNavDebug(); if (ov.digs) drawDigDebug(); }
     if (G.state === 'menu' || G.lobby) return;   // the arena lobby: no cockpit yet
     if (G.guide) { drawGuideHUD(); return; }
     const P = G.player, L = hudLayout(), dash = L.dash;

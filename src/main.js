@@ -24,7 +24,6 @@ import { createAudio } from './audio/sound.js';
 import { createInput } from './input/input.js';
 import { createUi } from './ui/screens.js';
 import { createNet } from './net/client.js';
-import { createFeelPanel } from './ui/feelPanel.js';
 import { createBench } from './ui/bench.js';
 import { readLook, LOOK_DEFAULT, LOOK_KEY } from './render/look.js';
 import { loadCampaign, saveCampaign } from './ui/campaign.js';
@@ -118,7 +117,7 @@ function start(root) {
   G.hooks.debrief = app.ui.debrief;
   G.hooks.arenaDeath = () => app.net.sendState();
   // ?debug=1 exposes the state for the smoke test and for poking at in the console.
-  if (params.has('debug')) { window.__stompy = { game: G, app, kill: m => destroy(G, m, G.player) }; app.bench = createBench(app); createFeelPanel(app); }
+  if (params.has('debug')) { window.__stompy = { game: G, app, kill: m => destroy(G, m, G.player) }; app.bench = createBench(app); }
 
   const quiet = () => { for (const k of Object.keys(app.audio.loops)) app.audio.loopSet(k, 0); app.audio.beamSound(false, 1); app.audio.fusionSound(false, 0); app.audio.ambience.tick(G, false); };
   let last = 0, lastAudioCheck = 0;
