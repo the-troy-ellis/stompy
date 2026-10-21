@@ -70,7 +70,8 @@ export function stepSway(s, drop, dt, V = FEEL.view) {
   }
   return out;
 }
-export const compassLabel = d => ({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[d] || String(d / 10).padStart(2, '0'));
+const COMPASS = Array.from({ length: 36 }, (_, i) => ({ 0: 'N', 9: 'E', 18: 'S', 27: 'W' }[i] || String(i).padStart(2, '0')));   // made once: the tape draws a dozen a frame
+export const compassLabel = d => COMPASS[(d / 10) | 0];
 
 // The ?debug=1 label over an enemy: its state, its profile, its group (with
 // a star on the flanker), and what it is up to right now.
@@ -424,25 +425,33 @@ export function createHud(app) {
   // calls, particles. On with the FRAME TIME setting (for playtests on real
   // phones), or ?debug=1's FRAME TIME overlay (on unless switched off), which
   // adds the build, the seed, the state and the cheats.
-  const frames = [];
   let lastFrameAt = 0, stopAt = null, rangeMemo = { t: null, r: 0, at: 0, rate: 0 };
-  function drawDebug() {
-    const now = performance.now();
-    if (lastFrameAt) frames.push(now - lastFrameAt);
-    lastFrameAt = now;
-    while (frames.length > 120) frames.shift();
-    const sorted = [...frames].sort((a, b) => a - b), q = f => (sorted.length ? sorted[min(sorted.length - 1, floor(sorted.length * f))] : 0);
-    ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'left'; ctx.fillStyle = '#9f9';
-    const full = app.params.has('debug');
-    const lines = [`FRAME ${q(0.5).toFixed(1)} ms  P95 ${q(0.95).toFixed(1)} ms`, `DRAWS ${app.R.draws}  CULLED ${app.R.culled || 0}  PARTICLES ${G.parts.length}  MECHS ${G.mechs.length}`];
+  // The readout's text is made DEBUG_EVERY frames (four times a second), not
+  // every frame: it was most of a frame's garbage (#315). The frame times
+  // sit in a ring, sorted in a scratch copy when the text is made.
+  const DEBUG_EVERY = 15, ring = new Float64Array(120), sorted = new Float64Array(120), lines = [];
+  let ringN = 0, ringAt = 0, debugTick = 0;
+  function debugLines(full) {
+    sorted.set(ring);
+    const s = sorted.subarray(0, ringN).sort(), q = f => (ringN ? s[min(ringN - 1, floor(ringN * f))] : 0);
+    lines.length = 0;
+    lines.push(`FRAME ${q(0.5).toFixed(1)} ms  P95 ${q(0.95).toFixed(1)} ms`, `DRAWS ${app.R.draws}  CULLED ${app.R.culled || 0}  PARTICLES ${G.parts.length}  MECHS ${G.mechs.length}`);
     if (full) lines.push(VERSION_LINE);   // which build: a cached phone checked against GitHub
     if (full) lines.push(`SEED ${G.ter?.seed ?? '-'}  T ${G.time.toFixed(1)}  STATE ${G.state}${app.net.mp() ? `  PING ${app.net.Net.rtt} ms` : ''}`);
-    if (full) {   // the cheats that are on, so a screenshot says how it was made; a plain loop: nothing made while none are on
+    if (full) {   // the cheats that are on, so a screenshot says how it was made
       let on = '';
       for (const [k, l] of CHEATS) if (G.cheats?.[k]) on += (on ? ' · ' : '') + l;
       if (on) lines.push(G.mode === 'sp' ? `CHEATS: ${on}` : 'CHEATS (OFF HERE)');
     }
-    lines.forEach((l, i) => ctx.fillText(l, 12, V.H * 0.5 + i * 13));
+  }
+  function drawDebug() {
+    const now = performance.now();
+    if (lastFrameAt) { ring[ringAt] = now - lastFrameAt; ringAt = (ringAt + 1) % ring.length; ringN = min(ringN + 1, ring.length); }
+    lastFrameAt = now;
+    ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'left'; ctx.fillStyle = '#9f9';
+    const full = app.params.has('debug');
+    if (debugTick-- <= 0 || !lines.length) { debugTick = DEBUG_EVERY; debugLines(full); }
+    for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], 12, V.H * 0.5 + i * 13);
   }
   // ?debug=1's overlays (ui/tuning.js § OVERLAYS), each drawn only while its switch is on.
   // A box's twelve edges, from its corners [x0, y0, z0, x1, y1, z1].

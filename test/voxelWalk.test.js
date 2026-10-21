@@ -8,7 +8,7 @@ import { makeGround } from '../src/world/voxels.js';
 import { polar } from '../src/sim/placement.js';
 import { initFeet } from '../src/sim/gait.js';
 import { blocked } from '../src/sim/sight.js';
-import { rayHit, center } from '../src/sim/geom.js';
+import { rayHit, center, eyeOf } from '../src/sim/geom.js';
 import { geoOf } from '../src/data/geo.js';
 
 const { hypot, max, PI } = Math;
@@ -112,4 +112,19 @@ test('an arch lets a shot through its opening; an overhang stops one its open to
   // The same line with only the open ground (no lip) is clear.
   G.ter = makeGround(1, { flat: true });
   assert.equal(blocked(G, under, above), false);
+});
+
+test('walking into a pocket the bucket dug, the cockpit stops short of its roof', () => {
+  // The digger bites the mesa's face at chest height, then keeps walking in:
+  // the hollow fits its chest, but its roof sits at eye height. The view must
+  // stay out of the rock (it would see through the inside of the ground).
+  const G = world([MESA], 0, polar([0, 400]).z - 80 - 12, 0, 'digger'), P = G.player;
+  let worst = Infinity;
+  for (let t = 0; t < 14; t += 0.25) {
+    stepFor(G, 0.25, input({ thrUp: true, punch: t > 1 && t % 1 === 0 }));
+    const e = eyeOf(P), a = P.yaw + P.twist;
+    for (let r = 0.1; r <= 0.6; r += 0.1) for (const up of [0, 0.3]) if (G.ter.solid(e[0] + Math.sin(a) * r, e[1] + up, e[2] + Math.cos(a) * r)) worst = Math.min(worst, r);
+  }
+  assert.ok(P.ore > 0, `it dug: ${P.ore} ore`);
+  assert.equal(worst, Infinity, `rock ${worst.toFixed(1)} m in front of the eye`);
 });
