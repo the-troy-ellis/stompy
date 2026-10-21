@@ -181,7 +181,15 @@ filling upward, amber over 55, red over 80, flashing over 85. Right: jump
 jets, filling upward. Bottom: speed, reverse to full from left to right
 with a tick at zero, the throttle's setting as an amber notch outside it,
 and KPH under it. It sits where the bars and the wire were: the dashboard's
-left on desktop, the top left on touch (`render/hud.js` `drawRing`). All of it stops the moment the
+left on desktop, the top left on touch (`render/hud.js` `drawRing`).
+
+**On touch, the fire buttons are the weapon readout** (the owner found the
+weapon list's bars too busy on a phone). The HUD's list is off there (a
+digger's hopper line stays). Each fire button shows its weapons: a dark pie
+that sweeps away clockwise as they recharge, the OOPS BUTTON's 3 s scan
+filling it bright, the ammo left under its label, and dim red when they are
+all destroyed or out of ammo (`input/input.js` `fireStatus`, CSS
+`conic-gradient`; a style is written only when it changes). All of it stops the moment the
 reactor trips, which is the point: the quiet after is the shutdown.
 
 ### Audio layer

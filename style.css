@@ -84,8 +84,14 @@ html, body {
   right: calc(12px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom));
   display: grid; grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(3, 52px); gap: 8px;
 }
-.tfire { border-radius: 50%; font-size: 10px; letter-spacing: 0; --c: 95, 255, 95; color: rgb(var(--c)); border-color: rgba(var(--c), .7); background: rgba(var(--c), .12); }
-.tfire.on { background: rgba(var(--c), .5); color: #000; }
+.tfire { border-radius: 50%; font-size: 10px; letter-spacing: 0; --c: 95, 255, 95; color: rgb(var(--c)); border-color: rgba(var(--c), .7);
+  /* input/input.js fireStatus: --cd, the recharge left (a dark pie sweeping away clockwise); --scan, the OOPS BUTTON's scan (bright, filling) */
+  background: conic-gradient(rgba(var(--c), .55) calc(var(--scan, 0) * 1turn), rgba(0, 0, 0, .55) 0 calc(var(--cd, 0) * 1turn), rgba(var(--c), .12) 0);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.tfire.on { background: conic-gradient(rgba(0, 0, 0, .55) calc(var(--cd, 0) * 1turn), rgba(var(--c), .5) 0); color: #000; }   /* held: the pie stays */
+.tfire.gone { --c: 255, 70, 70; opacity: .55; }
+.tammo { font-style: normal; font-size: 10px; opacity: .85; line-height: 1; }
+.tammo:empty { display: none; }
 .t-energy { grid-column: 2 / span 2; grid-row: 2 / span 2; font-size: 15px; --c: 92, 204, 255; }
 .t-missile { grid-column: 1; grid-row: 2; --c: 255, 120, 70; }
 .t-ballistic { grid-column: 1; grid-row: 3; --c: 255, 204, 51; }
