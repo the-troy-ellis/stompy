@@ -164,7 +164,7 @@ Open the browser's performance panel or use the in-game frame-time readout
 frame time over 60 s of fighting. Report both in the PR.
 
 For before and after on the same device, use the bench: `?debug=1&bench=1`
-(or BENCH on the FEEL panel) plays the same scripted 25 seconds every time
+(or BENCH on the DEBUG tab's JUMP TO) plays the same scripted 25 seconds every time
 and ends on a card of each part's frame rate, work time (mean and 95th
 percentile), draws and particles, with the last run's beside them. Run it
 on main, then on the branch.

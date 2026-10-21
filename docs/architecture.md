@@ -383,6 +383,7 @@ src/
     screens.js     briefing, pause, debrief
     debrief.js     objectiveRows, debriefTitle: the debrief's tick-or-cross rows
     debugMenu.js   the DEBUG tab under ?debug=1: RANGE, CHEATS, JUMP TO, TUNING (M8, spec 19)
+    tuning.js      TUNING's pages (FEEL, GAIT, LOOK) and the overlays' switches, on the tab and in the pause menu (M8, spec 19)
   input/
     keyboard.js
     mouse.js

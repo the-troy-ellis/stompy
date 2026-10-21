@@ -30,7 +30,6 @@ try {
   };
   await run('desktop', URL_ + '&lock', async page => {   // &lock: the locks a fresh save has, which ?debug=1 would open
     // FIT: cycle the left arm, see the preview mech change, go overweight, reset, back.
-    await page.click('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way
     const tabs = await page.evaluate(() => [...document.querySelectorAll('[data-sel]')].map(b => b.dataset.sel).join(','));
     if (tabs !== 'campaign,free,mp,settings') { failed = true; console.error(`FAIL: &lock should show the player's four tabs (${tabs})`); }
     await page.click('[data-a="fit"]');
@@ -107,7 +106,6 @@ try {
     const seen = await page.evaluate(() => [[...document.querySelectorAll('[data-sel]')].map(b => b.dataset.sel).join(','), document.querySelector('.mm-item.on')?.dataset.sel]);
     console.log(`debug tab: tabs ${seen[0]}, opened on ${seen[1]}`);
     if (seen[0] !== 'campaign,free,mp,settings,debug' || seen[1] !== 'debug') { failed = true; console.error(`FAIL: ?debug=1 should show a DEBUG tab and open on it (${seen})`); }
-    await page.click('.feel-panel [data-a="toggle"]');
     await page.click('[data-dsec="jump"]');
     await page.click('[data-dmis="1"]');
     const mis = await page.evaluate(() => window.__stompy.app.prefs.mission);
@@ -118,7 +116,6 @@ try {
   });
   // RANGE: the arch, two foes standing still; LAUNCH puts you on the range facing it.
   await run('debug-range', URL_, async page => {
-    await page.click('.feel-panel [data-a="toggle"]');
     await page.click('[data-dsec="cheats"]');
     await page.click('[data-dch="digs"]');   // BIG DIGS on
     await page.screenshot({ path: 'test-results/smoke-debug-cheats.png' });
@@ -145,7 +142,6 @@ try {
   });
   // The digger (spec 20, #308): ?debug=1's selector offers it; on the range its punch bites the mesa and fills the hopper.
   await run('digger', URL_, async page => {
-    await page.click('.feel-panel [data-a="toggle"]');
     for (let i = 0; i < 8 && (await page.evaluate(() => window.__stompy.app.prefs.chassis)) !== 'digger'; i++) await page.click('[data-mech="1"]');
     const menu = await page.evaluate(() => [window.__stompy.app.prefs.chassis, document.querySelector('.mm-role')?.textContent, !!document.querySelector('.mm-fit')]);
     await page.click('[data-sel="debug"]'); await page.click('[data-dsec="range"]');
@@ -159,9 +155,49 @@ try {
     console.log(`digger: ${menu[1]} (FIT shown ${menu[2]}); three bites into the mesa, ${r.ore} ore, ${r.guns} guns`);
     if (menu[0] !== 'digger' || menu[1] !== 'IT DIGS.' || menu[2] || !(r.ore > 0) || r.guns) { failed = true; console.error(`FAIL: the digger (${menu}, ${JSON.stringify(r)})`); }
   });
+  // TUNING and the overlays (spec 19, #299): a FEEL number edited on the page takes at once; NAV and DIGS AND FALLS
+  // drawn over the range's arch after its leg is cut; the same pages in the pause menu.
+  await run('tuning', URL_, async page => {
+    await page.click('[data-sel="debug"]'); await page.click('[data-dsec="tuning"]');
+    await page.click('[data-tune="feel"]');
+    const box = await page.$('.dbg-tune input[data-ev="step"][data-col="kick"]');
+    await box.fill('0.77'); await box.dispatchEvent('input');
+    const kick = await page.evaluate(async () => (await import('/src/data/feel.js')).FEEL.step.kick);
+    await page.click('[data-tune="gait"]');
+    const gaitRows = await page.$$eval('.dbg-tune input[data-gait]', l => l.length);
+    await page.click('[data-tune-a="copy"]');
+    const copied = await page.$eval('.dbg-tune-out', t => JSON.parse(t.value).step.kick);
+    await page.click('[data-tune="overlays"]');
+    for (const k of ['nav', 'digs']) if (!(await page.$eval(`[data-tov="${k}"]`, b => b.classList.contains('on')))) await page.click(`[data-tov="${k}"]`);
+    await page.screenshot({ path: 'test-results/smoke-tuning-menu.png' });
+    await page.click('[data-dsec="range"]');
+    for (let i = 0; i < 8 && (await page.$eval('[data-drg="ground"] ~ b', b => b.textContent)) !== 'ARCH'; i++) await page.click('[data-drg="ground"][data-d="1"]');
+    await page.click('[data-a="go"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'range' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    const logged = await page.evaluate(async () => {   // the arch's +x leg cut through (as test/torque.test.js), then a dig there runs the rules
+      const G = window.__stompy.game, { dig } = await import('/src/sim/dig.js'), ax = 0, az = 220;
+      for (const y of [0, 6, 12, 18]) for (const dz of [-8, 0, 8]) for (const dx of [-6, 0, 6]) G.ter.carve([ax - 46 + dx, y, az + dz], 7);
+      dig(G, [ax - 46, G.ter.groundBelow(ax - 46, 2, az), az], 4);
+      return G.digLog.map(e => e.kind);
+    });
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: 'test-results/smoke-overlay-digs.png' });
+    await page.evaluate(async () => {   // a route under the arch, so the nav has links to show (it works them out only when asked)
+      const G = window.__stompy.game, P = G.player, { navOf } = await import('/src/sim/ai/nav.js');
+      navOf(G).path(P.x, P.y, P.z, 0, 0, 300);
+      P.pitch = -0.5;
+    });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: 'test-results/smoke-overlay-nav.png' });
+    await page.keyboard.press('KeyP'); await page.waitForTimeout(300);
+    const inPause = await page.evaluate(() => !!document.querySelector('.dbg-pause .dbg-tune [data-tune="feel"]'));
+    await page.screenshot({ path: 'test-results/smoke-tuning-pause.png' });
+    const links = await page.evaluate(async () => (await import('/src/sim/ai/nav.js')).navOf(window.__stompy.game).links.size);
+    console.log(`tuning: FEEL step.kick -> ${kick}, ${gaitRows} gait inputs, COPY has ${copied}; digs logged ${[...new Set(logged)]}; ${links} nav links; in the pause menu ${inPause}`);
+    if (kick !== 0.77 || !(gaitRows > 4) || copied !== 0.77 || !logged.includes('dig') || !logged.includes('weigh') || !inPause) { failed = true; console.error('FAIL: TUNING and the overlays'); }
+  });
   // The crew and SWAP (spec 20, #310): a range with a digger parked beside you; Q swaps into it and back.
   await run('crew', URL_, async page => {
-    await page.click('.feel-panel [data-a="toggle"]');
     await page.click('[data-sel="debug"]'); await page.click('[data-dsec="range"]');
     for (let i = 0; i < 4 && (await page.$eval('[data-drg="crew"] ~ b', b => b.textContent)) === 'JUST YOU'; i++) await page.click('[data-drg="crew"][data-d="1"]');
     await page.click('[data-a="go"]');
@@ -177,7 +213,6 @@ try {
   });
   // The base (spec 20, #309): the digger, a silo; BUILD held then let go puts the factory up.
   await run('base', URL_, async page => {
-    await page.click('.feel-panel [data-a="toggle"]');
     for (let i = 0; i < 8 && (await page.evaluate(() => window.__stompy.app.prefs.chassis)) !== 'digger'; i++) await page.click('[data-mech="1"]');
     await page.click('[data-sel="debug"]'); await page.click('[data-dsec="range"]');
     for (let i = 0; i < 8 && (await page.$eval('[data-drg="ground"] ~ b', b => b.textContent)) !== 'FLAT'; i++) await page.click('[data-drg="ground"][data-d="1"]');
@@ -195,7 +230,6 @@ try {
   });
   // Raids (spec 20, #311): the range's SILO AND A RAID, the raid brought forward; it is called and walks on going for the base.
   await run('raid', URL_, async page => {
-    await page.click('.feel-panel [data-a="toggle"]');
     await page.click('[data-sel="debug"]'); await page.click('[data-dsec="range"]');
     for (let i = 0; i < 3 && (await page.$eval('[data-drg="base"] ~ b', b => b.textContent)) !== 'SILO AND A RAID'; i++) await page.click('[data-drg="base"][data-d="1"]');
     await page.click('[data-a="go"]');
@@ -210,7 +244,6 @@ try {
   });
   // The base mission (spec 20, #312) from JUMP TO: dig the mesa, unload at the silo, put the factory up, swap.
   await run('first-factory', URL_, async page => {
-    await page.click('.feel-panel [data-a="toggle"]');
     await page.click('[data-sel="debug"]'); await page.click('[data-dsec="jump"]');
     await page.click('[data-dj="base"]');
     await page.waitForFunction(() => window.__stompy.game.kind === 'base' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
@@ -234,7 +267,6 @@ try {
   });
   // SWAP on touch (spec 20): the digger shows BUILD and no guns; TGT held swaps into the KESTREL, whose fire buttons appear.
   await run('touch-swap', URL_ + '&touch=1', async page => {
-    await page.tap('.feel-panel [data-a="toggle"]');
     await page.tap('[data-sel="debug"]'); await page.tap('[data-dsec="jump"]');
     await page.tap('[data-dj="base"]');
     await page.waitForFunction(() => window.__stompy.game.kind === 'base' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
@@ -252,7 +284,6 @@ try {
   });
   await run('touch', URL_ + '&touch=1', async page => {
     // Taps, not clicks: a mouse click would switch the game back to mouse mode.
-    await page.tap('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way, as on desktop
     await page.tap('[data-sel="free"]');
     await page.tap('[data-a="go"]');
     await page.waitForFunction(() => window.__stompy?.game?.state === 'play', null, { timeout: 10000 });
@@ -324,7 +355,6 @@ try {
     page.on('console', m => { if (m.type() === 'error') errors.push(`editor: console ${m.text()}`); });
     await page.goto(`http://localhost:${PORT}/?debug=1&edit=1&mission=m03`);
     await page.waitForSelector('.ed-panel', { timeout: 15000 });
-    await page.evaluate(() => document.querySelector('.feel-panel [data-a="toggle"]')?.click());
     const at = id => page.evaluate(i => { const ed = window.__stompy.app.editor; return ed.toScreen(ed.E.map.things.find(x => x.id === i)); }, id);
     const truck = await at('entities.truck2');
     await page.touchscreen.tap(truck[0], truck[1]);
@@ -403,7 +433,7 @@ try {
       await page.addInitScript(([s, c]) => { localStorage.setItem('stompy.hud.scale', String(s)); localStorage.setItem('stompy.hud.colours', String(c)); }, [scale, colours]);
       await page.goto(URL_ + (touch ? '&touch=1' : ''));
       await page.waitForSelector('.mm-title', { timeout: 15000 });
-      await page.evaluate(() => { document.querySelector('.feel-panel [data-a="toggle"]')?.click(); document.querySelector('[data-sel="free"]').click(); document.querySelector('[data-a="go"]').click(); });
+      await page.evaluate(() => { document.querySelector('[data-sel="free"]').click(); document.querySelector('[data-a="go"]').click(); });
       await page.waitForFunction(() => window.__stompy.game.state === 'play', null, { timeout: 10000 });
       await page.evaluate(() => { const g = window.__stompy.game, p = g.player; p.hp.LA = p.max.LA * 0.5; p.hp.RA = p.max.RA * 0.2; p.hp.LL = 0.01; p.heat = 70; for (const m of g.mechs) if (m.team) m.ai.aware = false; g.target = g.mechs.find(m => m.team); window.__stompy.app.ui.pause(false); });
       await page.waitForTimeout(600);
@@ -428,7 +458,6 @@ try {
     const mission1 = async () => {
       await page.goto(URL_);
       await page.waitForSelector('.mm-title', { timeout: 15000 });
-      await page.click('.feel-panel [data-a="toggle"]');
       await page.click('[data-sel="campaign"]');
       await page.click('[data-a="go"]');
       await page.waitForFunction(() => window.__stompy.game.state === 'play', null, { timeout: 10000 });
@@ -468,7 +497,6 @@ try {
     });
     await page.goto(URL_ + '&touch=1');
     await page.waitForSelector('.mm-title', { timeout: 15000 });
-    await page.tap('.feel-panel [data-a="toggle"]');
     const press = async i => { await page.evaluate(i => window.__pad.set(i, true), i); await page.waitForTimeout(120); await page.evaluate(i => window.__pad.set(i, false), i); await page.waitForTimeout(120); };
     const hold = async (fn, ms) => { await page.evaluate(fn); await page.waitForTimeout(ms); };
     await press(13); await press(13);   // D-pad down twice: CAMPAIGN, then FREE PLAY
@@ -513,7 +541,6 @@ try {
       page.on('console', m => { if (m.type() === 'error') errors.push(`arena ${name}: console ${m.text()}`); });
       await page.goto(URL_);
       await page.waitForSelector('.mm-title', { timeout: 15000 });
-      await page.click('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way
       await page.click('[data-sel="mp"]');
       await page.fill('#callsign', name);
       // ONE joins in a custom fit (the two tabs share storage, so it is cleared again for TWO).
@@ -567,7 +594,6 @@ try {
     late.on('pageerror', e => errors.push(`arena THREE: ${e.message}`));
     await late.goto(URL_);
     await late.waitForSelector('.mm-title', { timeout: 15000 });
-    await late.click('.feel-panel [data-a="toggle"]');
     await late.click('[data-sel="mp"]');
     await late.fill('#callsign', 'THREE');
     await late.click('[data-a="go"]');
@@ -621,7 +647,6 @@ try {
       page.on('console', m => { if (m.type() === 'error') errors.push(`tdm ${name}: console ${m.text()}`); });
       await page.goto(URL_);
       await page.waitForSelector('.mm-title', { timeout: 15000 });
-      await page.click('.feel-panel [data-a="toggle"]');
       await page.click('[data-sel="mp"]');
       await page.fill('#callsign', name);
       await page.click('[data-a="go"]');
@@ -694,7 +719,6 @@ try {
       page.on('console', m => { if (m.type() === 'error') errors.push(`coop ${name}: console ${m.text()}`); });
       await page.goto(URL_);
       await page.waitForSelector('.mm-title', { timeout: 15000 });
-      await page.click('.feel-panel [data-a="toggle"]');
       await page.click('[data-sel="mp"]');
       await page.click('[data-mpk="coop"]');
       await page.fill('#callsign', name);
@@ -746,7 +770,6 @@ try {
       page.on('console', m => { if (m.type() === 'error') errors.push(`private ${name}: console ${m.text()}`); });
       await page.goto(URL_);
       await page.waitForSelector('.mm-title', { timeout: 15000 });
-      await page.click('.feel-panel [data-a="toggle"]');
       await page.click('[data-sel="mp"]');
       await page.click('[data-mpk="arena"]');
       await page.fill('#callsign', name);
@@ -820,7 +843,6 @@ try {
     await ctx.setOffline(true);
     await page.reload();
     await page.waitForSelector('.mm-title', { timeout: 10000 });
-    await page.click('.feel-panel [data-a="toggle"]');
     await page.click('[data-sel="campaign"]');
     await page.click('[data-a="go"]');
     const offline = await page.waitForFunction(() => window.__stompy.game.state === 'play', null, { timeout: 8000 }).then(() => true).catch(() => false);
