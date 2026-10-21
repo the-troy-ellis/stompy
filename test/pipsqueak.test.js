@@ -12,8 +12,8 @@ import { BEHAVIOUR as B } from '../src/data/ai.js';
 
 const ch = CHASSIS.light1;
 
-test('PIPSQUEAK (light1): the spec numbers, boosted jets stock, a placeholder name, selectable', () => {
-  assert.equal(NAMES.chassis.light1, 'PIPSQUEAK');
+test('BIG TROUBLE (light1): the spec numbers, boosted jets stock, the owner\'s name, selectable', () => {
+  assert.equal(NAMES.chassis.light1, 'BIG TROUBLE');
   assert.equal(NAMES.roles.light1.role, 'IT IS SMALL. IT IS RUDE.');
   assert.ok(MECH_ORDER.includes('light1'));
   assert.equal(ch.legs, 'reverse');
