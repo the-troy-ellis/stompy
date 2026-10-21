@@ -6,7 +6,7 @@ import { CATS, CAT_OF } from '../data/weapons.js';
 import { CHASSIS, MECH_ORDER, MECH_INFO, PILOTABLE } from '../data/chassis.js';
 import { NAMES } from '../data/names.js';
 import { PALS, palAt } from '../data/palettes.js';
-import { missionDef, missionFoes, FP_MAPS, FP_MIXES, FP_WEATHER, FP_TIMES, fpWeather, pickFoes } from '../data/missions.js';
+import { missionDef, missionFoes, BASE_MISSION, FP_MAPS, FP_MIXES, FP_WEATHER, FP_TIMES, fpWeather, pickFoes } from '../data/missions.js';
 import { MP_COLORS } from '../data/colors.js';
 import { MODE_NAMES } from './lobby.js';
 import { makeGround } from '../world/voxels.js';
@@ -42,12 +42,21 @@ export function createUi(app) {
   }
   // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
   function startSkirmish() {
+    if (FP_MAPS[prefs.fpMap] === 'base') { startBase(); return; }
     const pk = FP_MAPS[prefs.fpMap] === 'random' ? ['dusk', 'ice', 'volcanic'][floor(random() * 3)] : FP_MAPS[prefs.fpMap];
     const foes = pickFoes(FP_MIXES[prefs.fpMix] || FP_MIXES[0], prefs.fpFoes, random, k => !locked(k));
     G.diff = prefs.diff;
     const weather = fpWeather(FP_WEATHER[prefs.fpWeather] || 'clear', pk, random), time = FP_TIMES[prefs.fpTime] || 'day';
     startMatch(G, { name: 'Free Play', pal: pk, foes, intel: '', weather, time }, 1 + floor(random() * 1e5), false, prefs.chassis, { loadout: fitOf(prefs.chassis) });
     G.kind = 'free';
+    app.scene.uploadWorld();
+  }
+
+  // Build and fight's mission (spec 20): you start in its digger, whatever is in the selector.
+  function startBase() {
+    G.diff = prefs.diff;
+    startMatch(G, BASE_MISSION, BASE_MISSION.seed, false, BASE_MISSION.pilot);
+    G.kind = 'base';
     app.scene.uploadWorld();
   }
 
@@ -114,7 +123,7 @@ export function createUi(app) {
   /* ----- the main menu: Campaign / Free Play / Multiplayer / Settings (and DEBUG), and your mech ----- */
 
   // ?debug=1 adds the DEBUG tab (ui/debugMenu.js, docs/specs/19-debug-menu.md).
-  const dbg = createDebugMenu(app, { startMission, launch, renderMenu });
+  const dbg = createDebugMenu(app, { startMission, startBase, launch, renderMenu });
   // Under the tonnage budget, or NO WEIGHT LIMIT on (single player; never for the arena or co-op, which check it).
   const fitOk = k => fitUnder(k) || (cheat(G, 'weight') && prefs.menuSel !== 'mp');
   const MENU = [['campaign', 'CAMPAIGN'], ['free', 'FREE PLAY'], ['mp', 'MULTIPLAYER'], ['settings', 'SETTINGS'], ...(dbg.on ? [['debug', 'DEBUG']] : [])];
@@ -178,12 +187,15 @@ export function createUi(app) {
         ${camp.mission > 0 ? `<button class="opt${really ? ' really' : ''}" data-a="restart">${really ? 'REALLY?' : 'RESTART CAMPAIGN'}</button>` : ''}`;
     }
     if (prefs.menuSel === 'free') {
-      const mapName = FP_MAPS[prefs.fpMap] === 'random' ? 'RANDOM' : PALS[FP_MAPS[prefs.fpMap]].name.toUpperCase();
+      const map = FP_MAPS[prefs.fpMap], mapName = map === 'random' ? 'RANDOM' : map === 'base' ? 'BASE' : PALS[map].name.toUpperCase();
+      const mapPick = `<div class="mm-pick"><span>MAP</span><button data-fp="map" data-d="-1">◀</button><b>${mapName}</b><button data-fp="map" data-d="1">▶</button></div>`;
+      const diffPick = `<div class="mm-pick"><span>DIFFICULTY</span><button data-fp="diff" data-d="-1">◀</button><b>${DIFF[prefs.diff].label}</b><button data-fp="diff" data-d="1">▶</button></div>`;
+      if (map === 'base') return `<p>${esc(BASE_MISSION.name)}. ${esc(BASE_MISSION.intel)}</p><div class="fp-picks">${mapPick}${diffPick}</div>`;   // spec 20: its own mission, its own mechs
       return `<p>One fight. You pick.</p>
-        <div class="fp-picks"><div class="mm-pick"><span>MAP</span><button data-fp="map" data-d="-1">◀</button><b>${mapName}</b><button data-fp="map" data-d="1">▶</button></div>
+        <div class="fp-picks">${mapPick}
         <div class="mm-pick"><span>HOSTILES</span><button data-fp="foes" data-d="-1">◀</button><b>${prefs.fpFoes}</b><button data-fp="foes" data-d="1">▶</button></div>
         <div class="mm-pick"><span>MIX</span><button data-fp="mix" data-d="-1">◀</button><b>${(FP_MIXES[prefs.fpMix] || FP_MIXES[0]).label}</b><button data-fp="mix" data-d="1">▶</button></div>
-        <div class="mm-pick"><span>DIFFICULTY</span><button data-fp="diff" data-d="-1">◀</button><b>${DIFF[prefs.diff].label}</b><button data-fp="diff" data-d="1">▶</button></div>
+        ${diffPick}
         <div class="mm-pick"><span>WEATHER</span><button data-fp="weather" data-d="-1">◀</button><b>${(FP_WEATHER[prefs.fpWeather] || 'clear').toUpperCase()}</b><button data-fp="weather" data-d="1">▶</button></div>
         <div class="mm-pick"><span>TIME</span><button data-fp="time" data-d="-1">◀</button><b>${{ day: 'NORMAL', dawn: 'DAWN', night: 'NIGHT' }[FP_TIMES[prefs.fpTime] || 'day']}</b><button data-fp="time" data-d="1">▶</button></div></div>`;
     }
@@ -291,7 +303,7 @@ export function createUi(app) {
     app.audio.loadSamples();
     app.input.lockPointer();
     app.input.syncWeaponButtons();
-    app.audio.say(G.kind === 'campaign' ? `${missionSpoken(prefs.mission + 1, G.def.name)} Systems online.` : G.kind === 'edit' || G.kind === 'bench' ? 'Systems online.' : G.kind === 'range' ? 'Range open. Systems online.' : 'Free play. Systems online.', true);
+    app.audio.say(G.kind === 'campaign' ? `${missionSpoken(prefs.mission + 1, G.def.name)} Systems online.` : G.kind === 'edit' || G.kind === 'bench' ? 'Systems online.' : G.kind === 'range' ? 'Range open. Systems online.' : G.kind === 'base' ? `${G.def.name}. Systems online.` : 'Free play. Systems online.', true);
   }
 
   function debrief() {
@@ -315,7 +327,7 @@ export function createUi(app) {
     showOverlay(`
       <h1 style="color:${G.won ? '#5f5' : '#f44'}">${debriefTitle(G)}</h1>
       <div class="panel">
-        <div class="k">${isCamp ? esc(missionTitle(prefs.mission + 1, G.def.name)) : G.kind === 'edit' ? `EDITOR · ${esc(G.def.name)}` : 'FREE PLAY'}</div>
+        <div class="k">${isCamp ? esc(missionTitle(prefs.mission + 1, G.def.name)) : G.kind === 'edit' ? `EDITOR · ${esc(G.def.name)}` : G.kind === 'base' ? esc(G.def.name) : 'FREE PLAY'}</div>
         ${rows ? `<div class="objs">${rows}</div>` : ''}
         ${fresh.length ? `<div class="unlock">NEW MECH: ${fresh.map(k => esc(CHASSIS[k].name)).join(', ')}</div>` : ''}
         <div class="verdict ${G.won ? 'ok' : 'no'}">${esc(verdict(G))}</div>
@@ -428,6 +440,7 @@ export function createUi(app) {
     else if (a === 'retry') { startMission(prefs.mission); launch(); }
     else if (a === 'again' && G.kind === 'edit') app.editor.play();   // the editor's mission again, as it is now
     else if (a === 'again' && G.kind === 'range') dbg.again();   // the DEBUG tab's range (ui/debugMenu.js)
+    else if (a === 'again' && G.kind === 'base') { startBase(); launch(); }   // the base mission again (spec 20)
     else if (a === 'again') { startSkirmish(); launch(); }
     else if (G.state === 'play' && G.paused) pause(false);
   });
@@ -454,5 +467,5 @@ export function createUi(app) {
   ov.addEventListener('pointerup', endDrag); ov.addEventListener('pointercancel', endDrag);
   const setStatus = t => { const el = $('.status', ov); if (el) el.textContent = t; };
 
-  return { OPTS, MENU, fitOk, controls, showOverlay, hideOverlay, setStatus, mainMenu, showMech, menuTick, renderMenu, go, launch, debrief, pause, cycleMech, startMission, startSkirmish };
+  return { OPTS, MENU, fitOk, controls, showOverlay, hideOverlay, setStatus, mainMenu, showMech, menuTick, renderMenu, go, launch, debrief, pause, cycleMech, startMission, startSkirmish, startBase };
 }

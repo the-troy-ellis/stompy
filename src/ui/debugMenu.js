@@ -1,6 +1,6 @@
 import { esc } from '../util/dom.js';
 import { store } from '../util/store.js';
-import { missionDef, FP_MIXES, FP_WEATHER, FP_TIMES, fpWeather, pickFoes } from '../data/missions.js';
+import { missionDef, BASE_MISSION, FP_MIXES, FP_WEATHER, FP_TIMES, fpWeather, pickFoes } from '../data/missions.js';
 import { CHASSIS, MECH_ORDER } from '../data/chassis.js';
 import { RANGE_GROUNDS, RANGE_FOES, RANGE_MAX, RANGE_CREW, RANGE_BASE, rangeDef } from '../data/range.js';
 import { startMatch } from '../sim/state.js';
@@ -54,7 +54,7 @@ export function createDebugMenu(app, ui) {
     tuning: () => '<p class="dim">Not built yet.</p>',
     // Any mission (all open under ?debug=1); GO plays it. The rest go on a tap.
     jump: () => `<div class="mm-pick"><span>MISSION</span><button data-dmis="-1">◀</button><b>${esc(missionTitle(prefs.mission + 1, missionDef(prefs.mission).name))}</b><button data-dmis="1">▶</button></div>
-      <div class="opts"><button class="opt" data-dj="editor">EDITOR</button><button class="opt" data-dj="bench">BENCH</button><button class="opt" data-dj="tut">TUTORIAL AGAIN</button></div>`,
+      <div class="opts"><button class="opt" data-dj="editor">EDITOR</button><button class="opt" data-dj="bench">BENCH</button><button class="opt" data-dj="tut">TUTORIAL AGAIN</button><button class="opt" data-dj="base">${esc(BASE_MISSION.name)}</button></div>`,
   };
 
   return {
@@ -88,6 +88,7 @@ export function createDebugMenu(app, ui) {
       if (m) { prefs.mission = (prefs.mission + +m.dataset.dmis + STRIP) % STRIP; ui.renderMenu(); return true; }
       if (j === 'editor') { const q = new URLSearchParams(location.search); q.set('edit', '1'); q.set('debug', '1'); location.search = q.toString(); return true; }
       if (j === 'bench') { app.bench?.start(); return true; }
+      if (j === 'base') { ui.startBase(); ui.launch(); return true; }   // spec 20's mission
       if (j === 'tut') { store.set('tut.done', false); ui.startMission(0); ui.launch(); return true; }
       return false;
     },

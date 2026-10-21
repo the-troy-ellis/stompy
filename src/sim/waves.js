@@ -22,9 +22,10 @@ export function waveFoes(G, foes) {
 // degrees from the start (a flank), or a nav point's id (they walk in from
 // there). `reveal: s` makes an entrance (mission 10's PURPLE PUNCHER): for
 // its first s seconds it walks straight in without firing, and its steps are
-// heard and felt at any distance (ai.js, gait.js). Returns the new mechs.
+// heard and felt at any distance (ai.js, gait.js). `raid: true` sends it at
+// the base (raid.js). Returns the new mechs.
 export const revealing = (G, m) => (m.ai?.revealUntil ?? 0) > G.time;
-export function spawnWave(G, foes, { from = 'ring', dist = WAVE_DIST, reveal = 0 } = {}) {
+export function spawnWave(G, foes, { from = 'ring', dist = WAVE_DIST, reveal = 0, raid = false } = {}) {
   const rng = G.rng, P = G.player, nav = typeof from === 'string' && from !== 'ring' ? G.entities.find(e => e.id === from) : null;
   return foes.map((t, i) => {
     let x, z;
@@ -35,6 +36,7 @@ export function spawnWave(G, foes, { from = 'ring', dist = WAVE_DIST, reveal = 0
     const m = newMech(G, t, 1, x, z, atan2(P.x - x, P.z - z));
     m.ai.aware = true;
     if (reveal) m.ai.revealUntil = G.time + reveal;
+    if (raid) m.ai.raid = true;   // it goes for the base (raid.js)
     G.mechs.push(m);
     return m;
   });

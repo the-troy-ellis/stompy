@@ -40,6 +40,7 @@ export function objectiveLine(o) {
     case 'escort': return fit(`ESCORT ${fmtDist(o.dist ?? 0)}`, o.left != null ? ` ${fmtClock(o.left)}` : '');
     case 'extract': return fit(`EXTRACT ${fmtDist(o.dist ?? 0)}`, o.left != null ? ` ${fmtClock(o.left)}` : '');
     case 'protect': return fit(`PROTECT ${d.label || 'TARGETS'}`, ` ${o.alive ?? o.targets.length}/${o.total ?? o.targets.length}`);
+    case 'keep': return fit(`KEEP ${d.label || 'TARGETS'} UP`, '');
     default: return d.type.toUpperCase().slice(0, 24);
   }
 }

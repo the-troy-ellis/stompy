@@ -355,6 +355,7 @@ src/
     cheats.js      cheat(G, key): the DEBUG tab's cheats, single player only (M8, spec 19)
     crew.js        G.crew, swap(G), park, nextCrew: the mechs you drive and SWAP between (M9, spec 20)
     base.js        the base: silo, unloading, BUILD (footprint, placeFactory), the factory's queue (M9, spec 20)
+    raid.js        raids and salvage: the raid's call, what a raider goes for, wrecks' salvage to the silo (M9, spec 20)
     beams.js       melt, beamTick, coolArmour
     fusion.js      fusionTick, fusionFire, pulses
     missiles.js    missile steering, guide state (no camera code)

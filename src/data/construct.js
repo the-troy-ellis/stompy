@@ -19,7 +19,7 @@ export const CONSTRUCT = {
   bucket: 6, hopper: 40, orePerCorner: 4,
   startOre: 20, factory: 60, buildTime: 6, mechCost: { ore: 50, salvage: 30 }, mechTime: 30,
   salvage: { jackal: 10, light1: 10, kestrel: 20, sniper1: 20, warden: 35, puncher: 50 },
-  siloHp: 600, factoryHp: 400, unload: 14, footprint: 24, flat: 2,
+  siloHp: 600, factoryHp: 400, unload: 14, pickup: 8, footprint: 24, flat: 2,
 };
 // The buildings, as mission entities (sim/entities.js): unit meshes in mesh/props.js.
 export const BUILDINGS = {

@@ -16,7 +16,7 @@ export const NAMES = {
     digger: { role: 'IT DIGS.', kit: 'TWO BUCKETS · A HOPPER', fire: 0.05 },   // the BIG SCOOPER (the owner's name); role and kit lines are placeholders
   },
   // Campaign missions by key. Act I's are the owner's, picked after seeing them (docs/workflow.md § Naming).
-  missions: { m01: 'LIL SNOOZERS', m02: 'TOWER TOPPLER', m03: 'HELPLESS LIL BUDDIES', m04: 'FOUR LEGS BAD' },
+  missions: { m01: 'LIL SNOOZERS', m02: 'TOWER TOPPLER', m03: 'HELPLESS LIL BUDDIES', m04: 'FOUR LEGS BAD', b01: 'FIRST FACTORY' },   // b01: spec 20's base mission, a placeholder
   // The debrief's one word (docs/specs/04-campaign.md § Debrief verdicts): spec drafts until the owner picks.
   verdicts: { won: 'STOMPED.', untouched: 'UNTOUCHED.', punched: 'PUNCHED.', lost: 'SQUASHED.', awkward: 'AWKWARD.', flattened: 'FLATTENED.' },
   locked: n => `LOCKED · CLEAR MISSION ${n}`,

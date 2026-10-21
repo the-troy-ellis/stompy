@@ -106,8 +106,8 @@ export function startMatch(G, def, seed, gentle, chassis, { partsKey, terrainOpt
     const { x, z } = polar(s.at), c = newMech(G, s.type, 0, x, z, s.face != null ? -s.face * Math.PI / 180 : face);
     park(c); G.crew.push(c); G.mechs.push(c);
   }
+  initBase(G, def);   // the silo, if the mission has a base (sim/base.js, spec 20); first, so a `keep` finds it
   initObjectives(G, def);
-  initBase(G, def);   // the silo, if the mission has a base (sim/base.js, spec 20)
   placeScenery(G, def, st);
   G.state = 'play'; G.paused = false;
 }

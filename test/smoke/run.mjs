@@ -193,6 +193,45 @@ try {
     console.log(`base: silo up ${r.silo}; BUILD showed the footprint (why ${preview}); factory ${r.prog}, ore left ${r.ore}`);
     if (!r.silo || preview !== null || r.prog !== 1 || r.ore !== 40) { failed = true; console.error(`FAIL: the base (${preview}, ${JSON.stringify(r)})`); }
   });
+  // Raids (spec 20, #311): the range's SILO AND A RAID, the raid brought forward; it is called and walks on going for the base.
+  await run('raid', URL_, async page => {
+    await page.click('.feel-panel [data-a="toggle"]');
+    await page.click('[data-sel="debug"]'); await page.click('[data-dsec="range"]');
+    for (let i = 0; i < 3 && (await page.$eval('[data-drg="base"] ~ b', b => b.textContent)) !== 'SILO AND A RAID'; i++) await page.click('[data-drg="base"][data-d="1"]');
+    await page.click('[data-a="go"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'range' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    await page.evaluate(() => { const G = window.__stompy.game; G.waves[0].due = G.time + 4; });
+    await page.waitForFunction(() => window.__stompy.game.mechs.some(m => m.team === 1), null, { timeout: 10000 });
+    await page.waitForTimeout(1500);
+    const r = await page.evaluate(() => { const G = window.__stompy.game, f = G.mechs.filter(m => m.team === 1); return { n: f.length, raid: f.every(m => m.ai.raid), silo: G.base.silo.alive }; });
+    await page.screenshot({ path: 'test-results/smoke-raid.png' });
+    console.log(`raid: ${r.n} raiders, all raiding ${r.raid}, silo up ${r.silo}`);
+    if (r.n !== 2 || !r.raid || !r.silo) { failed = true; console.error(`FAIL: the raid (${JSON.stringify(r)})`); }
+  });
+  // The base mission (spec 20, #312) from JUMP TO: dig the mesa, unload at the silo, put the factory up, swap.
+  await run('first-factory', URL_, async page => {
+    await page.click('.feel-panel [data-a="toggle"]');
+    await page.click('[data-sel="debug"]'); await page.click('[data-dsec="jump"]');
+    await page.click('[data-dj="base"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'base' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    const start = await page.evaluate(() => { const G = window.__stompy.game; return [G.player.type, G.crew.length, G.base.ore]; });
+    // To the mesa's face (data/missions.js BASE_MISSION: at [10, 190], r 60), facing it.
+    await page.evaluate(() => { const G = window.__stompy.game, P = G.player, b = 10 * Math.PI / 180, cx = -Math.sin(b) * 190, cz = Math.cos(b) * 190; P.x = cx; P.z = cz - 71; P.y = G.ter.groundBelow(P.x, 30, P.z); P.yaw = 0; P.twist = 0; });
+    for (let i = 0; i < 3; i++) { await page.keyboard.press('e'); await page.waitForTimeout(1400); }
+    const dug = await page.evaluate(() => window.__stompy.game.player.ore);
+    await page.evaluate(() => { const G = window.__stompy.game, P = G.player, s = G.base.silo; P.x = s.x + Math.sin(s.yaw) * s.radius * 0.9; P.z = s.z + Math.cos(s.yaw) * s.radius * 0.9; P.y = G.ter.groundBelow(P.x, 30, P.z); });
+    await page.waitForTimeout(500);
+    const unloaded = await page.evaluate(() => [window.__stompy.game.player.ore, window.__stompy.game.base.ore]);
+    await page.evaluate(() => { const G = window.__stompy.game, P = G.player; G.base.ore = Math.max(G.base.ore, 60); P.x = 0; P.z = 0; P.y = G.ter.groundBelow(0, 30, 0); P.yaw = Math.PI; P.twist = 0; });
+    await page.keyboard.down('Space'); await page.waitForTimeout(400); await page.keyboard.up('Space');
+    await page.waitForFunction(() => window.__stompy.game.base.factory?.prog === 1, null, { timeout: 15000 }).catch(() => {});
+    const prog = await page.evaluate(() => window.__stompy.game.base.factory?.prog);
+    await page.keyboard.press('q'); await page.waitForTimeout(500);
+    const now = await page.evaluate(() => window.__stompy.game.player.type);
+    await page.screenshot({ path: 'test-results/smoke-first-factory.png' });
+    console.log(`first-factory: in the ${start[0]}, crew ${start[1]}, ${start[2]} ore; dug ${dug}; unloaded (hopper ${unloaded[0]}, silo ${unloaded[1]}); factory ${prog}; Q -> ${now}`);
+    if (start[0] !== 'digger' || start[1] !== 2 || !(dug > 0) || unloaded[0] !== 0 || !(unloaded[1] > start[2]) || prog !== 1 || now !== 'kestrel') { failed = true; console.error('FAIL: the base mission'); }
+  });
   await run('touch', URL_ + '&touch=1', async page => {
     // Taps, not clicks: a mouse click would switch the game back to mouse mode.
     await page.tap('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way, as on desktop
