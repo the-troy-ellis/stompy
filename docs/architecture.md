@@ -86,7 +86,7 @@ design.
 
 **Chassis** (`CHASSIS`, line 169) hold speed, turn rate, heat sink rate,
 scale, AI preferred range and accuracy, per-section HP, colours, and the
-mechlab block (`tons`, `frame`, `hardpoints`, `systems`, and an optional `sysMax` that caps a system lower for that chassis; see the loadout section). A `melee` block gives a chassis fists (`data/melee.js`: `FIST_MELEE`, `meleeOf`, `punchArm`). `unlock` is the number of campaign missions to clear before it can launch (`isUnlocked`; the menu reads the best ever, saved as `mech.best`, so restarting the campaign keeps unlocks; `?unlock` or `?debug=1` opens every chassis and every mission on the campaign strip for testing), and `lockedLook` is its silhouette in the selector. `legs` names a body plan in `GEO`; an optional `geo` partial overrides any of it (`geoFor(ch)`, which `geoOf(m)` calls), and an optional `style` picks the torso and arms (default: the leg type).
+mechlab block (`tons`, `frame`, `hardpoints`, `systems`, and an optional `sysMax` that caps a system lower for that chassis; see the loadout section). A `melee` block gives a chassis fists (`data/melee.js`: `FIST_MELEE`, `meleeOf`, `punchArm`), or buckets (`BUCKET_MELEE`: the digger, spec 20, whose punch bites the ground). `tools` drops the fusion cannon, and `hopper` gives the mech an `ore` count. `unlock` is the number of campaign missions to clear before it can launch (`isUnlocked`; the menu reads the best ever, saved as `mech.best`, so restarting the campaign keeps unlocks; `?unlock` or `?debug=1` opens every chassis and every mission on the campaign strip for testing), and `lockedLook` is its silhouette in the selector. `legs` names a body plan in `GEO`; an optional `geo` partial overrides any of it (`geoFor(ch)`, which `geoOf(m)` calls), and an optional `style` picks the torso and arms (default: the leg type).
 
 **Missions** (`MISSIONS`, line 198) are `{ name, pal, foes[], intel }`, plus from M3 `objectives`, `entities` (placed by polar `[bearing°, dist]`) and `flat` pads;
 `missionDef(n)` returns hand-authored ones for n < 4 and procedural contracts
@@ -334,6 +334,7 @@ src/
     missions.js    MISSIONS, missionDef, objective definitions (M3)
     range.js       the DEBUG tab's test range: grounds, foe arc, rangeDef (M8, spec 19)
     debug.js       the DEBUG tab's cheat keys and labels, BIG_DIG (M8, spec 19)
+    construct.js   CONSTRUCT: the digger's bucket, hopper and ore per rock corner (M9, spec 20)
     colors.js      MP_COLORS
     names.js       every display name, keyed; the only place a name lives
   world/

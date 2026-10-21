@@ -142,15 +142,18 @@ function groundApi(G) {
   // metres of the ground as built, goes to radius r; the rock band under it
   // only to r × `rock` (battle weapons: half); bedrock not at all. Each corner's
   // hole depends only on where it is, so digs still give the same bytes in any order.
-  function dig(p, r, rock = 0.5) {
+  // `tally` (optional): its `rock` goes up by the corners under the soft band
+  // this dig turns from solid to air (the digger's ore, docs/specs/20-build-and-fight.md).
+  function dig(p, r, rock = 0.5, tally = null) {
     const [i0, i1, j0, j1, k0, k1] = box(p, r);
     if (i0 > i1 || j0 > j1 || k0 > k1) return;
     const base = G.base;
     for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
       const soft = base[i + PX * k] - SOFT;
       for (let j = j0; j <= j1; j++) {
-        const y = Y0 + j * VS, o = cornerIndex(i, j, k), dist = hypot(-HALF + i * VS - p[0], y - p[1], -HALF + k * VS - p[2]);
-        D[o] = Q(min((D[o] - 128) / 127, (dist - (y >= soft ? r : r * rock)) / DS));
+        const y = Y0 + j * VS, o = cornerIndex(i, j, k), dist = hypot(-HALF + i * VS - p[0], y - p[1], -HALF + k * VS - p[2]), was = D[o];
+        D[o] = Q(min((was - 128) / 127, (dist - (y >= soft ? r : r * rock)) / DS));
+        if (tally && y < soft && was > 128 && D[o] <= 128) tally.rock++;
       }
     }
     touched(i0, i1, j0, j1, k0, k1);

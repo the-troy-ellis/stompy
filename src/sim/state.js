@@ -40,7 +40,7 @@ export function newMech(G, type, team, x, z, yaw, opts = {}) {
   const ch = CHASSIS[type], rng = G.rng;
   const m = {
     type, ch, team, partsKey: opts.partsKey || type, netId: 0, remote: false, spawnT: 0, x, z, y: G.ter.height(x, z), vy: 0, yaw, twist: 0, pitch: 0, speed: 0, throttle: 0, heat: 0,
-    fuel: 1, jetting: false, air: false, shutdown: false, alive: true,
+    fuel: 1, jetting: false, air: false, shutdown: false, alive: true, ore: ch.hopper ? 0 : undefined,   // ore: a digger's hopper (spec 20)
     hp: null, max: null, weapons: null, ai: null, lights: true,   // headlights: on unless switched off (they only show at night)
   };
   applyLoadout(G, m, opts.loadout || stockLoadout(ch));   // weapons, armour, sink, speed, jets; draws the cooldown stagger first, as always

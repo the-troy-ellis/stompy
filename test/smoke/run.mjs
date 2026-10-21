@@ -143,6 +143,22 @@ try {
     console.log(`debug cheats: pause shows ${before}, then ${after[0]} (G.cheats.digs ${after[1]})`);
     if (before !== 'BIG DIGS: ON' || after[0] !== 'BIG DIGS: OFF' || after[1] !== false) { failed = true; console.error('FAIL: the pause menu\'s cheat switch'); }
   });
+  // The digger (spec 20, #308): ?debug=1's selector offers it; on the range its punch bites the mesa and fills the hopper.
+  await run('digger', URL_, async page => {
+    await page.click('.feel-panel [data-a="toggle"]');
+    for (let i = 0; i < 8 && (await page.evaluate(() => window.__stompy.app.prefs.chassis)) !== 'digger'; i++) await page.click('[data-mech="1"]');
+    const menu = await page.evaluate(() => [window.__stompy.app.prefs.chassis, document.querySelector('.mm-role')?.textContent, !!document.querySelector('.mm-fit')]);
+    await page.click('[data-sel="debug"]'); await page.click('[data-dsec="range"]');
+    for (let i = 0; i < 8 && (await page.$eval('[data-drg="ground"] ~ b', b => b.textContent)) !== 'MESA'; i++) await page.click('[data-drg="ground"][data-d="1"]');
+    await page.click('[data-a="go"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'range' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    await page.evaluate(() => { const G = window.__stompy.game, P = G.player; P.z = 182; P.y = G.ter.groundBelow(0, 5, 182); P.yaw = 0; P.twist = 0; });
+    for (let i = 0; i < 3; i++) { await page.keyboard.press('e'); await page.waitForTimeout(1400); }
+    const r = await page.evaluate(() => ({ ore: window.__stompy.game.player.ore, guns: window.__stompy.game.player.weapons.length }));
+    await page.screenshot({ path: 'test-results/smoke-digger.png' });
+    console.log(`digger: ${menu[1]} (FIT shown ${menu[2]}); three bites into the mesa, ${r.ore} ore, ${r.guns} guns`);
+    if (menu[0] !== 'digger' || menu[1] !== 'IT DIGS.' || menu[2] || !(r.ore > 0) || r.guns) { failed = true; console.error(`FAIL: the digger (${menu}, ${JSON.stringify(r)})`); }
+  });
   await run('touch', URL_ + '&touch=1', async page => {
     // Taps, not clicks: a mouse click would switch the game back to mouse mode.
     await page.tap('.feel-panel [data-a="toggle"]');   // fold the ?debug FEEL panel out of the way, as on desktop

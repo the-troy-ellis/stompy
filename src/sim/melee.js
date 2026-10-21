@@ -8,6 +8,9 @@ import { hitQueue, sendFx } from './hitqueue.js';
 import { feel } from './feel.js';
 import { fxPunch } from '../net/protocol.js';
 import { damageEntity, solid, sceneryNear } from './entities.js';
+import { bite } from './dig.js';
+import { particle, msg } from './effects.js';
+import { CONSTRUCT } from '../data/construct.js';
 
 const { atan2, hypot, sin, cos } = Math;
 
@@ -101,12 +104,41 @@ export function meleeTick(G, m, dt) {
       feel(G, 'punched', { mech: t, k: 1, roll: -side, at: t === G.player ? null : p });
       G.fx.sfx.punch(m === G.player ? null : p, true);
       G.farthestShove = Math.max(G.farthestShove || 0, v);
+    } else if (def.bucket && bucketBite(G, m, def)) {
+      m.heat += def.heat;   // the digger's bucket found ground: a bite (sim/dig.js)
     } else {
       feel(G, 'whiff', { mech: m });
       G.fx.sfx.punch(m === G.player ? null : center(m), false);
     }
   }
   if (st.phase === 'recover' && st.t >= def.windup + def.recover) m.melee = null;
+}
+
+// The digger's bucket with no mech or structure in reach: rays from the
+// bucket's height along where the mech looks find the ground within reach,
+// first nearly level (the face of a wall or a mesa: mining) and then tipped
+// well down (the floor in front: a pit), and the bucket bites it there: the
+// thunk, a spray of dirt, ore into the hopper. False when there is no ground
+// in reach (it whiffs).
+const BITE_DIR = [0, 0, 0], BITE_TILT = [-0.12, -0.75];
+function bucketBite(G, m, def) {
+  const s = m.ch.scale, yaw = viewYaw(m), reach = def.reach * s * 1.3, o = [m.x, m.y + 4 * s, m.z];
+  let t = null;
+  for (let i = 0; i < BITE_TILT.length && t == null; i++) {
+    const down = (m.pitch || 0) + BITE_TILT[i];
+    BITE_DIR[0] = sin(yaw) * cos(down); BITE_DIR[1] = sin(down); BITE_DIR[2] = cos(yaw) * cos(down);
+    t = G.ter.ray(o, BITE_DIR, reach);
+  }
+  if (t == null) return false;
+  t += CONSTRUCT.bucket * 0.5;   // the bucket goes in: centred on the surface, a 6 m bite often reaches no solid corner (8 m apart)
+  const p = [o[0] + BITE_DIR[0] * t, o[1] + BITE_DIR[1] * t, o[2] + BITE_DIR[2] * t], full = (m.ore || 0) >= CONSTRUCT.hopper;
+  const got = bite(G, m, p);
+  m.melee.hit = { ground: true, p, ore: got };
+  feel(G, 'punch', { mech: m, k: 1, at: m === G.player ? null : p });
+  G.fx.sfx.punch(m === G.player ? null : p, true);
+  for (let i = 0; i < 10; i++) particle(G, [p[0] + G.rng.range(-2, 2), p[1] + 0.5, p[2] + G.rng.range(-2, 2)], [G.rng.range(-4, 4), G.rng.range(4, 9), G.rng.range(-4, 4)], G.rng.range(0.6, 1.1), G.rng.range(0.5, 1.0), G.pal.low, 'debris', 26);
+  if (m === G.player && full) msg(G, 'HOPPER FULL', '#fc3');
+  return true;
 }
 
 // Landing on a mech: a stomp. Called from the landing branch with how long

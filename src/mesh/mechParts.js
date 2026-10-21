@@ -186,6 +186,40 @@ const BODY = {
       barrel: part(b => b.cube(chain(M.T(...BARREL_AT.sniper1), M.S(0.34, 0.34, 2.4)), dark)),
     };
   },
+  // The digger (spec 20, placeholder name): a safety-yellow cab with a wide
+  // window, black and yellow hazard stripes across its chest, an exhaust
+  // stack, and an open hopper on its back for the ore. Short thick arms end
+  // in two buckets (the `fist` part, so they swing like PURPLE PUNCHER's):
+  // a scoop open to the front with a row of teeth.
+  digger(ch) {
+    const { c, dark, acc, glass } = palette(ch);
+    return {
+      torso: part(b => {
+        b.cube(chain(M.T(0, 1.2, 0.35), M.S(3.8, 2.4, 2.4)), c, 0.92, 0.9);                       // the cab
+        b.cube(chain(M.T(0, 2.0, 1.56), M.S(2.6, 0.75, 0.08)), glass);                           // its window
+        b.cube(chain(M.T(0, 2.55, 0.35), M.S(3.0, 0.3, 2.0)), dark);                              // a roof rail
+        for (let i = 0; i < 5; i++) b.cube(chain(M.T((i - 2) * 0.72, 0.75, 1.56), M.RZ(0.6), M.S(0.3, 0.9, 0.08)), acc);   // hazard stripes
+        b.cube(chain(M.T(1.45, 3.15, -0.2), M.S(0.32, 1.5, 0.32)), dark);                         // the exhaust stack...
+        b.cube(chain(M.T(1.45, 3.95, -0.2), M.S(0.42, 0.2, 0.42)), acc);                          // ...and its cap
+        // The hopper: an open box on the back, a floor and four walls.
+        b.cube(chain(M.T(0, 1.5, -1.6), M.S(3.2, 0.25, 1.9)), dark);
+        b.cube(chain(M.T(0, 2.25, -2.5), M.S(3.2, 1.5, 0.2)), c, 0.95, 0.9);
+        b.cube(chain(M.T(0, 2.1, -0.75), M.S(3.2, 1.2, 0.2)), c);
+        for (const sx of [1, -1]) b.cube(chain(M.T(sx * 1.55, 2.2, -1.6), M.S(0.2, 1.4, 1.9)), c, 1, 0.9);
+      }),
+      arm: part(b => {
+        b.cube(chain(M.T(0, -0.5, 0.15), M.S(1.2, 1.4, 1.3)), c);
+        b.cube(chain(M.T(0, 0.25, 0), M.S(1.45, 0.75, 1.55)), dark);
+      }),
+      // Hangs below the arm, open to the front; the bite swings it forward and down.
+      fist: part(b => {
+        b.cube(chain(M.T(0, -1.7, -0.35), M.S(1.9, 1.4, 0.2)), acc);                              // the back
+        b.cube(chain(M.T(0, -2.35, 0.35), M.S(1.9, 0.2, 1.5)), acc);                              // the floor
+        for (const sx of [1, -1]) b.cube(chain(M.T(sx * 0.9, -1.85, 0.25), M.S(0.16, 1.1, 1.3)), mul(acc, 1.6));   // the sides
+        for (let i = 0; i < 4; i++) b.cube(chain(M.T((i - 1.5) * 0.46, -2.4, 1.2), M.S(0.2, 0.18, 0.4)), dark);    // teeth
+      }),
+    };
+  },
   // The quadruped's turret: cockpit at the front, an LRM box on top.
   quad(ch) {
     const { c, dark, acc, glass, tube } = palette(ch);

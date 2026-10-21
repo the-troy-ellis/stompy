@@ -1,6 +1,6 @@
 import { store } from '../util/store.js';
 import { esc } from '../util/dom.js';
-import { CHASSIS, SECT_NAME } from '../data/chassis.js';
+import { CHASSIS, SECT_NAME, MECH_INFO } from '../data/chassis.js';
 import { WEAPONS, CAT_LABEL } from '../data/weapons.js';
 import { SYSTEMS } from '../data/systems.js';
 import { cycleSystem, cycleWeapon, stats, stockLoadout, systemsFor, validate } from '../sim/loadout.js';
@@ -17,6 +17,7 @@ export const fitOk = k => validate(k, fitOf(k)).ok;
 
 // What the menu's kit line says: the fitted weapons, doubles folded.
 export function kitLine(k) {
+  if (CHASSIS[k].tools) return MECH_INFO[k].kit;   // a construction mech: its tools, from names.js
   const lo = fitOf(k), names = [];
   for (const h of CHASSIS[k].hardpoints) if (lo.hp[h.id]) names.push(WEAPONS[lo.hp[h.id]].name);
   names.push(WEAPONS.fusion.name);

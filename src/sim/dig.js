@@ -1,6 +1,7 @@
 import { cheat } from './cheats.js';
 import { BIG_DIG } from '../data/debug.js';
 import { DIG, CRUSH, TORQUE, WEAPONS } from '../data/weapons.js';
+import { CONSTRUCT } from '../data/construct.js';
 import { sceneryNear, destroyEntity } from './entities.js';
 import { particle } from './effects.js';
 import { cloneGround, VS, Y0, PX, PY } from '../world/voxels.js';
@@ -69,6 +70,22 @@ export function dig(G, p, r, owned = true) {
   G.unechoed.push([0, x, y, z, rr]);
 }
 
+// The digger's bite (docs/specs/20-build-and-fight.md § The digger): a dig
+// of CONSTRUCT.bucket where the bucket meets the ground, rock at full size,
+// that fills the hopper with ore: CONSTRUCT.orePerCorner for each rock
+// corner (under the soft band) it turned to air; soft ground gives none. A
+// full hopper still digs. Single player: online a bite is a plain dig that
+// syncs and gives no ore (spec 20 § Edge cases). Returns the ore it got.
+export function bite(G, m, p) {
+  const r = CONSTRUCT.bucket;
+  if (!G.ter || online(G)) { dig(G, p, r, ownsDigs(G, m)); return 0; }
+  const x = q(p[0], 0.25), y = q(p[1], 0.25), z = q(p[2], 0.25), tally = { rock: 0 };
+  confirmDig(G, [0, x, y, z, r], true, 1, tally);
+  const ore = Math.min(CONSTRUCT.hopper - (m.ore || 0), tally.rock * CONSTRUCT.orePerCorner);
+  m.ore = (m.ore || 0) + Math.max(0, ore);
+  return Math.max(0, ore);
+}
+
 // Digs off the wire (the relay's `digs`, or the room's list in `welcome`):
 // [seq, op, x, y, z, r] each, in the relay's order. Anything malformed is skipped.
 // `replay`: the room's list in `welcome`, the past: falls in it land at once, unseen.
@@ -84,8 +101,8 @@ export function applyDigList(G, l, replay = false) {
 
 // One dig in the confirmed order: carved, the ground it leaves unheld falls,
 // and what stood there settles. `seen`: the falls are shown coming down.
-function confirmDig(G, e, seen, rock = DIG.rock) {
-  const [, x, y, z, r] = e, C = confirmed(G), b = C.dig([x, y, z], r, rock);
+function confirmDig(G, e, seen, rock = DIG.rock, tally = null) {
+  const [, x, y, z, r] = e, C = confirmed(G), b = C.dig([x, y, z], r, rock, tally);
   const falls = b ? C.islands(b).map(cells => C.fall(cells)) : [];
   // Then what still holds on but hangs too far off what holds it (the torque rule); a break can leave another.
   for (let n = 0; b && n < TORQUE.rounds; n++) {

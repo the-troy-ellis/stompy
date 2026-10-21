@@ -13,7 +13,7 @@
 import { $ } from './util/dom.js';
 import { store } from './util/store.js';
 import { MP_COLORS } from './data/colors.js';
-import { MECH_ORDER } from './data/chassis.js';
+import { MECH_ORDER, PILOTABLE } from './data/chassis.js';
 import { createGame } from './sim/state.js';
 import { update } from './sim/update.js';
 import { destroy } from './sim/combat.js';
@@ -42,7 +42,7 @@ function loadPrefs() {
     voice: store.get('mech.voice', true),
     invert: store.get('mech.invert', false),
     mission: 0,   // set from the campaign save below
-    chassis: MECH_ORDER.includes(store.get('mech.chassis')) ? store.get('mech.chassis') : 'kestrel',
+    chassis: (new URLSearchParams(location.search).has('debug') ? PILOTABLE : MECH_ORDER).includes(store.get('mech.chassis')) ? store.get('mech.chassis') : 'kestrel',
     menuSel: store.get('menu.sel', 'campaign'),
     fpMap: store.get('fp.map', 0), fpFoes: store.get('fp.foes', 3), fpMix: store.get('fp.mix', 0), fpWeather: store.get('fp.weather', 0), fpTime: store.get('fp.time', 0),
     diff: DIFF[store.get('diff')] ? store.get('diff') : 'normal',

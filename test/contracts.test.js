@@ -6,7 +6,7 @@ import { destroy } from '../src/sim/combat.js';
 import { destroyEntity } from '../src/sim/entities.js';
 import { stepFor, freeze, input } from './helpers.js';
 import { MISSIONS, missionDef, missionFoes, CONTRACT_OBJECTIVES } from '../src/data/missions.js';
-import { CHASSIS } from '../src/data/chassis.js';
+import { CHASSIS, MECH_ORDER } from '../src/data/chassis.js';
 import { BOUND } from '../src/world/terrain.js';
 
 const play = n => {
@@ -50,7 +50,7 @@ test('the count grows as it always has; the whole roster turns up, the big ones 
     assert.equal(all.filter(t => BIG.includes(t)).length, heavies, `contract ${n + 1}`);
     for (const t of all) { assert.ok(CHASSIS[t]); kinds.add(t); }
   }
-  for (const t of Object.keys(CHASSIS)) assert.ok(kinds.has(t), `${t} never turns up`);
+  for (const t of MECH_ORDER) assert.ok(kinds.has(t), `${t} never turns up`);   // the fighting roster (the digger isn't a foe)
   const light = CONTRACTS.flatMap(n => missionFoes(missionDef(n)).filter(t => !BIG.includes(t)));
   assert.ok(light.filter(t => t === 'kestrel').length < light.filter(t => t === 'jackal').length + light.filter(t => t === 'light1').length, 'lighter mechs more often');
 });

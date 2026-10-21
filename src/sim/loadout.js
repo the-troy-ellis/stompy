@@ -48,7 +48,7 @@ export function validate(chassis, loadout) {
 export function weaponList(chassis, loadout) {
   const ch = chassisOf(chassis);
   const list = ch.hardpoints.filter(h => loadout.hp[h.id]).map(h => [loadout.hp[h.id], h.loc]);
-  return [...list, ['fusion', 'T']];
+  return ch.tools ? list : [...list, ['fusion', 'T']];   // a construction mech carries tools, not the fusion cannon
 }
 
 // Derived stats live on the mech, never on CHASSIS.
