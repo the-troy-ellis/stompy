@@ -62,7 +62,7 @@ export function createUi(app) {
       <tr><td>BALLISTIC (hold)</td><td>autocannon: big single hits, little heat, limited ammo</td></tr>
       <tr><td>MISSILE</td><td>tap: fire the LRMs (they home in on a locked target)<br>hold: fly them yourself in IR -- drag to steer, let go to detonate</td></tr>
       <tr><td>Punch</td><td>double tap the lower stick: shove whoever is in front of you (the fist by the crosshair means someone is in reach; drop onto a mech from a jump to stomp it)</td></tr>
-      <tr><td>TGT</td><td>next target</td></tr>
+      <tr><td>TGT</td><td>tap: next target · hold: swap to your next mech (when you have more than one)</td></tr>
       <tr><td>ZOOM / STOP / II</td><td>zoom, full stop, pause</td></tr>
       <tr><td>LIGHTS</td><td>headlights at night: on, you see; off, you are harder to see</td></tr>
     </table>`;
@@ -80,7 +80,7 @@ export function createUi(app) {
       <tr><td>R</td><td>target under crosshair</td><td>J (hold)</td><td>jump jets</td></tr>
       <tr><td>C</td><td>centre torso on legs</td><td>Z</td><td>zoom</td></tr>
       <tr><td>Arrows</td><td>twist / aim without mouse</td><td>P / Esc</td><td>pause</td></tr>
-      <tr><td>L</td><td>headlights at night: on, you see; off, you are harder to see</td><td></td><td></td></tr>
+      <tr><td>L</td><td>headlights at night: on, you see; off, you are harder to see</td><td>Q</td><td>swap to your next mech (when you have more than one)</td></tr>
     </table>`;
 
   // The toggles: [label, get, set, SETTINGS section].

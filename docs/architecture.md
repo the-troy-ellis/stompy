@@ -353,6 +353,7 @@ src/
     gait.js        feet + IK
     combat.js      sectionHit, damage, destroy, fire, blast
     cheats.js      cheat(G, key): the DEBUG tab's cheats, single player only (M8, spec 19)
+    crew.js        G.crew, swap(G), park, nextCrew: the mechs you drive and SWAP between (M9, spec 20)
     beams.js       melt, beamTick, coolArmour
     fusion.js      fusionTick, fusionFire, pulses
     missiles.js    missile steering, guide state (no camera code)
