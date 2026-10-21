@@ -170,9 +170,18 @@ the feet are untouched. All the numbers are FEEL panel knobs.
 
 From 85 heat to shutdown (`hotFrac`, `HEAT` in `src/data/feel.js`) the view
 swims: a slow breath in the field of view and a sway, scaled down under
-REDUCED MOTION; the reactor hum rises in volume and pitch; and the HUD bars
-brown out in flickers that get harder the hotter it runs. The heat bar
-itself has flashed red over 85 since M0. All of it stops the moment the
+REDUCED MOTION; the reactor hum rises in volume and pitch; and the HUD's
+heat and jet arcs brown out in flickers that get harder the hotter it runs.
+The heat gauge itself has flashed red over 85 since M0.
+
+**The ring** (the owner's sketch, after M9): your own damage wireframe is
+the middle of one round gauge, a little bigger than before, with three
+arcs round it and gaps at the top and the lower corners. Left: heat,
+filling upward, amber over 55, red over 80, flashing over 85. Right: jump
+jets, filling upward. Bottom: speed, reverse to full from left to right
+with a tick at zero, the throttle's setting as an amber notch outside it,
+and KPH under it. It sits where the bars and the wire were: the dashboard's
+left on desktop, the top left on touch (`render/hud.js` `drawRing`). All of it stops the moment the
 reactor trips, which is the point: the quiet after is the shutdown.
 
 ### Audio layer

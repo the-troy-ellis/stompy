@@ -107,7 +107,7 @@ screen gains `SKIP TUTORIAL`).
 As shipped (#228):
 - **Where it lives:** `src/data/tutorial.js` holds the words; `src/sim/tutorial.js` decides
   which prompt is up and when it's done, headless and tested. The HUD draws
-  it by its instrument (the throttle, the weapon list, the heat bar, the
+  it by its instrument (the throttle, the weapon list, the heat gauge on the ring, the
   target box, under the compass, under the crosshair), in the words for what
   the pilot is holding: keys and mouse, the touch controls, or a gamepad.
 - **Order:** steps come one at a time, in the spec's order, a beat apart.

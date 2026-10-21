@@ -141,7 +141,7 @@ export function createHud(app) {
   // Each mech's reach for the diagram's scale, per partsKey: [height, distance from its upright axis],
   // the most seen so far (a long stride or a WARDEN's splayed legs reach wider than it stands still).
   const wireExt = new Map(), seen = new Float64Array(2);
-  function mechWire(m, x, y, u) {
+  function mechWire(m, x, y, u, round = 0) {   // round: clip to a circle of that radius round the box's middle (the ring), else to the box
     const pose = app.scene.poseWire?.(m);
     if (!pose) { mechDiagram(m, x, y, u); return; }
     let ext = wireExt.get(m.partsKey);
@@ -159,7 +159,9 @@ export function createHud(app) {
     }
     ext[0] = max(ext[0], seen[0]); ext[1] = max(ext[1], Math.sqrt(seen[1]));   // next frame fits anything reached this one
     ctx.save();
-    ctx.beginPath(); ctx.rect(x - WIRE_HALF * u, y - u, 2 * WIRE_HALF * u, h + u); ctx.clip();   // a long stride stays in its box
+    ctx.beginPath();
+    if (round) ctx.arc(x, y + h / 2, round, 0, TAU); else ctx.rect(x - WIRE_HALF * u, y - u, 2 * WIRE_HALF * u, h + u);
+    ctx.clip();   // a long stride stays in its box
     ctx.lineWidth = 1;
     for (const sec of WIRE_SECS) {
       const { pts, n } = wirePaths[sec];
@@ -219,33 +221,74 @@ export function createHud(app) {
   // Where the view edge is crossed going from the centre toward the objective's bearing.
   function edgePoint(W, top, bottom, m, vy, P, p) { return markerEdge(W, top, bottom, m, atan2(p[0] - P.x, p[2] - P.z) - vy); }
 
+  // The ring (the owner's sketch): your mech's damage wireframe in the middle,
+  // a bit bigger than it was, and round it three arcs with gaps at the top and
+  // the lower corners. Left: heat, filling upward. Right: jump jets, filling
+  // upward. Bottom: speed from reverse through zero to full, left to right,
+  // with the throttle's setting marked (amber) and KPH under it. (x, y) is
+  // its middle; the wire's box (u units, mechWire) sits inside the arcs.
+  const RING_GAP = 0.2, RING_W = 8;   // radians either side of each gap; arc thickness, px
+  const ringLayout = (x, y, r) => ({ x, y, r, u: (r - RING_W) * 0.16 });
+  // An arc from angle a0 to a1 (canvas radians; anticlockwise when a1 < a0), filled to `f` from the a0 end.
+  function ringArc(R, a0, a1, f, col) {
+    const back = a1 < a0;
+    ctx.lineWidth = RING_W + 2; ctx.strokeStyle = DIM; ctx.beginPath(); ctx.arc(R.x, R.y, R.r, a0, a1, back); ctx.stroke();
+    ctx.lineWidth = RING_W; ctx.strokeStyle = '#031203'; ctx.beginPath(); ctx.arc(R.x, R.y, R.r, a0, a1, back); ctx.stroke();
+    if (f > 0) { ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(R.x, R.y, R.r, a0, a0 + (a1 - a0) * f, back); ctx.stroke(); }
+  }
+  const LOWER_L = PI * 0.75, LOWER_R = PI * 0.25, UP = -PI / 2;   // canvas angles: y grows downward
+  function drawRing(R, P) {
+    const h = 10.5 * R.u;
+    mechWire(P, R.x, R.y - h / 2 - R.u * 0.3, R.u, R.r - RING_W);
+    // Near shutdown the instruments brown out: the arcs flicker harder the hotter it runs.
+    const hot = P.shutdown ? 0 : hotFrac(P.heat), browned = hot > 0 && (floor(G.time * 17) % 4 === 0 || (hot > 0.6 && floor(G.time * 23) % 5 === 0));
+    if (browned) ctx.globalAlpha = 1 - HEAT.flicker * hot;
+    const heatCol = P.heat > 85 ? (floor(G.time * 6) % 2 ? RED : AMBER) : P.heat > 80 ? RED : P.heat > 55 ? AMBER : GREEN;
+    ringArc(R, LOWER_L + RING_GAP, UP + TAU - RING_GAP, clampN(P.heat / 100, 0, 1), heatCol);   // left: from the lower left, up
+    ringArc(R, LOWER_R - RING_GAP, UP + RING_GAP, clampN(P.fuel, 0, 1), '#3cf');   // right: from the lower right, up (anticlockwise)
+    ctx.globalAlpha = 1;
+    // Bottom: speed. Its scale runs from full reverse (left) to 1.35 x top speed (right), zero at 0.35 / 1.35.
+    const b0 = LOWER_L - RING_GAP, b1 = LOWER_R + RING_GAP, span = b1 - b0, at = v => b0 + span * clampN((v + 0.35) / 1.35, 0, 1);
+    ringArc(R, b0, b1, 0, GREEN);
+    const sp = P.speed / (P.maxSpeed ?? P.ch.speed), zero = at(0);
+    ctx.lineWidth = RING_W; ctx.strokeStyle = GREEN; ctx.beginPath();
+    if (sp >= 0) ctx.arc(R.x, R.y, R.r, at(sp), zero); else ctx.arc(R.x, R.y, R.r, zero, at(sp));   // b0 > b1: the arc runs anticlockwise, right to left
+    ctx.stroke();
+    ctx.lineWidth = 1; ctx.strokeStyle = DIM; ctx.beginPath();   // the zero tick
+    ctx.moveTo(R.x + Math.cos(zero) * (R.r - RING_W), R.y + sin(zero) * (R.r - RING_W)); ctx.lineTo(R.x + Math.cos(zero) * (R.r + RING_W), R.y + sin(zero) * (R.r + RING_W)); ctx.stroke();
+    const t = at(P.throttle), tx = R.x + Math.cos(t) * (R.r + RING_W / 2 + 2), ty = R.y + sin(t) * (R.r + RING_W / 2 + 2);   // the setting: an amber notch outside the arc
+    ctx.fillStyle = AMBER; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + Math.cos(t + 0.09) * 7, ty + sin(t + 0.09) * 7); ctx.lineTo(tx + Math.cos(t - 0.09) * 7, ty + sin(t - 0.09) * 7); ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.font = '10px "Lucida Console", monospace'; ctx.fillStyle = DIM;
+    ctx.textAlign = 'right'; ctx.fillText('HT', R.x - R.r * 0.72, R.y + R.r * 0.86);
+    ctx.textAlign = 'left'; ctx.fillText('JJ', R.x + R.r * 0.72, R.y + R.r * 0.86);
+    ctx.textAlign = 'center'; ctx.fillStyle = GREEN; ctx.fillText(`${Math.round(P.speed * 5.4)} KPH`, R.x, R.y + R.r + RING_W + 10);
+    ctx.textAlign = 'left';
+  }
+
   // Where each instrument goes. Desktop: the cockpit dashboard along the
   // bottom. Touch: no dashboard -- the bottom belongs to the thumbs and the
   // controls -- so instruments move to the top corners.
   function hudLayout() {
     if (!G.touchUI) {
-      const dash = min(150, V.H * 0.27), top = V.H - dash + 8, u = min(7, dash / 12);
+      const dash = min(150, V.H * 0.27), top = V.H - dash + 8;
       return {
         frame: true, dash, viewBottom: V.H - dash,
         radar: { x: V.W / 2, y: V.H - dash / 2 + 4, r: dash * 0.4 },
-        bars: { x: V.W * 0.1 + 6, y: top, h: dash - 30 },
-        diag: { x: V.W * 0.1 + 38 + WIRE_HALF * u, y: top + 6, u },   // 4 px clear of the bars
+        ring: ringLayout(V.W * 0.1 + 12 + dash * 0.4, V.H - dash / 2 - 6, dash * 0.38),   // your own mech, heat, jets and throttle (drawRing)
         weapons: { x: min(V.W * 0.62, V.W * 0.9 - 26 - 200), y: top + 4 },   // the list is 190 wide: never into the throttle (HUD SCALE)
-        throttle: { x: V.W * 0.9 - 26, y: top, h: dash - 30 },
         target: { x: V.W * 0.1 + 8, y: 48 },
         hostiles: { x: V.W * 0.965 - 10, y: 20 },
         crew: { x: V.W * 0.965 - 10, y: 34 },   // spec 20's crew strip: under HOSTILES
         compass: { w: min(340, V.W * 0.5) },
       };
     }
-    const r = clampN(V.H * 0.12, 30, 46), u = 5, tgtX = 132 / V.s;   // the target box keeps right of the pause and zoom buttons, which don't scale
+    const r = clampN(V.H * 0.12, 30, 46), tgtX = 132 / V.s;   // the target box keeps right of the pause and zoom buttons, which don't scale
     return {
       frame: false, dash: 0, viewBottom: V.H,
       radar: { x: V.W - r - 14, y: r + 12, r },
-      bars: { x: 64, y: 112, h: 70 },
-      diag: { x: 104 + WIRE_HALF * u, y: 116, u },
+      ring: ringLayout(18 + 54, 112 + 54, 54),
       weapons: { x: V.W - 205, y: 2 * r + 34 },
-      throttle: { x: 14, y: V.H - 196, h: 120 },
       target: { x: tgtX, y: 10 },   // right of the pause and zoom buttons
       hostiles: { x: V.W - 14, y: 2 * r + 34 + 56 },   // under the weapon list, clear of the compass
       crew: { x: V.W - 2 * r - 30, y: 20 },   // left of the radar, clear of the buttons below
@@ -277,7 +320,7 @@ export function createHud(app) {
     if (!c || !G.player.alive) return;
     const text = c[G.padActive ? 'pad' : G.touchUI ? 'touch' : 'kb'], W = V.W, vb = L.viewBottom;
     const at = {
-      throttle: [L.throttle.x, L.throttle.y - (L.frame ? 34 : 16)], weapons: [L.weapons.x + 60, L.weapons.y - (L.frame ? 34 : 14)], heat: [L.bars.x + 40, L.bars.y - (L.frame ? 34 : 14)],
+      throttle: [L.ring.x, L.frame ? L.ring.y - L.ring.r - 26 : L.ring.y + L.ring.r + 30], weapons: [L.weapons.x + 60, L.weapons.y - (L.frame ? 34 : 14)], heat: [L.ring.x, L.frame ? L.ring.y - L.ring.r - 26 : L.ring.y + L.ring.r + 30],
       target: [L.target.x + 60, L.target.y + 34], compass: [W / 2, vb * 0.3], centre: [W / 2, vb * 0.64],
     }[c.at] || [W / 2, vb * 0.64];
     ctx.font = 'bold 15px "Lucida Console", monospace'; ctx.textAlign = 'center';
@@ -452,7 +495,8 @@ export function createHud(app) {
     ctx.font = '11px "Lucida Console", monospace'; ctx.textAlign = 'left'; ctx.fillStyle = '#9f9';
     const full = app.params.has('debug');
     if (debugTick-- <= 0 || !lines.length) { debugTick = DEBUG_EVERY; debugLines(full); }
-    for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], 12, V.H * 0.5 + i * 13);
+    const dx = G.touchUI ? 140 : 12, dy = V.H * 0.5 + (G.touchUI ? 40 : 0);   // on touch, right of and below the ring's middle (drawRing)
+    for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], dx, dy + i * 13);
   }
   // ?debug=1's overlays (ui/tuning.js § OVERLAYS), each drawn only while its switch is on.
   // A box's twelve edges, from its corners [x0, y0, z0, x1, y1, z1].
@@ -772,23 +816,8 @@ export function createHud(app) {
     }
     ctx.fillStyle = DIM; ctx.textAlign = 'center'; ctx.fillText(`${RANGE}m`, rx, ry + rr + 9 > V.H ? ry + rr - 8 : ry + rr + 8);
 
-    // Left: own damage, heat, jump jets.
-    ctx.textAlign = 'left';
-    mechWire(P, L.diag.x, L.diag.y, L.diag.u);
-    const bar = (x, label, f, col, warn) => {
-      const bh = L.bars.h, top = L.bars.y;
-      ctx.fillStyle = '#031203'; ctx.fillRect(x, top, 10, bh);
-      ctx.fillStyle = warn ? (floor(G.time * 6) % 2 ? RED : AMBER) : col; ctx.fillRect(x, top + bh * (1 - clampN(f, 0, 1)), 10, bh * clampN(f, 0, 1));
-      ctx.strokeStyle = DIM; ctx.strokeRect(x + 0.5, top + 0.5, 9, bh - 1);
-      ctx.fillStyle = DIM; ctx.fillText(label, x - 1, top + bh + 8);
-    };
-    const lx = L.bars.x;
-    // Near shutdown the instruments brown out: the bars flicker harder the hotter it runs.
-    const hot = P.shutdown ? 0 : hotFrac(P.heat), browned = hot > 0 && (floor(G.time * 17) % 4 === 0 || (hot > 0.6 && floor(G.time * 23) % 5 === 0));
-    if (browned) ctx.globalAlpha = 1 - HEAT.flicker * hot;
-    bar(lx, 'HT', P.heat / 100, P.heat > 80 ? RED : P.heat > 55 ? AMBER : GREEN, P.heat > 85);
-    bar(lx + 18, 'JJ', P.fuel, '#3cf');
-    ctx.globalAlpha = 1;
+    // Left: the ring (drawRing): your own damage, heat, jump jets and throttle.
+    drawRing(L.ring, P);
 
     // Right: weapons (a digger has none: its hopper, how full, instead; spec 20).
     const wx = L.weapons.x;
@@ -830,20 +859,6 @@ export function createHud(app) {
       });
       wy += 15;
     }
-
-    // Throttle / speed.
-    const thx = L.throttle.x, top = L.throttle.y, bh = L.throttle.h;
-    ctx.fillStyle = '#031203'; ctx.fillRect(thx, top, 12, bh);
-    const zero = top + bh * (1 / 1.35);
-    const spF = P.speed / ((P.maxSpeed ?? P.ch.speed) * 1.35);
-    ctx.fillStyle = GREEN;
-    if (P.speed >= 0) ctx.fillRect(thx, zero - bh * spF, 12, bh * spF); else ctx.fillRect(thx, zero, 12, -bh * spF);
-    ctx.strokeStyle = DIM; ctx.strokeRect(thx + 0.5, top + 0.5, 11, bh - 1);
-    ctx.beginPath(); ctx.moveTo(thx - 3, zero); ctx.lineTo(thx + 15, zero); ctx.stroke();
-    const thY = zero - bh * (P.throttle / 1.35);
-    ctx.fillStyle = AMBER; ctx.beginPath(); ctx.moveTo(thx - 2, thY); ctx.lineTo(thx - 8, thY - 4); ctx.lineTo(thx - 8, thY + 4); ctx.fill();
-    ctx.textAlign = L.frame ? 'right' : 'left'; ctx.fillStyle = GREEN;
-    ctx.fillText(`${Math.round(P.speed * 5.4)} KPH`, L.frame ? thx - 10 : thx, L.frame ? top + bh + 8 : top - 10);
 
     layer('hud');
     // Target panel.
