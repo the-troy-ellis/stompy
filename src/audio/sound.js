@@ -339,6 +339,7 @@ export function createAudio(app) {
       this.osc('sawtooth', 2200, 50, 1.3, 0.12, o); this.osc('sine', 90, 20, 1.6, 0.5, o);
     },
     beep() { if (!play('beep', { vol: 0.2, vary: 0 })) this.osc('square', 1200, 1190, 0.06, 0.03); },
+    lock() { this.osc('square', 1500, 1500, 0.04, 0.03); this.osc('square', 2200, 2200, 0.05, 0.03, { delay: 0.05 }); },   // the brackets snapping to a diamond: a two-tone chirp
     powerdown() { play('powerdown', { vol: 0.6, rate: 0.6, vary: 0 }); this.osc('sawtooth', 220, 30, 1.6, 0.05); },
     powerup() { play('powerup', { vol: 0.6, rate: 0.8, vary: 0 }); this.osc('sine', 60, 240, 0.8, 0.06); },
     // A punch landing (the clip, a crunch, a sub thump) or swinging at nothing (a quiet whoosh).

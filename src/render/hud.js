@@ -615,6 +615,8 @@ export function createHud(app) {
     ctx.textAlign = 'right';
   }
   const sway = makeSway();
+  const BRACKET_LOW = 0.15, lockSnap = makeSpring(900, 0.45);   // torso left under which the brackets flash; the snap: quick, a little overshoot
+  let bracketFor = null, lastBracketAt = 0;
   let lastSwayAt = 0;
   function drawHUD() {
     setLook();
@@ -721,21 +723,36 @@ export function createHud(app) {
     }
 
     // Target brackets (gone while a bolt has the HUD scrambled), the distance over them. There is no
-    // target panel: the owner took it out to see how it plays.
+    // target panel: the owner took it out to see how it plays. The brackets' colour is the target's
+    // torso (what kills it), on your own wireframe's scale, flashing under BRACKET_LOW; with a
+    // missile lock (G.lockOn) the four corners snap shut into a diamond on a springy morph.
     const scr = P.scramble > 0, t = scr ? null : G.target, sees = sightLine(G);
+    if (t !== bracketFor) { bracketFor = t; lockSnap.x = 0; lockSnap.v = 0; }   // a new target starts open
+    const nowB = performance.now();
+    stepSpring(lockSnap, lastBracketAt ? min(0.05, (nowB - lastBracketAt) / 1000) : 0, G.lockOn ? 1 : 0);
+    lastBracketAt = nowB;
     if (t && t.alive && hypot(t.x - P.x, t.z - P.z) < sees) {
-      const a = project([t.x, t.y + 8.2 * t.ch.scale, t.z]), b = project([t.x, t.y, t.z]);
+      const a = project([t.x, t.y + (t.kind ? t.height : 8.2 * t.ch.scale), t.z]), b = project([t.x, t.y, t.z]);
       if (a && b) {
         const hgt = max(14, b[1] - a[1]), wdt = hgt * 0.75, x0 = a[0] - wdt / 2, y0 = a[1], k = min(10, wdt / 3);
-        ctx.strokeStyle = G.lock ? RED : AMBER; ctx.lineWidth = 2;
+        const f = t.kind ? t.hp / t.max : t.hp.T / t.max.T, col = f < BRACKET_LOW && floor(G.time * 6) % 2 ? '#fff' : hpCol(f);
+        const sn = clampN(lockSnap.x, 0, 1.25), mx = a[0], my = y0 + hgt / 2, dx = wdt * 0.46, dy = hgt * 0.5;
+        ctx.strokeStyle = col; ctx.lineWidth = 2 + sn * 0.5;
         ctx.beginPath();
-        for (const [px, py, sx, sy] of [[x0, y0, 1, 1], [x0 + wdt, y0, -1, 1], [x0, y0 + hgt, 1, -1], [x0 + wdt, y0 + hgt, -1, -1]]) {
-          ctx.moveTo(px + sx * k, py); ctx.lineTo(px, py); ctx.lineTo(px, py + sy * k);
+        // Each corner is three points (its two arms' ends and the corner); shut, they are a diamond's
+        // top or bottom point, the middle of its side, and its left or right point.
+        for (let c = 0; c < 4; c++) {
+          const sx = c & 1 ? -1 : 1, sy = c & 2 ? -1 : 1, px = sx > 0 ? x0 : x0 + wdt, py = sy > 0 ? y0 : y0 + hgt;
+          const tx = mx, ty = my - sy * dy, vx = mx - sx * dx, vy = my;   // the diamond's point above or below, and to the side
+          const ax = px + sx * k + (tx - px - sx * k) * sn, ay = py + (ty - py) * sn;
+          const cx = px + ((tx + vx) / 2 - px) * sn, cy = py + ((ty + vy) / 2 - py) * sn;
+          const bx = px + (vx - px) * sn, by = py + sy * k + (vy - py - sy * k) * sn;
+          ctx.moveTo(ax, ay); ctx.lineTo(cx, cy); ctx.lineTo(bx, by);
         }
         ctx.stroke(); ctx.lineWidth = 1;
-        ctx.fillStyle = G.lock ? RED : AMBER;
+        ctx.fillStyle = '#fff';
         ctx.textAlign = 'center';
-        ctx.fillText(fmtDist(hypot(t.x - P.x, t.z - P.z)), a[0], y0 - 8);   // the one thing by it: how far (red brackets: locked)
+        ctx.fillText(fmtDist(hypot(t.x - P.x, t.z - P.z)), a[0], y0 - 8 - sn * 4);   // the one thing by it: how far
       }
       // Autocannon lead: a small diamond where a shell fired now would meet it, while it is moving and in range.
       const ac = P.weapons.find(w => w.def.kind === 'shell' && !w.dead && (w.ammo == null || w.ammo > 0));

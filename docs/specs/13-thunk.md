@@ -194,7 +194,13 @@ all destroyed or out of ammo (`input/input.js` `fireStatus`, CSS
 **No target panel** (the owner's call, to see how it plays): the corner box
 with the target's name, range, speed, closing rate and damage blocks is
 gone. The only thing by the target's brackets is its distance (`256 m`);
-the brackets still turn red on a lock. All of it stops the moment the
+the brackets show two things more (the owner's design):
+- **Colour is the target's torso** (what kills it), on your own wireframe's
+  scale: green, amber, red, and flashing white and red under 15%.
+- **Shape is the missile lock.** Open corners; with a lock that means
+  something (`G.lockOn`: locked, and carrying missiles that can fly) the
+  four corners snap shut into a diamond on a quick, springy morph, with a
+  two-tone chirp as it shuts (`sfx.lock`). All of it stops the moment the
 reactor trips, which is the point: the quiet after is the shutdown.
 
 ### Audio layer

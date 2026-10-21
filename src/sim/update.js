@@ -6,7 +6,7 @@ import { blendPal } from '../data/palettes.js';
 import { tickWeather } from './weather.js';
 import { add, clampN, dirOf, dot, len, mul, norm, sub } from '../util/math.js';
 import { stepParticles } from './particles.js';
-import { WEAPONS } from '../data/weapons.js';
+import { WEAPONS, CAT_OF } from '../data/weapons.js';
 import { geoOf } from '../data/geo.js';
 import { center, eyeOf, muzzle, rayHit, viewYaw } from './geom.js';
 import { stepMech } from './mech.js';
@@ -87,6 +87,11 @@ export function update(G, input, dt) {
   G.aimMech = aimHit?.mech || (aimHit?.ent?.targetable ? aimHit.ent : null);   // R targets it; a structure counts
   const t = G.target;
   G.lock = !!(t && t.alive && len(sub(center(t), G.eye)) < WEAPONS.lrm.range && dot(norm(sub(center(t), G.eye)), G.view) > cos(0.3));
+  // A lock that means something: you carry missiles that can fly. The HUD's
+  // brackets snap to a diamond on it, and it chirps as it comes on.
+  const was = G.lockOn;
+  G.lockOn = G.lock && P.weapons.some(w => CAT_OF[w.type] === 'missile' && !w.dead && (w.ammo == null || w.ammo > 0));
+  if (G.lockOn && !was && P.alive) G.fx.sfx.lock();
 
   const live = P.alive && !G.paused && !G.roundOver;
   if (live && input.punch) meleePress(G, P);
