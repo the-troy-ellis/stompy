@@ -267,6 +267,16 @@ mech within 120 m of them, or you. Each raid is a mission wave
 - **`keep`:** `{ type: 'keep', targets: ['silo'], label: 'SILO' }`. It fails the moment one of its targets falls and is held, like `protect`, until the rest of the mission is won. The voice says `Silo hit.` when one is shot at, at most every 12 s. The HUD reads `KEEP SILO UP`. The base is set up before the objectives so a `keep` finds the silo, and the editor's problems strip knows a base brings a silo.
 - **Trying it:** the range's BASE picker gets SILO AND A RAID: the silo, and two JACKALs from the west after 20 s.
 
+### As built in #312
+
+- **The mission:** `BASE_MISSION` in `data/missions.js` (key `b01`, placeholder name FIRST FACTORY in `names.js`).
+  - Dusk, with a mesa (r 60, top 90) about 190 m ahead of the start; the silo 55 m off to the front left, with a flattened patch round it for the factory.
+  - You start in the digger (`pilot: 'digger'`, whatever the selector says), a stock KESTREL parked to your right.
+  - Three raids: two JACKALs from the west at 2:00; two JACKALs and a KESTREL from the east at 4:30; two KESTRELs and a WARDEN from the south at 7:00.
+  - Objectives: `keep` the silo, and `eliminate` (done only once the last raid has come and gone down).
+  - Brief: `Dig the rock. Fill the silo. Build a factory. Keep the silo safe.`
+- **Where:** a button on the DEBUG tab's JUMP TO, and BASE at the end of Free Play's MAP picker (MAP and DIFFICULTY only). `G.kind` is `'base'`; the debrief's AGAIN plays it again.
+
 ## Code touchpoints
 
 - `src/data/construct.js` (new): the numbers above.

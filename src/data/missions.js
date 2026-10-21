@@ -121,6 +121,27 @@ export const MISSIONS = [
     objectives: [{ type: 'eliminate' }],
     intel: 'Everyone is here. Big ones, little ones, purple ones. Stomp them all.' },
 ].map(m => ({ ...m, name: NAMES.missions[m.key] }));
+// Build and fight (docs/specs/20-build-and-fight.md § The mission): outside
+// the campaign, on the DEBUG tab's JUMP TO and as BASE in Free Play's MAP.
+// You start in the digger (`pilot`), a KESTREL parked beside you, the silo
+// off to the left and a rocky mesa ahead; three raids, each bigger. Survive
+// the last with the silo up.
+export const BASE_MISSION = {
+  key: 'b01', pal: 'dusk', seed: 31, pilot: 'digger',
+  ground: { landmarks: [{ kind: 'mesa', at: [10, 190], r: 60, top: 90 }] },
+  base: { silo: [300, 55] },
+  flat: [[300, 70, 70]],   // room round the silo for the factory
+  crew: [{ type: 'kestrel', at: [90, 30], face: 0 }],
+  foes: [],
+  objectives: [{ type: 'keep', targets: ['silo'], label: 'SILO' }, { type: 'eliminate' }],
+  waves: [
+    { at: 120, from: 270, foes: ['jackal', 'jackal'], raid: true },
+    { at: 270, from: 90, foes: ['jackal', 'jackal', 'kestrel'], raid: true },
+    { at: 420, from: 180, foes: ['kestrel', 'kestrel', 'warden'], raid: true },
+  ],
+  intel: 'Dig the rock. Fill the silo. Build a factory. Keep the silo safe.',
+  name: NAMES.missions.b01,
+};
 // Every hostile a mission brings: placed, in its waves, and on a SURVIVE's clock.
 export const missionFoes = d => [...d.foes, ...(d.waves || []).flatMap(w => w.foes), ...(d.objectives || []).flatMap(o => (o.waves || []).flatMap(w => w.foes))];
 // Board-book numbers (docs/vision.md § Tone guide): words, not digits.
@@ -185,7 +206,7 @@ export function contractDef(n) {
   return def;
 }
 // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
-export const FP_MAPS = ['random', 'dusk', 'ice', 'volcanic'];
+export const FP_MAPS = ['random', 'dusk', 'ice', 'volcanic', 'base'];   // base: BASE_MISSION, not a skirmish
 // Free Play's WEATHER (RANDOM rolls one that suits the map, clear half the time)
 // and TIME (NORMAL is the map's own light).
 export const FP_WEATHER = ['clear', 'random', 'rain', 'snow', 'dust', 'fog'];
