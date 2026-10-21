@@ -19,7 +19,7 @@ try {
   const browser = await chromium.launch({ executablePath, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
   const errors = [];
   const run = async (name, url, body) => {
-    const page = await browser.newPage({ viewport: { width: 1024, height: 640 }, hasTouch: name === 'touch' });
+    const page = await browser.newPage({ viewport: { width: 1024, height: 640 }, hasTouch: name.startsWith('touch') });
     page.on('pageerror', e => errors.push(`${name}: ${e.message}`));
     page.on('console', m => { if (m.type() === 'error') errors.push(`${name}: console ${m.text()}`); });
     await page.goto(url);
@@ -241,8 +241,9 @@ try {
     await page.waitForTimeout(300);
     const btns = () => page.evaluate(() => Object.fromEntries(['missile', 'energy', 'ballistic', 'fusion'].map(c => { const b = document.querySelector(`[data-t="${c}"]`); return [c, b.hidden ? '-' : b.textContent]; })));
     const dig = await btns();
-    const tgt = await page.$('[data-t="tgt"]'), box = await tgt.boundingBox(), at = { clientX: box.x + box.width / 2, clientY: box.y + box.height / 2, pointerId: 7, pointerType: 'touch', bubbles: true };
-    await tgt.dispatchEvent('pointerdown', at); await page.waitForTimeout(700); await tgt.dispatchEvent('pointerup', at);
+    const box = await (await page.$('[data-t="tgt"]')).boundingBox(), cdp = await page.context().newCDPSession(page), pt = [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }];
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt }); await page.waitForTimeout(800);   // a real finger, held
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await page.waitForTimeout(300);
     const kes = await btns(), now = await page.evaluate(() => window.__stompy.game.player.type);
     await page.screenshot({ path: 'test-results/smoke-touch-swap.png' });
