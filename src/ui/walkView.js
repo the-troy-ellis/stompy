@@ -182,9 +182,11 @@ export function createWalkView(app) {
     ctx.fillStyle = 'rgba(0,10,0,0.88)'; ctx.fillRect(x0, y0, w, h);
     const line = (col, f) => { ctx.strokeStyle = col; ctx.beginPath(); hist.forEach((r, i) => { const y = clampN(f(r), y0, y0 + h); i ? ctx.lineTo(X(r[0]), y) : ctx.moveTo(X(r[0]), y); }); ctx.stroke(); };
     ctx.lineWidth = 1.5;
-    line('#fc3', r => y0 + h * 0.3 - r[1] / span * h * 0.5);
+    let mid = 0;   // the hips and torso about their own middle over the window, so a walk that stands taller stays in the box
+    for (const r of hist) mid += (r[1] + r[3]) / (2 * hist.length);
+    line('#fc3', r => y0 + h * 0.3 - (r[1] - mid) / span * h * 0.5);
     line('#3cf', r => y0 + h * 0.3 - r[2] / span * h * 0.5);
-    line('#f83', r => y0 + h * 0.3 - r[3] / span * h * 0.5);
+    line('#f83', r => y0 + h * 0.3 - (r[3] - mid) / span * h * 0.5);
     for (let k = 4; k < hist[0].length; k++) line('#5f5', r => y0 + h - 4 - r[k] / (span * 2) * h * 0.6);
     ctx.fillStyle = '#9f9'; ctx.font = '10px monospace'; ctx.textAlign = 'left';
     const last = hist[hist.length - 1];

@@ -133,10 +133,22 @@ owner picks, and the walk viewer's MODEL switch (spec 19) flips it for the
 whole debug session, cockpit included.
 
 - **The vault.** The hull vaults over the planted leg like a weight on a
-  stiff pole (an inverted pendulum, as long as the leg). The planted leg
-  nearest upright holds it up, so it is highest right over a foot and
-  lowest between steps. `vault` keeps that share of the pole's rise and
-  fall; it is smoothed a little (40 ms) where one leg hands over to the next.
+  stiff pole. The planted leg nearest upright holds it up, so it is highest
+  right over a foot and lowest between steps. `vault` keeps that share of
+  the pole's rise and fall; it is smoothed a little (40 ms) where one leg
+  hands over to the next.
+- **Straight planted legs.** (The owner, after the first trial: "they look
+  like they are crouching while walking; the knees don't bend".) The pole
+  is the leg with its knee opened to `knee` degrees: a walker's planted
+  knee sits near 150°, against the old body's 80° to 120°, and no leg is
+  stretched past its reach (the others straighten to keep up). The
+  swinging leg does the bending: its lift still peaks early, so the foot
+  comes up behind and the knee folds to about 100° before it reaches
+  forward. Walking, the mech stands taller than at rest (about 0.6 m for a
+  walker); it eases from its stance into the walk over the first third of
+  its speed and settles back as it stops. The old `crouch` is the old
+  body's alone. At top speed the strides are long for the legs, so the hips
+  still dip where one foot hands over to the next.
 - **Height for speed.** Low, the hull runs a little ahead; high, it falls
   back (`speedUp`), drawn as the lurch and leaking back to nothing.
 - **The weight landing.** Each footfall pushes the hull down on a spring
@@ -147,8 +159,8 @@ whole debug session, cockpit included.
   (`nod`). `sim/geom.js` torsoFrame carries the lag, so the eye and the guns
   go with the drawn torso.
 - **The swing.** The swinging foot moves as a pendulum: quickest through
-  the middle, slowing as it reaches out, its lift highest midway (instead of
-  `liftEarly` and `slam`).
+  the middle, slowing as it reaches out (instead of `slam`), its lift
+  peaking early (`liftEarly`).
 - All of it is drawn, like the old bob: the mech's place, speed and feet
   are the same under either body (`test/pendulumBody.test.js`), and
   planted feet never slide.

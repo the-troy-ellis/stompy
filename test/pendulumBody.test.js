@@ -5,6 +5,8 @@ import { update, noInput } from '../src/sim/update.js';
 import { recordFx } from '../src/sim/fx.js';
 import { startWalkView } from '../src/sim/walkView.js';
 import { BODY } from '../src/data/walk.js';
+import { solveKnee } from '../src/sim/gait.js';
+import { geoOf } from '../src/data/geo.js';
 
 // The pendulum body (sim/gait.js, data/walk.js BODY): one mech walking at
 // `thr` for `secs`, `each` called every frame after the first second.
@@ -71,4 +73,28 @@ test('pendulum body: standing still, nothing bobs', () => {
   const bobs = [];
   walk('pendulum', { thr: 0, secs: 4, each: P => bobs.push(P.bob) });
   assert.ok(range(bobs.slice(60)) < 1e-3, `${range(bobs.slice(60))}`);
+});
+
+// Each foot's knee, in degrees (180: straight), as render/scene.js would pose it (without the sway).
+function kneeAngles(P) {
+  const g = geoOf(P), s = P.ch.scale, c = Math.cos(P.yaw), sn = Math.sin(P.yaw), fwd = [sn, 0, c];
+  return P.feet.map((f, i) => {
+    const l = g.legs[i], H = [P.x + (c * l.hx + sn * l.hz) * s, P.y + P.bob + g.hip * s, P.z + (-sn * l.hx + c * l.hz) * s];
+    const A = [f.pos[0], f.pos[1] + g.ankle * s, f.pos[2]], K = solveKnee(H, A, fwd, g.l1 * s, g.l2 * s);
+    const a = H.map((v, k) => v - K[k]), b = A.map((v, k) => v - K[k]);
+    return [f.lifted, Math.acos((a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / Math.hypot(...a) / Math.hypot(...b)) * 180 / Math.PI];
+  });
+}
+
+test('pendulum body: the planted leg stands nearly straight and the swinging leg does the bending', () => {
+  const go = model => {
+    const st = [], sw = [];
+    walk(model, { thr: 0.5, each: P => { for (const [up, a] of kneeAngles(P)) (up ? sw : st).push(a); } });
+    const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+    return { st: mean(st), sw: Math.min(...sw), stMin: Math.min(...st) };
+  };
+  const old = go('old'), pend = go('pendulum');
+  assert.ok(pend.st > 145, `planted knee ${pend.st}°`);
+  assert.ok(pend.st > old.st + 25, `${pend.st}° against the old ${old.st}°`);
+  assert.ok(pend.sw < pend.stMin - 20, `the swing folds to ${pend.sw}°, the planted leg no less than ${pend.stMin}°`);
 });
