@@ -4,7 +4,8 @@ import { geoOf } from '../data/geo.js';
 import { particle } from './effects.js';
 import { feel } from './feel.js';
 import { FEEL } from '../data/feel.js';
-import { GAIT } from '../data/walk.js';
+import { GAIT, BODY } from '../data/walk.js';
+import { makeSpring, stepSpring, kickSpring } from '../util/spring.js';
 
 const { sin, cos, abs, min, hypot, PI } = Math;
 
@@ -85,7 +86,7 @@ export function gait(G, m, dt) {
   // No legs left: the hull sits on the ground, the torso still turns and fires.
   if (m.hp.LL <= 0 && m.hp.RL <= 0) {
     m.feet.forEach((f, i) => { f.pos = restFoot(G, m, i); f.lifted = false; f.yaw = m.yaw; });
-    m.bob = -(g0.hip - 0.9) * s; m.lean = 0; m.sway = 0; m.hipYaw = 0; m.surge = 0; m.lastYaw = m.yaw;
+    m.bob = -(g0.hip - 0.9) * s; m.lean = 0; m.sway = 0; m.hipYaw = 0; m.surge = 0; m.lastYaw = m.yaw; stillBody(m);
     return;
   }
   // One leg gone: lean toward the gap, about 8 degrees.
@@ -96,7 +97,7 @@ export function gait(G, m, dt) {
   if (m.air) {
     // Legs hang under the body until touchdown.
     m.feet.forEach((f, i) => { const r = restFoot(G, m, i); f.pos = [r[0], m.y + 1.4 * s, r[2]]; f.lifted = false; f.yaw = m.yaw; });
-    m.bob = 0; m.sway = 0; m.hipYaw = 0; m.surge = 0; m.wasAir = true;
+    m.bob = 0; m.sway = 0; m.hipYaw = 0; m.surge = 0; m.wasAir = true; stillBody(m);
     return;
   }
   if (m.wasAir) { m.wasAir = false; m.cyc = restCyc(geoOf(m)); m.feet.forEach((f, i) => { f.pos = restFoot(G, m, i); f.yaw = m.yaw; }); }
@@ -121,14 +122,15 @@ export function gait(G, m, dt) {
   // and drops back through the step, instead of gliding (drawn, not moved).
   const lurch = since < 1.5 ? (since / 0.16) * Math.exp(1 - since / 0.16) : 0;
   m.surge = lurch * gp.surge * pace * dir;
-  let rise = 0, sway = 0, turn = 0;
+  const pend = BODY.model === 'pendulum';
+  let rise = 0, sway = 0, turn = 0, lame = Infinity;
   m.feet.forEach((f, i) => {
     const u = swingOf(i);
     if (!legOk(i)) {
       // The leg is gone: nothing swings, and the body dips where its step would
       // have carried it, deeper than any stride's crouch (a walker's is deep).
       f.lifted = false;
-      if (u != null) m.bob = min(m.bob, crouch - sin(PI * u) * (gp.crouch + 0.35) * s);
+      if (u != null) lame = min(lame, crouch - sin(PI * u) * (gp.crouch + 0.35) * s);
       return;
     }
     if (u == null) {
@@ -141,11 +143,13 @@ export function gait(G, m, dt) {
     }
     if (!f.lifted) { f.from = [...f.pos]; f.lifted = true; }
     // A heavy foot lifts slowly and is driven into the ground (slam), its
-    // lift peaking early so it comes down rather than glides down.
-    const t = swingTarget(G, m, i, u, D, dir, sw), e = lerp(u * u * (3 - 2 * u), u * u, gp.slam);
+    // lift peaking early so it comes down rather than glides down. Under the
+    // pendulum body the leg swings as a pendulum does instead: quickest
+    // through the middle, slowing as it reaches out, its lift highest midway.
+    const t = swingTarget(G, m, i, u, D, dir, sw), e = pend ? (1 - cos(PI * u)) / 2 : lerp(u * u * (3 - 2 * u), u * u, gp.slam);
     // Shoved mid-stride: a normal step starts about a stride (D) from its target; far more than that, start from the target.
     if (hypot(f.from[0] - t[0], f.from[2] - t[2]) > 1.5 * D + 3 * s) f.from = [...t];
-    const up = sin(PI * Math.pow(u, gp.liftEarly)) * (gp.lift[0] + gp.lift[1] * pace) * s;
+    const up = sin(PI * (pend ? u : Math.pow(u, gp.liftEarly))) * (gp.lift[0] + gp.lift[1] * pace) * s;
     f.pos = [lerp(f.from[0], t[0], e), lerp(f.from[1], t[1], e) + up, lerp(f.from[2], t[2], e)];
     f.yaw += wrapA(m.yaw - f.yaw) * min(1, dt * 10);
     const arc = sin(PI * u), leg = g.legs[i], side = Math.sign(leg.hx) * (leg.hz >= -0.2 ? 1 : 0);   // a quad shifts by its front legs
@@ -153,7 +157,8 @@ export function gait(G, m, dt) {
     sway -= side * arc * gp.sway * min(1, 0.3 + pace);
     turn -= side * arc * gp.hipTurn * pace;
   });
-  m.bob += rise * s;
+  if (pend) pendulumBody(m, g, gp, s, crouch, v, dt, lame, legOk);
+  else { m.bob = min(m.bob, lame) + rise * s; stillBody(m); }
   m.sway = sway; m.hipYaw = turn;   // drawn (render/scene.js), not felt: the guns and the eye don't sway
   // A planted foot left hopelessly far away (shoved, respawned) just resets.
   m.feet.forEach((f, i) => {
@@ -163,10 +168,53 @@ export function gait(G, m, dt) {
   });
 }
 
+// The pendulum body (BODY.model 'pendulum', data/walk.js). The hull vaults
+// over the planted leg like a weight on a stiff pole: highest right over the
+// foot, lowest between steps, so it rises and falls with every step, and it
+// goes a little faster low than high (it trades height for speed). On top of
+// that it sits on a spring that each footfall pushes down (footDown) and that
+// comes back late, with an overshoot: the weight landing on the new leg. The torso follows the hull on a softer spring
+// of its own, so it drops a beat after the hips and nods as it lags. All of
+// it is drawn, like the old bob: the mech's place, speed and feet are the
+// same under either body.
+function pendulumBody(m, g, gp, s, crouch, v, dt, lame, legOk) {
+  const L = (g.l1 + g.l2) * s, c = cos(m.yaw), sn = sin(m.yaw);
+  // The planted leg nearest upright holds the hull up: its drop below a pole's full height.
+  let drop = Infinity;
+  m.feet.forEach((f, i) => {
+    if (f.lifted || !legOk(i)) return;
+    const l = g.legs[i], rx = m.x + (c * l.fx + sn * l.fz) * s, rz = m.z + (-sn * l.fx + c * l.fz) * s;
+    const d = min(abs((f.pos[0] - rx) * sn + (f.pos[2] - rz) * c), L * 0.95);
+    drop = min(drop, L - Math.sqrt(L * L - d * d));
+  });
+  if (drop === Infinity) drop = m.pDrop ?? 0;   // in the air between strides (a runner's run): it keeps going as it was
+  m.pDrop = drop; m.pMean = (m.pMean ?? drop) + (drop - (m.pMean ?? drop)) * min(1, dt * 2);
+  // The vault, smoothed a touch where one leg hands over to the next, and the footfalls' spring.
+  m.pVault = m.pVault == null ? drop : m.pVault + (drop - m.pVault) * min(1, dt / 0.04);
+  const hit = (m.hull ||= makeSpring(gp.bodyK, gp.bodyZeta));
+  hit.k = gp.bodyK; hit.c = 2 * Math.sqrt(gp.bodyK) * gp.bodyZeta;   // live from the GAIT page
+  stepSpring(hit, dt, 0);
+  const hullY = crouch - gp.vault * m.pVault + hit.x;
+  m.bob = min(hullY, lame);
+  // Low (more drop than usual) runs ahead, high falls back: drawn as the lurch, leaking back to nothing.
+  const ahead = abs(v) * gp.speedUp * clampN((drop - m.pMean) / (0.05 * L), -1, 1) * Math.sign(v);
+  m.pAhead = (m.pAhead || 0) + (ahead - (m.pAhead || 0) * 3) * dt;
+  m.surge = m.pAhead / s;
+  const torso = (m.torso ||= makeSpring(1, 0.7));
+  torso.k = 1 / (gp.lag * gp.lag); torso.c = 2 * Math.sqrt(torso.k) * 0.7;
+  if (m.torsoDrop == null) torso.x = hullY;
+  stepSpring(torso, dt, hullY);
+  const lagM = torso.x - hullY;
+  m.torsoDrop = lagM / s; m.torsoNod = -lagM * gp.nod;   // model units (render/scene.js, sim/geom.js torsoFrame); lagging low, it nods forward
+}
+// The old body (or none): no lag, no nod, and the pendulum's springs start afresh next time.
+function stillBody(m) { m.torsoDrop = null; m.torsoNod = 0; m.hull = null; m.torso = null; m.pAhead = 0; m.pMean = null; m.pVault = null; }
+
 // Touchdown: the sound, the cockpit jolt, a puff of dust.
 function footDown(G, m, f, pace) {
   const P = G.player, r = G.rng, d = P ? hypot(m.x - P.x, m.z - P.z) : 1e9;
   m.stepAt = G.time;   // the hull's dip (gait)
+  if (m.hull) kickSpring(m.hull, -gaitOf(m).sink * m.ch.scale * (0.4 + 0.6 * pace));   // the pendulum body: the weight comes down on the new foot
   // Heavier mechs thump harder; a planted foot's weight scales with scale^2.
   feel(G, 'step', { mech: m, k: (0.35 + 0.65 * pace) * m.ch.scale * m.ch.scale, at: m === P ? null : f.pos });
   const entering = m !== P && revealing(G, m);   // a wave's big entrance (waves.js): heard and felt from anywhere

@@ -241,7 +241,7 @@ it from outside.
   lock. The sim side is `src/sim/walkView.js` (the match, `G.walk`, and
   `walkStep`, which update.js runs as it runs the bench); the page side is
   `src/ui/walkView.js`.
-- The panel, top left: WALK ◀ mech ▶ · SPEED (a slider, −35% to 100%) and
+- The panel, top left: WALK ◀ mech ▶ · MODEL (below) · SPEED (a slider, −35% to 100%) and
   STOP/GO · PATH STRAIGHT/CIRCLE · TIME 1× ½× ¼× ⅒×, II, STEP (one 1/60 s
   frame) · VIEW SIDE ¾ FRONT BACK COCKPIT · SHOW GRID, CHART, TUNING, EXIT.
   The picks are saved (`debug.walk`).
@@ -258,6 +258,9 @@ it from outside.
 - TUNING opens the FEEL, GAIT, LOOK and OVERLAYS pages under the panel,
   live as anywhere else.
 - Keys: Space pauses, `.` or → steps, 1 to 4 pick the speed, Esc leaves.
+- MODEL OLD/PENDULUM (added with the pendulum body, spec 16): which body
+  rides the legs, saved, and in force for the whole debug session, play
+  included. The chart adds the torso (orange) to see its lag.
 
 ## Code touchpoints
 

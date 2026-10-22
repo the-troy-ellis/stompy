@@ -5,7 +5,7 @@ import { sceneryAlong } from './entities.js';
 const { sqrt } = Math;
 
 export const frame = m => chain(M.T(m.x, m.y + (m.bob || 0), m.z), M.RY(m.yaw), M.S(m.ch.scale));
-export const torsoFrame = m => chain(frame(m), M.T(0, geoOf(m).torsoY, 0), M.RY(m.twist));
+export const torsoFrame = m => chain(frame(m), M.T(0, geoOf(m).torsoY + (m.torsoDrop || 0), 0), M.RY(m.twist));   // torsoDrop: the pendulum body's lag (sim/gait.js)
 export const center = m => [m.x, m.y + 4.2 * m.ch.scale, m.z];
 // Where a shell fired now from `from` at `speed` m/s meets a mech walking
 // on its heading: two passes of time-of-flight are plenty at these ranges.

@@ -25,8 +25,25 @@ export const WALK = {
 //   bounce     how far the hull rises over a swinging leg, model units
 //   sway       how far the hips shift over the planted foot, model units
 //   hipTurn    how far the hips turn with the stride, radians (the torso doesn't)
+// The PENDULUM body only (BODY below; sim/gait.js § The pendulum body):
+//   vault      share of the inverted pendulum's rise and fall the hull keeps (0: level)
+//   sink       how hard a footfall pushes the hull down, m/s
+//   bodyK      the spring a footfall pushes the hull down on (stiffer: a quicker bounce back), 1/s²
+//   bodyZeta   its damping (1: no overshoot; less: it bobs once after a footfall)
+//   speedUp    how much faster the hull goes low between steps than high over a leg (share of speed)
+//   lag        how far behind the hull the torso follows, s (its spring's time)
+//   nod        the torso's nod forward per metre it lags, radians
 export const GAIT = {
-  forward: { cadence: 1.7, runAt: 2, runSwing: 0.42, crouch: 0.8, lift: [0.6, 0.9], liftEarly: 0.6, slam: 0.85, drop: 0.24, surge: 0.35, bounce: 0.04, sway: 0.2, hipTurn: 0.08 },
-  reverse: { cadence: 3.0, runAt: 0.55, runSwing: 0.62, crouch: 0.45, lift: [0.5, 1.2], liftEarly: 0.85, slam: 0.3, drop: 0.08, surge: 0.1, bounce: 0.4, sway: 0.06, hipTurn: 0.04 },
-  quad: { cadence: 1.4, runAt: 2, runSwing: 0.34, crouch: 0.4, lift: [0.4, 0.6], liftEarly: 0.6, slam: 0.75, drop: 0.2, surge: 0.2, bounce: 0.03, sway: 0.1, hipTurn: 0.03 },
+  forward: { cadence: 1.7, runAt: 2, runSwing: 0.42, crouch: 0.8, lift: [0.6, 0.9], liftEarly: 0.6, slam: 0.85, drop: 0.24, surge: 0.35, bounce: 0.04, sway: 0.2, hipTurn: 0.08,
+    vault: 0.6, sink: 1.1, bodyK: 70, bodyZeta: 0.55, speedUp: 0.12, lag: 0.045, nod: 0.3 },
+  reverse: { cadence: 3.0, runAt: 0.55, runSwing: 0.62, crouch: 0.45, lift: [0.5, 1.2], liftEarly: 0.85, slam: 0.3, drop: 0.08, surge: 0.1, bounce: 0.4, sway: 0.06, hipTurn: 0.04,
+    vault: 0.4, sink: 0.5, bodyK: 140, bodyZeta: 0.6, speedUp: 0.08, lag: 0.03, nod: 0.15 },
+  quad: { cadence: 1.4, runAt: 2, runSwing: 0.34, crouch: 0.4, lift: [0.4, 0.6], liftEarly: 0.6, slam: 0.75, drop: 0.2, surge: 0.2, bounce: 0.03, sway: 0.1, hipTurn: 0.03,
+    vault: 0.35, sink: 0.8, bodyK: 90, bodyZeta: 0.6, speedUp: 0.06, lag: 0.05, nod: 0.15 },
 };
+
+// Which body rides the legs (the walk viewer's MODEL switch, ui/walkView.js):
+// 'old', the drawn bob, dip and lurch above; or 'pendulum', the hull vaulting
+// over the planted leg on a spring, the torso following late. Play stays on
+// 'old' until the owner picks.
+export const BODY = { model: 'old' };
