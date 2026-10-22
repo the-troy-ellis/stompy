@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestGame, stepFor, input } from './helpers.js';
 import { FEEL } from '../src/data/feel.js';
+import { BODY } from '../src/data/walk.js';
 
 test('weight: the body rocks back pulling away, pitches forward braking, and settles at a cruise', () => {
   const G = createTestGame({ foes: [] });
@@ -35,7 +36,11 @@ test('weight: a turn at speed rolls it outward, and a bigger mech swings slower'
   assert.ok(heavy.P.tilt.r.k < light.P.tilt.r.k, 'the bigger mech has the softer spring');
 });
 
-test('weight: the body lurches ahead after a footfall and eases back; standing still, it does not', () => {
+test('weight: the body lurches ahead after a footfall and eases back; standing still, it does not (the old body)', () => {
+  BODY.model = 'old';   // the pendulum body's lurch is its own (test/pendulumBody.test.js)
+  try { oldLurch(); } finally { BODY.model = 'pendulum'; }
+});
+function oldLurch() {
   const G = createTestGame({ foes: [] });
   const P = G.player;
   stepFor(G, 1);
@@ -44,4 +49,4 @@ test('weight: the body lurches ahead after a footfall and eases back; standing s
   let lo = Infinity, hi = -Infinity;
   for (let i = 0; i < 120; i++) { stepFor(G, 1 / 60, input({ thrUp: true })); lo = Math.min(lo, P.surge); hi = Math.max(hi, P.surge); }
   assert.ok(hi > 0.2 && lo < hi * 0.5, `surge ${lo.toFixed(2)}..${hi.toFixed(2)}`);
-});
+}

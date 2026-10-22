@@ -125,14 +125,21 @@ shallow arc between landings instead of bobbing over a planted leg. Below
 Feet never slide (architecture § Invariants), and terrain height still
 matches the mesh. None of this changes speed, acceleration or turning.
 
-### The pendulum body (a second model, on trial)
+### The pendulum body (the default since 2026-10-22)
 
 The owner, watching the walk viewer: the steps are technically right but
 don't move like a heavy, inertial thing. The old body glides at one height
 with a sharp dip at each footfall. `BODY.model` in `src/data/walk.js` picks
-which body rides the legs; `'old'` stays the default in play until the
-owner picks, and the walk viewer's MODEL switch (spec 19) flips it for the
-whole debug session, cockpit included.
+which body rides the legs. It began on trial beside `'old'`; after the
+tweaks below the owner picked it, and `'pendulum'` is the default in play.
+The walk viewer's MODEL switch (spec 19) still flips it for a debug session
+to compare.
+- **Headroom.** Your own mech walks taller than it stands, so in a low
+  pocket (a dig, a tunnel) its eye could rise into a roof the walk's cab
+  sample (`mech.js` rockAt) only keeps clear at the stance's height. The
+  rise comes down there until the line 0.1 to 0.6 m ahead of the eye (and
+  0.3 m above it) is clear, torso lag included. Drawn only: where it walks
+  is the same.
 
 - **The vault.** The hull vaults over the planted leg like a weight on a
   stiff pole. The planted leg nearest upright holds it up, so it is highest

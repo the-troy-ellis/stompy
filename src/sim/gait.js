@@ -168,7 +168,7 @@ export function gait(G, m, dt) {
     sway -= side * arc * gp.sway * min(1, 0.3 + pace);
     turn -= side * arc * gp.hipTurn * pace;
   });
-  if (pend) pendulumBody(m, g, gp, s, pace, v, dt, lame, legOk);
+  if (pend) pendulumBody(G, m, g, gp, s, pace, v, dt, lame, legOk);
   else { m.bob = min(m.bob, lame) + rise * s; stillBody(m); }
   // Into a run, a sprinter's lean: the torso pitches forward and the hips
   // sink (runLean, runDrop), easing in and out over a quarter second.
@@ -197,7 +197,7 @@ export function gait(G, m, dt) {
 // follows the hull on a softer spring of its own, so it drops a beat after
 // the hips and nods as it lags. All of it is drawn, like the old bob: the
 // mech's place, speed and feet are the same under either body.
-function pendulumBody(m, g, gp, s, pace, v, dt, lame, legOk) {
+function pendulumBody(G, m, g, gp, s, pace, v, dt, lame, legOk) {
   const l1 = g.l1 * s, l2 = g.l2 * s, c = cos(m.yaw), sn = sin(m.yaw);
   // A fast walk bends the knee a little more (kneeFast), for the reach a long
   // stride wants; a run has its own knee (runKnee), blended in with the run.
@@ -228,7 +228,6 @@ function pendulumBody(m, g, gp, s, pace, v, dt, lame, legOk) {
   hit.k = gp.bodyK; hit.c = 2 * Math.sqrt(gp.bodyK) * gp.bodyZeta;   // live from the GAIT page
   stepSpring(hit, dt, 0);
   const hullY = m.pVault + hit.x;
-  m.bob = min(hullY, lame);
   // Low (more drop than usual) runs ahead, high falls back: drawn as the lurch, leaking back to nothing.
   const ahead = abs(v) * gp.speedUp * clampN((drop - m.pMean) / (0.05 * (l1 + l2)), -1, 1) * Math.sign(v);
   m.pAhead = (m.pAhead || 0) + (ahead - (m.pAhead || 0) * 3) * dt;
@@ -239,6 +238,24 @@ function pendulumBody(m, g, gp, s, pace, v, dt, lame, legOk) {
   stepSpring(torso, dt, hullY);
   const lagM = torso.x - hullY;
   m.torsoDrop = lagM / s; m.torsoNod = -lagM * gp.nod;   // model units (render/scene.js, sim/geom.js torsoFrame); lagging low, it nods forward
+  const eyeUp = hullY + lagM;   // where the eye rides, hull and torso: the hull gives way to a low roof
+  m.bob = min(hullY - (eyeUp - headroom(G, m, g, s, eyeUp)), lame);
+}
+// Your own mech walks taller than it stands, but never with its eye in a
+// roof: in a low pocket (a dig, a tunnel) the rise comes down until the view
+// ahead of the eye is clear, as the walk's cab sample (mech.js rockAt) keeps
+// it clear at the stance's height. Drawn only, like the rise: where it walks
+// is the same. Others' heads may brush a roof; nobody sees out of them.
+function headroom(G, m, g, s, y) {
+  if (m !== G.player || y <= 0 || !G.ter) return y;
+  const a = m.yaw + (m.twist || 0), fx = Math.sin(a), fz = Math.cos(a);
+  const ex = m.x + fx * g.eye[2] * s, ez = m.z + fz * g.eye[2] * s, base = m.y + (g.torsoY + g.eye[1]) * s;
+  const roofed = h => {
+    for (let r = 0.1; r < 0.65; r += 0.1) for (const up of [0, 0.3]) if (G.ter.solid(ex + fx * r, base + h + up, ez + fz * r)) return true;
+    return false;
+  };
+  while (y > 0 && roofed(y)) y = Math.max(0, y - 0.1);
+  return y;
 }
 // The old body (or none): no lag, no nod, and the pendulum's springs start afresh next time.
 function stillBody(m) { m.torsoDrop = null; m.torsoNod = 0; m.hull = null; m.torso = null; m.pAhead = 0; m.pMean = null; m.pVault = null; m.pWalk = null; }

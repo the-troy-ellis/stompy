@@ -260,7 +260,8 @@ it from outside.
 - Keys: Space pauses, `.` or → steps, 1 to 4 pick the speed, Esc leaves.
 - MODEL OLD/PENDULUM (added with the pendulum body, spec 16): which body
   rides the legs, saved, and in force for the whole debug session, play
-  included. The chart adds the torso (orange) to see its lag.
+  included. PENDULUM is the game's default; OLD is kept to compare. The
+  chart adds the torso (orange) to see its lag.
 
 ## Code touchpoints
 
