@@ -732,11 +732,11 @@ export function createHud(app) {
     stepSpring(lockSnap, lastBracketAt ? min(0.05, (nowB - lastBracketAt) / 1000) : 0, G.lockOn ? 1 : 0);
     lastBracketAt = nowB;
     if (t && t.alive && hypot(t.x - P.x, t.z - P.z) < sees) {
+      const f = t.kind ? t.hp / t.max : t.hp.T / t.max.T, col = f < BRACKET_LOW && floor(G.time * 6) % 2 ? '#fff' : hpCol(f);   // the target's torso: the brackets' and the lead's colour
       const a = project([t.x, t.y + (t.kind ? t.height : 8.2 * t.ch.scale), t.z]), b = project([t.x, t.y, t.z]);
       if (a && b) {
         const hgt = max(14, b[1] - a[1]), wdt = hgt * 0.75, x0 = a[0] - wdt / 2, y0 = a[1], k = min(10, wdt / 3);
-        const f = t.kind ? t.hp / t.max : t.hp.T / t.max.T, col = f < BRACKET_LOW && floor(G.time * 6) % 2 ? '#fff' : hpCol(f);
-        const sn = clampN(lockSnap.x, 0, 1.25), mx = a[0], my = y0 + hgt / 2, dx = wdt * 0.46, dy = hgt * 0.5;
+        const sn = clampN(lockSnap.x, 0, 1.25), mx = a[0], my = y0 + hgt / 2, dx = wdt * 0.72, dy = hgt * 0.7;   // the diamond reaches round the whole mech
         ctx.strokeStyle = col; ctx.lineWidth = 2 + sn * 0.5;
         ctx.beginPath();
         // Each corner is three points (its two arms' ends and the corner); shut, they are a diamond's
@@ -754,14 +754,16 @@ export function createHud(app) {
         ctx.textAlign = 'center';
         ctx.fillText(fmtDist(hypot(t.x - P.x, t.z - P.z)), a[0], y0 - 8 - sn * 4);   // the one thing by it: how far
       }
-      // Autocannon lead: a small diamond where a shell fired now would meet it, while it is moving and in range.
-      const ac = P.weapons.find(w => w.def.kind === 'shell' && !w.dead && (w.ammo == null || w.ammo > 0));
+      // Shell lead: a small diamond where a shell fired now would meet it, while it is moving, in the
+      // shell's range, and inside the lock's zone (G.lock: lock range and ~17 degrees of the view;
+      // missiles or not), in the brackets' colour.
+      const ac = G.lock && P.weapons.find(w => w.def.kind === 'shell' && !w.dead && (w.ammo == null || w.ammo > 0));
       if (ac && Math.abs(t.speed) > 1 && hypot(t.x - P.x, t.z - P.z) < ac.def.range) {
         const lp = project(leadPoint(G.eye, t, ac.def.speed));
         if (lp) {
-          ctx.strokeStyle = AMBER; ctx.beginPath();
+          ctx.strokeStyle = col; ctx.beginPath();
           ctx.moveTo(lp[0], lp[1] - 6); ctx.lineTo(lp[0] + 6, lp[1]); ctx.lineTo(lp[0], lp[1] + 6); ctx.lineTo(lp[0] - 6, lp[1]); ctx.closePath(); ctx.stroke();
-          ctx.fillStyle = AMBER; ctx.fillRect(lp[0] - 1, lp[1] - 1, 2, 2);
+          ctx.fillStyle = col; ctx.fillRect(lp[0] - 1, lp[1] - 1, 2, 2);
         }
       }
     }

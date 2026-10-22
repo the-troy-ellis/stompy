@@ -200,7 +200,11 @@ the brackets show two things more (the owner's design):
 - **Shape is the missile lock.** Open corners; with a lock that means
   something (`G.lockOn`: locked, and carrying missiles that can fly) the
   four corners snap shut into a diamond on a quick, springy morph, with a
-  two-tone chirp as it shuts (`sfx.lock`). All of it stops the moment the
+  two-tone chirp as it shuts (`sfx.lock`).
+- **The shell lead** (the small diamond where a shell fired now would meet a
+  moving target) shows only inside the lock's zone (`G.lock`: lock range and
+  about 17 degrees of the view, missiles or not), in the brackets' colour.
+  The lock diamond is drawn big enough to go round the whole mech. All of it stops the moment the
 reactor trips, which is the point: the quiet after is the shutdown.
 
 ### Audio layer
