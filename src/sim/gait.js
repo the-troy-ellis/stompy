@@ -199,8 +199,9 @@ export function gait(G, m, dt) {
 // mech's place, speed and feet are the same under either body.
 function pendulumBody(m, g, gp, s, pace, v, dt, lame, legOk) {
   const l1 = g.l1 * s, l2 = g.l2 * s, c = cos(m.yaw), sn = sin(m.yaw);
-  // A fast walk (not a run) bends the knee a little more (kneeFast), for the reach a long stride wants.
-  const knee = gp.knee - (gp.kneeFast || 0) * pace * (1 - runOf(m, pace));
+  // A fast walk bends the knee a little more (kneeFast), for the reach a long
+  // stride wants; a run has its own knee (runKnee), blended in with the run.
+  const knee = lerp(gp.knee - (gp.kneeFast || 0) * pace, gp.runKnee ?? gp.knee, runOf(m, pace));
   const pole = Math.sqrt(l1 * l1 + l2 * l2 - 2 * l1 * l2 * cos(knee * PI / 180)), full = (l1 + l2) * 0.98;
   // The planted leg nearest upright holds the hull up, at its pole's length,
   // keeping `vault` of the pole's fall away from upright; none may be

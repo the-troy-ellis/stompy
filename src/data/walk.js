@@ -33,6 +33,7 @@ export const WALK = {
 //   runDrop    how far the hips sink at a full run, model units
 // The PENDULUM body only (BODY below; sim/gait.js § The pendulum body):
 //   knee       the planted leg's knee right over its foot, degrees (180: dead straight); the hull rides that high
+//   runKnee    the same, running (blended in as the run comes on; none: knee)
 //   kneeFast   degrees less knee at a fast walk (not a run): the reach a long stride wants, with less bob
 //   vault      share of the pole's fall away from upright the hull keeps (0: level; 1: a rigid pole)
 //   sink       how hard a footfall pushes the hull down, m/s
@@ -45,7 +46,7 @@ export const GAIT = {
   forward: { cadence: 1.7, runCadence: 2.6, runMin: 12, runAt: 0.55, runSwing: 0.6, crouch: 0.8, lift: [0.6, 0.9], liftEarly: 0.6, slam: 0.85, drop: 0.24, surge: 0.35, bounce: 0.04, sway: 0.2, hipTurn: 0.08, runLean: 0.2, runDrop: 0.4, plantBack: [0.1, 0.35],
     knee: 145, kneeFast: 20, vault: 0.3, sink: 1.1, bodyK: 70, bodyZeta: 0.55, speedUp: 0.12, lag: 0.045, nod: 0.3 },
   reverse: { cadence: 3.0, runCadence: 3.0, runMin: 0, runAt: 0.55, runSwing: 0.62, crouch: 0.45, lift: [0.5, 1.2], liftEarly: 0.85, slam: 0.3, drop: 0.08, surge: 0.1, bounce: 0.4, sway: 0.06, hipTurn: 0.04, runLean: 0.28, runDrop: 0.5, plantBack: [0.25, 0.5],
-    knee: 125, vault: 0.5, sink: 0.5, bodyK: 140, bodyZeta: 0.6, speedUp: 0.08, lag: 0.03, nod: 0.15 },
+    knee: 100, runKnee: 125, vault: 0.5, sink: 0.5, bodyK: 140, bodyZeta: 0.6, speedUp: 0.08, lag: 0.03, nod: 0.15 },
   quad: { cadence: 1.4, runAt: 2, runSwing: 0.34, crouch: 0.4, lift: [0.4, 0.6], liftEarly: 0.6, slam: 0.75, drop: 0.2, surge: 0.2, bounce: 0.03, sway: 0.1, hipTurn: 0.03,
     knee: 105, vault: 0.5, sink: 0.8, bodyK: 90, bodyZeta: 0.6, speedUp: 0.06, lag: 0.05, nod: 0.15 },
 };

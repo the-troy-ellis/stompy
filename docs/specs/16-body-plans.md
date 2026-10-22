@@ -207,7 +207,9 @@ walker's strides were long for its legs, so the hull had to dip about
   does. Feet still never slide, and no leg is stretched further than before.
 - **Bird legs crouch walking** (the owner: "chicken walkers don't need to
   have their legs so straight"): under the pendulum body their planted knee
-  sits at 125° (was 145°).
+  sits at 125° (was 145°). Then, walking, 100° (`runKnee` keeps 125° for
+  the run): at 125° a walking bird rode 0.4 m above its stance, "on tip
+  toes"; at 100° its hips sit just below where they stand.
 
 ### Crawler traction
 
