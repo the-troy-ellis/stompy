@@ -94,7 +94,7 @@ test('pendulum body: the planted leg stands nearly straight and the swinging leg
     return { st: mean(st), sw: Math.min(...sw), stMin: Math.min(...st) };
   };
   const old = go('old'), pend = go('pendulum');
-  assert.ok(pend.st > 145, `planted knee ${pend.st}°`);
+  assert.ok(pend.st > 135, `planted knee ${pend.st}°`);   // at half speed: GAIT knee less half its kneeFast
   assert.ok(pend.st > old.st + 25, `${pend.st}° against the old ${old.st}°`);
   assert.ok(pend.sw < pend.stMin - 20, `the swing folds to ${pend.sw}°, the planted leg no less than ${pend.stMin}°`);
 });

@@ -26,7 +26,9 @@ this, a heavy walker takes about 1.5 and a runner about 3.
 - A **runner** (JACKAL, PIPSQUEAK) walks at low speed and breaks into a run
   past half throttle. You can see the switch: long bounding strides, a moment
   with both feet in the air, and a light quick slap at each landing.
-- A **walker** (KESTREL, BEANPOLE, PURPLE PUNCHER) never has both feet up. Each
+- A **walker** (KESTREL, BEANPOLE, PURPLE PUNCHER) never has both feet up
+  (changed, 2026-10-22: a quick one, BARRY or LONG LARRY, now breaks into a
+  run like a runner; see § Forward knees run). Each
   step is long and slow. The foot lifts, swings, and comes down hard and stops
   dead. The hips shift over the planted foot, the body drops at impact and
   recovers, and the next foot waits a beat before it lifts.
@@ -45,7 +47,7 @@ No new text, except the role lines in the selector that name the leg type
 | Class | Legs | Gait | Speed | Build | Slopes |
 |---|---|---|---|---|---|
 | Runner | reverse (bird) | walks, then runs: a flight phase above `runAt` | fastest | light: less armour, fewer tons | as now |
-| Walker | forward | walks only: always a foot down | normal | medium to heavy: more armour and guns | as now |
+| Walker | forward | walks; a quick one runs past `runAt` (top speed ≥ `runMin`, 12 m/s); a heavy always has a foot down | normal | medium to heavy: more armour and guns | as now |
 | Crawler | quad | trots: diagonal pairs, long plants | slowest | the heaviest | **no slope factor** (no uphill loss, no downhill gain) |
 
 ### The roster (owner's choices)
@@ -166,6 +168,28 @@ whole debug session, cockpit included.
   planted feet never slide.
 - Still to come, if the owner keeps it: capture-point foot placement (where
   the next foot goes to stop the body, so braking hard takes an extra step).
+
+### Forward knees run
+
+The owner, on the straight-legged pendulum walk (2026-10-22): "it's too
+bouncy for the body. The chicken walker mechs look better, so it might be
+worth having the normal knee mechs be able to run also." At top speed a
+walker's strides were long for its legs, so the hull had to dip about
+0.75 m where one foot handed over to the next.
+
+- Forward knees now run past `runAt` (0.55), as bird legs do, with a flight
+  phase (`runSwing` 0.6) and quicker steps (`runCadence` 2.6, blended in as
+  the run comes on; the walk keeps `cadence`). A run covers its stride in
+  the air, so each foot is planted for less ground and the hull hardly has
+  to dip: BARRY bobs 0.35 m at full speed (was 0.75), LONG LARRY 0.16 m.
+- Only a mech whose top speed reaches `runMin` (12 m/s) runs. PURPLE
+  PUNCHER and the digger (9 m/s) keep the heavy planted walk, at 1.58
+  footfalls a second; a fast walk bends their knee a little more
+  (`kneeFast`, 20° at full speed) for the reach their long strides want, so
+  PURPLE PUNCHER bobs 0.30 m (was 0.72).
+- The walker's pendulum is calmer too: `knee` 145°, `vault` 0.3.
+- These are look-only (GAIT): speeds, turns and everything else are as
+  they were. Under the old body, forward knees run too.
 
 ### Crawler traction
 

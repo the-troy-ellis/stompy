@@ -14,6 +14,8 @@ export const WALK = {
 // steps look, never how fast it goes. All live in the ?debug=1 FEEL panel.
 //   cadence    footfalls a second at top speed (a quad's pairs count once); the
 //              stride follows from it, within the legs' reach
+//   runCadence the same, running (blended in as the run comes on)
+//   runMin     top speed in m/s below which a mech never runs (a heavy keeps walking)
 //   runAt      share of top speed where a runner starts to run (2: never)
 //   runSwing   share of the cycle a running foot is in the air (> 0.5: a flight phase)
 //   crouch     how far the hips sink at full speed, model units
@@ -27,6 +29,7 @@ export const WALK = {
 //   hipTurn    how far the hips turn with the stride, radians (the torso doesn't)
 // The PENDULUM body only (BODY below; sim/gait.js § The pendulum body):
 //   knee       the planted leg's knee right over its foot, degrees (180: dead straight); the hull rides that high
+//   kneeFast   degrees less knee at a fast walk (not a run): the reach a long stride wants, with less bob
 //   vault      share of the pole's fall away from upright the hull keeps (0: level; 1: a rigid pole)
 //   sink       how hard a footfall pushes the hull down, m/s
 //   bodyK      the spring a footfall pushes the hull down on (stiffer: a quicker bounce back), 1/s²
@@ -35,9 +38,9 @@ export const WALK = {
 //   lag        how far behind the hull the torso follows, s (its spring's time)
 //   nod        the torso's nod forward per metre it lags, radians
 export const GAIT = {
-  forward: { cadence: 1.7, runAt: 2, runSwing: 0.42, crouch: 0.8, lift: [0.6, 0.9], liftEarly: 0.6, slam: 0.85, drop: 0.24, surge: 0.35, bounce: 0.04, sway: 0.2, hipTurn: 0.08,
-    knee: 150, vault: 0.5, sink: 1.1, bodyK: 70, bodyZeta: 0.55, speedUp: 0.12, lag: 0.045, nod: 0.3 },
-  reverse: { cadence: 3.0, runAt: 0.55, runSwing: 0.62, crouch: 0.45, lift: [0.5, 1.2], liftEarly: 0.85, slam: 0.3, drop: 0.08, surge: 0.1, bounce: 0.4, sway: 0.06, hipTurn: 0.04,
+  forward: { cadence: 1.7, runCadence: 2.6, runMin: 12, runAt: 0.55, runSwing: 0.6, crouch: 0.8, lift: [0.6, 0.9], liftEarly: 0.6, slam: 0.85, drop: 0.24, surge: 0.35, bounce: 0.04, sway: 0.2, hipTurn: 0.08,
+    knee: 145, kneeFast: 20, vault: 0.3, sink: 1.1, bodyK: 70, bodyZeta: 0.55, speedUp: 0.12, lag: 0.045, nod: 0.3 },
+  reverse: { cadence: 3.0, runCadence: 3.0, runMin: 0, runAt: 0.55, runSwing: 0.62, crouch: 0.45, lift: [0.5, 1.2], liftEarly: 0.85, slam: 0.3, drop: 0.08, surge: 0.1, bounce: 0.4, sway: 0.06, hipTurn: 0.04,
     knee: 145, vault: 0.5, sink: 0.5, bodyK: 140, bodyZeta: 0.6, speedUp: 0.08, lag: 0.03, nod: 0.15 },
   quad: { cadence: 1.4, runAt: 2, runSwing: 0.34, crouch: 0.4, lift: [0.4, 0.6], liftEarly: 0.6, slam: 0.75, drop: 0.2, surge: 0.2, bounce: 0.03, sway: 0.1, hipTurn: 0.03,
     knee: 105, vault: 0.5, sink: 0.8, bodyK: 90, bodyZeta: 0.6, speedUp: 0.06, lag: 0.05, nod: 0.15 },
