@@ -282,7 +282,7 @@ export function createScene(app) {
     const sq = m.squash ? m.squash.x : 0, wp = (m.wob ? m.wob.p.x : 0) + sin(swt) * sway, wr = (m.wob ? m.wob.r.x : 0) + cos(swt * 0.8) * sway * 0.7;
     const pose = meleePose(m);
     const fists = parts.fist && meleeOf(m).fists ? fistPose(m) : null;   // with both arms gone it shoves like anyone else
-    const TB = chain(B, M.T(0, g.torsoY + (m.torsoDrop || 0), 0), M.S(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5), M.RY(m.twist + (fists ? fists.twist : 0)), M.T(0, 0, pose.lunge), M.RX(wp - pose.lean + (m.torsoNod || 0)), M.RZ(wr));   // torsoDrop, torsoNod: the pendulum body (sim/gait.js)
+    const TB = chain(B, M.T(0, g.torsoY + (m.torsoDrop || 0), 0), M.S(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5), M.RY(m.twist + (fists ? fists.twist : 0)), M.T(0, 0, pose.lunge), M.RX(wp - pose.lean + (m.torsoNod || 0) + (m.runLean || 0)), M.RZ(wr));   // torsoDrop, torsoNod: the pendulum body; runLean: a run's lean forward (sim/gait.js)
     if (DARK > 0.05 && parts.lamps) { const l = m.lampAt || (m.lampAt = [[0, 0, 0], [0, 0, 0]]); placeInto(TB, parts.lamps[0], l[0]); placeInto(TB, parts.lamps[1], l[1]); }   // the headlamps, drawn after the run
     put(BONE.torso, parts.torso, TB);
     for (const [s, k, side] of [[1, 'LA', 0], [-1, 'RA', 1]]) {

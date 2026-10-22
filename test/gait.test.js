@@ -83,3 +83,17 @@ test('no high kicks: a swinging foot never jumps, and never gets far out ahead o
     assert.ok(maxJump < 0.4, `${chassis}: a foot jumped ${maxJump.toFixed(2)} leg lengths in one frame`);
   }
 });
+
+test('into a run, a sprinter\'s lean: the torso pitches forward (and the hips sink, gait.js); a heavy that walks stays upright', () => {
+  const at = (chassis, thr) => {
+    const G = createTestGame({ chassis, foes: [] }), P = G.player;
+    for (let k = 0; k < 8 * 60; k++) { P.throttle = thr; update(G, input({}), DT); }
+    return { lean: P.runLean };
+  };
+  for (const chassis of ['kestrel', 'jackal']) {
+    const walk = at(chassis, 0.4), run = at(chassis, 1), gp = GAIT[CHASSIS[chassis].legs];
+    assert.equal(walk.lean, 0, `${chassis} walking stands up`);
+    assert.ok(Math.abs(run.lean - gp.runLean) < 0.02, `${chassis} leans ${run.lean} running`);
+  }
+  assert.equal(at('puncher', 1).lean, 0, 'a heavy walks upright');
+});
