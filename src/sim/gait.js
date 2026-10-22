@@ -93,7 +93,7 @@ export function gait(G, m, dt) {
   // No legs left: the hull sits on the ground, the torso still turns and fires.
   if (m.hp.LL <= 0 && m.hp.RL <= 0) {
     m.feet.forEach((f, i) => { f.pos = restFoot(G, m, i); f.lifted = false; f.yaw = m.yaw; });
-    m.bob = -(g0.hip - 0.9) * s; m.lean = 0; m.sway = 0; m.hipYaw = 0; m.surge = 0; m.lastYaw = m.yaw; stillBody(m);
+    m.bob = -(g0.hip - 0.9) * s; m.lean = 0; m.sway = 0; m.hipYaw = 0; m.surge = 0; m.lastYaw = m.yaw; m.runK = 0; m.runLean = 0; stillBody(m);
     return;
   }
   // One leg gone: lean toward the gap, about 8 degrees.
@@ -167,6 +167,11 @@ export function gait(G, m, dt) {
   });
   if (pend) pendulumBody(m, g, gp, s, pace, v, dt, lame, legOk);
   else { m.bob = min(m.bob, lame) + rise * s; stillBody(m); }
+  // Into a run, a sprinter's lean: the torso pitches forward and the hips
+  // sink (runLean, runDrop), easing in and out over a quarter second.
+  m.runK = (m.runK || 0) + ((dir > 0 ? runOf(m, pace) : 0) - (m.runK || 0)) * min(1, dt * 4);
+  m.runLean = (gp.runLean || 0) * m.runK;
+  m.bob -= (gp.runDrop || 0) * s * m.runK;
   m.sway = sway; m.hipYaw = turn;   // drawn (render/scene.js), not felt: the guns and the eye don't sway
   // A planted foot left hopelessly far away (shoved, respawned) just resets.
   m.feet.forEach((f, i) => {

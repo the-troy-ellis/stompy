@@ -190,6 +190,15 @@ walker's strides were long for its legs, so the hull had to dip about
 - The walker's pendulum is calmer too: `knee` 145°, `vault` 0.3.
 - These are look-only (GAIT): speeds, turns and everything else are as
   they were. Under the old body, forward knees run too.
+- **A sprinter's lean** (the owner: "as mechs get into running they should
+  lean forward and down a bit like a sprinter"). Running forward, the torso
+  pitches forward by `runLean` (walkers 0.2 rad, about 11°; bird legs 0.28,
+  about 16°) and the hips sink by `runDrop` (0.4 and 0.5 model units),
+  easing in and out over a quarter second with the run. Under both bodies;
+  the eye and the guns don't pitch with it (only the drawn torso does).
+- **Bird legs crouch walking** (the owner: "chicken walkers don't need to
+  have their legs so straight"): under the pendulum body their planted knee
+  sits at 125° (was 145°).
 
 ### Crawler traction
 
