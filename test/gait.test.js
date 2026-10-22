@@ -97,3 +97,25 @@ test('into a run, a sprinter\'s lean: the torso pitches forward (and the hips si
   }
   assert.equal(at('puncher', 1).lean, 0, 'a heavy walks upright');
 });
+
+test('a runner plants under its body: a foot lands nearer the hips than it pushes off behind them (plantBack)', () => {
+  for (const chassis of ['kestrel', 'jackal']) {
+    const G = createTestGame({ chassis, foes: [] }), P = G.player, g = geoOf(P), s = P.ch.scale;
+    const lands = [], lifts = [];
+    let prev = P.feet.map(f => f.lifted);
+    for (let k = 0; k < 9 * 60; k++) {
+      P.throttle = 1; update(G, input({}), DT);
+      if (k > 5 * 60) {
+        const c = Math.cos(P.yaw), sn = Math.sin(P.yaw);
+        P.feet.forEach((f, i) => {
+          const l = g.legs[i], d = (f.pos[0] - P.x - (c * l.hx + sn * l.hz) * s) * sn + (f.pos[2] - P.z - (-sn * l.hx + c * l.hz) * s) * c;
+          if (prev[i] && !f.lifted) lands.push(d);
+          if (!prev[i] && f.lifted) lifts.push(-d);
+        });
+      }
+      prev = P.feet.map(f => f.lifted);
+    }
+    const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+    assert.ok(mean(lands) < mean(lifts) * 0.7, `${chassis} lands ${mean(lands).toFixed(2)} m ahead, pushes off ${mean(lifts).toFixed(2)} m behind`);
+  }
+});

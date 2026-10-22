@@ -41,9 +41,11 @@ export function restCyc(g) {
 // [ph, ph + swing) of the cycle (bipeds: left at 0, right at 0.5; the
 // quadruped trots, diagonal pairs together); between swings all feet are
 // planted. Each swing aims, every frame, at where its rest spot will be
-// at touchdown plus a stance's worth ahead.
-function swingTarget(G, m, i, u, D, dir, sw) {
-  return restFoot(G, m, i, dir * ((1 - u) * sw * D + ((1 - sw) / 2) * D));
+// at touchdown plus a stance's worth ahead, less `back` (plantBack): the
+// stance moved back under the body, so a foot lands nearer the hips and
+// pushes off further behind them, as a runner's does.
+function swingTarget(G, m, i, u, D, dir, sw, back = 0) {
+  return restFoot(G, m, i, dir * ((1 - u) * sw * D + ((1 - sw) / 2) * D - back));
 }
 
 // The class's gait (data/walk.js GAIT): a runner's, a walker's or a crawler's.
@@ -130,6 +132,7 @@ export function gait(G, m, dt) {
   const lurch = since < 1.5 ? (since / 0.16) * Math.exp(1 - since / 0.16) : 0;
   m.surge = lurch * gp.surge * pace * dir;
   const pend = BODY.model === 'pendulum';
+  const pb = gp.plantBack || [0, 0], back = lerp(pb[0], pb[1], runOf(m, pace)) * ((1 - sw) / 2) * D;   // share of half a stance
   let rise = 0, sway = 0, turn = 0, lame = Infinity;
   m.feet.forEach((f, i) => {
     const u = swingOf(i);
@@ -142,7 +145,7 @@ export function gait(G, m, dt) {
     }
     if (u == null) {
       if (f.lifted) {   // the swing just ended (it was in the air: the swing's share can change with pace): put it down exactly on target
-        f.pos = swingTarget(G, m, i, 1, D, dir, sw);
+        f.pos = swingTarget(G, m, i, 1, D, dir, sw, back);
         f.yaw = m.yaw; f.lifted = false;
         footDown(G, m, f, pace);
       }
@@ -154,7 +157,7 @@ export function gait(G, m, dt) {
     // pendulum body the leg swings as a pendulum does instead: quickest
     // through the middle, slowing as it reaches out; its lift still peaks
     // early, so the foot comes up behind and the knee folds before it reaches.
-    const t = swingTarget(G, m, i, u, D, dir, sw), e = pend ? (1 - cos(PI * u)) / 2 : lerp(u * u * (3 - 2 * u), u * u, gp.slam);
+    const t = swingTarget(G, m, i, u, D, dir, sw, back), e = pend ? (1 - cos(PI * u)) / 2 : lerp(u * u * (3 - 2 * u), u * u, gp.slam);
     // Shoved mid-stride: a normal step starts about a stride (D) from its target; far more than that, start from the target.
     if (hypot(f.from[0] - t[0], f.from[2] - t[2]) > 1.5 * D + 3 * s) f.from = [...t];
     const up = sin(PI * Math.pow(u, gp.liftEarly)) * (gp.lift[0] + gp.lift[1] * pace) * s;

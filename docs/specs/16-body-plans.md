@@ -196,6 +196,15 @@ walker's strides were long for its legs, so the hull had to dip about
   about 16°) and the hips sink by `runDrop` (0.4 and 0.5 model units),
   easing in and out over a quarter second with the run. Under both bodies;
   the eye and the guns don't pitch with it (only the drawn torso does).
+- **Planted under the body** (the owner: "are the legs a bit forward
+  biased?"). They were, running: a foot landed far ahead of its hips (up to
+  2.7 m for a runner) and lifted off nearer them, a reach-and-brake that
+  fought the lean, and bird legs' rest spots stand 0.35 m ahead of their
+  hips. `plantBack` moves the stance back under the body by a share of half
+  a stance, walking and running (walkers 0.1 and 0.35, bird legs 0.25 and
+  0.5): walking, the feet now sit centred under the hips; running, a foot
+  lands about 1.5 m ahead and pushes off about 3 m behind, as a sprinter's
+  does. Feet still never slide, and no leg is stretched further than before.
 - **Bird legs crouch walking** (the owner: "chicken walkers don't need to
   have their legs so straight"): under the pendulum body their planted knee
   sits at 125° (was 145°).
