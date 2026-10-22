@@ -473,3 +473,10 @@ html, body {
 .ed-io-msg { margin: 0; color: #fc3; min-height: 1em; }
 .ed-io button { font: inherit; color: #7f7; background: #000; border: 1px solid #2a7a2a; min-height: 40px; padding: 0 14px; }
 .ed[hidden] { display: none; }
+/* ?debug=1's walk viewer (ui/walkView.js): its panel on the left of the view. */
+.walk-ui { position: absolute; left: 8px; top: 8px; max-width: min(380px, 48vw); max-height: calc(100% - 16px); overflow: auto; padding: 6px 8px; background: rgba(0, 12, 0, 0.82); border: 1px solid #1a4a1a; font: 11px "Lucida Console", "Courier New", monospace; color: #9f9; z-index: 5; }
+.walk-row { margin: 3px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.walk-ui button { font: inherit; background: #031; color: #9f9; border: 1px solid #1a4a1a; padding: 4px 7px; min-height: 28px; cursor: pointer; }
+.walk-ui button.on { border-color: #5f5; background: #052; color: #fff; }
+.walk-ui input[type=range] { width: 110px; }
+.walk-name { min-width: 9em; text-align: center; color: #fc3; }

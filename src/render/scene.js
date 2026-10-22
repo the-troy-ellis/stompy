@@ -549,13 +549,17 @@ export function createScene(app) {
     const hor = ir ? IR_HOR : SKY_H;
     R.gl.clearColor(hor[0], hor[1], hor[2], 1);
     R.gl.clear(R.gl.COLOR_BUFFER_BIT | R.gl.DEPTH_BUFFER_BIT);
-    let fov, yaw, pitch, eye, dir, spec, near = 0.5, far = 1800, top, up = UP;
+    let fov, yaw, pitch, eye, dir, spec, walkCam, near = 0.5, far = 1800, top, up = UP;
     if (G.state === 'edit' && (top = app.topView?.())) {
       // The mission editor (ui/editor.js): from above, in daylight with no fog,
       // the whole map in view.
       fov = top.fov; eye = top.eye; dir = top.dir; near = top.near; far = top.far;
       yaw = atan2(dir[0], dir[2]); pitch = Math.asin(clampN(dir[1], -1, 1));
       FOG[0] = FOG[1] = 1e6;
+    } else if (G.state === 'walk' && (walkCam = app.walk?.camera())) {
+      // ?debug=1's walk viewer (ui/walkView.js): your mech, from outside.
+      fov = walkCam.fov; eye = walkCam.eye; dir = walkCam.dir;
+      yaw = atan2(dir[0], dir[2]); pitch = Math.asin(clampN(dir[1], -1, 1));
     } else if (G.state === 'menu') {
       // The main menu's mech: camera in front, aimed left of it so the mech
       // stands in the right-hand part of the screen beside the menu panel.
@@ -656,7 +660,7 @@ export function createScene(app) {
     drawScorches();
     // In the missile camera your own mech is out there too.
     R.drawHeat = 1;
-    const shown = m => (m.alive || m.dying) && (m !== P || gd || G.state === 'menu' || G.state === 'edit') && seen(m.x, m.y + 6 * m.ch.scale, m.z, (m.dying ? 16 : 10) * m.ch.scale);
+    const shown = m => (m.alive || m.dying) && (m !== P || gd || G.state === 'menu' || G.state === 'edit' || walkCam) && seen(m.x, m.y + 6 * m.ch.scale, m.z, (m.dying ? 16 : 10) * m.ch.scale);
     if (R.skinned) R.beginSkinned();
     for (const m of G.mechs) if (shown(m)) drawMech(m);
     R.drawHeat = 0.45;

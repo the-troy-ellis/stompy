@@ -196,6 +196,25 @@ try {
     console.log(`tuning: FEEL step.kick -> ${kick}, ${gaitRows} gait inputs, COPY has ${copied}; digs logged ${[...new Set(logged)]}; ${links} nav links; in the pause menu ${inPause}`);
     if (kick !== 0.77 || !(gaitRows > 4) || copied !== 0.77 || !logged.includes('dig') || !logged.includes('weigh') || !inPause) { failed = true; console.error('FAIL: TUNING and the overlays'); }
   });
+  // The walk viewer (spec 19 § Walk viewer): JUMP TO → WALK, your mech walking with the camera outside; slow, pause, step, back out.
+  await run('walk', URL_, async page => {
+    await page.click('[data-sel="debug"]'); await page.click('[data-dsec="jump"]');
+    await page.click('[data-dj="walk"]');
+    await page.waitForFunction(() => window.__stompy.game.state === 'walk' && window.__stompy.game.player.speed > 1, null, { timeout: 10000 });
+    await page.click('[data-w="view"][data-v="three"]'); await page.click('[data-w="time"][data-v="2"]');
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: 'test-results/smoke-walk.png' });
+    await page.click('[data-w="pause"]');
+    const t0 = await page.evaluate(() => window.__stompy.game.time);
+    await page.waitForTimeout(300);
+    const t1 = await page.evaluate(() => window.__stompy.game.time);
+    await page.click('[data-w="step"]'); await page.waitForTimeout(200);
+    const t2 = await page.evaluate(() => window.__stompy.game.time);
+    await page.keyboard.press('Escape'); await page.waitForTimeout(300);
+    const out = await page.evaluate(() => [window.__stompy.game.state, document.querySelector('.walk-ui')?.hidden]);
+    console.log(`walk: paused ${t0 === t1}, a step ${(t2 - t1).toFixed(4)} s; out to ${out[0]}, panel hidden ${out[1]}`);
+    if (t0 !== t1 || Math.abs(t2 - t1 - 1 / 60) > 1e-6 || out[0] !== 'menu' || out[1] !== true) { failed = true; console.error('FAIL: the walk viewer'); }
+  });
   // The crew and SWAP (spec 20, #310): a range with a digger parked beside you; Q swaps into it and back.
   await run('crew', URL_, async page => {
     await page.click('[data-sel="debug"]'); await page.click('[data-dsec="range"]');
