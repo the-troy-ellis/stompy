@@ -52,7 +52,7 @@ export const GAIT = {
 };
 
 // Which body rides the legs (the walk viewer's MODEL switch, ui/walkView.js):
-// 'old', the drawn bob, dip and lurch above; or 'pendulum', the hull vaulting
-// over the planted leg on a spring, the torso following late. Play stays on
-// 'old' until the owner picks.
-export const BODY = { model: 'old' };
+// 'pendulum', the hull vaulting over the planted leg on a spring, the torso
+// following late (the owner's pick, 2026-10-22); or 'old', the drawn bob, dip
+// and lurch above, kept in the viewer to compare.
+export const BODY = { model: 'pendulum' };
