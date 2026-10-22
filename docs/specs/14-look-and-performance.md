@@ -38,7 +38,7 @@ calls, not polygons**, and most of the draw calls are effects.
    | muzzle flash | flat star (6–8 tris), emissive | two frames, faces the camera's plane, not the camera |
    | shockwave | flat ring on the ground (16 segments) | expands, thins, gone in 0.4 s |
    | rain | thin vertical sliver | falls, leans with wind |
-   | snow | octahedron (8 tris) | drifts, spins slowly |
+   | snow | flat three-pointed flake (6 tris; the owner's sketch, 2026-10-22) | drifts, spins and tumbles |
    | dust | flattened cube | streams sideways with the wind |
 3. **Fade by shape, colour and dither, never by blending.** Things disappear
    by shrinking, by blending toward the sky or fog colour, or by being replaced

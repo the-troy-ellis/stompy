@@ -88,6 +88,12 @@ fog distances (x0.3) and a haze that greys the zenith into the horizon (80%;
 dust gets 60%) do it. The perf harness has a `snow` scene; rain and snow
 each cost one draw over free-start and no more garbage.
 
+Changed (2026-10-22, the owner's sketch): a flake is now three flat
+triangles, points together in the middle and wide ends out, a third of the way
+round from each other. It spins about its middle and tumbles end over end as
+it falls (about 2.2 and 1.6 radians a second, each flake a little faster or
+slower than the next), so it flashes as it turns to the light.
+
 As shipped (#160): dust is 2,500 small flat grains (1,500 on touch) streaming
 sideways at 1.4x the 9 m/s wind, with an orange-tinted horizon and fog
 (halfway to `tint`) on top of its haze. A mech in the air is pushed 0.5 m/s
