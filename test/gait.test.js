@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { createTestGame, input, DT, stepFor } from './helpers.js';
 import { geoOf } from '../src/data/geo.js';
 import { update } from '../src/sim/update.js';
-import { MECH_ORDER } from '../src/data/chassis.js';
+import { MECH_ORDER, CHASSIS } from '../src/data/chassis.js';
+import { runOf } from '../src/sim/gait.js';
+import { GAIT } from '../src/data/walk.js';
 
 for (const chassis of MECH_ORDER) {
   test(`${chassis}: a planted foot never moves while planted, walking straight and turning`, () => {
@@ -47,13 +49,15 @@ function topSpeedGait(chassis) {
     }
     prev = P.feet.map(f => f.lifted);
   }
-  return { perSec: lands / (frames * DT) / (P.feet.length === 4 ? 2 : 1), flight: flight / frames, legs: P.ch.legs };
+  return { perSec: lands / (frames * DT) / (P.feet.length === 4 ? 2 : 1), flight: flight / frames, legs: P.ch.legs, runs: runOf(P, 1) > 0.99 };
 }
 for (const chassis of MECH_ORDER) {
   test(`${chassis}: fewer, longer steps, and only a runner leaves the ground`, () => {
-    const { perSec, flight, legs } = topSpeedGait(chassis);
+    const { perSec, flight, legs, runs } = topSpeedGait(chassis);
     assert.ok(perSec < BEFORE[chassis] * 0.85, `${perSec.toFixed(2)} footfalls a second (was ${BEFORE[chassis]})`);
-    if (legs === 'reverse') assert.ok(flight > 0.15, `a runner in the air ${(flight * 100).toFixed(0)}% of the time`);
+    // Bird legs run; forward knees run too if they're quick enough (GAIT runMin); heavies and crawlers walk.
+    assert.equal(runs, legs === 'reverse' || (legs === 'forward' && CHASSIS[chassis].speed >= GAIT.forward.runMin), 'who runs');
+    if (runs) assert.ok(flight > 0.15, `a runner in the air ${(flight * 100).toFixed(0)}% of the time`);
     else assert.equal(flight, 0, 'a walker or crawler always has a foot down');
     if (chassis === 'puncher' || chassis === 'warden') assert.ok(perSec < 1.9, `a heavy at ${perSec.toFixed(2)} a second`);
   });

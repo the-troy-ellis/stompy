@@ -51,8 +51,14 @@ export const gaitOf = m => GAIT[m.ch.legs] || GAIT.forward;
 // The share of the cycle a foot is in the air now: a runner's grows from its
 // walk to its run as it passes runAt (a flight phase once past a half).
 export function swingNow(m, pace) {
-  const g = geoOf(m), gp = gaitOf(m), t = clampN((pace - gp.runAt) / 0.2, 0, 1);
-  return lerp(g.swing, Math.max(g.swing, gp.runSwing), t * t * (3 - 2 * t));
+  const g = geoOf(m), gp = gaitOf(m);
+  return lerp(g.swing, Math.max(g.swing, gp.runSwing), runOf(m, pace));
+}
+// How far into its run a mech is at this pace, 0 to 1: past runAt, and only
+// if its top speed reaches runMin (forward knees run, but a heavy one walks).
+export function runOf(m, pace) {
+  const gp = gaitOf(m), t = clampN((pace - gp.runAt) / 0.2, 0, 1);
+  return (m.maxSpeed ?? m.ch.speed) >= (gp.runMin || 0) ? t * t * (3 - 2 * t) : 0;
 }
 // How far a planted foot may sit ahead of or behind its rest spot before its
 // leg is straight, in metres, with the hips sunk by `crouch` (model units).
@@ -73,7 +79,8 @@ export function legRoom(g, s, crouch) {
 export function strideOf(m, pace, sw) {
   const g = geoOf(m), gp = gaitOf(m), s = m.ch.scale, top = m.maxSpeed ?? m.ch.speed;
   const reach = 2 * legRoom(g, s, gp.crouch * pace) / (1 - sw) * 0.85;
-  const want = Math.max(s * (g.stride[0] + g.stride[1]), (2 * top) / gp.cadence);
+  const cad = lerp(gp.cadence, gp.runCadence ?? gp.cadence, runOf(m, pace));   // quicker steps as it runs
+  const want = Math.max(s * (g.stride[0] + g.stride[1]), (2 * top) / cad);
   const Dtop = Math.max(s * g.stride[0], min(want, reach));
   return s * g.stride[0] + (Dtop - s * g.stride[0]) * pace;
 }
@@ -184,7 +191,9 @@ export function gait(G, m, dt) {
 // mech's place, speed and feet are the same under either body.
 function pendulumBody(m, g, gp, s, pace, v, dt, lame, legOk) {
   const l1 = g.l1 * s, l2 = g.l2 * s, c = cos(m.yaw), sn = sin(m.yaw);
-  const pole = Math.sqrt(l1 * l1 + l2 * l2 - 2 * l1 * l2 * cos(gp.knee * PI / 180)), full = (l1 + l2) * 0.98;
+  // A fast walk (not a run) bends the knee a little more (kneeFast), for the reach a long stride wants.
+  const knee = gp.knee - (gp.kneeFast || 0) * pace * (1 - runOf(m, pace));
+  const pole = Math.sqrt(l1 * l1 + l2 * l2 - 2 * l1 * l2 * cos(knee * PI / 180)), full = (l1 + l2) * 0.98;
   // The planted leg nearest upright holds the hull up, at its pole's length,
   // keeping `vault` of the pole's fall away from upright; none may be
   // stretched past its reach (the others straighten to keep up).
