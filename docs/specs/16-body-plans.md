@@ -123,6 +123,38 @@ shallow arc between landings instead of bobbing over a planted leg. Below
 Feet never slide (architecture § Invariants), and terrain height still
 matches the mesh. None of this changes speed, acceleration or turning.
 
+### The pendulum body (a second model, on trial)
+
+The owner, watching the walk viewer: the steps are technically right but
+don't move like a heavy, inertial thing. The old body glides at one height
+with a sharp dip at each footfall. `BODY.model` in `src/data/walk.js` picks
+which body rides the legs; `'old'` stays the default in play until the
+owner picks, and the walk viewer's MODEL switch (spec 19) flips it for the
+whole debug session, cockpit included.
+
+- **The vault.** The hull vaults over the planted leg like a weight on a
+  stiff pole (an inverted pendulum, as long as the leg). The planted leg
+  nearest upright holds it up, so it is highest right over a foot and
+  lowest between steps. `vault` keeps that share of the pole's rise and
+  fall; it is smoothed a little (40 ms) where one leg hands over to the next.
+- **Height for speed.** Low, the hull runs a little ahead; high, it falls
+  back (`speedUp`), drawn as the lurch and leaking back to nothing.
+- **The weight landing.** Each footfall pushes the hull down on a spring
+  (`sink`, `bodyK`, `bodyZeta`) that comes back late with an overshoot,
+  instead of the old dip's fixed shape.
+- **The torso follows late.** The torso rides its own spring on the hull
+  (`lag`, about 50 ms behind for a walker), and nods forward as it lags low
+  (`nod`). `sim/geom.js` torsoFrame carries the lag, so the eye and the guns
+  go with the drawn torso.
+- **The swing.** The swinging foot moves as a pendulum: quickest through
+  the middle, slowing as it reaches out, its lift highest midway (instead of
+  `liftEarly` and `slam`).
+- All of it is drawn, like the old bob: the mech's place, speed and feet
+  are the same under either body (`test/pendulumBody.test.js`), and
+  planted feet never slide.
+- Still to come, if the owner keeps it: capture-point foot placement (where
+  the next foot goes to stop the body, so braking hard takes an extra step).
+
 ### Crawler traction
 
 `slopeFactor` (sim/mech.js) returns 1 for a quad: no uphill loss and no

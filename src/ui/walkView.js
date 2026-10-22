@@ -1,6 +1,7 @@
 import { startWalkView, WALK_PATHS } from '../sim/walkView.js';
 import { update, noInput } from '../sim/update.js';
 import { geoOf } from '../data/geo.js';
+import { BODY } from '../data/walk.js';
 import { CHASSIS, PILOTABLE } from '../data/chassis.js';
 import { store } from '../util/store.js';
 import { add, clampN, norm, sub } from '../util/math.js';
@@ -15,19 +16,21 @@ const { sin, cos, PI, max } = Math;
 // the view to orbit, wheel or pinch to zoom. TUNING's pages (ui/tuning.js)
 // sit under it, so a gait number can change while you watch. The HUD canvas
 // gets a ground grid (does a planted foot stay put?) and a strip chart of the
-// last 3 s: the hips' height, the lurch and each foot's height.
+// last 3 s: the hips' height, the lurch and each foot's height. MODEL picks
+// the body that rides the legs (data/walk.js BODY), OLD or PENDULUM.
 export const WALK_VIEWS = [['side', 'SIDE', PI / 2, 0.06], ['three', '¾', PI / 4, 0.22], ['front', 'FRONT', 0, 0.1], ['back', 'BACK', PI, 0.15], ['cockpit', 'COCKPIT']];
 export const WALK_TIMES = [[1, '1×'], [0.5, '½×'], [0.25, '¼×'], [0.1, '⅒×']];
 const KEY = 'debug.walk', STEP = 1 / 60, CHART_S = 3;
 
 export function createWalkView(app) {
   const G = app.G;
-  const st = { chassis: null, view: 'side', time: 0, grid: true, chart: true, tune: false, thr: 0.6, path: 'straight', ...store.get(KEY, {}) };
+  const st = { chassis: null, view: 'side', time: 0, grid: true, chart: true, tune: false, thr: 0.6, path: 'straight', model: BODY.model, ...store.get(KEY, {}) };
+  BODY.model = st.model === 'pendulum' ? 'pendulum' : 'old';   // MODEL: which body rides the legs (data/walk.js); kept for play in this debug session too
   const cam = { a: PI / 2, p: 0.06, d: 1 };   // the orbit: round from the mech's nose, up, and how far (×)
   let paused = false, steps = 0, el = null, drag = null;
   const pinch = new Map();
   const hist = [];   // [t, hips, lurch, ...feet heights], sim time
-  const save = () => store.set(KEY, { chassis: st.chassis, view: st.view, time: st.time, grid: st.grid, chart: st.chart, tune: st.tune, thr: st.thr, path: st.path });
+  const save = () => store.set(KEY, { chassis: st.chassis, view: st.view, time: st.time, grid: st.grid, chart: st.chart, tune: st.tune, thr: st.thr, path: st.path, model: BODY.model });
   const setView = k => {
     st.view = k;
     const v = WALK_VIEWS.find(([x]) => x === k);
@@ -61,6 +64,7 @@ export function createWalkView(app) {
     const W = G.walk || st;
     el.innerHTML = `<div class="walk-row"><b>WALK</b>${btn('mech', '◀', false, -1)}<span class="walk-name">${CHASSIS[st.chassis]?.name || ''}</span>${btn('mech', '▶', false, 1)}</div>
       <div class="walk-row">SPEED <input type="range" min="-35" max="100" step="5" data-w="thr" value="${Math.round(st.thr * 100)}"><span class="walk-thr">${pct()}</span>${btn('go', W.go === false ? 'GO' : 'STOP', W.go === false)}</div>
+      <div class="walk-row">MODEL ${btn('model', 'OLD', BODY.model === 'old', 'old')}${btn('model', 'PENDULUM', BODY.model === 'pendulum', 'pendulum')}</div>
       <div class="walk-row">PATH ${WALK_PATHS.map(p => btn('path', p.toUpperCase(), st.path === p, p)).join('')}</div>
       <div class="walk-row">TIME ${WALK_TIMES.map(([, l], i) => btn('time', l, st.time === i && !paused, i)).join('')}${btn('pause', 'II', paused)}${btn('step', 'STEP', false)}</div>
       <div class="walk-row">VIEW ${WALK_VIEWS.map(([k, l]) => btn('view', l, st.view === k, k)).join('')}</div>
@@ -78,6 +82,7 @@ export function createWalkView(app) {
     if (a === 'exit') { exit(); return; }
     if (a === 'go') G.walk.go = !G.walk.go;
     else if (a === 'path') { st.path = v; G.walk.path = v; }
+    else if (a === 'model') BODY.model = v;
     else if (a === 'time') { st.time = +v; paused = false; }
     else if (a === 'pause') paused = !paused;
     else if (a === 'step') { paused = true; steps++; }
@@ -129,7 +134,7 @@ export function createWalkView(app) {
   }
   function sample() {
     const P = G.player, s = P.ch.scale, ground = G.ter.groundBelow(P.x, P.y + 20, P.z);
-    hist.push([G.time, (P.y - ground) + (P.bob || 0), (P.surge || 0) * s, ...P.feet.map(f => f.pos[1] - G.ter.groundBelow(f.pos[0], f.pos[1] + 5, f.pos[2]))]);
+    hist.push([G.time, (P.y - ground) + (P.bob || 0), (P.surge || 0) * s, (P.y - ground) + (P.bob || 0) + (P.torsoDrop || 0) * s, ...P.feet.map(f => f.pos[1] - G.ter.groundBelow(f.pos[0], f.pos[1] + 5, f.pos[2]))]);
     while (hist.length && hist[0][0] < G.time - CHART_S) hist.shift();
     if (hist.length > 1 && hist[hist.length - 2][0] > G.time) hist.length = 0;   // a fresh start
   }
@@ -167,8 +172,8 @@ export function createWalkView(app) {
     }
     if (st.chart && hist.length > 1) chart(ctx, W, H);
   }
-  // The last 3 s, newest on the right: hips (yellow), lurch (cyan, about its
-  // own zero), and each foot's height (green, one line a foot). Ticks on the
+  // The last 3 s, newest on the right: hips (yellow), torso (orange: the
+  // hips plus its lag, the same under OLD), lurch (cyan, about its own zero), and each foot's height (green, one line a foot). Ticks on the
   // bottom are footfalls (a foot reaching the ground).
   function chart(ctx, W, H) {
     const w = Math.min(360, W * 0.45), h = 90, x0 = W - w - 10, y0 = H - h - 10, t1 = hist[hist.length - 1][0];
@@ -179,10 +184,11 @@ export function createWalkView(app) {
     ctx.lineWidth = 1.5;
     line('#fc3', r => y0 + h * 0.3 - r[1] / span * h * 0.5);
     line('#3cf', r => y0 + h * 0.3 - r[2] / span * h * 0.5);
-    for (let k = 3; k < hist[0].length; k++) line('#5f5', r => y0 + h - 4 - r[k] / (span * 2) * h * 0.6);
+    line('#f83', r => y0 + h * 0.3 - r[3] / span * h * 0.5);
+    for (let k = 4; k < hist[0].length; k++) line('#5f5', r => y0 + h - 4 - r[k] / (span * 2) * h * 0.6);
     ctx.fillStyle = '#9f9'; ctx.font = '10px monospace'; ctx.textAlign = 'left';
     const last = hist[hist.length - 1];
-    ctx.fillText(`HIPS ${last[1].toFixed(2)}  LURCH ${last[2].toFixed(2)}  FEET   ${max(0, P.speed).toFixed(1)} m/s`, x0 + 4, y0 + 11);
+    ctx.fillText(`HIPS ${last[1].toFixed(2)}  TORSO  LURCH ${last[2].toFixed(2)}  FEET   ${max(0, P.speed).toFixed(1)} m/s`, x0 + 4, y0 + 11);
   }
 
   let shown = false;
