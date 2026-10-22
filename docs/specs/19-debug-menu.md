@@ -57,7 +57,7 @@ The new text, in full:
 | foes names | NONE · STANDING STILL · AWAKE |
 | cheats | INVINCIBLE · NO HEAT · ENDLESS AMMO · NO WEIGHT LIMIT · BIG DIGS · FOES FROZEN |
 | cheats blurb | Single player only. The arena does not care. |
-| jump to | MISSION ◀ n ▶ · EDITOR · BENCH · TUTORIAL AGAIN |
+| jump to | MISSION ◀ n ▶ · EDITOR · BENCH · WALK · TUTORIAL AGAIN |
 | tuning | FEEL · GAIT · LOOK · COPY |
 | overlays | FRAME TIME · AI LABELS · NAV · DIGS AND FALLS |
 | HUD | CHEATS: … · CHEATS (OFF HERE) |
@@ -119,6 +119,7 @@ They only set up the range.
 | MISSION ◀ n ▶ | GO plays that campaign mission (all twelve are open under `?debug=1`) |
 | EDITOR | opens the editor (`?edit=1&debug=1`) |
 | BENCH | plays the bench (ui/bench.js), as the FEEL panel's BENCH did |
+| WALK | opens the walk viewer (below) in the picked mech |
 | TUTORIAL AGAIN | forgets that mission 1's tutorial was done, then plays mission 1 |
 
 ### Tuning and overlays
@@ -228,6 +229,35 @@ The overlays are drawn on the HUD canvas, like the AI labels.
   are drawn: boxes green, the weighed ones as `load / section`, amber if
   it held and red if it broke.
 - BENCH stays on JUMP TO; the bench no longer folds a panel away.
+
+### Walk viewer
+
+Added after #299, to settle how the gait looks (the owner: "technically
+correct but not artistically correct"). JUMP TO → WALK puts the picked
+mech on flat ground with nothing else about, walking north, and watches
+it from outside.
+
+- Its own screen state, `walk`: no cockpit, no touch controls, no pointer
+  lock. The sim side is `src/sim/walkView.js` (the match, `G.walk`, and
+  `walkStep`, which update.js runs as it runs the bench); the page side is
+  `src/ui/walkView.js`.
+- The panel, top left: WALK ◀ mech ▶ · SPEED (a slider, −35% to 100%) and
+  STOP/GO · PATH STRAIGHT/CIRCLE · TIME 1× ½× ¼× ⅒×, II, STEP (one 1/60 s
+  frame) · VIEW SIDE ¾ FRONT BACK COCKPIT · SHOW GRID, CHART, TUNING, EXIT.
+  The picks are saved (`debug.walk`).
+- The throttle eases to the speed (and to 0 on STOP) at the keys' rate,
+  so starting and stopping look as they do in play. STRAIGHT is moved back
+  to the middle past 200 m, feet and all, so nothing slides; CIRCLE turns
+  at a third of the legs' rate.
+- The camera goes round the mech, keeping its place relative to the mech's
+  nose; drag to orbit (the view then has no preset lit), wheel or pinch to
+  zoom. COCKPIT is the normal view from inside, HUD and all.
+- GRID: a cross every 4 m on the ground round the mech, to see that a
+  planted foot stays put. CHART: the last 3 s, bottom right: the hips'
+  height (yellow), the lurch (cyan) and each foot's height (green).
+- TUNING opens the FEEL, GAIT, LOOK and OVERLAYS pages under the panel,
+  live as anywhere else.
+- Keys: Space pauses, `.` or → steps, 1 to 4 pick the speed, Esc leaves.
 
 ## Code touchpoints
 

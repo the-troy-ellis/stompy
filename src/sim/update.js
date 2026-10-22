@@ -27,6 +27,7 @@ import { stepTurrets } from './turrets.js';
 import { tickCoopRespawn } from './coopRules.js';
 import { tickTutorial } from './tutorial.js';
 import { benchStep } from './bench.js';
+import { walkStep } from './walkView.js';
 import { dig, stepFalls } from './dig.js';
 import { DIG } from '../data/weapons.js';
 
@@ -49,6 +50,7 @@ export function update(G, input, dt) {
   G.cbeams = [];   // continuous beams are redrawn every frame they're on
   G.frame = (G.frame || 0) + 1;
   if (G.bench) input = benchStep(G, noInput(), dt);   // ?debug=1's scripted scene drives everyone (sim/bench.js)
+  else if (G.walk) input = walkStep(G, noInput(), dt);   // the walk viewer drives you (sim/walkView.js)
   G.input = input;
   // SWAP (sim/crew.js): into the next live crew mech; and after the one you were in died, the next one is yours.
   if (G.handover != null && G.time >= G.handover) { G.handover = null; swap(G); }

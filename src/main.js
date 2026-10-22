@@ -25,6 +25,7 @@ import { createInput } from './input/input.js';
 import { createUi } from './ui/screens.js';
 import { createNet } from './net/client.js';
 import { createBench } from './ui/bench.js';
+import { createWalkView } from './ui/walkView.js';
 import { readLook, LOOK_DEFAULT, LOOK_KEY } from './render/look.js';
 import { loadCampaign, saveCampaign } from './ui/campaign.js';
 import { DIFF } from './data/ai.js';
@@ -117,7 +118,7 @@ function start(root) {
   G.hooks.debrief = app.ui.debrief;
   G.hooks.arenaDeath = () => app.net.sendState();
   // ?debug=1 exposes the state for the smoke test and for poking at in the console.
-  if (params.has('debug')) { window.__stompy = { game: G, app, kill: m => destroy(G, m, G.player) }; app.bench = createBench(app); }
+  if (params.has('debug')) { window.__stompy = { game: G, app, kill: m => destroy(G, m, G.player) }; app.bench = createBench(app); app.walk = createWalkView(app); }
 
   const quiet = () => { for (const k of Object.keys(app.audio.loops)) app.audio.loopSet(k, 0); app.audio.beamSound(false, 1); app.audio.fusionSound(false, 0); app.audio.ambience.tick(G, false); };
   let last = 0, lastAudioCheck = 0;
@@ -142,7 +143,9 @@ function start(root) {
       else update(G, app.input.snapshot(), dt);
       app.net.tick(dt);
       app.audio.tick();
-    } else quiet();
+    } else if (G.state === 'walk') { app.walk.tick(dt); app.audio.tick(); }   // ?debug=1's walk viewer (ui/walkView.js)
+    else quiet();
+    app.walk?.show(G.state === 'walk');
     app.scene.render();
     app.hud.draw();
     if (G.touchUI && G.state === 'play') app.input.fireStatus();   // the fire buttons' pies and ammo (input/input.js)

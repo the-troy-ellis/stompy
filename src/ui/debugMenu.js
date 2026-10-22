@@ -29,7 +29,7 @@ export function createDebugMenu(app, ui) {
   if (!on && prefs.menuSel === 'debug') prefs.menuSel = 'campaign';
   // The cheats (sim/cheats.js), saved; the FEEL panel's old INVINCIBLE switch carries over.
   app.G.cheats = on ? { god: !!store.get('debug.invincible', false), ...store.get(CHEATS_KEY, {}) } : {};
-  const tune = on ? createTuning(app) : null;   // TUNING's pages and the overlays (ui/tuning.js)
+  const tune = (app.tune = on ? createTuning(app) : null);   // TUNING's pages and the overlays (ui/tuning.js); the walk viewer shows them too
   const cheatsHTML = () => `<div class="opts">${CHEATS.map(([k, l]) => `<button class="opt${app.G.cheats[k] ? ' on' : ''}" data-dch="${k}">${l}: ${app.G.cheats[k] ? 'ON' : 'OFF'}</button>`).join('')}</div>`;
 
   // The range's picks, saved: indices into their lists, and how many foes.
@@ -56,7 +56,7 @@ export function createDebugMenu(app, ui) {
     tuning: () => tune.html(),
     // Any mission (all open under ?debug=1); GO plays it. The rest go on a tap.
     jump: () => `<div class="mm-pick"><span>MISSION</span><button data-dmis="-1">◀</button><b>${esc(missionTitle(prefs.mission + 1, missionDef(prefs.mission).name))}</b><button data-dmis="1">▶</button></div>
-      <div class="opts"><button class="opt" data-dj="editor">EDITOR</button><button class="opt" data-dj="bench">BENCH</button><button class="opt" data-dj="tut">TUTORIAL AGAIN</button><button class="opt" data-dj="base">${esc(BASE_MISSION.name)}</button></div>`,
+      <div class="opts"><button class="opt" data-dj="editor">EDITOR</button><button class="opt" data-dj="bench">BENCH</button><button class="opt" data-dj="walk">WALK</button><button class="opt" data-dj="tut">TUTORIAL AGAIN</button><button class="opt" data-dj="base">${esc(BASE_MISSION.name)}</button></div>`,
   };
 
   return {
@@ -92,6 +92,7 @@ export function createDebugMenu(app, ui) {
       if (m) { prefs.mission = (prefs.mission + +m.dataset.dmis + STRIP) % STRIP; ui.renderMenu(); return true; }
       if (j === 'editor') { const q = new URLSearchParams(location.search); q.set('edit', '1'); q.set('debug', '1'); location.search = q.toString(); return true; }
       if (j === 'bench') { app.bench?.start(); return true; }
+      if (j === 'walk') { app.walk?.start(prefs.chassis); return true; }   // the walk viewer (ui/walkView.js), in the picked mech
       if (j === 'base') { ui.startBase(); ui.launch(); return true; }   // spec 20's mission
       if (j === 'tut') { store.set('tut.done', false); ui.startMission(0); ui.launch(); return true; }
       return false;

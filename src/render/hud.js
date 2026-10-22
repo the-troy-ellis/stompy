@@ -626,6 +626,7 @@ export function createHud(app) {
     if (ov ? ov.frame : app.prefs.frameTime) drawDebug();
     if (ov && G.state !== 'menu' && G.VP) { if (ov.ai) drawAIDebug(); if (ov.nav) drawNavDebug(); if (ov.digs) drawDigDebug(); }
     if (G.state === 'menu' || G.lobby) return;   // the arena lobby: no cockpit yet
+    if (G.state === 'walk' && app.walk?.showsMech()) { app.walk.draw(ctx, V.W, V.H, project); return; }   // the walk viewer from outside (ui/walkView.js)
     if (G.guide) { drawGuideHUD(); return; }
     const P = G.player, L = hudLayout(), dash = L.dash;
     // The cockpit and the HUD each ride their own spring (stepSway): the
