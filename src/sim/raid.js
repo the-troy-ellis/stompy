@@ -27,7 +27,7 @@ export function raidTarget(G, e) {
   if (!G.base) return null;
   for (const m of crewOf(G)) if (m.alive && hypot(m.x - e.x, m.z - e.z) < RAID_NEAR) return null;
   let best = null, bestD = Infinity;
-  for (const b of [G.base.silo, G.base.factory]) {
+  for (const b of [G.base.silo, G.base.factory, ...(G.base.bays || [])]) {   // not walls (docs/specs/21-mining.md): raiders go round or through
     if (!b || !b.alive) continue;
     const d = hypot(b.x - e.x, b.z - e.z);
     if (d < bestD) { best = b; bestD = d; }

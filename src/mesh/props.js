@@ -190,6 +190,30 @@ const BUILD = {
     for (let i = 0; i < 4; i++) b.cube(chain(M.T(-0.3 + i * 0.2, 0.51, 0.77), M.RZ(0.6), M.S(0.08, 0.06, 0.03)), C.hazard);
     box(b, 0.7, 0.6, -0.5, 0.16, 0.4, 0.16, C.rust);                                                       // the chimney
   },
+  // A repair bay (docs/specs/21-mining.md): a gantry over a striped pad in
+  // front, two posts and a beam with arms hanging down, a green lamp on top.
+  bay: b => {
+    box(b, 0, 0, 0.35, 1.7, 0.05, 1.2, C.pad);
+    for (const x of [-0.55, 0.55]) box(b, x, 0.05, 0.92, 0.25, 0.01, 0.1, C.hazard);
+    for (const x of [-0.8, 0.8]) box(b, x, 0, -0.45, 0.18, 0.85, 0.18, C.steel);
+    box(b, 0, 0.85, -0.45, 1.8, 0.12, 0.25, C.hazard);
+    for (const x of [-0.35, 0.35]) box(b, x, 0.55, -0.3, 0.08, 0.3, 0.08, C.dark, M.RX(0.5));
+    box(b, 0, 0.97, -0.45, 0.16, 0.08, 0.16, [0.3, 0.9, 0.4]);
+  },
+  bayWreck: b => {
+    box(b, 0, 0, 0.35, 1.7, 0.05, 1.2, C.char);
+    box(b, -0.8, 0, -0.45, 0.18, 0.4, 0.18, C.char);
+    box(b, 0.1, 0.16, -0.4, 1.6, 0.1, 0.25, C.ash, M.RZ(0.15));
+  },
+  // A wall slab you build (docs/specs/21-mining.md): grey armour with a hazard band along the top.
+  slab: b => {
+    box(b, 0, 0, 0, 1.9, 0.86, 0.62, C.concrete, M.id(), 0.97, 0.9);
+    box(b, 0, 0.86, 0, 1.86, 0.1, 0.5, C.hazard);
+  },
+  slabWreck: b => {
+    box(b, 0, 0, 0, 1.9, 0.3, 0.62, C.char, M.id(), 0.8, 0.9);
+    box(b, 0.3, 0.3, 0.05, 0.8, 0.15, 0.5, C.ash, M.RY(0.4));
+  },
   factoryWreck: b => {
     box(b, 0, 0, 0, 1.9, 0.18, 1.5, C.char);
     box(b, -0.4, 0.18, 0.1, 0.9, 0.08, 0.7, C.ash, M.RY(0.3));

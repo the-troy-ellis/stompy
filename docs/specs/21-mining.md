@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (the owner picked these three from spec 20's Room to grow, 2026-10-23: "Do 1-3") |
+| Status | built (the owner picked these three from spec 20's Room to grow, 2026-10-23: "Do 1-3"): seams #343, dirt #344, buildings |
 | Milestone | M9 |
 | Size | L, split in three: seams, dirt, buildings |
 | Depends on | [20-build-and-fight.md](20-build-and-fight.md) (the digger, the base, BUILD); [18-voxel-ground.md](18-voxel-ground.md) (digging, building ground, the mesher) |
@@ -120,6 +120,15 @@ two or three.
 - `dig.js` `dump(G, m)`: 4 dirt (`dumpCost`) becomes a build of radius 4.5 m (`dumpR`) centred on the ground 9 m ahead (`dumpAt`, times the mech's scale), so the next lands on top. It settles scorches and marks the nav there. `NO DIRT` when short. Online it does nothing yet.
 - `update.js`: a digger's ENERGY button (Mouse 1) is DUMP, once a press. The touch button reads DUMP. The HUD's hopper panel gets a DIRT line under it, lit when there's enough for a DUMP.
 
+### As built: buildings
+
+- `data/construct.js` `PLACE` (price, seconds going up, hp, footprint `w` × `d`, flatness, one or many, a wall's `segs`) and `PLACE_ORDER`. `CONSTRUCT.bayRate` 10 and `bayPad` 6. Building names moved to `names.js` `buildings` (SILO, FACTORY, BAY, WALL; placeholders).
+- `sim/base.js`: `pickOf` and `pickNext` (BALLISTIC, once a press). `footprint(G, m, kind)` is a w × d rectangle across your view, and checks mechs and buildings in it. `placeBuilding` puts any of them down, and `placeFactory` stays as a wrapper. Everything going up rises together, and each kind is called once: `Factory up.`, `Bay up.`, `Wall up.`.
+- **The bay:** a gantry over a striped pad, like the silo (mesh `bay`). `mend` gives a crew mech on a finished bay's pad 10 armour a second, the worst section first, never a section that's gone. `REPAIRING` shows once when it starts, and stays on the base panel while it lasts.
+- **A wall:** three slabs side by side (mesh `slab`, since a mission `wall` prop already existed). Each is its own structure, 4.2 m wide and 6 m tall, so it blocks and is shot down slab by slab.
+- `raid.js`: raiders hunt the silo, the factory and bays, not walls.
+- **HUD:** the footprint is drawn w × d, with `BUILD BAY · 30 ORE`. The base panel reads `M2 BUILDS BAY · 30` in a digger, dim when there's not enough ore. On touch, BUILD reads `BUILD BAY` and the BALLISTIC button `NEXT`.
+
 ## Code touchpoints
 
 - `src/world/seams.js` (new): `seamAt`, `SEAM_PITCH`, `SEAM_THICK`.
@@ -154,7 +163,7 @@ two or three.
 `test/seams.test.js` (pure seams; ore by seam and depth; the mesher's
 colour), `test/dirt.test.js` (dirt from soft ground, a dump raises the
 ground), `test/buildings.test.js` (the pick, prices, the bay's repair,
-raids skip walls). The smoke test's base run builds a bay.
+raids skip walls).
 
 ## Performance
 
