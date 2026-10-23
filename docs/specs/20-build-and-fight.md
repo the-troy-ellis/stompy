@@ -344,7 +344,7 @@ Each loop gets one step here. Each item below can be a spec of its own and
 adds to this one without reworking it.
 
 - **Mining:** ore seams as a material layer in the ground, shown as
-  coloured bands, so you dig toward them. Deeper means richer. Dirt the
+  coloured bands, so you dig toward them (built: [21-mining.md](21-mining.md)). Deeper means richer. Dirt the
   digger carries and dumps as ramps and berms. Bigger hoppers and faster
   buckets as parts. More construction mechs (dozer, crane, mixer).
 - **Building:** more buildings (a weapon shop, a repair bay, walls, turrets

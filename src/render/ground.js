@@ -14,7 +14,7 @@ import { boxVisible } from '../util/math.js';
 // (world/voxels.js), and they and the far meshes over them are meshed again.
 const LOD_AT = 300, NEAR_NOW = 200, BUDGET_MS = 2, SEND_MAX = 32, G2 = 2, GX = Math.ceil(CX / G2), GZ = Math.ceil(CZ / G2), SIZE = CS * VS * G2;
 const FAR = 1 << 16;   // a job id at or past this is a group's far mesh
-const plain = p => ({ low: p.low, mid: p.mid, high: p.high, rock: p.rock });
+const plain = (p, seed) => ({ low: p.low, mid: p.mid, high: p.high, rock: p.rock, ore: p.ore, seed });   // seed: where the seams run (world/seams.js)
 const groupDist = (g, eye) => {   // from eye to the group's square, flat
   const x0 = -HALF + (g % GX) * SIZE, z0 = -HALF + ((g / GX) | 0) * SIZE;
   return Math.hypot(Math.max(x0 - eye[0], 0, eye[0] - x0 - SIZE), Math.max(z0 - eye[2], 0, eye[2] - z0 - SIZE));
@@ -86,7 +86,7 @@ export function createGround(R) {
 
   // A new world: far meshes for everything, chunks for what's near `eye`.
   function load(g, p, eye = [0, 0, 0]) {
-    ground = g; pal = plain(p); world++; inFlight = 0;
+    ground = g; pal = plain(p, g.seed); world++; inFlight = 0;
     mesh.fill(null); ver.fill(0); waiting.fill(0); queue = [];
     for (const gr of groups) { gr.wanted = false; gr.left = 0; gr.near.dirty = true; }
     for (const row of rows) row.dirty = true;

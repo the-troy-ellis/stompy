@@ -137,6 +137,10 @@ function bucketBite(G, m, def) {
   feel(G, 'punch', { mech: m, k: 1, at: m === G.player ? null : p });
   G.fx.sfx.punch(m === G.player ? null : p, true);
   for (let i = 0; i < 10; i++) particle(G, [p[0] + G.rng.range(-2, 2), p[1] + 0.5, p[2] + G.rng.range(-2, 2)], [G.rng.range(-4, 4), G.rng.range(4, 9), G.rng.range(-4, 4)], G.rng.range(0.6, 1.1), G.rng.range(0.5, 1.0), G.pal.low, 'debris', 26);
+  if (m.seamBite) {   // a seam (docs/specs/21-mining.md): a sparkle in its colour
+    for (let i = 0; i < 8; i++) particle(G, [p[0] + G.rng.range(-1.5, 1.5), p[1] + 1, p[2] + G.rng.range(-1.5, 1.5)], [G.rng.range(-3, 3), G.rng.range(5, 10), G.rng.range(-3, 3)], G.rng.range(0.5, 0.9), G.rng.range(0.3, 0.6), G.pal.ore || G.pal.high, 'spark', 26);
+    if (m === G.player && !full) msg(G, 'ORE SEAM', '#7fd');
+  }
   if (m === G.player && full) msg(G, 'HOPPER FULL', '#fc3');
   return true;
 }

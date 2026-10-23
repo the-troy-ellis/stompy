@@ -3,10 +3,13 @@
 //   bucket        the digger's bite, a radius in metres: rock digs at full
 //                 size (a construction tool, not a battle blast)
 //   hopper        the ore a digger carries
-//   orePerCorner  ore per rock corner a bite turns to air (rock: below the
-//                 soft band, world/voxels.js SOFT). At 8 m corners a 6 m
-//                 bite in solid rock turns two to four, so 4 each: a full
-//                 hopper is about four bites
+//   orePerCorner  ore per plain rock corner a bite turns to air (rock: below
+//                 the soft band, world/voxels.js SOFT). At 8 m corners a 6 m
+//                 bite in solid rock turns two to four
+//   orePerSeam    the same in a seam (world/seams.js, docs/specs/21-mining.md),
+//                 times 1 + depth / seamDeep below the ground as built, up to
+//                 seamMax times: a seam fills the hopper in two or three bites,
+//                 plain rock in ten or more
 //   startOre      in the silo at the start
 //   factory       the factory's price in ore; buildTime, seconds going up
 //   mechCost      one fighting mech from the factory; mechTime, seconds
@@ -16,7 +19,7 @@
 //   footprint     m: the factory's square, which wants ground `flat` to
 //                 within that many metres and no mech on it
 export const CONSTRUCT = {
-  bucket: 6, hopper: 40, orePerCorner: 4,
+  bucket: 6, hopper: 40, orePerCorner: 1, orePerSeam: 8, seamDeep: 40, seamMax: 2.5,
   startOre: 20, factory: 60, buildTime: 6, mechCost: { ore: 50, salvage: 30 }, mechTime: 30,
   salvage: { jackal: 10, light1: 10, kestrel: 20, sniper1: 20, warden: 35, puncher: 50 },
   siloHp: 600, factoryHp: 400, unload: 14, pickup: 8, footprint: 24, flat: 2,
