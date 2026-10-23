@@ -299,7 +299,7 @@ try {
     const kes = await btns(), now = await page.evaluate(() => window.__stompy.game.player.type);
     await page.screenshot({ path: 'test-results/smoke-touch-swap.png' });
     console.log(`touch-swap: digger ${JSON.stringify(dig)}; TGT held -> ${now} ${JSON.stringify(kes)}`);
-    if (dig.missile !== 'BUILD' || dig.energy !== 'DUMP' || now !== 'kestrel' || kes.missile !== 'MISSILE' || kes.energy !== 'ENERGY') { failed = true; console.error('FAIL: touch buttons after SWAP'); }
+    if (dig.missile !== 'BUILD FACTORY' || dig.energy !== 'DUMP' || dig.ballistic !== 'NEXT' || now !== 'kestrel' || kes.missile !== 'MISSILE' || kes.energy !== 'ENERGY') { failed = true; console.error('FAIL: touch buttons after SWAP'); }
   });
   await run('touch', URL_ + '&touch=1', async page => {
     // Taps, not clicks: a mouse click would switch the game back to mouse mode.
