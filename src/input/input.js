@@ -36,15 +36,17 @@ export function createInput(app) {
 
   // Only show fire buttons for the kinds of weapon this mech carries. A
   // digger's MISSILE button is BUILD (sim/base.js), shown where there is a
-  // base. Run again whenever the mech you are in changes (SWAP, spec 20).
+  // base, and its ENERGY button DUMP (sim/dig.js, docs/specs/21-mining.md).
+  // Run again whenever the mech you are in changes (SWAP, spec 20).
   let buttonsFor = null;
   function syncWeaponButtons() {
     const P = (buttonsFor = G.player), build = !!(P.ch.tools && G.base);
     for (const c of CATS) {
       const btn = $(`[data-t="${c}"]`, tui);
       if (!btn) continue;
-      btn.hidden = !(P.weapons.some(w => CAT_OF[w.type] === c) || (c === 'missile' && build));
+      btn.hidden = !(P.weapons.some(w => CAT_OF[w.type] === c) || (c === 'missile' && build) || (c === 'energy' && P.ch.tools));
       if (c === 'missile') btn.firstChild.textContent = build ? 'BUILD' : 'MISSILE';
+      if (c === 'energy') btn.firstChild.textContent = P.ch.tools ? 'DUMP' : 'ENERGY';
     }
   }
   // Each fire button shows its weapons' state (touch only; the HUD's weapon

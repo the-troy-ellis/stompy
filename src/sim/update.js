@@ -28,7 +28,7 @@ import { tickCoopRespawn } from './coopRules.js';
 import { tickTutorial } from './tutorial.js';
 import { benchStep } from './bench.js';
 import { walkStep } from './walkView.js';
-import { dig, stepFalls } from './dig.js';
+import { dig, dump, stepFalls } from './dig.js';
 import { DIG } from '../data/weapons.js';
 
 const { sin, abs, min, max, hypot, cos } = Math;
@@ -103,7 +103,12 @@ export function update(G, input, dt) {
   fusionTick(G, P, dt, armed && input.held.fusion && !G.guide);
   if (armed && input.held.energy && !G.guide) fireCat(G, 'energy');   // energy weapons that are not beams (bolts); beams skip themselves
   if (armed && input.held.ballistic) fireCat(G, 'ballistic');
-  if (P.ch.tools) buildTrigger(G, P, armed && input.held.missile);   // a digger's missile button is BUILD (sim/base.js)
+  if (P.ch.tools) {
+    buildTrigger(G, P, armed && input.held.missile);   // a digger's missile button is BUILD (sim/base.js)
+    const tip = armed && input.held.energy;   // its energy button is DUMP, once a press (sim/dig.js)
+    if (tip && !G.dumpHeld) dump(G, P);
+    G.dumpHeld = tip;
+  }
   else missileTrigger(G, armed && (input.held.missile || input.missileTap));
   if (G.guide) steerVolley(G, dt);
 

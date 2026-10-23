@@ -114,6 +114,12 @@ two or three.
 - The mesher colours a face in `pal.ore` where `seamAt` says, if it is more than 6 m under its column's top; the palette carries the ground's seed to the worker. Desert teal, glacier amber, volcanic green.
 - On FIRST FACTORY the mesa's foot shows a wide seam band from the start.
 
+### As built: dirt
+
+- A bite's soft corners (the top 6 m) are dirt, 2 each (`dirtPerCorner`): a bite turns one or two, about one DUMP's worth. The bucket holds 12 (`dirtMax`).
+- `dig.js` `dump(G, m)`: 4 dirt (`dumpCost`) becomes a build of radius 4.5 m (`dumpR`) centred on the ground 9 m ahead (`dumpAt`, times the mech's scale), so the next lands on top. It settles scorches and marks the nav there. `NO DIRT` when short. Online it does nothing yet.
+- `update.js`: a digger's ENERGY button (Mouse 1) is DUMP, once a press. The touch button reads DUMP. The HUD's hopper panel gets a DIRT line under it, lit when there's enough for a DUMP.
+
 ## Code touchpoints
 
 - `src/world/seams.js` (new): `seamAt`, `SEAM_PITCH`, `SEAM_THICK`.

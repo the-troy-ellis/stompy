@@ -10,6 +10,11 @@
 //                 times 1 + depth / seamDeep below the ground as built, up to
 //                 seamMax times: a seam fills the hopper in two or three bites,
 //                 plain rock in ten or more
+//   dirtPerCorner dirt for each soft corner a bite turns to air (docs/specs/21-mining.md
+//                 § Dirt): a bite turns one or two, about one DUMP's worth
+//   dirtMax       dirt a digger's bucket keeps
+//   dumpCost      dirt one DUMP tips out; dumpR, metres: the mound's radius;
+//   dumpAt        metres ahead of the digger it lands
 //   startOre      in the silo at the start
 //   factory       the factory's price in ore; buildTime, seconds going up
 //   mechCost      one fighting mech from the factory; mechTime, seconds
@@ -20,6 +25,7 @@
 //                 within that many metres and no mech on it
 export const CONSTRUCT = {
   bucket: 6, hopper: 40, orePerCorner: 1, orePerSeam: 8, seamDeep: 40, seamMax: 2.5,
+  dirtPerCorner: 2, dirtMax: 12, dumpCost: 4, dumpR: 4.5, dumpAt: 9,
   startOre: 20, factory: 60, buildTime: 6, mechCost: { ore: 50, salvage: 30 }, mechTime: 30,
   salvage: { jackal: 10, light1: 10, kestrel: 20, sniper1: 20, warden: 35, puncher: 50 },
   siloHp: 600, factoryHp: 400, unload: 14, pickup: 8, footprint: 24, flat: 2,
