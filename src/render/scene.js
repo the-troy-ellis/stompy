@@ -169,12 +169,14 @@ export function createScene(app) {
   const FOG = [0, 0];   // this frame's fog distances: the palette's, cut by the weather (data/weather.js)
   const SHADE = [1, 1, 1], SKY_Z = [0, 0, 0], SKY_H = [0, 0, 0], FLASH_SHADE = [1.8, 1.8, 2.0], FLASH_SKY = [0.78, 0.8, 0.92], WHITE_SKY = [0.86, 0.89, 0.94];
   // Rain and snow (spec 07): drops in a box round the camera, one instanced
-  // draw each. Rain is thin streaks leaning with the wind; snow is small
-  // octahedra drifting down, turning and swaying. `clear`: metres round the
+  // draw each. Rain is thin streaks leaning with the wind; snow is flat
+  // three-pointed flakes drifting down, spinning and tumbling as they go
+  // (`whirl`: radians a second about their middle and end over end, each flake
+  // a little faster or slower than the next), and swaying. `clear`: metres round the
   // cockpit kept free, so nothing sits on the canopy.
   const WX_LOOK = {
     rain: { shape: 'streak', count: 1500, fall: 22, size: 1.8, col: [0.6, 0.66, 0.76], glow: 0.3, clear: 6, lean: true },
-    snow: { shape: 'octa', count: 800, fall: 1.6, size: 0.32, col: [0.95, 0.96, 1], glow: 0.55, clear: 5, sway: 0.5 },
+    snow: { shape: 'flake', count: 800, fall: 1.6, size: 0.42, col: [0.95, 0.96, 1], glow: 0.55, clear: 5, sway: 0.5, whirl: [2.2, 1.6] },
     dust: { shape: 'flat', count: 2500, fall: 0.6, size: 0.22, col: [0.7, 0.5, 0.32], glow: 0.15, clear: 4, sway: 0.3, gust: 1.4 },   // grains streaming sideways
   };
   const box = makeWeatherBox(2500), WX_VEL = [0, 0, 0];
@@ -189,14 +191,14 @@ export function createScene(app) {
     stepWeatherBox(box, eye, Math.round(L.count * w.intensity * (G.weatherScale ?? 1)), WX_VEL, dt);
     const g = R.fx[L.shape], wind = Math.hypot(w.wind[0], w.wind[1]);
     g.n = L.lean ? fillDrops(g.data, g.n, box, eye, L, Math.atan2(w.wind[0], w.wind[1]), Math.atan2(wind, L.fall), 0, 0, G.time)
-      : fillDrops(g.data, g.n, box, eye, L, 0, 0, 1, L.sway || 0, G.time);
+      : fillDrops(g.data, g.n, box, eye, L, 0, 0, 1, L.sway || 0, G.time, L.whirl ? L.whirl[0] : 0.7, L.whirl ? L.whirl[1] : 0.45);
   }
   // The drops into an effect shape's instances, from `n` on; returns the new
   // count. Rain leans (yaw, lean) with spin 0; snow and dust have spin 1 and
   // turn and sway instead. No ternaries in the loop: V8 boxes a number picked
   // between a passed-in value and fresh arithmetic, which is a heap number per
   // drop per frame.
-  function fillDrops(d, n, box, eye, L, yaw, lean, spin, sway, t) {
+  function fillDrops(d, n, box, eye, L, yaw, lean, spin, sway, t, rs = 0.7, rt = 0.45) {
     const cap = R.FX_CAP, F = R.FX_FLOATS, pos = box.pos, ex = eye[0], ez = eye[2], clear2 = L.clear * L.clear;
     const size = L.size, cr = L.col[0], cg = L.col[1], cb = L.col[2], glow = L.glow;
     for (let i = 0; i < box.n && n < cap; i++) {
@@ -205,7 +207,8 @@ export function createScene(app) {
       const o = n * F, sw = Math.sin(t * 0.9 + i * 1.7) * sway;
       n++;
       d[o] = pos[i3] + sw; d[o + 1] = pos[i3 + 1]; d[o + 2] = pos[i3 + 2] + sw * 0.6; d[o + 3] = size;
-      d[o + 4] = yaw + spin * (t * 0.7 + i * 1.3); d[o + 5] = lean + spin * (t * 0.45 + i);
+      const k = 0.6 + 0.8 * ((i * 0.618) % 1);   // this one's own pace
+      d[o + 4] = yaw + spin * (t * rs * k + i * 1.3); d[o + 5] = lean + spin * (t * rt * k + i);
       d[o + 6] = cr; d[o + 7] = cg; d[o + 8] = cb; d[o + 9] = glow; d[o + 10] = 0; d[o + 11] = 0;
     }
     return n;
