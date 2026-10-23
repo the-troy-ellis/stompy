@@ -2,8 +2,9 @@
 // § Rendering): one vertex per cell the surface crosses, at the mean of its
 // edges' crossings, and one quad per crossed edge, between the four cells
 // around it. Flat-shaded, coloured per triangle: flat tops by height (low,
-// mid, high), steep faces as banded rock, darker under cover. Pure, so it runs
-// in the worker and in the tests.
+// mid, high), steep faces as banded rock with the ore seams in `pal.ore`
+// (world/seams.js, from `pal.seed`; only rock, more than SOFT under its
+// column's top), darker under cover. Pure, so it runs in the worker and in the tests.
 //
 // `D` holds a block of corners (one byte each, above 128 solid), `dims` =
 // [nx, ny, nz] of them: a chunk's own plus one corner before and after on
@@ -14,7 +15,10 @@
 // mesh/builder.js does.
 // The cube's 12 edges as corner pairs (corner c is x = c & 1, y = c >> 1 & 1, z = c >> 2).
 const EA = [0, 2, 4, 6, 0, 1, 4, 5, 0, 1, 2, 3], EB = [1, 3, 5, 7, 2, 3, 6, 7, 4, 5, 6, 7];
+import { seamAt } from './seams.js';
+
 const { sin, floor, hypot, round } = Math;
+const SOFT = 6;   // world/voxels.js SOFT (not imported: the worker's bundle stays the mesher alone)
 const hash = (x, z) => { const v = sin(x * 12.9898 + z * 78.233) * 43758.5453; return v - floor(v); };
 
 export function meshChunk(D, top, dims, o, s, pal) {
@@ -66,13 +70,15 @@ export function meshChunk(D, top, dims, o, s, pal) {
     if (ey > 0.6) {   // ground you could stand on: by height, as the old terrain was
       const t = Math.min(Math.max(cy / 70, 0), 1), lo = t < 0.5 ? pal.low : pal.mid, hi = t < 0.5 ? pal.mid : pal.high, u = t < 0.5 ? t * 2 : t * 2 - 1, f = 0.9 + r * 0.14;
       col0 = (lo[0] + (hi[0] - lo[0]) * u) * f; col1 = (lo[1] + (hi[1] - lo[1]) * u) * f; col2 = (lo[2] + (hi[2] - lo[2]) * u) * f;
-    } else {          // a face: rock in bands
-      const f = (floor(cy / 6) & 1 ? 0.9 : 1.05) * (0.92 + r * 0.12);
-      col0 = pal.rock[0] * f; col1 = pal.rock[1] * f; col2 = pal.rock[2] * f;
     }
     // Under cover (a roof over it): below the top surface there, blended as ground.height is.
     const gx = Math.min(Math.max((cx - o[0]) / s, 0), mx - 1e-4), gz = Math.min(Math.max((cz - o[2]) / s, 0), mz - 1e-4), ti = (gx | 0) + nx * (gz | 0), u = gx % 1, w = gz % 1;
     const roof = (top[ti] * (1 - u) + top[ti + 1] * u) * (1 - w) + (top[ti + nx] * (1 - u) + top[ti + nx + 1] * u) * w;
+    if (ey <= 0.6) {   // a face: rock in bands, a seam in its ore colour
+      const ore = pal.ore && pal.seed != null && cy < roof - SOFT && seamAt(pal.seed, cx, cy, cz), c = ore ? pal.ore : pal.rock;
+      const f = (ore ? 1 : floor(cy / 6) & 1 ? 0.9 : 1.05) * (0.92 + r * 0.12);
+      col0 = c[0] * f; col1 = c[1] * f; col2 = c[2] * f;
+    }
     if (cy < roof - 4) { col0 *= 0.62; col1 *= 0.62; col2 *= 0.62; }
     if (no + 27 > out.length) { const grown = new Float32Array(out.length * 2); grown.set(out); out = grown; }
     for (let q = 0; q < 3; q++) {

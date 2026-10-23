@@ -1,3 +1,4 @@
+import { seamAt } from '../world/seams.js';
 import { cheat } from './cheats.js';
 import { BIG_DIG } from '../data/debug.js';
 import { DIG, CRUSH, TORQUE, WEAPONS } from '../data/weapons.js';
@@ -72,18 +73,25 @@ export function dig(G, p, r, owned = true) {
 
 // The digger's bite (docs/specs/20-build-and-fight.md § The digger): a dig
 // of CONSTRUCT.bucket where the bucket meets the ground, rock at full size,
-// that fills the hopper with ore: CONSTRUCT.orePerCorner for each rock
-// corner (under the soft band) it turned to air; soft ground gives none. A
-// full hopper still digs. Single player: online a bite is a plain dig that
-// syncs and gives no ore (spec 20 § Edge cases). Returns the ore it got.
+// that fills the hopper with ore for each rock corner (under the soft band)
+// it turned to air: a little for plain rock, a lot for a seam, more the
+// deeper it runs (seamOre; docs/specs/21-mining.md); soft ground gives none.
+// A full hopper still digs. Single player: online a bite is a plain dig that
+// syncs and gives no ore (spec 20 § Edge cases). Returns the ore it got, and
+// sets `m.seamBite` when a seam paid for it (the sparkle, melee.js).
+export const seamOre = depth => CONSTRUCT.orePerSeam * Math.min(CONSTRUCT.seamMax, 1 + Math.max(0, depth) / CONSTRUCT.seamDeep);
 export function bite(G, m, p) {
   const r = CONSTRUCT.bucket;
+  m.seamBite = false;
   if (!G.ter || online(G)) { dig(G, p, r, ownsDigs(G, m)); return 0; }
-  const x = q(p[0], 0.25), y = q(p[1], 0.25), z = q(p[2], 0.25), tally = { rock: 0 };
+  const x = q(p[0], 0.25), y = q(p[1], 0.25), z = q(p[2], 0.25), seed = G.ter.seed;
+  let got = 0, seams = 0;
+  const tally = { rock: 0, soft: 0, corner: (cx, cy, cz, depth) => { if (seamAt(seed, cx, cy, cz)) { got += seamOre(depth); seams++; } else got += CONSTRUCT.orePerCorner; } };
   confirmDig(G, [0, x, y, z, r], true, 1, tally);
-  const ore = Math.min(CONSTRUCT.hopper - (m.ore || 0), tally.rock * CONSTRUCT.orePerCorner);
-  m.ore = (m.ore || 0) + Math.max(0, ore);
-  return Math.max(0, ore);
+  const ore = Math.max(0, Math.min(CONSTRUCT.hopper - (m.ore || 0), Math.round(got)));
+  m.ore = (m.ore || 0) + ore;
+  m.seamBite = seams > 0;
+  return ore;
 }
 
 // Digs off the wire (the relay's `digs`, or the room's list in `welcome`):
