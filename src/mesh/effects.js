@@ -6,8 +6,8 @@ import { KINDS } from '../sim/particles.js';
 // effect is a small solid, one shape per kind, drawn instanced (one draw per
 // shape) and coloured per instance, so the shapes are built white. Unit size:
 // about 1 across, centred on the origin. ≤ 16 triangles each.
-export const SHAPE_OF = { smoke: 'cube', dust: 'flat', fire: 'tetra', flame: 'tetra', debris: 'chunk', spark: 'sliver', rain: 'streak', snow: 'octa', shock: 'ring' };
-export const EFFECT_SHAPES = ['cube', 'tetra', 'chunk', 'sliver', 'octa', 'flat', 'streak', 'ring'];
+export const SHAPE_OF = { smoke: 'cube', dust: 'flat', fire: 'tetra', flame: 'tetra', debris: 'chunk', spark: 'sliver', rain: 'streak', snow: 'flake', shock: 'ring' };
+export const EFFECT_SHAPES = ['cube', 'tetra', 'chunk', 'sliver', 'flake', 'flat', 'streak', 'ring'];
 export const shapeOf = kind => SHAPE_OF[kind] || 'cube';
 // The same, by the particle pool's kind number (sim/particles.js KINDS).
 export const SHAPE_BY_KIND = KINDS.map(shapeOf);
@@ -39,9 +39,17 @@ const BUILD = {
     const at = (r, i) => { const a = (i / 8) * Math.PI * 2; return [Math.sin(a) * r, r > 0.4 ? 0.06 : 0, Math.cos(a) * r]; };
     for (let i = 0; i < 8; i++) b.quad(at(0.38, i), at(0.5, i), at(0.5, i + 1), at(0.38, i + 1), W, 'up');
   },
-  octa: b => {
-    const v = [[0.5, 0, 0], [-0.5, 0, 0], [0, 0.5, 0], [0, -0.5, 0], [0, 0, 0.5], [0, 0, -0.5]];
-    solid(b, v, [[2, 0, 4], [2, 4, 1], [2, 1, 5], [2, 5, 0], [3, 4, 0], [3, 1, 4], [3, 5, 1], [3, 0, 5]]);
+  // A snowflake (the owner's sketch): three flat triangles, points together
+  // in the middle and their wide ends out, a third of the way round from each
+  // other, with gaps between. Each is two halves, the middle raised a hair, so
+  // as it spins and tumbles one half catches the light and then the other.
+  flake: b => {
+    const at = (a, r) => [Math.sin(a) * r, 0, Math.cos(a) * r], mid = [0, 0.04, 0];
+    for (let k = 0; k < 3; k++) {
+      const a = (k / 3) * Math.PI * 2, w = Math.PI / 6;
+      b.tri(mid, at(a - w, 0.5), at(a, 0.44), W, 'up');
+      b.tri(mid, at(a, 0.44), at(a + w, 0.5), W, 'up');
+    }
   },
 };
 export function buildEffectShapes() {

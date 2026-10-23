@@ -183,7 +183,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
     const p = buildMechParts(ch), set = Object.fromEntries(Object.entries(p).map(([n, b]) => [n, upload(b)]));
     if (skinProg) set.skin = uploadSkin(skinMech(p, geoFor(ch).legs.length));
     set.lamps = lampSpots(p);   // torso space, for the headlamps
-    set.wire = new Map(Object.entries(p).filter(([n]) => set[n]?.buf).map(([n, b]) => [set[n], wireEdges(b.d)]));   // each part's edges, for the HUD's damage diagram
+    set.wire = new Map(Object.entries(p).filter(([n]) => set[n]?.buf).map(([n, b]) => [set[n], wireEdges(b.wireD ? b.wireD() : b.d)]));   // each part's edges, for the HUD's damage diagram (not the round joints)
     return set;
   };
   const mechParts = {};

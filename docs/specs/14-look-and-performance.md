@@ -38,7 +38,7 @@ calls, not polygons**, and most of the draw calls are effects.
    | muzzle flash | flat star (6–8 tris), emissive | two frames, faces the camera's plane, not the camera |
    | shockwave | flat ring on the ground (16 segments) | expands, thins, gone in 0.4 s |
    | rain | thin vertical sliver | falls, leans with wind |
-   | snow | octahedron (8 tris) | drifts, spins slowly |
+   | snow | flat three-pointed flake (6 tris; the owner's sketch, 2026-10-22) | drifts, spins and tumbles |
    | dust | flattened cube | streams sideways with the wind |
 3. **Fade by shape, colour and dither, never by blending.** Things disappear
    by shrinking, by blending toward the sky or fog colour, or by being replaced
@@ -49,7 +49,12 @@ calls, not polygons**, and most of the draw calls are effects.
    states (an arena pilot respawning); never for solid objects or the HUD.
 4. **Chunky, readable silhouettes.** Mechs ≤ 700 triangles, props ≤ 120,
    effect shapes ≤ 16. A thing that does not read at 400 m on a phone gets
-   fewer, bigger parts, not more detail.
+   fewer, bigger parts, not more detail. Joints are round (the owner,
+   2026-10-22: limbs clipped through each other at the joints): a knee or
+   a shoulder turns on a hinge, a drum across the limb; a hip or an ankle on
+   a ball, an 8-by-4 faceted sphere (`mesh/builder.js` `sphere`). Each is
+   sized to cover the box corners that sweep round it, and is left out of
+   the HUD's wireframe (`Builder.joint`).
 5. **One light and a sky.** One directional light plus the palette's sky and
    fog. Hot things are emissive (they ignore the light). Night headlights
    ([07](07-atmosphere.md)) are the one exception: a single spotlight term.
