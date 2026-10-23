@@ -6,6 +6,8 @@ import { CATS, CAT_OF } from '../data/weapons.js';
 import { steerBy, alpha, cycleTarget } from '../sim/missiles.js';
 import { nextSpectate, orbitSpectate } from '../net/spectate.js';
 import { darkness } from '../data/palettes.js';
+import { NAMES } from '../data/names.js';
+import { PLACE_ORDER } from '../data/construct.js';
 import { readPad, firstPad } from './gamepad.js';
 
 const { abs, hypot } = Math;
@@ -38,15 +40,17 @@ export function createInput(app) {
   // digger's MISSILE button is BUILD (sim/base.js), shown where there is a
   // base, and its ENERGY button DUMP (sim/dig.js, docs/specs/21-mining.md).
   // Run again whenever the mech you are in changes (SWAP, spec 20).
-  let buttonsFor = null;
+  let buttonsFor = null, builds = null;
+  const buildLabel = () => `BUILD ${NAMES.buildings[PLACE_ORDER[G.base?.pick || 0]]}`;   // what BUILD puts down (sim/base.js, docs/specs/21-mining.md)
   function syncWeaponButtons() {
     const P = (buttonsFor = G.player), build = !!(P.ch.tools && G.base);
     for (const c of CATS) {
       const btn = $(`[data-t="${c}"]`, tui);
       if (!btn) continue;
-      btn.hidden = !(P.weapons.some(w => CAT_OF[w.type] === c) || (c === 'missile' && build) || (c === 'energy' && P.ch.tools));
-      if (c === 'missile') btn.firstChild.textContent = build ? 'BUILD' : 'MISSILE';
+      btn.hidden = !(P.weapons.some(w => CAT_OF[w.type] === c) || ((c === 'missile' || c === 'ballistic') && build) || (c === 'energy' && P.ch.tools));
+      if (c === 'missile') btn.firstChild.textContent = builds = build ? buildLabel() : 'MISSILE';
       if (c === 'energy') btn.firstChild.textContent = P.ch.tools ? 'DUMP' : 'ENERGY';
+      if (c === 'ballistic') btn.firstChild.textContent = build ? 'NEXT' : 'BALLISTIC';
     }
   }
   // Each fire button shows its weapons' state (touch only; the HUD's weapon
@@ -56,6 +60,7 @@ export function createInput(app) {
   const fireLast = {}, fireBtn = {};
   function fireStatus() {
     const P = G.player;
+    if (P.ch.tools && G.base && buildLabel() !== builds) { builds = buildLabel(); const b = $('[data-t="missile"]', tui); if (b) b.firstChild.textContent = builds; }   // NEXT picked another
     for (const c of CATS) {
       const btn = fireBtn[c] || (fireBtn[c] = $(`[data-t="${c}"]`, tui));   // found once
       if (!btn || btn.hidden) continue;

@@ -1,7 +1,8 @@
 import { VERSION } from '../util/version.js';
 const VERSION_LINE = `v${VERSION}`;   // made once: the readout runs every frame
 import { CHEATS } from '../data/debug.js';
-import { CONSTRUCT } from '../data/construct.js';
+import { CONSTRUCT, PLACE, PLACE_ORDER } from '../data/construct.js';
+import { NAMES } from '../data/names.js';
 import { SWAP_WIPE } from '../sim/crew.js';
 import { RADAR_RANGE, radarOf, fogOf } from '../data/weather.js';
 import { TAU, clampN, len, rnd, sub } from '../util/math.js';
@@ -590,6 +591,13 @@ export function createHud(app) {
         ctx.fillText(!f.alive ? 'FACTORY DOWN' : f.prog < 1 ? `FACTORY ${Math.floor(f.prog * 100)}%` : f.job != null ? `NEW MECH ${Math.ceil(CONSTRUCT.mechTime - f.job)} s` : 'FACTORY', L.crew.x, y0);
         y0 += 12;
       }
+      // What BUILD puts down (docs/specs/21-mining.md): in a digger, with its price; and a bay mending you.
+      if (G.player?.ch.tools) {
+        const k = PLACE_ORDER[b.pick || 0];
+        ctx.fillStyle = b.ore >= PLACE[k].ore ? GREEN : DIM;
+        ctx.fillText(`${G.touchUI ? '' : 'M2 '}BUILDS ${NAMES.buildings[k]} · ${PLACE[k].ore}`, L.crew.x, y0); y0 += 12;
+      }
+      if (G.mending) { ctx.fillStyle = GREEN; ctx.fillText('REPAIRING', L.crew.x, y0); y0 += 12; }
       if (G.buildAt) drawFootprint(G.buildAt);
     }
     if (!c || c.length < 2) return;
@@ -604,14 +612,15 @@ export function createHud(app) {
   // BUILD held (sim/base.js): the factory's footprint on the ground, green where it can go, red where not,
   // and why not at the crosshair.
   function drawFootprint(f) {
-    const r = f.r, s = Math.sin(f.yaw), c = Math.cos(f.yaw), pts = [[-r, -r], [r, -r], [r, r], [-r, r]].map(([u, v]) => {
+    const hw = f.w / 2, hd = f.d / 2, s = Math.sin(f.yaw), c = Math.cos(f.yaw), pts = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([u, v]) => {
       const x = f.x + u * c + v * s, z = f.z - u * s + v * c;
       return project([x, G.ter.height(x, z) + 0.5, z]);
     });
     const col = f.why ? RED : GREEN;
     if (pts.every(Boolean)) { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.stroke(); ctx.lineWidth = 1; }
     ctx.textAlign = 'center'; ctx.fillStyle = col;
-    ctx.fillText(f.why === 'ore' ? `BUILD · ${CONSTRUCT.factory} ORE` : f.why === 'room' ? 'NO ROOM' : f.why === 'built' ? 'BUILT' : `BUILD · ${CONSTRUCT.factory} ORE`, V.W / 2, V.H * 0.5 + 34);
+    const what = `${NAMES.buildings[f.kind]} · ${PLACE[f.kind].ore} ORE`;
+    ctx.fillText(f.why === 'room' ? 'NO ROOM' : f.why === 'built' ? 'BUILT' : `BUILD ${what}`, V.W / 2, V.H * 0.5 + 34);
     ctx.textAlign = 'right';
   }
   const sway = makeSway();

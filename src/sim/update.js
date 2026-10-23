@@ -1,6 +1,6 @@
 import { cheat } from './cheats.js';
 import { swap } from './crew.js';
-import { buildTrigger, stepBase } from './base.js';
+import { buildTrigger, stepBase, pickNext } from './base.js';
 import { stepSalvage } from './raid.js';
 import { blendPal } from '../data/palettes.js';
 import { tickWeather } from './weather.js';
@@ -108,6 +108,9 @@ export function update(G, input, dt) {
     const tip = armed && input.held.energy;   // its energy button is DUMP, once a press (sim/dig.js)
     if (tip && !G.dumpHeld) dump(G, P);
     G.dumpHeld = tip;
+    const pick = armed && input.held.ballistic;   // its ballistic button picks what BUILD puts down (sim/base.js)
+    if (pick && !G.pickHeld) pickNext(G);
+    G.pickHeld = pick;
   }
   else missileTrigger(G, armed && (input.held.missile || input.missileTap));
   if (G.guide) steerVolley(G, dt);
