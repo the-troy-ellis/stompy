@@ -92,26 +92,28 @@ export function bite(G, m, p) {
   const ore = Math.max(0, Math.min(CONSTRUCT.hopper - (m.ore || 0), Math.round(got)));
   m.ore = (m.ore || 0) + ore;
   m.seamBite = seams > 0;
-  m.dirt = Math.min(CONSTRUCT.dirtMax, (m.dirt || 0) + tally.soft * CONSTRUCT.dirtPerCorner);   // the soft ground stays in the bucket (DUMP, below)
+  m.dirt = Math.min(CONSTRUCT.dirtMax, (m.dirt || 0) + (tally.soft + tally.rock) * CONSTRUCT.dirtPerCorner);   // what it digs out stays in the bucket as dirt (DUMP, below)
   return ore;
 }
 
 // DUMP (docs/specs/21-mining.md § Dirt; the ENERGY button while you drive a
-// digger): tips CONSTRUCT.dumpCost of the bucket's dirt out as a mound,
-// CONSTRUCT.dumpR across, on the ground dumpAt metres ahead. It lands on
-// whatever is there, so mounds stack into berms and ramps. Single player, as
-// a bite's ore is: online, building ground isn't sent yet. True if it tipped.
+// digger): tips CONSTRUCT.dumpCost of the bucket's dirt out as a pile, a
+// cone dumpH high and dumpR across its foot, about the hole one bite leaves,
+// dumpAt metres ahead. It lands on whatever is there, so piles stack into
+// berms and ramps. Single player, as a bite's ore is: online, building ground
+// isn't sent yet. True if it tipped.
 export function dump(G, m) {
   if (!G.ter || online(G)) return false;
   if ((m.dirt || 0) < CONSTRUCT.dumpCost) { if (m === G.player) msg(G, 'NO DIRT', '#fc3'); return false; }
-  const s = m.ch.scale, yaw = viewYaw(m), d = CONSTRUCT.dumpAt * s, r = CONSTRUCT.dumpR;
-  const x = q(m.x + Math.sin(yaw) * d, 0.25), z = q(m.z + Math.cos(yaw) * d, 0.25), y = q(G.ter.groundBelow(x, m.y + 12 * s, z, m.y - 40), 0.25);
-  G.ter.build([x, y, z], r);
+  const s = m.ch.scale, yaw = viewYaw(m), d = CONSTRUCT.dumpAt * s, r = CONSTRUCT.dumpR, h = CONSTRUCT.dumpH;
+  const x = q(m.x + Math.sin(yaw) * d, 0.25), z = q(m.z + Math.cos(yaw) * d, 0.25);
+  G.ter.pile(x, z, h, r);
+  const y = G.ter.height(x, z) - h * 0.5;
   m.dirt -= CONSTRUCT.dumpCost;
   settle(G, x, z, r);
   if (G.nav) G.nav.mark(x, z, r);
   feel(G, 'land', { mech: m, k: 0.35, at: m === G.player ? null : [x, y, z] });
-  for (let i = 0; i < 12; i++) particle(G, [x + G.rng.range(-r, r) * 0.6, y + r * 0.6, z + G.rng.range(-r, r) * 0.6], [G.rng.range(-2, 2), G.rng.range(1, 3), G.rng.range(-2, 2)], G.rng.range(0.8, 1.4), G.rng.range(1, 2), G.pal.low, 'dust');
+  for (let i = 0; i < 16; i++) particle(G, [x + G.rng.range(-r, r) * 0.5, y + h * 0.5, z + G.rng.range(-r, r) * 0.5], [G.rng.range(-2, 2), G.rng.range(1, 3), G.rng.range(-2, 2)], G.rng.range(0.8, 1.4), G.rng.range(1, 2), G.pal.low, 'dust');
   return true;
 }
 

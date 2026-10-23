@@ -116,8 +116,9 @@ two or three.
 
 ### As built: dirt
 
-- A bite's soft corners (the top 6 m) are dirt, 2 each (`dirtPerCorner`): a bite turns one or two, about one DUMP's worth. The bucket holds 12 (`dirtMax`).
-- `dig.js` `dump(G, m)`: 4 dirt (`dumpCost`) becomes a build of radius 4.5 m (`dumpR`) centred on the ground 9 m ahead (`dumpAt`, times the mech's scale), so the next lands on top. It settles scorches and marks the nav there. `NO DIRT` when short. Online it does nothing yet.
+- Every corner a bite turns to air, soft ground or rock, is a unit of dirt (`dirtPerCorner` 1; a bite turns two to four). The bucket holds 24 (`dirtMax`, six piles).
+- `dig.js` `dump(G, m)`: 4 dirt (`dumpCost`) becomes a pile, a cone 6 m high (`dumpH`) and 9 m across its foot (`dumpR`), 13 m ahead (`dumpAt`, times the mech's scale). `voxels.js` `pile` raises it column by column off each column's top, so its height comes out exact on the 8 m grid and the next lands on top. A four-corner bite digs out about 600 m³ and its pile is about 900 m³, since loose dirt bulks up. It settles scorches and marks the nav there. `NO DIRT` shows when short. Online it does nothing yet.
+- First version, changed after the owner's playtest ("the dumping doesn't seem to make very big piles relative to the amount of dirt scooped out"): only soft ground gave dirt (2 a corner, 12 held), and a dump was a 4.5 m sphere built on the grid, a 3 m hump.
 - `update.js`: a digger's ENERGY button (Mouse 1) is DUMP, once a press. The touch button reads DUMP. The HUD's hopper panel gets a DIRT line under it, lit when there's enough for a DUMP.
 
 ### As built: buildings

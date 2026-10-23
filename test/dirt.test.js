@@ -17,7 +17,7 @@ test('a bite into soft ground fills the bucket with dirt, and no ore', () => {
   const ore = bite(G, P, [40, y, 40]);
   assert.equal(ore, 0);
   assert.ok(P.dirt >= CONSTRUCT.dirtPerCorner, `dirt ${P.dirt}`);
-  for (let i = 0; i < 20; i++) bite(G, P, [40 + i * 8, y, 80]);
+  for (let i = 0; i < 40; i++) bite(G, P, [40 + i * 8, y, 80]);
   assert.equal(P.dirt, CONSTRUCT.dirtMax, 'the bucket holds so much');
 });
 
@@ -26,10 +26,10 @@ test('DUMP tips a mound ahead, and mounds stack', () => {
   P.dirt = CONSTRUCT.dirtMax;
   assert.equal(dump(G, P), true);
   const h1 = G.ter.height(x, z);
-  assert.ok(h1 > h0 + 2, `a mound: ${h0.toFixed(1)} -> ${h1.toFixed(1)}`);
+  assert.ok(h1 > h0 + CONSTRUCT.dumpH * 0.6, `a pile: ${h0.toFixed(1)} -> ${h1.toFixed(1)}`);
   assert.equal(P.dirt, CONSTRUCT.dirtMax - CONSTRUCT.dumpCost);
   dump(G, P);
-  assert.ok(G.ter.height(x, z) > h1 + 1, 'on top of the last');
+  assert.ok(G.ter.height(x, z) > h1 + CONSTRUCT.dumpH * 0.6, 'on top of the last');
   const [nx, nz] = ahead(G, 0);
   assert.ok(Math.abs(G.ter.height(nx, nz) - h0) < 0.5, 'not under the digger');
 });
@@ -50,4 +50,21 @@ test('the ENERGY button is DUMP for a digger: one mound a press, however long it
   update(G, input({}), 1 / 60);
   update(G, input({ held: { energy: true } }), 1 / 60);
   assert.equal(P.dirt, CONSTRUCT.dirtMax - 2 * CONSTRUCT.dumpCost, 'again on the next press');
+});
+
+test('a pile is about one bite\'s hole of ground, and rock bites give dirt too', async () => {
+  const G = digger(), P = G.player, ter = G.ter;
+  const vol = (cx, cz, half, y0, y1) => { let v = 0; for (let x = cx - half; x <= cx + half; x += 1) for (let z = cz - half; z <= cz + half; z += 1) for (let y = y0; y <= y1; y += 1) if (ter.solid(x, y, z)) v++; return v; };
+  const h = ter.height(60, 60), b0 = vol(60, 60, 12, h - 16, h + 6);
+  bite(G, P, [60, h - CONSTRUCT.bucket * 0.5, 60]);
+  const hole = b0 - vol(60, 60, 12, h - 16, h + 6), dirt = P.dirt;
+  const [x, z] = ahead(G), hp = ter.height(x, z), p0 = vol(x, z, 12, hp - 4, hp + 12);
+  P.dirt = CONSTRUCT.dumpCost;
+  dump(G, P);
+  const pile = vol(x, z, 12, hp - 4, hp + 12) - p0;
+  assert.ok(pile > hole * 0.8 * (CONSTRUCT.dumpCost / dirt) && pile < hole * 2.5 * (CONSTRUCT.dumpCost / dirt), `hole ${hole} m³ for ${dirt} dirt, pile ${pile} m³ for ${CONSTRUCT.dumpCost}`);
+  // Deep under the soft band: rock, and it still fills the bucket.
+  P.dirt = 0;
+  bite(G, P, [100, h - 30, 100]);
+  assert.ok(P.dirt > 0, 'rock gives dirt');
 });
