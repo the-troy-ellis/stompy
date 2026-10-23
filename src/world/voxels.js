@@ -306,6 +306,25 @@ function groundApi(G) {
     return (h >>> 0).toString(16).padStart(8, '0');
   }
   const build = (p, r) => shape(p, r, (d, dist) => max(d, (r - dist) / DS));
+  // A pile (the digger's DUMP, docs/specs/21-mining.md § Dirt): a cone of
+  // ground `h` high and `r` across its foot, raised column by column off
+  // whatever each column's top is, so its height comes out exact on the 8 m
+  // grid (a sphere built there spreads wide and low) and piles stack.
+  function pile(x, z, h, r) {
+    const i0 = clampN(floor((x + HALF - r) / VS), 1, NX - 1), i1 = clampN(ceil((x + HALF + r) / VS), 1, NX - 1);
+    const k0 = clampN(floor((z + HALF - r) / VS), 1, NZ - 1), k1 = clampN(ceil((z + HALF + r) / VS), 1, NZ - 1);
+    let j0 = NY, j1 = 0;
+    for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
+      const d = hypot(-HALF + i * VS - x, -HALF + k * VS - z);
+      if (d >= r) continue;
+      const t = top[i + PX * k], want = t + h * (1 - d / r);
+      // Each corner up the column takes the larger of the ground and the cone's surface.
+      const ja = max(BEDROCK + 1, floor((t - DS - Y0) / VS)), jb = min(NY - 1, ceil((want + DS - Y0) / VS));
+      for (let j = ja; j <= jb; j++) { const o = cornerIndex(i, j, k); D[o] = Q(max((D[o] - 128) / 127, (want - (Y0 + j * VS)) / DS)); }
+      j0 = min(j0, ja); j1 = max(j1, jb);
+    }
+    if (j0 <= j1) touched(i0, i1, j0, j1, k0, k1);
+  }
   // Smooth: each corner in reach eases toward the mean of its six neighbours (read from a copy).
   function smooth(p, r) {
     const [i0, i1, j0, j1, k0, k1] = box(p, r);
@@ -340,7 +359,7 @@ function groundApi(G) {
   // An editor stroke: [op, x, y, z, r], op 0 carve, 1 build, 2 smooth.
   const stroke = ([op, x, y, z, r]) => (op === 0 ? carve : op === 1 ? build : smooth)([x, y, z], r);
   const mark = b => touched(...b);   // mesh a box of corners again (a heap that has landed)
-  return { sample, height, solid, groundBelow, ray, carve, dig, islands, overhangs, fall, copyBox, mark, build, smooth, block, stroke, retop, hash };
+  return { sample, height, solid, groundBelow, ray, carve, dig, islands, overhangs, fall, copyBox, mark, build, pile, smooth, block, stroke, retop, hash };
 }
 
 // A landmark, as a distance shape laid onto the ground: positive inside rock.
