@@ -850,6 +850,14 @@ export function createHud(app) {
       ctx.fillText(String(ore).padStart(3), wx + 118, wy);
       ctx.fillStyle = '#031203'; ctx.fillRect(wx + 150, wy - 3, 40, 6);
       ctx.fillStyle = full ? AMBER : GREEN; ctx.fillRect(wx + 150, wy - 3, 40 * ore / CONSTRUCT.hopper, 6);
+      // The bucket's dirt (docs/specs/21-mining.md): enough for a DUMP lights it up.
+      const dirt = P.dirt || 0, can = dirt >= CONSTRUCT.dumpCost;
+      wy += 14;
+      ctx.fillStyle = can ? GREEN : DIM;
+      ctx.fillText(G.touchUI ? 'DIRT' : 'M1    DIRT', wx, wy);
+      ctx.fillText(String(dirt).padStart(3), wx + 118, wy);
+      ctx.fillStyle = '#031203'; ctx.fillRect(wx + 150, wy - 3, 40, 6);
+      ctx.fillStyle = can ? GREEN : DIM; ctx.fillRect(wx + 150, wy - 3, 40 * dirt / CONSTRUCT.dirtMax, 6);
     }
     for (const cat of G.touchUI ? NO_CATS : CATS) {   // on touch the fire buttons show this (input/input.js fireStatus)
       const ws = P.weapons.filter(w => CAT_OF[w.type] === cat);
