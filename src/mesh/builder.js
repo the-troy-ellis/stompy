@@ -2,7 +2,7 @@ import { M, cross, dot, mul, norm, sub } from '../util/math.js';
 
 // Flat-shaded triangle soup: position, normal, colour per vertex.
 export class Builder {
-  constructor() { this.d = []; }
+  constructor() { this.d = []; this.joints = []; }
   tri(a, b, c, col, ref) {
     let n = norm(cross(sub(b, a), sub(c, a)));
     // Orient outward: away from `ref` (a point inside), or upward for terrain.
@@ -33,5 +33,29 @@ export class Builder {
       this.tri(cLo, lo[i], lo[j], col, ctr);
       if (top > 0) this.tri(cHi, hi[i], hi[j], col, ctr);
     }
+  }
+  // A unit sphere (radius 0.5) through matrix m: n sides round, r bands pole
+  // to pole, flat-shaded facets (8 by 4 is 48 triangles).
+  sphere(m, col, n = 8, r = 4) {
+    const ctr = M.apply(m, [0, 0, 0]);
+    const P = (i, j) => { const t = (j / r) * Math.PI, a = (i / n) * Math.PI * 2; return M.apply(m, [Math.sin(t) * Math.sin(a) * 0.5, Math.cos(t) * 0.5, Math.sin(t) * Math.cos(a) * 0.5]); };
+    for (let j = 0; j < r; j++) for (let i = 0; i < n; i++) {
+      const a = P(i, j), b = P(i + 1, j), c = P(i + 1, j + 1), d = P(i, j + 1);
+      if (j === 0) this.tri(a, c, d, col, ctr);
+      else if (j === r - 1) this.tri(a, b, c, col, ctr);
+      else this.quad(a, b, c, d, col, ctr);
+    }
+  }
+  // A joint (mesh/mechParts.js): whatever `f` adds is drawn, but left out of
+  // the HUD's wireframe (wireD), where a ball's facets would only be noise.
+  joint(f) { const s = this.d.length; f(this); this.joints.push([s, this.d.length]); return this; }
+  // The triangles but the joints', for the wireframe.
+  wireD() {
+    if (!this.joints.length) return this.d;
+    const out = [];
+    let at = 0;
+    for (const [s, e] of this.joints) { for (let i = at; i < s; i++) out.push(this.d[i]); at = e; }
+    for (let i = at; i < this.d.length; i++) out.push(this.d[i]);
+    return out;
   }
 }

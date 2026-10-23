@@ -15,6 +15,13 @@ export const BARREL_AT = { forward: [0, -1.15, 1.45], reverse: [0, -1.15, 1.45],
 export const styleOf = ch => ch.style || ch.legs;
 
 const part = f => { const b = new Builder(); f(b); return b; };
+// The joints: round, so a limb turning about one never shows a box corner
+// cutting through its neighbour. A hinge is a drum across the limb (along its
+// x, the axis a knee or a shoulder turns about), `d` across and `len` wide; a
+// ball is a sphere `d` across. Each is sized to cover the corners that sweep
+// round it, and left out of the HUD's wireframe (Builder.joint).
+const hinge = (b, at, d, len, col) => b.joint(j => j.cyl(chain(M.T(...at), M.RZ(Math.PI / 2), M.S(d, len, d)), col));
+const ball = (b, at, d, col) => b.joint(j => j.sphere(chain(M.T(...at), M.S(d, d, d)), col));
 const palette = ch => ({ c: ch.col, dark: mul(ch.col, 0.55), acc: ch.acc, glass: [0.08, 0.1, 0.13], tube: [0.06, 0.06, 0.07] });
 
 export function buildMechParts(ch) {
@@ -29,8 +36,8 @@ const LEGS = {
     const { c, dark } = palette(ch), { l1, l2 } = g, k2 = l2 / 2.5, w = g.girth || 1;
     return {
       hip: part(b => b.cube(M.S(2.6 * w, 0.9 * w, 1.6 * w), dark)),
-      uleg: part(b => { b.cube(chain(M.T(0, -l1 / 2, 0), M.S(0.95 * w, l1 + 0.2, 1.25 * w)), c, 0.85, 0.9); b.cube(chain(M.T(0, -l1, 0.25), M.S(1.05 * w, 0.75 * w, 1 * w)), dark); }),
-      lleg: part(b => { b.cube(chain(M.T(0, -l2 / 2, -0.1), M.S(0.8 * w, l2, 1.05 * w)), c); b.cube(chain(M.T(0, -1.1 * k2, -0.65 * w), M.S(0.3 * w, 1.8 * k2, 0.3 * w)), dark); }),
+      uleg: part(b => { b.cube(chain(M.T(0, -l1 / 2, 0), M.S(0.95 * w, l1 + 0.2, 1.25 * w)), c, 0.85, 0.9); ball(b, [0, 0, 0], 1.3 * w, dark); hinge(b, [0, -l1, 0.05], 1.4 * w, 1.15 * w, dark); }),
+      lleg: part(b => { b.cube(chain(M.T(0, -l2 / 2, -0.1), M.S(0.8 * w, l2, 1.05 * w)), c); b.cube(chain(M.T(0, -1.1 * k2, -0.65 * w), M.S(0.3 * w, 1.8 * k2, 0.3 * w)), dark); ball(b, [0, -l2, -0.05], 1.0 * w, dark); }),
       foot: part(b => b.cube(chain(M.T(0, -0.2, 0.35 * w), M.S(1.25 * w, 0.4 * w, 2.3 * w)), dark, 0.8, 0.8)),
       plate: part(b => b.cube(M.S(0.9, 0.12, 0.7), c)),   // a knocked-loose armour plate (hit feedback)
     };
@@ -41,8 +48,8 @@ const LEGS = {
     const { c, dark } = palette(ch), { l1, l2 } = g, k2 = l2 / 2.9;
     return {
       hip: part(b => { b.cube(M.S(2.8, 0.9, 1.8), dark); b.cube(chain(M.T(0, -0.1, -0.9), M.S(1.4, 0.6, 0.5)), c); }),
-      uleg: part(b => { b.cube(chain(M.T(0, -l1 / 2, 0), M.S(1.15, l1 + 0.2, 1.45)), c, 0.8, 0.85); b.cube(chain(M.T(0, -l1, 0), M.S(1.1, 0.8, 1.1)), dark); }),
-      lleg: part(b => { b.cube(chain(M.T(0, -l2 / 2, 0), M.S(0.7, l2, 0.9)), c, 1.2, 1.15); b.cube(chain(M.T(0, -1.3 * k2, 0.55), M.S(0.28, 2.2 * k2, 0.28)), dark); }),
+      uleg: part(b => { b.cube(chain(M.T(0, -l1 / 2, 0), M.S(1.15, l1 + 0.2, 1.45)), c, 0.8, 0.85); ball(b, [0, 0, 0], 1.5, dark); hinge(b, [0, -l1, 0], 1.6, 1.25, dark); }),
+      lleg: part(b => { b.cube(chain(M.T(0, -l2 / 2, 0), M.S(0.7, l2, 0.9)), c, 1.2, 1.15); b.cube(chain(M.T(0, -1.3 * k2, 0.55), M.S(0.28, 2.2 * k2, 0.28)), dark); ball(b, [0, -l2, 0], 0.95, dark); }),
       plate: part(b => b.cube(M.S(0.9, 0.12, 0.7), c)),
       foot: part(b => {
         b.cube(chain(M.T(0, -0.15, 0), M.S(0.8, 0.5, 0.8)), dark);
@@ -61,10 +68,10 @@ const LEGS = {
         b.cube(M.S(3.4, 1.3, 4.4), c, 0.85, 0.9);
         b.cube(chain(M.T(0, -0.1, 2.45), M.S(2.4, 0.9, 0.7)), dark, 0.8, 0.8);
         b.cube(chain(M.T(0, 0.15, -2.35), M.S(2.6, 1.0, 0.6)), dark);
-        for (const sx of [1, -1]) for (const sz of [1, -1]) b.cube(chain(M.T(sx * 1.45, 0, sz * 1.6), M.S(0.95, 0.95, 0.95)), acc);
+        for (const sx of [1, -1]) for (const sz of [1, -1]) ball(b, [sx * 1.45, 0, sz * 1.6], 1.2, acc);   // the hip joints
       }),
-      uleg: part(b => { b.cube(chain(M.T(0, -l1 / 2, 0), M.S(0.8, l1, 0.9)), c); b.cube(chain(M.T(0, -l1, 0), M.S(0.95, 0.75, 0.95)), dark); }),
-      lleg: part(b => { b.cube(chain(M.T(0, -l2 / 2, 0), M.S(0.55, l2, 0.6)), c, 1.45, 1.4); b.cube(chain(M.T(0, -0.2, 0), M.S(0.85, 0.5, 0.85)), dark); }),
+      uleg: part(b => { b.cube(chain(M.T(0, -l1 / 2, 0), M.S(0.8, l1, 0.9)), c); hinge(b, [0, -l1, 0], 1.2, 1.05, dark); }),
+      lleg: part(b => { b.cube(chain(M.T(0, -l2 / 2, 0), M.S(0.55, l2, 0.6)), c, 1.45, 1.4); ball(b, [0, -l2, 0], 0.8, dark); }),
       foot: part(b => b.cube(chain(M.T(0, -0.17, 0), M.S(1.15, 0.35, 1.15)), dark, 0.75, 0.75)),
       plate: part(b => b.cube(M.S(0.9, 0.12, 0.7), c)),
     };
@@ -84,7 +91,7 @@ const BODY = {
       }),
       arm: part(b => {
         b.cube(chain(M.T(0, -0.6, 0.1), M.S(0.95, 1.8, 1.15)), c);
-        b.cube(chain(M.T(0, 0.25, 0), M.S(1.25, 0.8, 1.45)), acc);
+        hinge(b, [0, 0.15, 0], 1.5, 1.25, acc);   // the shoulder
       }),
       barrel: part(b => b.cube(chain(M.T(...BARREL_AT.forward), M.S(0.38, 0.38, 2.3)), dark)),
     };
@@ -108,7 +115,7 @@ const BODY = {
       }),
       arm: part(b => {
         b.cube(chain(M.T(0, -0.6, 0.1), M.S(0.95, 1.8, 1.15)), c);
-        b.cube(chain(M.T(0, 0.25, 0), M.S(1.2, 0.75, 1.35)), dark);
+        hinge(b, [0, 0.15, 0], 1.45, 1.2, dark);
       }),
       barrel: part(b => b.cube(chain(M.T(...BARREL_AT.reverse), M.S(0.38, 0.38, 2.3)), dark)),
     };
@@ -134,7 +141,7 @@ const BODY = {
       }),
       arm: part(b => {
         b.cube(chain(M.T(0, -0.55, 0.1), M.S(1.35, 1.5, 1.45)), c);
-        b.cube(chain(M.T(0, 0.25, 0), M.S(1.6, 0.8, 1.7)), dark);
+        hinge(b, [0, 0.15, 0], 1.8, 1.6, dark);
       }),
       // Hangs knuckles-down below the arm; a punch swings it forward, knuckles first.
       fist: part(b => {
@@ -159,7 +166,7 @@ const BODY = {
       }),
       arm: part(b => {
         b.cube(chain(M.T(0, -0.45, 0.05), M.S(0.7, 1.2, 0.85)), c);
-        b.cube(chain(M.T(0, 0.2, 0), M.S(0.9, 0.6, 1.0)), dark);
+        hinge(b, [0, 0.1, 0], 1.05, 0.9, dark);
       }),
       barrel: part(b => b.cube(chain(M.T(...BARREL_AT.light1), M.S(0.3, 0.3, 1.6)), dark)),
     };
@@ -181,7 +188,7 @@ const BODY = {
       }),
       arm: part(b => {
         b.cube(chain(M.T(0, -0.55, 0.1), M.S(0.8, 1.6, 1.0)), c);
-        b.cube(chain(M.T(0, 0.25, 0), M.S(1.05, 0.7, 1.25)), acc);
+        hinge(b, [0, 0.15, 0], 1.3, 1.05, acc);
       }),
       barrel: part(b => b.cube(chain(M.T(...BARREL_AT.sniper1), M.S(0.34, 0.34, 2.4)), dark)),
     };
@@ -209,7 +216,7 @@ const BODY = {
       }),
       arm: part(b => {
         b.cube(chain(M.T(0, -0.5, 0.15), M.S(1.2, 1.4, 1.3)), c);
-        b.cube(chain(M.T(0, 0.25, 0), M.S(1.45, 0.75, 1.55)), dark);
+        hinge(b, [0, 0.15, 0], 1.65, 1.45, dark);
       }),
       // Hangs below the arm, open to the front; the bite swings it forward and down.
       fist: part(b => {
@@ -233,6 +240,7 @@ const BODY = {
       }),
       arm: part(b => {
         b.cube(chain(M.T(0, -0.35, 0.2), M.S(0.8, 1.1, 1.6)), c);
+        hinge(b, [0, 0, 0], 1.1, 0.9, dark);
       }),
       barrel: part(b => b.cube(chain(M.T(...BARREL_AT.quad), M.S(0.36, 0.36, 2.4)), dark)),
     };
