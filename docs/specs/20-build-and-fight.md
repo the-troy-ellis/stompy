@@ -353,7 +353,8 @@ adds to this one without reworking it.
 - **The factory:** more chassis and parts; parts into the mechlab; choosing
   what to build.
 - **Defending:** orders for parked mechs (hold, follow, guard the silo,
-  keep digging). Repairs at the base. Smarter raids that dig.
+  keep digging; a parked digger keeps digging on its own already:
+  [21-mining.md](21-mining.md) § Diggers on their own). Repairs at the base. Smarter raids that dig.
 - **Conquering:** going out to an enemy factory, breaking it for salvage,
   claiming its seams. A rival crew that plays by the same rules.
 - **Campaign and multiplayer:** a base act in the campaign (Act I fights,

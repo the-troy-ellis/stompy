@@ -604,7 +604,7 @@ export function createHud(app) {
     c.forEach((m, i) => {
       const y = y0 + i * 12, me = m === G.player, f = m.alive ? Math.max(0, m.hp.T / m.max.T) : 0;
       ctx.fillStyle = !m.alive ? '#622' : me ? AMBER : GREEN;
-      ctx.fillText(`${me ? '▶ ' : ''}${m.ch.name}`, L.crew.x - 34, y);
+      ctx.fillText(`${me ? '▶ ' : m.alive && m.job ? `${m.job} ` : ''}${m.ch.name}`, L.crew.x - 34, y);   // a digger on its own says what it's at (sim/miner.js)
       ctx.fillStyle = '#031203'; ctx.fillRect(L.crew.x - 30, y - 6, 30, 5);
       ctx.fillStyle = !m.alive ? '#622' : f < 0.35 ? RED : me ? AMBER : GREEN; ctx.fillRect(L.crew.x - 30, y - 6, 30 * f, 5);
     });
