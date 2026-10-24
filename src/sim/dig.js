@@ -79,11 +79,12 @@ export function dig(G, p, r, owned = true) {
 // deeper it runs (seamOre; docs/specs/21-mining.md); soft ground gives none.
 // A full hopper still digs. Single player: online a bite is a plain dig that
 // syncs and gives no ore (spec 20 § Edge cases). Returns the ore it got, and
-// sets `m.seamBite` when a seam paid for it (the sparkle, melee.js).
+// sets `m.seamBite` when a seam paid for it (the sparkle, melee.js) and
+// `m.biteCorners` to how many corners it turned to air.
 export const seamOre = depth => CONSTRUCT.orePerSeam * Math.min(CONSTRUCT.seamMax, 1 + Math.max(0, depth) / CONSTRUCT.seamDeep);
 export function bite(G, m, p) {
   const r = CONSTRUCT.bucket;
-  m.seamBite = false;
+  m.seamBite = false; m.biteCorners = 0;
   if (!G.ter || online(G)) { dig(G, p, r, ownsDigs(G, m)); return 0; }
   const x = q(p[0], 0.25), y = q(p[1], 0.25), z = q(p[2], 0.25), seed = G.ter.seed;
   let got = 0, seams = 0;
@@ -92,6 +93,7 @@ export function bite(G, m, p) {
   const ore = Math.max(0, Math.min(CONSTRUCT.hopper - (m.ore || 0), Math.round(got)));
   m.ore = (m.ore || 0) + ore;
   m.seamBite = seams > 0;
+  m.biteCorners = tally.soft + tally.rock;   // none: the bucket scraped the hole's side (sim/miner.js moves on)
   m.dirt = Math.min(CONSTRUCT.dirtMax, (m.dirt || 0) + (tally.soft + tally.rock) * CONSTRUCT.dirtPerCorner);   // what it digs out stays in the bucket as dirt (DUMP, below)
   return ore;
 }
