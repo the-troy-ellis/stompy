@@ -108,11 +108,12 @@ export function mend(m, amount) {
   return amount - left;
 }
 
-// Once a frame: diggers unload at the silo; buildings go up; the factory
-// builds; bays mend.
+// Once a frame: diggers tip into a hauler beside them; diggers and haulers
+// unload at the silo; buildings go up; the factory builds; bays mend.
 export function stepBase(G, dt) {
   const b = G.base;
   if (!b) return;
+  handover(G);
   if (b.silo.alive) {
     const [px, pz] = padOf(b.silo);
     for (const m of G.crew || []) {
@@ -155,4 +156,21 @@ export function stepBase(G, dt) {
   park(k); G.mechs.push(k);
   (G.crew ||= [G.player]).push(k);
   G.fx.say('New mech ready.');
+}
+
+// A crew digger with ore, near a crew hauler with room (docs/specs/21-mining.md
+// § The hauler): its hopper goes into the hauler's tub, as much as fits.
+export function handover(G) {
+  const crew = G.crew || [];
+  for (const h of crew) {
+    if (!h.alive || h.ch.tools || !h.ch.hopper) continue;   // a hauler: a hopper and no bucket
+    for (const d of crew) {
+      const room = h.ch.hopper - (h.ore || 0);
+      if (!(room > 0)) break;
+      if (!d.alive || !d.ch.tools || !(d.ore > 0) || hypot(d.x - h.x, d.z - h.z) > CONSTRUCT.handover) continue;
+      const n = Math.min(room, d.ore);
+      d.ore -= n; h.ore = (h.ore || 0) + n;
+      if (d === G.player || h === G.player) msg(G, 'ORE ACROSS');
+    }
+  }
 }

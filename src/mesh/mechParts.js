@@ -227,6 +227,33 @@ const BODY = {
       }),
     };
   },
+  // The hauler (docs/specs/21-mining.md § The hauler, placeholder name), on
+  // the quad's legs: the digger's safety yellow, a low cab up front with
+  // hazard stripes under its window, an exhaust stack, and behind it a big
+  // open tub for the ore, its rims in black. No guns: its arms are lamp boxes.
+  hauler(ch) {
+    const { c, dark, acc, glass } = palette(ch);
+    return {
+      torso: part(b => {
+        b.cube(chain(M.T(0, 0.2, -0.1), M.S(3.6, 0.4, 4.8)), dark);                               // the deck
+        b.cube(chain(M.T(0, 1.15, 1.65), M.S(2.8, 1.5, 1.4)), c, 0.92, 0.9);                       // the cab
+        b.cube(chain(M.T(0, 1.45, 2.36), M.S(2.2, 0.6, 0.08)), glass);                            // its window
+        for (let i = 0; i < 4; i++) b.cube(chain(M.T((i - 1.5) * 0.66, 0.75, 2.36), M.RZ(0.6), M.S(0.28, 0.75, 0.08)), acc);   // hazard stripes
+        b.cube(chain(M.T(1.1, 2.35, 1.3), M.S(0.28, 1.0, 0.28)), dark);                           // the exhaust stack...
+        b.cube(chain(M.T(1.1, 2.9, 1.3), M.S(0.38, 0.16, 0.38)), acc);                            // ...and its cap
+        // The tub: a floor and four walls, black along the top.
+        b.cube(chain(M.T(0, 0.5, -1.0), M.S(3.4, 0.2, 3.2)), dark);
+        b.cube(chain(M.T(0, 1.35, -2.55), M.S(3.4, 1.5, 0.2)), c, 0.95, 0.9);
+        b.cube(chain(M.T(0, 1.35, 0.55), M.S(3.4, 1.5, 0.2)), c);
+        for (const sx of [1, -1]) {
+          b.cube(chain(M.T(sx * 1.65, 1.35, -1.0), M.S(0.2, 1.5, 3.2)), c, 1, 0.9);
+          b.cube(chain(M.T(sx * 1.65, 2.15, -1.0), M.S(0.28, 0.12, 3.3)), acc);
+        }
+        b.cube(chain(M.T(0, 2.15, -2.55), M.S(3.5, 0.12, 0.28)), acc);
+      }),
+      arm: part(b => { b.cube(chain(M.T(0, -0.1, 0.3), M.S(0.6, 0.6, 1.0)), dark); hinge(b, [0, 0, 0], 0.8, 0.7, c); }),
+    };
+  },
   // The quadruped's turret: cockpit at the front, an LRM box on top.
   quad(ch) {
     const { c, dark, acc, glass, tube } = palette(ch);
