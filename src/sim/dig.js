@@ -89,7 +89,7 @@ export function bite(G, m, p) {
   let got = 0, seams = 0;
   const tally = { rock: 0, soft: 0, corner: (cx, cy, cz, depth) => { if (seamAt(seed, cx, cy, cz)) { got += seamOre(depth); seams++; } else got += CONSTRUCT.orePerCorner; } };
   confirmDig(G, [0, x, y, z, r], true, 1, tally);
-  const ore = Math.max(0, Math.min(CONSTRUCT.hopper - (m.ore || 0), Math.round(got)));
+  const ore = Math.max(0, Math.min(m.ch.hopper - (m.ore || 0), Math.round(got)));
   m.ore = (m.ore || 0) + ore;
   m.seamBite = seams > 0;
   m.dirt = Math.min(CONSTRUCT.dirtMax, (m.dirt || 0) + (tally.soft + tally.rock) * CONSTRUCT.dirtPerCorner);   // what it digs out stays in the bucket as dirt (DUMP, below)

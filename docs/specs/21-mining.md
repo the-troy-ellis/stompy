@@ -57,7 +57,7 @@ repair bay and walls, picked with the BUILD button.
 
 New text, in full: `ORE SEAM` · `DIRT` · `NO DIRT` · `DUMP` · `BUILD BAY` ·
 `BUILD WALL` · `BUILD FACTORY` · `BAY` · `WALL` · `REPAIRING` · voice
-`Bay up.` · `Wall up.`
+`Bay up.` · `Wall up.` · `ORE ACROSS` (§ The hauler)
 
 ## Design
 
@@ -129,6 +129,36 @@ two or three.
 - **A wall:** three slabs side by side (mesh `slab`, since a mission `wall` prop already existed). Each is its own structure, 4.2 m wide and 6 m tall, so it blocks and is shot down slab by slab.
 - `raid.js`: raiders hunt the silo, the factory and bays, not walls.
 - **HUD:** the footprint is drawn w × d, with `BUILD BAY · 30 ORE`. The base panel reads `M2 BUILDS BAY · 30` in a digger, dim when there's not enough ore. On touch, BUILD reads `BUILD BAY` and the BALLISTIC button `NEXT`.
+
+### The hauler
+
+Added after the three parts. The owner, asked which construction mechs
+should come next, picked a hauler: "The hauler should be a quad mech".
+
+- **What it is.** `CHASSIS.hauler` (placeholder name `HAULER`, role
+  `IT CARRIES.`), a work quad in the digger's safety yellow.
+  - It stands on the quad's four bowed legs (`legs: 'quad'`).
+  - Its body (`style: 'hauler'`) is a low cab up front, with hazard stripes
+    under its window and an exhaust stack, and a big open tub behind, rimmed
+    in black.
+  - No guns, no tools, no fusion cannon. Its arms are lamp boxes.
+  - Speed 11, a little quicker than the digger's 9.
+- **What it does.**
+  - Its tub holds `CONSTRUCT.haul` 160 ore, four hoppers.
+  - A crew digger with ore within `handover` 16 m of a crew hauler tips its
+    hopper in, as much as fits, whoever is driving (`base.js` `handover`).
+    `ORE ACROSS` shows if you're in either one.
+  - At the silo's pad it empties like a digger.
+- **Hopper sizes by chassis.** `ch.hopper` is now the ore a chassis carries
+  (the digger's is `CONSTRUCT.hopper`). Bites, the HUD's hopper line and the
+  handover read it. The DIRT line is the digger's only.
+- **Where you get it:** `?debug=1`'s selector (`PILOTABLE`) and the range's
+  CREW option. Like the digger, it isn't in a mission yet, and MULTIPLAYER
+  turns it away (any chassis with a hopper `STAYS HOME`).
+- **Next:** parked, it should shuttle by itself, meeting diggers and walking
+  the tub home. That follows the digger's own work (§ Diggers on their own)
+  once it is in.
+- **Tests:** `test/hauler.test.js`.
 
 ## Code touchpoints
 

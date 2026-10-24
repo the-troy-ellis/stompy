@@ -2,7 +2,7 @@
 // keys; the owner names things after seeing them, so renaming is a change
 // here and nowhere else (docs/workflow.md, "Naming things").
 export const NAMES = {
-  chassis: { kestrel: 'BARRY', jackal: 'SKEDADDLE', warden: 'SLOWPOKE', puncher: 'PURPLE PUNCHER', light1: 'BIG TROUBLE', sniper1: 'LONG LARRY', digger: 'BIG SCOOPER' },   // every one the owner's, confirmed
+  chassis: { kestrel: 'BARRY', jackal: 'SKEDADDLE', warden: 'SLOWPOKE', puncher: 'PURPLE PUNCHER', light1: 'BIG TROUBLE', sniper1: 'LONG LARRY', digger: 'BIG SCOOPER', hauler: 'HAULER' },   // every one the owner's, confirmed, but the hauler's (a placeholder)
   // Every one the owner's, confirmed (docs/workflow.md § Naming).
   weapons: { laser: 'BIG ZAPPER', mlaser: 'LIL ZAPPER', ac: 'BIG BOOMER', lrm: 'ANGRY BEES', fusion: 'OOPS BUTTON', ppc: 'ANGRY ZAPPER', plaser: 'BLINKY', srm: 'FIRECRACKERS', gauss: 'BIG BONKER', mg: 'RATATAT', flamer: 'TOASTER' },
   // What the menu says about each selectable mech, in the board-book voice (docs/vision.md § Tone guide).
@@ -14,6 +14,7 @@ export const NAMES = {
     light1: { role: 'IT IS SMALL. IT IS RUDE.', kit: 'FIRECRACKERS · LIL ZAPPER · RATATAT · OOPS BUTTON', fire: 0.4 },
     sniper1: { role: 'LONG LEGS. LONG GUN.', kit: 'BIG BONKER · ANGRY ZAPPER · LIL ZAPPER · OOPS BUTTON', fire: 0.7 },
     digger: { role: 'IT DIGS.', kit: 'TWO BUCKETS · A HOPPER', fire: 0.05 },   // the BIG SCOOPER (the owner's name); role and kit lines are placeholders
+    hauler: { role: 'IT CARRIES.', kit: 'A BIG TUB · FOUR LEGS', fire: 0 },   // placeholders
   },
   // Campaign missions by key. Act I's are the owner's, picked after seeing them (docs/workflow.md § Naming).
   // The base's buildings (docs/specs/20-build-and-fight.md, 21-mining.md): placeholders.
