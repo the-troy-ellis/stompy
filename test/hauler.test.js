@@ -75,3 +75,53 @@ test('two haulers or two diggers hand nothing over', () => {
   assert.equal(a.ore + b.ore, 20);
   assert.ok(a.ore === 10 && b.ore === 10);
 });
+
+// Both parked (sim/miner.js): you in a KESTREL, a digger and a hauler on the range's flat ground.
+const crew3 = () => {
+  const G = createGame({ fx: recordFx(), seed: 4 }), def = rangeDef({ ground: 'flat', crew: 'digger', base: 'silo' });
+  def.crew.push({ type: 'hauler', at: [-90, 30], face: 0 });
+  startMatch(G, def, 4, false, 'kestrel', { terrainOpts: { flat: true } });
+  return { G, d: G.crew.find(m => m.type === 'digger'), h: G.crew.find(m => m.type === 'hauler') };
+};
+const run = (G, s, until = () => false) => { for (let i = 0; i < s / DT && !until(); i++) frame(G); };
+
+test('a full digger walks its ore to a hauler with room, not the silo', () => {
+  const { G, d, h } = crew3();
+  d.ore = CONSTRUCT.hopper; d.site = { x: d.x, y: d.y, z: d.z, yaw: 0, pitch: 0, t: 0 };
+  h.ore = CONSTRUCT.haul;   // full: the digger goes to the silo
+  frame(G);
+  assert.equal(d.job, 'HAULING');
+  const toSilo = Math.hypot(d.x - G.base.silo.x, d.z - G.base.silo.z);
+  h.ore = 0; h.site = null;
+  run(G, 90, () => d.ore === 0);
+  assert.equal(d.ore, 0, 'tipped');
+  assert.ok(h.ore >= CONSTRUCT.hopper, 'into the tub');
+  assert.ok(Math.hypot(d.x - G.base.silo.x, d.z - G.base.silo.z) > toSilo * 0.5, 'not at the silo');
+});
+
+test('a parked hauler waits behind a digger at work, and takes a full tub home', () => {
+  const { G, d, h } = crew3(), ore0 = G.base.ore;
+  d.site = { x: d.x, y: d.y, z: d.z, yaw: 0, pitch: 0, t: 0 };
+  run(G, 60, () => h.job === 'LOADING' && Math.hypot(h.x - d.x, h.z - d.z) < CONSTRUCT.handover);
+  assert.equal(h.job, 'LOADING');
+  assert.ok(Math.hypot(h.x - d.x, h.z - d.z) < CONSTRUCT.handover, 'within the handover');
+  h.ore = CONSTRUCT.haul;
+  frame(G);
+  assert.equal(h.job, 'HAULING');
+  run(G, 120, () => h.ore === 0);
+  assert.equal(G.base.ore, ore0 + CONSTRUCT.haul);
+});
+
+test('with ore and no digger at work it goes home; with nothing to carry it stands', () => {
+  const { G, h } = crew3(), ore0 = G.base.ore;
+  h.ore = 30;
+  frame(G);
+  assert.equal(h.job, 'HAULING');
+  run(G, 120, () => h.ore === 0);
+  assert.equal(G.base.ore, ore0 + 30);
+  run(G, 1);
+  const x = h.x, z = h.z;
+  run(G, 5);
+  assert.equal(h.job, null);
+  assert.ok(Math.hypot(h.x - x, h.z - z) < 0.5);
+});

@@ -124,7 +124,7 @@ const BITE_DIR = [0, 0, 0], BITE_TILT = [-0.12, -0.75];
 function bucketBite(G, m, def) {
   const s = m.ch.scale, yaw = viewYaw(m), reach = def.reach * s * 1.3, o = [m.x, m.y + 4 * s, m.z];
   let t = null;
-  for (let i = 0; i < BITE_TILT.length && t == null; i++) {
+  for (let i = 0; i < (m.parked ? 1 : BITE_TILT.length) && t == null; i++) {   // parked (sim/miner.js): only ahead, never the floor it stands on
     const down = (m.pitch || 0) + BITE_TILT[i];
     BITE_DIR[0] = sin(yaw) * cos(down); BITE_DIR[1] = sin(down); BITE_DIR[2] = cos(yaw) * cos(down);
     t = G.ter.ray(o, BITE_DIR, reach);
@@ -133,6 +133,9 @@ function bucketBite(G, m, def) {
   t += CONSTRUCT.bucket * 0.5;   // the bucket goes in: centred on the surface, a 6 m bite often reaches no solid corner (8 m apart)
   const p = [o[0] + BITE_DIR[0] * t, o[1] + BITE_DIR[1] * t, o[2] + BITE_DIR[2] * t], full = (m.ore || 0) >= m.ch.hopper;
   const got = bite(G, m, p);
+  // Where it stood to dig: a parked digger comes back here (sim/miner.js), and
+  // keeps its own heading there, only noting that the bite dug.
+  if (m.biteCorners) { if (m.parked && m.site) m.site.t = G.time; else m.site = { x: m.x, y: m.y, z: m.z, yaw, pitch: m.pitch || 0, t: G.time }; }
   m.melee.hit = { ground: true, p, ore: got };
   feel(G, 'punch', { mech: m, k: 1, at: m === G.player ? null : p });
   G.fx.sfx.punch(m === G.player ? null : p, true);

@@ -12,6 +12,7 @@ import { center, eyeOf, muzzle, rayHit, viewYaw } from './geom.js';
 import { stepMech } from './mech.js';
 import { gait } from './gait.js';
 import { think, stand } from './ai.js';
+import { mine, haul } from './miner.js';
 import { groupPass } from './ai/group.js';
 import { stepBursts, stepShots, stepDying, WRECK_BURN, WRECK_SETTLE } from './combat.js';
 import { beamTick, coolArmour, remoteBeam } from './beams.js';
@@ -124,7 +125,7 @@ export function update(G, input, dt) {
       if (m.alive && m.net?.fl) G.cbeams.push({ a: muzzle(m, m.weapons.find(w => w.def.kind === 'fusion')), b: m.net.fl, col: WEAPONS.fusion.col, w: 0.05 + 0.035 * abs(sin(G.time * 37)) });
       continue;
     }
-    if (m.parked && m !== P && m.alive) stand(m);   // a crew mech you left: it stands (sim/crew.js)
+    if (m.parked && m !== P && m.alive) { if (m.ch.tools) mine(G, m, dt); else if (m.ch.hopper) haul(G, m, dt); else stand(m); }   // a crew mech you left: it stands (sim/crew.js), a digger digs, a hauler carries (sim/miner.js)
     if (m.team !== 0 && m.alive && !m.script) {   // the bench's cast is on a script
       if (m.ai.still || cheat(G, 'freeze')) { stand(m); m.ai.frozen = !m.ai.still; }   // a range's target; FOES FROZEN (sim/cheats.js)
       else { if (m.ai.frozen) { m.ai.frozen = false; m.ai.aware = true; } think(G, m, dt); }   // unfrozen: awake, and after you

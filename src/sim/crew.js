@@ -4,7 +4,8 @@ import { feel } from './feel.js';
 // on your side you can drive, in G.crew, in order; G.player is the one you
 // are in. SWAP moves you to the next live one. The one you leave is parked:
 // it stands where it is (no throttle, no jets, no shots), takes hits and can
-// die. Ordering parked mechs about comes later (spec 20 § Room to grow).
+// die; a digger keeps digging and hauls its ore home (sim/miner.js). Ordering
+// parked mechs about comes later (spec 20 § Room to grow).
 // A match without a crew is a crew of one, and nothing here changes it.
 export const SWAP_WIPE = 0.3;   // s: the cockpit's static wipe after a swap (render/hud.js)
 export const HANDOVER = 2.2;    // s: after the mech you are in dies, the next live one is yours

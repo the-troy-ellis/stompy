@@ -57,7 +57,8 @@ repair bay and walls, picked with the BUILD button.
 
 New text, in full: `ORE SEAM` · `DIRT` · `NO DIRT` · `DUMP` · `BUILD BAY` ·
 `BUILD WALL` · `BUILD FACTORY` · `BAY` · `WALL` · `REPAIRING` · voice
-`Bay up.` · `Wall up.` · `ORE ACROSS` (§ The hauler)
+`Bay up.` · `Wall up.` · and on the crew strip (§ Diggers on their own)
+`DIGGING` · `HAULING` · and (§ The hauler) `ORE ACROSS` · `LOADING`
 
 ## Design
 
@@ -130,6 +131,39 @@ two or three.
 - `raid.js`: raiders hunt the silo, the factory and bays, not walls.
 - **HUD:** the footprint is drawn w × d, with `BUILD BAY · 30 ORE`. The base panel reads `M2 BUILDS BAY · 30` in a digger, dim when there's not enough ore. On touch, BUILD reads `BUILD BAY` and the BALLISTIC button `NEXT`.
 
+### Diggers on their own
+
+Added after the three parts, at the owner's ask: "add ai for the mining
+robots so they can mine and bring ore back to the silos autonomously when
+not being driven".
+
+- **What you see.** Leave a digger where it has been digging (SWAP out) and
+  it keeps digging. Full, it walks the ore to the silo, empties it and walks
+  back. The crew strip says `DIGGING` or `HAULING` before its name.
+- **Where it digs.** Every bite that turns ground to air marks where the
+  digger stood and which way it faced (`m.site`, set in `melee.js`), whoever
+  drove. A digger that has never dug has nowhere to go, so it stands, as
+  any parked mech does.
+- **How it digs.** `sim/miner.js` `mine`, run for a parked digger in place
+  of `stand`.
+  - It walks to the site, turns to its heading and bites.
+  - It aims level (`MINER.level`), and while parked its bucket only tries
+    the ray ahead, never the floor. So it tunnels on into a face instead of
+    digging itself a pit.
+  - A bite that digs nothing tries the next aim: left, right, up. When none
+    digs, the site moves 4 m ahead after the face (`follow`). After three
+    such moves, or onto ground 16 m under where you left it (`deep`), it
+    gives the site up and stands.
+- **How it hauls.** Full, it walks to the silo's pad by the foes' nav
+  (`routeYaw`, `feelers`) and `stepBase` empties it there.
+  - With no silo standing, a full digger stands.
+  - A trip that gets no nearer in 8 s (`stuck`) is given up.
+- **Speed.** It digs slower than you do: on the range's mesa a hopper (40
+  ore) takes about four minutes, then a minute to haul.
+- **Limits.** Single player only, as bites' ore is. It doesn't dump its dirt
+  and doesn't run from a raid.
+- **Tests:** `test/miner.test.js`.
+
 ### The hauler
 
 Added after the three parts. The owner, asked which construction mechs
@@ -155,9 +189,19 @@ should come next, picked a hauler: "The hauler should be a quad mech".
 - **Where you get it:** `?debug=1`'s selector (`PILOTABLE`) and the range's
   CREW option. Like the digger, it isn't in a mission yet, and MULTIPLAYER
   turns it away (any chassis with a hopper `STAYS HOME`).
-- **Next:** parked, it should shuttle by itself, meeting diggers and walking
-  the tub home. That follows the digger's own work (§ Diggers on their own)
-  once it is in.
+- **Parked, it shuttles** (`miner.js` `haul`, run for a parked hauler in
+  place of `stand`).
+  - It finds the nearest digger at work (the one you drive, or a parked one
+    with a site) and waits 12 m behind it (`MINER.behind`), inside the
+    handover. The crew strip reads `LOADING`.
+  - A parked digger that fills up walks to the nearest hauler with room
+    instead of the silo, a much shorter walk. So a digger in its tunnel
+    tips into the hauler behind it and goes straight back to digging.
+  - Full, or with ore and no digger at work, the hauler walks the tub to
+    the silo (`HAULING`) and empties it. With nothing to carry it stands.
+  - On the range's mesa, the hauler followed a digger down its tunnel and
+    took three loads from it. When the digger ran out of face, it walked
+    120 ore home.
 - **Tests:** `test/hauler.test.js`.
 
 ## Code touchpoints
