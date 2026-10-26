@@ -241,7 +241,9 @@ try {
     await page.evaluate(() => { const G = window.__stompy.game; G.base.ore = 100; G.player.yaw = Math.PI; G.player.twist = 0; });
     await page.keyboard.down('Space'); await page.waitForTimeout(400);
     const preview = await page.evaluate(() => window.__stompy.game.buildAt && window.__stompy.game.buildAt.why);
-    await page.keyboard.up('Space'); await page.waitForTimeout(7500);
+    await page.keyboard.up('Space');
+    // It goes up in 6 s of game time; a slow software renderer runs game time slower than the clock, so wait for it, not a fixed time.
+    await page.waitForFunction(() => window.__stompy.game.base.factory?.prog === 1, null, { timeout: 20000 }).catch(() => {});
     const r = await page.evaluate(() => { const b = window.__stompy.game.base; return { silo: b.silo.alive, ore: b.ore, prog: b.factory?.prog }; });
     await page.screenshot({ path: 'test-results/smoke-base.png' });
     console.log(`base: silo up ${r.silo}; BUILD showed the footprint (why ${preview}); factory ${r.prog}, ore left ${r.ore}`);
