@@ -88,7 +88,7 @@ export function createInput(app) {
   let hadLock = false;
   const onLockChange = () => {
     if (locked()) hadLock = true;
-    else if (hadLock && G.state === 'play' && !G.paused) app.ui.pause(true);
+    else if (hadLock && G.state === 'play' && !G.paused && !G.command) app.ui.pause(true);   // going up to the command view lets go on purpose
   };
   document.addEventListener('pointerlockchange', onLockChange);
 
@@ -107,7 +107,7 @@ export function createInput(app) {
 
   wrap.addEventListener('contextmenu', e => e.preventDefault());
   cv.parentElement.addEventListener('mousedown', e => {
-    if (e.target.closest('.mech-overlay') || G.touchUI) return;
+    if (e.target.closest('.mech-overlay') || G.touchUI || G.command) return;   // up in the command view, the mouse is its own (ui/command.js)
     wrap.focus();
     app.audio.Sound.unlock();
     app.audio.loadSamples();
@@ -146,6 +146,8 @@ export function createInput(app) {
     if (G.state !== 'play') return;
     // Esc only ever pauses: leaving pointer lock already pauses via
     // pointerlockchange, and a toggle here would immediately undo that.
+    if (G.command && (e.code === 'Escape' || e.code === 'Tab')) { e.preventDefault(); app.command.close(); return; }   // BACK (ui/command.js)
+    if (e.code === 'Tab' && !G.paused) { e.preventDefault(); app.command.open(); return; }   // MAP
     if (e.code === 'Escape') { e.preventDefault(); if (!G.paused) app.ui.pause(true); return; }
     if (e.code === 'KeyP') { e.preventDefault(); app.ui.pause(!G.paused); return; }
     if (G.paused || !GAME_KEYS.has(e.code)) return;
@@ -211,7 +213,9 @@ export function createInput(app) {
     return { dx, dy, x: dead(dx), y: dead(dy) };
   };
   const syncTouchUI = () => {
-    tui.hidden = !(G.touchUI && !G.padActive && (G.state === 'play' || G.state === 'over') && !G.paused);   // a gamepad in use: out of the way
+    tui.hidden = !(G.touchUI && !G.padActive && (G.state === 'play' || G.state === 'over') && !G.paused && !G.command);   // a gamepad in use, or up in the command view: out of the way
+    const map = root.querySelector('[data-t="map"]');
+    if (map) map.hidden = !app.command?.can();   // MAP: only with a crew (docs/specs/22-command-view.md)
     const h = tui.getBoundingClientRect().height || window.innerHeight;
     if (zoneLabels[1]) zoneLabels[1].style.flex = `0 0 ${h - split(h)}px`;   // the faint labels follow the zones
     const lights = root.querySelector('[data-t="lights"]');
@@ -238,6 +242,7 @@ export function createInput(app) {
     else if (name === 'lights') toggleLights();
     else if (name === 'stop') G.player.throttle = 0;
     else if (name === 'pause') app.ui.pause(true);
+    else if (name === 'map') { releaseFingers(); app.command.open(); }
   }
   // Stop the browser turning touches into scrolls, zooms and fake mouse clicks.
   tui.addEventListener('touchstart', e => e.preventDefault(), { passive: false });

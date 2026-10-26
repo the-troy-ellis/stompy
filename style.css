@@ -112,6 +112,11 @@ html, body {
 }
 .tlights.lit { color: #ffe9b0; border-color: rgba(255, 240, 200, .75); box-shadow: 0 0 8px rgba(255, 230, 170, .35); }
 .tlights[hidden] { display: none; }
+.tmap {
+  position: absolute; right: calc(12px + env(safe-area-inset-right)); top: calc(118px + env(safe-area-inset-top));
+  width: 58px; height: 40px; color: #7df; border-color: rgba(120, 220, 255, .6);
+}
+.tmap[hidden] { display: none; }
 .tpause {
   position: absolute; left: calc(12px + env(safe-area-inset-left)); top: calc(10px + env(safe-area-inset-top));
   width: 44px; height: 40px;
@@ -480,3 +485,20 @@ html, body {
 .walk-ui button.on { border-color: #5f5; background: #052; color: #fff; }
 .walk-ui input[type=range] { width: 110px; }
 .walk-name { min-width: 9em; text-align: center; color: #fc3; }
+
+/* ---------- the command view (docs/specs/22-command-view.md; ui/command.js) ---------- */
+
+.cmd { position: absolute; inset: 0; z-index: 2; font: bold 12px "Lucida Console", monospace; color: #7f7; pointer-events: none; }
+.cmd[hidden] { display: none; }
+.cmd-surface { position: absolute; inset: 0; touch-action: none; cursor: crosshair; pointer-events: auto; }
+.cmd-btn {
+  pointer-events: auto; font: inherit; color: #7f7; background: rgba(0, 0, 0, .75); border: 1px solid #2a7a2a;
+  min-height: 44px; min-width: 64px; padding: 0 12px; letter-spacing: 1px;
+}
+.cmd-btn:disabled { opacity: .35; }
+.cmd-back { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); }
+.cmd-bar {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom));
+  display: flex; gap: 8px; pointer-events: none;
+}
+
