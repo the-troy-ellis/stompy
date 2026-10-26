@@ -21,6 +21,8 @@ import { give, can } from '../sim/orders.js';
 export const COMMAND = { across: 400, finger: 28 };   // m of ground across the screen when you go up; px a tap reaches
 
 const D2R = Math.PI / 180;
+// A building's label on the map; a site (docs/specs/23-construction-sites.md) says so, with its ore.
+const siteLabel = e => { const n = NAMES.buildings[e.tags?.find(t => NAMES.buildings[t])] || ''; return e.site ? `${n} SITE · ORE ${Math.floor(e.site.ore)}/${e.site.need}` : n; };
 export const BAR = ['go', 'dig', 'follow', 'stay', 'work', 'drive'];   // the order bar, in order (keys 1–6)
 
 export function createCommand(app) {
@@ -143,7 +145,7 @@ export function createCommand(app) {
     const view = { W, H, mpp: mpp(), toScreen: (x, y, z) => groundToScreen(C.cam, { x, y, z }, W, H, VP) };
     const crew = live(), reach = RADAR_RANGE * radarOf(G), things = [];
     for (const m of crew) things.push({ id: m, kind: 'start', x: m.x, y: m.y, z: m.z, face: -m.yaw / D2R, label: `${m === G.command.from ? '▶ ' : ''}${m.ch.name}${m.job ? ` · ${m.job}` : ''}` });
-    for (const e of G.entities) if (e.alive && e.team === 0 && e.kind !== 'nav') things.push({ id: e, kind: 'structure', x: e.x, y: e.y, z: e.z, label: NAMES.buildings[e.tags?.find(t => NAMES.buildings[t])] || '' });
+    for (const e of G.entities) if (e.alive && e.team === 0 && e.kind !== 'nav') things.push({ id: e, kind: 'structure', x: e.x, y: e.y, z: e.z, label: siteLabel(e) });
     for (const f of G.mechs) if (f.alive && f.team !== 0 && crew.some(m => Math.hypot(f.x - m.x, f.z - m.z) < reach)) things.push({ id: f, kind: 'foe', x: f.x, y: f.y, z: f.z, face: -f.yaw / D2R });
     drawMap(ctx, view, { map: { bound: BOUND, height: G.ter.height, grid: 100 }, things, sel: C.picked, box: C.box, pal });
     drawOrders(ctx, view, crew, pal);

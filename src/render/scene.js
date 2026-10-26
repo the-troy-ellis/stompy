@@ -429,6 +429,14 @@ export function createScene(app) {
   // go into one instanced draw per mesh (render/propBatch.js); a toppled one,
   // and anything without a prop mesh, is drawn here on its own.
   const PROPS = makePropBatches(), ONE = {};
+  // A construction site's hazard tape round its footprint, with a post at each
+  // corner (docs/specs/23-construction-sites.md); a wall's slabs share one, drawn once.
+  const TAPE = [0.95, 0.75, 0.1], POST = [0.12, 0.12, 0.13];
+  function drawSite(e) {
+    const [fw, fd, yaw] = e.foot, at = chain(M.T(e.x, G.ter.height(e.x, e.z), e.z), M.RY(yaw)), hw = fw / 2, hd = fd / 2;
+    for (const [x, z, sx, sz] of [[0, hd, fw, 0.3], [0, -hd, fw, 0.3], [hw, 0, 0.3, fd], [-hw, 0, 0.3, fd]]) R.draw(R.meshes.cube, chain(at, M.T(x, 0.9, z), M.S(sx, 0.25, sz)), TAPE);
+    for (const [x, z] of [[hw, hd], [-hw, hd], [hw, -hd], [-hw, -hd]]) R.draw(R.meshes.cube, chain(at, M.T(x, 0.6, z), M.S(0.3, 1.2, 0.3)), POST);
+  }
   function drawEntity(e) {
     const base = M.T(e.x, e.y, e.z), w = e.radius * 1.7, dead = !e.alive;
     const col = dead ? mul(e.col, 0.35) : e.col, prop = propInto(e, ONE);
@@ -457,6 +465,7 @@ export function createScene(app) {
     batchEntities(PROPS, G.entities, eye, FOG[1] + 60, seen, drawEntity);   // past the fog: skipped
     batchEntities(PROPS, G.scenery, eye, FOG[1] + 60, seen, drawEntity);
     R.drawProps(PROPS, R.meshes.props);
+    for (const s of G.base?.sites || []) { const e = s.parts.find(p => p.alive); if (e?.foot) drawSite(e); }
   }
   function drawShotsAndBeams(eye, gd) {
       R.drawHeat = 1;

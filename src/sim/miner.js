@@ -2,7 +2,8 @@ import { clampN, wrapA } from '../util/math.js';
 import { CONSTRUCT } from '../data/construct.js';
 import { canPunch, meleePress, meleeTarget } from './melee.js';
 import { routeYaw, feelers } from './ai/nav.js';
-import { padOf } from './base.js';
+import { padOf, siteWork } from './base.js';
+import { meleeOf } from '../data/melee.js';
 
 const { atan2, hypot, sin, cos, abs, min } = Math;
 
@@ -14,8 +15,11 @@ const { atan2, hypot, sin, cos, abs, min } = Math;
 // bitten has nowhere to go and stands. With a hauler in the crew that has
 // room, a full digger walks to the hauler instead, and a parked hauler waits
 // behind a digger at work and takes the tub home when it's full (`haul`,
-// docs/specs/21-mining.md § The hauler). `m.job` says which, for the crew
-// strip: 'DIGGING', 'HAULING', 'LOADING' or null.
+// docs/specs/21-mining.md § The hauler). Construction sites come first
+// (docs/specs/23-construction-sites.md): a digger builds one its bucket can
+// work, or brings a full hopper to one that needs ore; a hauler fetches silo
+// ore for one (`fetch`). `m.job` says which, for the crew strip: 'DIGGING',
+// 'HAULING', 'LOADING', 'BUILDING', 'FETCHING', 'DELIVERING' or null.
 export const MINER = {
   arrive: 3,      // m: this near its site it stops and bites
   face: 0.12,     // rad: this square to the site's heading before it swings
@@ -34,7 +38,10 @@ const AIMS = [[0, 0], [0.4, 0], [-0.4, 0], [0, 0.25]];
 export function mine(G, m, dt) {
   const a = (m.ai ||= {});   // the nav's route and the feelers' side live here, as a foe's do
   m.jetting = false; m.beamOn = false;
-  const silo = G.base?.silo?.alive ? G.base.silo : null, full = (m.ore || 0) >= m.ch.hopper, h = full && hauler(G, m);
+  const silo = G.base?.silo?.alive ? G.base.silo : null, full = (m.ore || 0) >= m.ch.hopper;
+  const e = siteFor(G, m, a, full);
+  if (e) return build(G, m, a, e, dt);
+  const h = full && hauler(G, m);
   if (h) {   // a hauler with room: into its tub (base.js handover), a far shorter walk than the silo's
     m.job = 'HAULING';
     if (hypot(h.x - m.x, h.z - m.z) < CONSTRUCT.handover * 0.6) return halt(m, dt);
@@ -68,6 +75,36 @@ export function mine(G, m, dt) {
   if (!m.melee && abs(wrapA(yaw - m.yaw)) < MINER.face && canPunch(G, m) && !meleeTarget(G, m) && meleePress(G, m)) a.swung = G.time;
 }
 
+// The nearest part of a site this digger should go to: one its bucket can
+// work now, or, with a full hopper, one that still needs ore. Null if none
+// (or the last trip to it got stuck, for a while).
+function siteFor(G, m, a, full) {
+  let best = null, bd = Infinity;
+  for (const s of G.base?.sites || []) {
+    if (!siteWork(s) && !(full && s.ore < s.need)) continue;
+    for (const e of s.parts) {
+      const d = hypot(e.x - m.x, e.z - m.z);
+      if (e.alive && d < bd && !(a.skip?.e === e && G.time < a.skip.until)) { best = e; bd = d; }
+    }
+  }
+  return best;
+}
+// To a site's part, square on, and swing (melee.js builds it with the
+// bucket; base.js tipIn takes its ore on the way in).
+function build(G, m, a, e, dt) {
+  m.job = 'BUILDING';
+  const reach = meleeOf(m).reach * m.ch.scale, d = hypot(e.x - m.x, e.z - m.z) - e.radius;
+  if (d > reach * 0.7) {
+    const k = e.radius + reach * 0.5, x = e.x + (m.x - e.x) / (d + e.radius) * k, z = e.z + (m.z - e.z) / (d + e.radius) * k;
+    return walkTo(G, m, a, x, G.ter.height(x, z), z, dt, () => { a.skip = { e, until: G.time + 20 }; m.job = null; });
+  }
+  halt(m, dt);
+  const yaw = atan2(e.x - m.x, e.z - m.z);
+  m.yaw += clampN(wrapA(yaw - m.yaw), -m.ch.turn * dt, m.ch.turn * dt);
+  m.pitch = 0;
+  if (!m.melee && abs(wrapA(yaw - m.yaw)) < MINER.face * 2 && canPunch(G, m) && meleeTarget(G, m) === e) meleePress(G, m);
+}
+
 // The nearest live crew hauler with room in its tub, or null.
 function hauler(G, m) {
   let best = null, bd = Infinity;
@@ -94,6 +131,8 @@ export function haul(G, m, dt, follow = null) {
     if (k < bd) { dig = d; bd = k; }
   }
   const silo = G.base?.silo?.alive ? G.base.silo : null, ore = m.ore || 0;
+  if (follow) m.fetch = null;
+  else if (fetch(G, m, a, silo, dt)) return;   // a site needs ore: that first (spec 23)
   if (silo && (ore >= m.ch.hopper || (ore > 0 && !dig))) {
     const [px, pz] = padOf(silo);
     m.job = 'HAULING';
@@ -105,6 +144,42 @@ export function haul(G, m, dt, follow = null) {
   const yaw = dig.site ? dig.site.yaw : dig.yaw, x = dig.x - sin(yaw) * MINER.behind, z = dig.z - cos(yaw) * MINER.behind;
   if (hypot(x - m.x, z - m.z) < MINER.arrive * 2) return halt(m, dt);
   walkTo(G, m, a, x, dig.y, z, dt, () => {});
+}
+
+// A site that needs ore and no other hauler is feeding (spec 23): with ore,
+// take it there (base.js tipIn empties it in); without, load it at the
+// silo's pad, as much as the site still needs. `m.fetch` is the site; while
+// it's set the silo doesn't take this hauler's ore back (base.js). False
+// when there's nothing to fetch for, or nothing to fetch.
+function fetch(G, m, a, silo, dt) {
+  const sites = G.base?.sites || [], crew = G.crew || [];
+  if (m.fetch && (!sites.includes(m.fetch) || m.fetch.ore >= m.fetch.need)) m.fetch = null;
+  const ore = m.ore || 0, stock = silo && G.base.ore > 0;
+  if (!m.fetch) {
+    if (!(ore > 0 || stock)) return false;
+    m.fetch = sites.find(s => s.ore < s.need && !crew.some(h => h !== m && h.alive && h.fetch === s)) || null;
+    if (!m.fetch) return false;
+  }
+  const s = m.fetch;
+  if (ore > 0) {
+    let e = null, bd = Infinity;
+    for (const p of s.parts) { const d = hypot(p.x - m.x, p.z - m.z) - p.radius; if (p.alive && d < bd) { e = p; bd = d; } }
+    m.job = 'DELIVERING';
+    if (bd < CONSTRUCT.handover * 0.6) { halt(m, dt); return true; }
+    walkTo(G, m, a, e.x, e.y, e.z, dt, () => { m.fetch = null; });
+    return true;
+  }
+  if (!stock) { m.fetch = null; return false; }
+  const [px, pz] = padOf(silo);
+  m.job = 'FETCHING';
+  if (hypot(px - m.x, pz - m.z) < CONSTRUCT.unload * 0.5) {
+    const take = min(m.ch.hopper, s.need - s.ore, G.base.ore);
+    m.ore = take; G.base.ore -= take;
+    halt(m, dt);
+    return true;
+  }
+  walkTo(G, m, a, px, G.ter.height(px, pz), pz, dt, () => { m.fetch = null; });
+  return true;
 }
 
 export function halt(m, dt) { m.throttle = 0; m.twist -= clampN(m.twist, -2 * dt, 2 * dt); }

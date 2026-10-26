@@ -44,11 +44,14 @@ export const CONSTRUCT = {
 // BALLISTIC picks them: the price in ore, seconds going up, hit points, the
 // footprint (w across your view, d along it, in metres, wanting ground flat
 // to `flat` metres), and whether there can be only one. A wall goes up as
-// `segs` slabs side by side, each its own entity.
+// `segs` slabs side by side, each its own entity. It goes down as a site
+// (docs/specs/23-construction-sites.md): `ore` carried to it and `swings` of
+// a digger's bucket build it (for a wall, shared among its slabs); `time`
+// is no longer used.
 export const PLACE = {
-  factory: { ore: CONSTRUCT.factory, time: CONSTRUCT.buildTime, hp: CONSTRUCT.factoryHp, w: CONSTRUCT.footprint, d: CONSTRUCT.footprint, flat: CONSTRUCT.flat, one: true },
-  bay: { ore: 30, time: 5, hp: 300, w: 16, d: 16, flat: 2 },
-  wall: { ore: 10, time: 2, hp: 300, w: 12, d: 3, flat: 3, segs: 3 },
+  factory: { ore: CONSTRUCT.factory, time: CONSTRUCT.buildTime, swings: 12, hp: CONSTRUCT.factoryHp, w: CONSTRUCT.footprint, d: CONSTRUCT.footprint, flat: CONSTRUCT.flat, one: true },
+  bay: { ore: 30, time: 5, swings: 8, hp: 300, w: 16, d: 16, flat: 2 },
+  wall: { ore: 10, time: 2, swings: 6, hp: 300, w: 12, d: 3, flat: 3, segs: 3 },
 };
 export const PLACE_ORDER = ['factory', 'bay', 'wall'];
 // The buildings, as mission entities (sim/entities.js): unit meshes in mesh/props.js.

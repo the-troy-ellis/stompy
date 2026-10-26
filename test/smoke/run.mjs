@@ -241,13 +241,12 @@ try {
     await page.evaluate(() => { const G = window.__stompy.game; G.base.ore = 100; G.player.yaw = Math.PI; G.player.twist = 0; });
     await page.keyboard.down('Space'); await page.waitForTimeout(400);
     const preview = await page.evaluate(() => window.__stompy.game.buildAt && window.__stompy.game.buildAt.why);
-    await page.keyboard.up('Space');
-    // It goes up in 6 s of game time; a slow software renderer runs game time slower than the clock, so wait for it, not a fixed time.
-    await page.waitForFunction(() => window.__stompy.game.base.factory?.prog === 1, null, { timeout: 20000 }).catch(() => {});
-    const r = await page.evaluate(() => { const b = window.__stompy.game.base; return { silo: b.silo.alive, ore: b.ore, prog: b.factory?.prog }; });
+    await page.keyboard.up('Space'); await page.waitForTimeout(500);
+    // What goes down is a site (spec 23): nothing paid, nothing rising on its own.
+    const r = await page.evaluate(() => { const b = window.__stompy.game.base; return { silo: b.silo.alive, ore: b.ore, sites: b.sites.length, site: !!b.factory?.site, prog: b.factory?.prog }; });
     await page.screenshot({ path: 'test-results/smoke-base.png' });
-    console.log(`base: silo up ${r.silo}; BUILD showed the footprint (why ${preview}); factory ${r.prog}, ore left ${r.ore}`);
-    if (!r.silo || preview !== null || r.prog !== 1 || r.ore !== 40) { failed = true; console.error(`FAIL: the base (${preview}, ${JSON.stringify(r)})`); }
+    console.log(`base: silo up ${r.silo}; BUILD showed the footprint (why ${preview}); a factory site ${r.site} (${r.sites}), prog ${r.prog}, ore left ${r.ore}`);
+    if (!r.silo || preview !== null || !r.site || r.sites !== 1 || r.prog !== 0 || r.ore !== 100) { failed = true; console.error(`FAIL: the base (${preview}, ${JSON.stringify(r)})`); }
   });
   // Raids (spec 20, #311): the range's SILO AND A RAID, the raid brought forward; it is called and walks on going for the base.
   await run('raid', URL_, async page => {
@@ -278,7 +277,9 @@ try {
     const unloaded = await page.evaluate(() => [window.__stompy.game.player.ore, window.__stompy.game.base.ore]);
     await page.evaluate(() => { const G = window.__stompy.game, P = G.player; G.base.ore = Math.max(G.base.ore, 60); P.x = 0; P.z = 0; P.y = G.ter.groundBelow(0, 30, 0); P.yaw = Math.PI; P.twist = 0; });
     await page.keyboard.down('Space'); await page.waitForTimeout(400); await page.keyboard.up('Space');
-    await page.waitForFunction(() => window.__stompy.game.base.factory?.prog === 1, null, { timeout: 15000 }).catch(() => {});
+    // Its site (spec 23): its ore in, then the bucket builds it, a swing a press, from just in front.
+    await page.evaluate(() => { const G = window.__stompy.game, P = G.player, f = G.base.factory; f.site.ore = f.site.need; const d = f.radius + 6; P.x = f.x - Math.sin(P.yaw) * d; P.z = f.z - Math.cos(P.yaw) * d; P.y = G.ter.groundBelow(P.x, 30, P.z); });
+    for (let i = 0; i < 40 && (await page.evaluate(() => window.__stompy.game.base.factory?.prog)) < 1; i++) { await page.keyboard.press('e'); await page.waitForTimeout(700); }
     const prog = await page.evaluate(() => window.__stompy.game.base.factory?.prog);
     await page.keyboard.press('q'); await page.waitForTimeout(500);
     const now = await page.evaluate(() => window.__stompy.game.player.type);
