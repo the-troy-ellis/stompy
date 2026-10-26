@@ -83,11 +83,12 @@ function hauler(G, m) {
 // ore and no digger at work, it takes the tub to the silo's pad; otherwise it
 // waits MINER.behind metres behind the nearest digger at work (the one you
 // drive, or a parked one with a site), where that digger's hopper tips into it when full.
-export function haul(G, m, dt) {
+// `follow`: that digger and no other (a FOLLOW order, sim/orders.js).
+export function haul(G, m, dt, follow = null) {
   const a = (m.ai ||= {});
   m.jetting = false; m.beamOn = false;
-  let dig = null, bd = Infinity;
-  for (const d of G.crew || []) {
+  let dig = follow, bd = Infinity;
+  if (!follow) for (const d of G.crew || []) {
     if (d === m || !d.alive || !d.ch.tools || !(d === G.player || d.site)) continue;   // at work: yours, or parked with a site
     const k = hypot(d.x - m.x, d.z - m.z);
     if (k < bd) { dig = d; bd = k; }
@@ -100,17 +101,17 @@ export function haul(G, m, dt) {
     return walkTo(G, m, a, px, G.ter.height(px, pz), pz, dt, () => { m.job = null; });
   }
   if (!dig || ore >= m.ch.hopper) { m.job = null; return halt(m, dt); }   // no digger at work; or full, and no silo
-  m.job = 'LOADING';
+  m.job = follow ? 'FOLLOWING' : 'LOADING';
   const yaw = dig.site ? dig.site.yaw : dig.yaw, x = dig.x - sin(yaw) * MINER.behind, z = dig.z - cos(yaw) * MINER.behind;
   if (hypot(x - m.x, z - m.z) < MINER.arrive * 2) return halt(m, dt);
   walkTo(G, m, a, x, dig.y, z, dt, () => {});
 }
 
-function halt(m, dt) { m.throttle = 0; m.twist -= clampN(m.twist, -2 * dt, 2 * dt); }
+export function halt(m, dt) { m.throttle = 0; m.twist -= clampN(m.twist, -2 * dt, 2 * dt); }
 
 // Toward (x, y, z) by the nav's way round, the feelers along walls; `giveUp`
 // when it hasn't got a metre nearer in MINER.stuck seconds of walking.
-function walkTo(G, m, a, x, y, z, dt, giveUp) {
+export function walkTo(G, m, a, x, y, z, dt, giveUp) {
   const d = hypot(x - m.x, z - m.z), g = a.goal;
   if (!g || g.x !== x || g.z !== z || d < g.best - 1 || G.time - g.seen > 1) a.goal = { x, z, best: d, t: G.time, seen: G.time };   // a new trip, nearer, or back after a break
   else if (G.time - g.t > MINER.stuck) { a.goal = null; giveUp(); return halt(m, dt); }
