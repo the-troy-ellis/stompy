@@ -13,6 +13,7 @@ import { stepMech } from './mech.js';
 import { gait } from './gait.js';
 import { think, stand } from './ai.js';
 import { mine, haul } from './miner.js';
+import { obey } from './orders.js';
 import { groupPass } from './ai/group.js';
 import { stepBursts, stepShots, stepDying, WRECK_BURN, WRECK_SETTLE } from './combat.js';
 import { beamTick, coolArmour, remoteBeam } from './beams.js';
@@ -126,7 +127,13 @@ export function update(G, input, dt) {
       if (m.alive && m.net?.fl) G.cbeams.push({ a: muzzle(m, m.weapons.find(w => w.def.kind === 'fusion')), b: m.net.fl, col: WEAPONS.fusion.col, w: 0.05 + 0.035 * abs(sin(G.time * 37)) });
       continue;
     }
-    if (m.parked && (m !== P || G.command) && m.alive) { if (m.ch.tools) mine(G, m, dt); else if (m.ch.hopper) haul(G, m, dt); else stand(m); }   // a crew mech you left (or all of them, up in the command view): it stands (sim/crew.js), a digger digs, a hauler carries (sim/miner.js)
+    if (m.parked && (m !== P || G.command) && m.alive) {   // a crew mech you left (or all of them, up in the command view)
+      if (!obey(G, m, dt)) {   // its order from the command view (sim/orders.js), else its own job:
+        if (m.ch.tools) mine(G, m, dt);   // a digger digs, a hauler carries (sim/miner.js),
+        else if (m.ch.hopper) haul(G, m, dt);
+        else stand(m);   // the rest stand (sim/crew.js)
+      }
+    }
     if (m.team !== 0 && m.alive && !m.script) {   // the bench's cast is on a script
       if (m.ai.still || cheat(G, 'freeze')) { stand(m); m.ai.frozen = !m.ai.still; }   // a range's target; FOES FROZEN (sim/cheats.js)
       else { if (m.ai.frozen) { m.ai.frozen = false; m.ai.aware = true; } think(G, m, dt); }   // unfrozen: awake, and after you

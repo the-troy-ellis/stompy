@@ -284,7 +284,7 @@ try {
     console.log(`first-factory: in the ${start[0]}, crew ${start[1]}, ${start[2]} ore; dug ${dug}; unloaded (hopper ${unloaded[0]}, silo ${unloaded[1]}); factory ${prog}; Q -> ${now}`);
     if (start[0] !== 'digger' || start[1] !== 2 || !(dug > 0) || unloaded[0] !== 0 || !(unloaded[1] > start[2]) || prog !== 1 || now !== 'kestrel') { failed = true; console.error('FAIL: the base mission'); }
   });
-  // The command view (spec 22): from FIRST FACTORY, Tab goes up; a click on the KESTREL picks it; DRIVE drops you into it.
+  // The command view (spec 22): from FIRST FACTORY, Tab goes up; a click on the KESTREL picks it, a click on the ground sends it (GO); DRIVE drops you into it.
   await run('command', URL_, async page => {
     await page.click('[data-sel="debug"]'); await page.click('[data-dsec="jump"]');
     await page.click('[data-dj="base"]');
@@ -296,10 +296,13 @@ try {
     await page.waitForTimeout(300);
     await page.screenshot({ path: 'test-results/smoke-command.png' });
     const picked = await page.evaluate(() => [...window.__stompy.app.command.C.picked].map(m => m.type).join());
+    if (at) await page.mouse.click(at[0] + 120, at[1] + 40);
+    await page.waitForTimeout(300);
+    const go = await page.evaluate(() => window.__stompy.game.crew.find(m => m.type === 'kestrel').order?.kind);
     await page.click('[data-c="drive"]'); await page.waitForTimeout(400);
     const now = await page.evaluate(() => [!!window.__stompy.game.command, window.__stompy.game.player.type]);
-    console.log(`command: Tab up ${up}; picked ${picked}; DRIVE -> ${now[1]} (still up ${now[0]})`);
-    if (!up || picked !== 'kestrel' || now[0] || now[1] !== 'kestrel') { failed = true; console.error('FAIL: the command view'); }
+    console.log(`command: Tab up ${up}; picked ${picked}; a ground click gave it ${go}; DRIVE -> ${now[1]} (still up ${now[0]})`);
+    if (!up || picked !== 'kestrel' || go !== 'go' || now[0] || now[1] !== 'kestrel') { failed = true; console.error('FAIL: the command view'); }
   });
   // SWAP on touch (spec 20): the digger shows BUILD and no guns; TGT held swaps into the KESTREL, whose fire buttons appear.
   await run('touch-swap', URL_ + '&touch=1', async page => {

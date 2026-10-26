@@ -496,6 +496,8 @@ html, body {
   min-height: 44px; min-width: 64px; padding: 0 12px; letter-spacing: 1px;
 }
 .cmd-btn:disabled { opacity: .35; }
+.cmd-btn[hidden] { display: none; }
+.cmd-btn.on { background: #2a7a2a; color: #000; }
 .cmd-back { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); }
 .cmd-bar {
   position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom));

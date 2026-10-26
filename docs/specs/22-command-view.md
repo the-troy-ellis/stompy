@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (the owner, 2026-10-25: "start working on the top down view so we can start sending commands to autonomous mechs like in an RTS game"; picked time keeps running, and crew jobs first) |
+| Status | in progress: parts 1 and 2 built (the owner, 2026-10-25: "start working on the top down view so we can start sending commands to autonomous mechs like in an RTS game"; picked time keeps running, and crew jobs first) |
 | Milestone | M10 (proposed) |
 | Size | L, split in three: the view, orders, then polish |
 | Depends on | [15-mission-editor.md](15-mission-editor.md) (the shared top camera, gestures, picking and map markers it built for this); [20-build-and-fight.md](20-build-and-fight.md) (the crew, SWAP); [21-mining.md](21-mining.md) (diggers and haulers that work on their own) |
@@ -137,6 +137,47 @@ mech picks it; foes and buildings can't be picked in this slice. With
 - A `DIG` tap where there is nothing to dig: the digger goes, finds no
   ground in reach, and gives the site up as spec 21 says. It stands.
 - Pausing (Esc in the cockpit) still pauses the world.
+
+## As built
+
+### Part 1: the view (#350)
+
+- `sim/crew.js` `canCommand`, `commandUp`, `commandDown`. While up,
+  `update.js` gives the cockpit no input, runs the mech you left as a parked
+  one, and holds the death handover until you come down.
+- `ui/command.js`:
+  - The overlay, gestures, picking, the camera (`view()`, which `scene.js`
+    draws from) and the markers. `main.js` draws them instead of the HUD.
+  - About 400 m across the screen when you go up, turned to where the mech
+    you left faces.
+- `input.js`:
+  - Tab goes up; Tab or Esc comes down.
+  - Up there the mouse doesn't take pointer lock, and letting go of it
+    doesn't pause.
+  - The touch UI hides. MAP sits top right under the radar, shown only with
+    a crew.
+- Building labels come from `NAMES.buildings` by tag.
+
+### Part 2: orders
+
+- `sim/orders.js`: `give`, `obey`, `can`, `ORDER` (arrive 4 m, stand-off
+  9 m by scale), `SAY`. `update.js` runs `obey` first for every parked crew
+  mech, then its own job.
+- **DIG** stands short of the face, not the tapped spot. A level line at
+  bucket height finds the face; a tap on a mesa's rim lands on top, and
+  ground under an overhang hides how far in the face is. On arrival it looks
+  again and walks on (up to four times) until the face is in the bucket's
+  reach. Then the spot is its site and `mine` takes over.
+- **FOLLOW** is `haul` with that digger and no other. The crew strip and the
+  map say `FOLLOWING`. It clears when the digger dies or stops digging.
+- **GO** that gets nowhere in 8 s becomes STAY where it is.
+- **The order bar** shows only what the picked mechs can take, and DRIVE
+  only with one picked. GO, DIG and FOLLOW light up and wait for their tap;
+  STAY and WORK act at once. Keys 1–6 press them.
+- **Orders on the map:** a line to a GO flag, a line to a DIG stand point
+  with a tick toward the face, a dashed line to the digger a hauler follows.
+- **Tests:** `test/orders.test.js`. The smoke run `command` also gives a GO
+  by a ground click.
 
 ## Code touchpoints
 
