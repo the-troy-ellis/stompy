@@ -1,5 +1,6 @@
 import { NAMES } from './names.js';
 import { FIST_MELEE, BUCKET_MELEE } from './melee.js';
+import { CONSTRUCT } from './construct.js';
 
 // Hit points per section: T(orso), L/R A(rm), L/R L(eg). Losing the torso kills.
 // `legs` names a body plan in geo.js; `pref` is the AI's preferred range,
@@ -63,8 +64,18 @@ export const CHASSIS = {
   digger: { name: NAMES.chassis.digger, legs: 'forward', style: 'digger', speed: 9, turn: 0.7, sink: 10, scale: 1.15, pref: 30, acc0: 0.03, ai: { profile: 'brawler' },
     hp: { T: 90, LA: 40, RA: 40, LL: 50, RL: 50 }, col: [0.93, 0.72, 0.12], acc: [0.13, 0.13, 0.14],
     geo: { hip: 3.9, l1: 2.1, l2: 1.9, stride: [2.6, 3.2], girth: 1.5, radius: 3.0, height: 8.2, armX: 2.75, armY: 1.0, eye: [0, 2.5, 1.7], acY: 0.8, rackY: 2.6 },
-    melee: BUCKET_MELEE, tools: true, hopper: true,
+    melee: BUCKET_MELEE, tools: true, hopper: CONSTRUCT.hopper,
     tons: 40, frame: 40, systems: { sinks: 0, armour: 0, jets: 0 }, sysMax: { jets: 0, sinks: 0, armour: 0, knuckles: 0 },
+    hardpoints: [] },
+  // The hauler (docs/specs/21-mining.md § The hauler, placeholder name): a
+  // work quad, a low cab up front and a big open tub behind, four times a
+  // digger's hopper (`hopper`, the ore it carries). Diggers tip into it, it
+  // walks the lot to the silo. No guns, no tools, no fusion cannon; a bit
+  // quicker than the digger. Like the digger: ?debug=1 only, single player.
+  hauler: { name: NAMES.chassis.hauler, legs: 'quad', style: 'hauler', speed: 11, turn: 0.75, sink: 10, scale: 1.3, pref: 30, acc0: 0.03, ai: { profile: 'brawler' },
+    hp: { T: 100, LA: 30, RA: 30, LL: 45, RL: 45 }, col: [0.93, 0.72, 0.12], acc: [0.13, 0.13, 0.14],
+    hopper: CONSTRUCT.haul,
+    tons: 50, frame: 50, systems: { sinks: 0, armour: 0, jets: 0 }, sysMax: { jets: 0, sinks: 0, armour: 0, knuckles: 0 },
     hardpoints: [] },
 };
 
@@ -72,7 +83,7 @@ export const CHASSIS = {
 // the selector shows them as silhouettes, and they cannot launch.
 export const MECH_ORDER = ['kestrel', 'jackal', 'warden', 'light1', 'sniper1', 'puncher'];
 // What ?debug=1's selector also offers: the construction mechs, not yet in a mission of their own.
-export const PILOTABLE = [...MECH_ORDER, 'digger'];
+export const PILOTABLE = [...MECH_ORDER, 'digger', 'hauler'];
 export const isUnlocked = (key, cleared) => (CHASSIS[key]?.unlock || 0) <= cleared;
 // A locked chassis on show: a near-black silhouette, except the one that
 // stays purple (on purpose: it is the game's set piece).

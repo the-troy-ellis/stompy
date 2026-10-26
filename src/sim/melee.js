@@ -131,7 +131,7 @@ function bucketBite(G, m, def) {
   }
   if (t == null) return false;
   t += CONSTRUCT.bucket * 0.5;   // the bucket goes in: centred on the surface, a 6 m bite often reaches no solid corner (8 m apart)
-  const p = [o[0] + BITE_DIR[0] * t, o[1] + BITE_DIR[1] * t, o[2] + BITE_DIR[2] * t], full = (m.ore || 0) >= CONSTRUCT.hopper;
+  const p = [o[0] + BITE_DIR[0] * t, o[1] + BITE_DIR[1] * t, o[2] + BITE_DIR[2] * t], full = (m.ore || 0) >= m.ch.hopper;
   const got = bite(G, m, p);
   // Where it stood to dig: a parked digger comes back here (sim/miner.js), and
   // keeps its own heading there, only noting that the bite dug.

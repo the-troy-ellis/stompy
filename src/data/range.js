@@ -33,7 +33,7 @@ export const RANGE_GROUNDS = [
 ];
 export const RANGE_FOES = [['none', 'NONE'], ['still', 'STANDING STILL'], ['awake', 'AWAKE']];
 // A second mech for your crew, parked 30 m to your side, to try SWAP (spec 20): none, or this chassis.
-export const RANGE_CREW = ['none', 'kestrel', 'digger'];
+export const RANGE_CREW = ['none', 'kestrel', 'digger', 'hauler'];
 // A base (spec 20 § Two buildings): none, or a silo 70 m off to the right, to
 // try unloading and BUILD; or that and a raid of two JACKALs from the west
 // after RANGE_RAID s, to try salvage (§ The raid).

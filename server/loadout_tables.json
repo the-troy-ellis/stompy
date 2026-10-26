@@ -202,6 +202,22 @@
     "knuckles": 0
    },
    "hardpoints": []
+  },
+  "hauler": {
+   "tons": 50,
+   "frame": 50,
+   "systems": {
+    "sinks": 0,
+    "armour": 0,
+    "jets": 0
+   },
+   "max": {
+    "sinks": 0,
+    "armour": 0,
+    "jets": 0,
+    "knuckles": 0
+   },
+   "hardpoints": []
   }
  },
  "weapons": {
