@@ -1,0 +1,207 @@
+# Command view: orders from above
+
+| | |
+|---|---|
+| Status | draft (the owner, 2026-10-25: "start working on the top down view so we can start sending commands to autonomous mechs like in an RTS game"; picked time keeps running, and crew jobs first) |
+| Milestone | M10 (proposed) |
+| Size | L, split in three: the view, orders, then polish |
+| Depends on | [15-mission-editor.md](15-mission-editor.md) (the shared top camera, gestures, picking and map markers it built for this); [20-build-and-fight.md](20-build-and-fight.md) (the crew, SWAP); [21-mining.md](21-mining.md) (diggers and haulers that work on their own) |
+| Touch parity | Full: one finger taps and picks, two fingers pan, pinch and twist (the editor's gestures); every order is a button. No keyboard needed |
+
+## Summary
+
+A button lifts you out of the cockpit to a map of the match from above,
+while the world keeps going. Tap one of your mechs, tap an order, tap the
+ground: it goes there, digs there, stays, or follows. Drop back into any of
+them with one tap. Your crew has done its jobs on its own since spec 21;
+this is how you tell it which jobs.
+
+## Player experience
+
+### Going up and coming down
+
+- **MAP** (a touch button under the crew strip; Tab on a keyboard, View
+  on a gamepad) goes up. It shows only in a match with a crew of two or
+  more.
+- The cockpit drops away and the camera rises to look down on the mech you
+  were in, about 400 m of ground across the screen. The mech you left is
+  parked, as after a SWAP: it stands, or does its job (a digger digs).
+- **The world keeps running.** Raids still come, shots still land, the
+  factory still builds. You are not safe up here; you are just elsewhere.
+- **BACK** (top right; Tab or Esc) drops you into the mech you came from.
+  **DRIVE** (in the order bar, with one mech picked) drops you into that
+  one instead.
+- If the mech you came from dies while you're up, nothing happens to you:
+  pick another and DRIVE. With none left alive, the mission is lost as now.
+
+### What you see
+
+- The ground from above in the match's own light, with fog off so the whole
+  base reads. The editor's 100 m grid and compass, faint.
+- **Your crew** as markers in their own colour: a chevron pointing where
+  each faces, its name, and what it is doing (`DIGGING`, `HAULING`,
+  `LOADING`, `GOING`, `STAYING`, `FOLLOWING`). The one you came from is
+  marked `▶`.
+- **Buildings:** the silo, factory, bays and wall slabs, outlined.
+- **Foes** as red markers where your radar would show them, no further.
+  No fog of war beyond that.
+- An order is drawn from its mech: a line to a GO flag, a line to a DIG
+  face with a little pick, a link to the digger a hauler follows.
+
+### Giving orders
+
+- **Pick:** tap one of your mechs. Drag a box round several. Tap empty
+  ground with nothing picked to clear.
+- **The order bar** (bottom of the screen) shows what the picked mechs can
+  do:
+
+  | button | who | then | what it does |
+  |---|---|---|---|
+  | `GO` | any | tap ground | walks there and stays |
+  | `DIG` | diggers | tap a face or a spot | walks up to it, faces it and digs there, on its own from then on (its site, spec 21) |
+  | `FOLLOW` | haulers | tap a digger | waits behind that digger and takes its loads |
+  | `STAY` | any | (at once) | stops where it stands |
+  | `WORK` | diggers, haulers | (at once) | back to its own job, as a parked one does |
+  | `DRIVE` | one picked | (at once) | you're in it |
+
+- **A tap on the ground with mechs picked and no order chosen is `GO`**:
+  the common order needs one tap.
+- The voice answers each order, flat: `Going.` `Digging.` `Staying.`
+  `Following.` `Back to work.`
+
+### Desktop
+
+Left click picks and orders, left drag boxes, right or middle drag pans, the
+wheel zooms, Q/E rotate (the editor's controls). Keys 1–6 press the order
+bar's buttons in order.
+
+New text, in full: `MAP` · `BACK` · `GO` · `DIG` · `FOLLOW` · `STAY` ·
+`WORK` · `DRIVE` · `GOING` · `STAYING` · `FOLLOWING` · voice `Going.` ·
+`Digging.` · `Staying.` · `Following.` · `Back to work.`
+
+## Design
+
+### State
+
+- `G.command` is null in the cockpit, and up there
+  `{ cam, from, picked: Set, order: null | 'go' | 'dig' | 'follow' }`.
+  `from` is the mech you came up from.
+- Going up parks `G.player` (`crew.js` `park`). Coming down un-parks the one
+  you drop into and makes it `G.player`, as `swap` does, with its wipe.
+- The sim never imports the view. Orders are plain data on the mech:
+  `m.order = { kind: 'go' | 'dig' | 'follow' | 'stay', x, y, z, yaw, target }`.
+  The view writes them through `sim/orders.js` `give(G, mechs, order)`, so
+  a headless test can give the same orders.
+
+### Who runs what
+
+A parked crew mech, each frame (`update.js`, where `mine`/`haul`/`stand`
+run now):
+
+1. `m.order` set → `obey(G, m, dt)` (`sim/orders.js`):
+   - `go`: walk there by `walkTo` (`miner.js`, the nav's way round). Within
+     `arrive`, the order becomes `stay`. A trip that gets nowhere in
+     `stuck` seconds becomes `stay` where it is.
+   - `stay`: stand (`halt`).
+   - `dig`: walk to a stand point 9 m short of the tapped spot, facing it.
+     There, set `m.site` (as a bite would) and clear the order, so the
+     digger's own `mine` takes over from that site.
+   - `follow`: a hauler's `haul`, but always behind `target` while that
+     digger lives and works; when it doesn't, the order clears.
+2. No order → as now: a digger `mine`s, a hauler `haul`s, the rest stand.
+
+`WORK` clears `m.order`. The mech you drive ignores its order; leaving it
+(SWAP or MAP) brings the order back into force.
+
+### The camera
+
+`render/topCamera.js` as the editor uses it, centred on `from`, `dist` set
+so about 400 m spans the screen's width, the map's edge kept in view
+(`settle`). `scene.js` draws from it when `G.command` is set (as it does for
+`G.state === 'edit'`) but keeps the palette, time of day and weather, with
+fog off.
+
+### Picking
+
+`sim/pick.js` (`pickNearest`, `pickInside`) on the crew's ground positions,
+in screen space, as the editor picks markers. A tap within 24 px of a crew
+mech picks it; foes and buildings can't be picked in this slice. With
+`DIG` chosen, the tap's ground point (`screenToGround`) is the spot; with
+`FOLLOW`, the nearest crew digger to the tap.
+
+### Edge cases
+
+- Only single player with a crew, as the crew is. Online, MAP is hidden.
+- A picked mech that dies is unpicked; its order goes with it.
+- Picking only fighters hides `DIG`, `FOLLOW` and `WORK`.
+- A `DIG` tap where there is nothing to dig: the digger goes, finds no
+  ground in reach, and gives the site up as spec 21 says. It stands.
+- Pausing (Esc in the cockpit) still pauses the world.
+
+## Code touchpoints
+
+- `src/sim/orders.js` (new): `give`, `obey`, and `ORDER` (arrive and
+  stand-off distances).
+- `src/sim/miner.js`: `walkTo` and `halt` exported for `orders.js`; `haul`
+  takes an optional digger to follow.
+- `src/sim/update.js`: parked crew mechs with an order `obey` first.
+- `src/sim/crew.js`: `commandUp(G)`, `commandDown(G, m)`, beside `swap`.
+- `src/ui/command.js` (new): the view's buttons, gestures (`input/pointer.js`),
+  the camera and the marker drawing (`render/markers.js` `drawMap`, given
+  the crew, buildings and foes). Loaded with the game; small.
+- `src/render/scene.js`: the top camera when `G.command` is set.
+- `src/input/input.js`: Tab and the gamepad's View button; MAP's touch
+  button.
+- `src/render/hud.js`: in the command view, only the crew strip and the
+  base panel.
+
+## Acceptance criteria
+
+1. In a match with a crew, MAP (touch), Tab and the gamepad's View button
+   go up; BACK comes down into the mech you left. Without a crew, or
+   online, there is no MAP.
+2. Up there, time runs: a factory's build and a raid's walk both go on.
+3. Tap a crew mech, tap GO, tap the ground: it walks there and stays.
+   A bare tap on the ground with it picked does the same.
+4. A digger told DIG at a mesa face walks to it and digs there, and carries
+   on hauling as in spec 21.
+5. A hauler told FOLLOW a digger waits behind that digger and takes its
+   loads.
+6. STAY stops a mech; WORK sends a digger or hauler back to its own job.
+7. DRIVE drops you into the picked mech.
+8. All of it on a phone held sideways, one finger and two.
+
+## Tests
+
+- `test/orders.test.js` (headless): `give` and `obey` for each order;
+  GO's arrive-then-stay; DIG setting the site where it stops; FOLLOW sticking
+  to its digger; WORK clearing; the mech you drive ignores its order.
+- `test/command.test.js`: going up parks and coming down un-parks; MAP is
+  absent without a crew; picking by screen position with the top camera.
+- Smoke: FIRST FACTORY, up, pick the digger, GO, back down; the digger
+  walked; a touch run does the same with taps.
+
+## Performance
+
+The world draws once from above instead of from the cockpit: the same cost.
+Markers are a few dozen canvas shapes. Orders are one more branch per
+parked crew mech a frame.
+
+## Build order
+
+1. **The view:** MAP and BACK, the camera, markers for the crew, buildings
+   and foes, picking, DRIVE. No orders yet.
+2. **Orders:** `orders.js`, the order bar, GO, DIG, FOLLOW, STAY, WORK, the
+   lines and flags, the voice.
+3. **Polish:** box picking, keys 1–6, the gamepad, smoke runs.
+
+## Open questions
+
+- **Fighters.** A KESTREL from the factory can GO and STAY here, but not
+  fight on its own. Default: next, an `ATTACK` (a foe) and `GUARD` (a
+  building) order using the foes' own AI (`ai.js` `think`) on your team.
+- **Orders from the cockpit.** Default: no; the map is where orders come
+  from. Revisit if going up feels slow in a fight.
+- **A minimap in the cockpit.** Default: no; the radar is the cockpit's map.
+- **Co-op.** A commander seat while others pilot is in spec 15's list of
+  shapes. Default: single player only until the crew is online.
