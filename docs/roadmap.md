@@ -279,6 +279,17 @@ Spec: [specs/20-build-and-fight.md](specs/20-build-and-fight.md). Issues:
 #308 the digger and its bucket, #309 the base (silo and factory), #310 the
 crew and SWAP, #311 raids and salvage, #312 the FIRST FACTORY mission.
 
+## M10 — Command view (proposed)
+
+Goal: orders from above. A MAP button lifts you out of the cockpit to the
+match from above while the world keeps running; tap your mechs and tell
+them where to go, where to dig, whom to follow, or to stay, and drop back
+into any of them. Built on the editor's shared camera, gestures and
+picking, and on the crew that already works on its own.
+
+Spec: [specs/22-command-view.md](specs/22-command-view.md). In three parts:
+the view, orders, polish.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
