@@ -30,3 +30,31 @@ export function swap(G) {
   G.fx.say(`${n.ch.name}.`);   // the voice's caption puts the name on screen too
   return true;
 }
+
+// The command view (docs/specs/22-command-view.md): up to a map of the match
+// while the world runs on, and down into a crew mech again. Up there
+// G.command = { from }, `from` the mech you came up from, and G.player
+// stays that mech, parked, doing its job like any other parked crew mech.
+// Single player with a crew of two or more, as the crew is.
+export const canCommand = G => G.mode !== 'mp' && (G.role || 'solo') === 'solo' && crewOf(G).length > 1 && G.state === 'play';
+export function commandUp(G) {
+  if (G.command || !canCommand(G)) return false;
+  if (G.player.alive) park(G.player);
+  G.command = { from: G.player };
+  G.target = null; G.guide = null; G.mDown = false; G.buildAt = null;
+  return true;
+}
+// Down into `m` (DRIVE), or the mech you came up from (BACK); if that one is
+// gone, the next live one. False, and still up, if none is alive.
+export function commandDown(G, m = G.command?.from) {
+  if (!G.command) return false;
+  const c = crewOf(G), n = m?.alive ? m : c.find(k => k.alive), from = G.command.from;
+  if (!n) return false;
+  G.command = null;
+  G.player = n; n.parked = false;
+  G.swapT = G.time; G.handover = null;
+  feel(G, 'land', { mech: n, k: 0.5 });
+  if (n !== from) G.fx.say(`${n.ch.name}.`);   // a different mech than you left: say which
+  return true;
+}
+

@@ -22,6 +22,7 @@ import { createScene } from './render/scene.js';
 import { createHud } from './render/hud.js';
 import { createAudio } from './audio/sound.js';
 import { createInput } from './input/input.js';
+import { createCommand } from './ui/command.js';
 import { createUi } from './ui/screens.js';
 import { createNet } from './net/client.js';
 import { createBench } from './ui/bench.js';
@@ -67,6 +68,7 @@ function start(root) {
         <button class="tbtn tpause" data-t="pause" aria-label="Pause">II</button>
         <button class="tbtn tzoom" data-t="zoom">ZOOM</button>
         <button class="tbtn tlights" data-t="lights" hidden>LIGHTS</button>
+        <button class="tbtn tmap" data-t="map" hidden>MAP</button>
         <button class="tbtn tstop" data-t="stop">STOP</button>
         <button class="tcompass" data-t="centre" aria-label="Torso back over the legs"></button>
         <div class="tcluster">
@@ -110,6 +112,7 @@ function start(root) {
   app.scene = createScene(app);
   app.hud = createHud(app);
   app.input = createInput(app);
+  app.command = createCommand(app);   // the command view (docs/specs/22-command-view.md)
   app.net = createNet(app);
   app.mechlab = createMechlab(app);
   app.ui = createUi(app);
@@ -147,7 +150,7 @@ function start(root) {
     else quiet();
     app.walk?.show(G.state === 'walk');
     app.scene.render();
-    app.hud.draw();
+    if (G.command) app.command.draw(); else app.hud.draw();   // up in the command view: its markers instead of the cockpit
     if (G.touchUI && G.state === 'play') app.input.fireStatus();   // the fire buttons' pies and ammo (input/input.js)
     if (G.bench && G.state === 'play') app.bench.record(ts, performance.now() - t0);
   };

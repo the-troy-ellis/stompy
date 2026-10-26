@@ -553,9 +553,9 @@ export function createScene(app) {
     R.gl.clearColor(hor[0], hor[1], hor[2], 1);
     R.gl.clear(R.gl.COLOR_BUFFER_BIT | R.gl.DEPTH_BUFFER_BIT);
     let fov, yaw, pitch, eye, dir, spec, walkCam, near = 0.5, far = 1800, top, up = UP;
-    if (G.state === 'edit' && (top = app.topView?.())) {
+    if ((G.state === 'edit' && (top = app.topView?.())) || (G.command && (top = app.command?.view()))) {
       // The mission editor (ui/editor.js): from above, in daylight with no fog,
-      // the whole map in view.
+      // the whole map in view. The command view (ui/command.js) the same, in the match's own light.
       fov = top.fov; eye = top.eye; dir = top.dir; near = top.near; far = top.far;
       yaw = atan2(dir[0], dir[2]); pitch = Math.asin(clampN(dir[1], -1, 1));
       FOG[0] = FOG[1] = 1e6;

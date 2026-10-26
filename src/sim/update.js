@@ -52,9 +52,10 @@ export function update(G, input, dt) {
   G.frame = (G.frame || 0) + 1;
   if (G.bench) input = benchStep(G, noInput(), dt);   // ?debug=1's scripted scene drives everyone (sim/bench.js)
   else if (G.walk) input = walkStep(G, noInput(), dt);   // the walk viewer drives you (sim/walkView.js)
+  if (G.command) input = noInput();   // up in the command view (sim/crew.js): nobody is in the cockpit
   G.input = input;
   // SWAP (sim/crew.js): into the next live crew mech; and after the one you were in died, the next one is yours.
-  if (G.handover != null && G.time >= G.handover) { G.handover = null; swap(G); }
+  if (G.handover != null && G.time >= G.handover && !G.command) { G.handover = null; swap(G); }
   else if (input.swap && !G.paused && G.state === 'play' && G.mode !== 'mp') swap(G);
   const P = G.player;
   if (P.alive && !P.shutdown && !G.paused) {
@@ -125,7 +126,7 @@ export function update(G, input, dt) {
       if (m.alive && m.net?.fl) G.cbeams.push({ a: muzzle(m, m.weapons.find(w => w.def.kind === 'fusion')), b: m.net.fl, col: WEAPONS.fusion.col, w: 0.05 + 0.035 * abs(sin(G.time * 37)) });
       continue;
     }
-    if (m.parked && m !== P && m.alive) { if (m.ch.tools) mine(G, m, dt); else stand(m); }   // a crew mech you left: it stands (sim/crew.js), a digger digs (sim/miner.js)
+    if (m.parked && (m !== P || G.command) && m.alive) { if (m.ch.tools) mine(G, m, dt); else stand(m); }   // a crew mech you left: it stands (sim/crew.js), a digger digs (sim/miner.js)
     if (m.team !== 0 && m.alive && !m.script) {   // the bench's cast is on a script
       if (m.ai.still || cheat(G, 'freeze')) { stand(m); m.ai.frozen = !m.ai.still; }   // a range's target; FOES FROZEN (sim/cheats.js)
       else { if (m.ai.frozen) { m.ai.frozen = false; m.ai.aware = true; } think(G, m, dt); }   // unfrozen: awake, and after you
