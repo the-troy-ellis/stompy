@@ -263,7 +263,7 @@ export function createUi(app) {
             <div class="mm-role${shut ? ' locked' : ''}">${shut ? NAMES.locked(ch.unlock) : info.role}</div>
             <div class="mm-kit">${kitLine(prefs.chassis)}</div>
             <div class="mm-stats">${bar('SPEED', ch.speed / maxSpeed)}${bar('ARMOR', hpSum(prefs.chassis) / maxHp)}${bar('FIREPOWER', info.fire)}</div>
-            ${lab || shut || ch.tools ? '' : '<button class="opt mm-fit" data-a="fit">FIT</button>'}
+            ${lab || shut || ch.hopper ? '' : '<button class="opt mm-fit" data-a="fit">FIT</button>'}
           </div>
         </div>
       </div>`, 'menu');
@@ -279,7 +279,7 @@ export function createUi(app) {
       // The public arena, a private one (its mode), co-op (open a room for the
       // picked mission), or any room by its code.
       const coop = prefs.mpKind === 'coop';
-      if (CHASSIS[prefs.chassis].tools) { setStatus(`THE ${CHASSIS[prefs.chassis].name} STAYS HOME. PICK ANOTHER MECH.`); return; }   // single player only (spec 20)
+      if (CHASSIS[prefs.chassis].hopper) { setStatus(`THE ${CHASSIS[prefs.chassis].name} STAYS HOME. PICK ANOTHER MECH.`); return; }   // single player only (spec 20)
       if (coop ? prefs.coopJoin : prefs.arenaPick === 2) {
         prefs.roomCode = ($('.room', ov)?.value || prefs.roomCode).trim().toUpperCase().slice(0, 4);
         if (prefs.roomCode.length !== 4) { setStatus('TYPE THE ROOM CODE: FOUR LETTERS'); return; }

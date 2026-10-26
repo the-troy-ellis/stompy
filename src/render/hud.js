@@ -853,12 +853,14 @@ export function createHud(app) {
     let wy = L.weapons.y;
     ctx.textAlign = 'left';
     if (P.ch.hopper) {
-      const ore = P.ore || 0, full = ore >= CONSTRUCT.hopper;
+      const ore = P.ore || 0, cap = P.ch.hopper, full = ore >= cap;
       ctx.fillStyle = full ? AMBER : GREEN;
       ctx.fillText(full ? 'HOPPER FULL' : 'HOPPER', wx, wy);
       ctx.fillText(String(ore).padStart(3), wx + 118, wy);
       ctx.fillStyle = '#031203'; ctx.fillRect(wx + 150, wy - 3, 40, 6);
-      ctx.fillStyle = full ? AMBER : GREEN; ctx.fillRect(wx + 150, wy - 3, 40 * ore / CONSTRUCT.hopper, 6);
+      ctx.fillStyle = full ? AMBER : GREEN; ctx.fillRect(wx + 150, wy - 3, 40 * ore / cap, 6);
+    }
+    if (P.ch.tools) {
       // The bucket's dirt (docs/specs/21-mining.md): enough for a DUMP lights it up.
       const dirt = P.dirt || 0, can = dirt >= CONSTRUCT.dumpCost;
       wy += 14;

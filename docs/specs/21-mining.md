@@ -58,7 +58,7 @@ repair bay and walls, picked with the BUILD button.
 New text, in full: `ORE SEAM` · `DIRT` · `NO DIRT` · `DUMP` · `BUILD BAY` ·
 `BUILD WALL` · `BUILD FACTORY` · `BAY` · `WALL` · `REPAIRING` · voice
 `Bay up.` · `Wall up.` · and on the crew strip (§ Diggers on their own)
-`DIGGING` · `HAULING`
+`DIGGING` · `HAULING` · and (§ The hauler) `ORE ACROSS` · `LOADING`
 
 ## Design
 
@@ -163,6 +163,46 @@ not being driven".
 - **Limits.** Single player only, as bites' ore is. It doesn't dump its dirt
   and doesn't run from a raid.
 - **Tests:** `test/miner.test.js`.
+
+### The hauler
+
+Added after the three parts. The owner, asked which construction mechs
+should come next, picked a hauler: "The hauler should be a quad mech".
+
+- **What it is.** `CHASSIS.hauler` (placeholder name `HAULER`, role
+  `IT CARRIES.`), a work quad in the digger's safety yellow.
+  - It stands on the quad's four bowed legs (`legs: 'quad'`).
+  - Its body (`style: 'hauler'`) is a low cab up front, with hazard stripes
+    under its window and an exhaust stack, and a big open tub behind, rimmed
+    in black.
+  - No guns, no tools, no fusion cannon. Its arms are lamp boxes.
+  - Speed 11, a little quicker than the digger's 9.
+- **What it does.**
+  - Its tub holds `CONSTRUCT.haul` 160 ore, four hoppers.
+  - A crew digger with ore within `handover` 16 m of a crew hauler tips its
+    hopper in, as much as fits, whoever is driving (`base.js` `handover`).
+    `ORE ACROSS` shows if you're in either one.
+  - At the silo's pad it empties like a digger.
+- **Hopper sizes by chassis.** `ch.hopper` is now the ore a chassis carries
+  (the digger's is `CONSTRUCT.hopper`). Bites, the HUD's hopper line and the
+  handover read it. The DIRT line is the digger's only.
+- **Where you get it:** `?debug=1`'s selector (`PILOTABLE`) and the range's
+  CREW option. Like the digger, it isn't in a mission yet, and MULTIPLAYER
+  turns it away (any chassis with a hopper `STAYS HOME`).
+- **Parked, it shuttles** (`miner.js` `haul`, run for a parked hauler in
+  place of `stand`).
+  - It finds the nearest digger at work (the one you drive, or a parked one
+    with a site) and waits 12 m behind it (`MINER.behind`), inside the
+    handover. The crew strip reads `LOADING`.
+  - A parked digger that fills up walks to the nearest hauler with room
+    instead of the silo, a much shorter walk. So a digger in its tunnel
+    tips into the hauler behind it and goes straight back to digging.
+  - Full, or with ore and no digger at work, the hauler walks the tub to
+    the silo (`HAULING`) and empties it. With nothing to carry it stands.
+  - On the range's mesa, the hauler followed a digger down its tunnel and
+    took three loads from it. When the digger ran out of face, it walked
+    120 ore home.
+- **Tests:** `test/hauler.test.js`.
 
 ## Code touchpoints
 

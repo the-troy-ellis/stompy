@@ -4,7 +4,9 @@ import { NAMES } from './names.js';
 // numbers. Starting values, to tweak in play.
 //   bucket        the digger's bite, a radius in metres: rock digs at full
 //                 size (a construction tool, not a battle blast)
-//   hopper        the ore a digger carries
+//   hopper        the ore a digger carries; haul, the ore a hauler carries
+//                 (docs/specs/21-mining.md § The hauler), and handover, m: a
+//                 crew digger this near a crew hauler tips its hopper into it
 //   orePerCorner  ore per plain rock corner a bite turns to air (rock: below
 //                 the soft band, world/voxels.js SOFT). At 8 m corners a 6 m
 //                 bite in solid rock turns two to four
@@ -31,7 +33,7 @@ import { NAMES } from './names.js';
 //   bayRate       armour a second a repair bay gives a crew mech on its pad
 //                 (bayPad m from it), most damaged section first (docs/specs/21-mining.md)
 export const CONSTRUCT = {
-  bucket: 6, hopper: 40, orePerCorner: 1, orePerSeam: 8, seamDeep: 40, seamMax: 2.5,
+  bucket: 6, hopper: 40, haul: 160, handover: 16, orePerCorner: 1, orePerSeam: 8, seamDeep: 40, seamMax: 2.5,
   dirtPerCorner: 1, dirtMax: 24, dumpCost: 4, dumpH: 6, dumpR: 9, dumpAt: 13,
   startOre: 20, factory: 60, buildTime: 6, mechCost: { ore: 50, salvage: 30 }, mechTime: 30,
   salvage: { jackal: 10, light1: 10, kestrel: 20, sniper1: 20, warden: 35, puncher: 50 },
