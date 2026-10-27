@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (the owner, 2026-10-27: wants it to feel like a native app with "more phone accessibility like haptics"; asked that the browser version keeps working; then iOS; then monetisation: "a straightforward demo plus 2-5 dollar full game unlock") |
+| Status | draft (the owner, 2026-10-27: wants it to feel like a native app with "more phone accessibility like haptics"; asked that the browser version keeps working; then iOS; then monetisation: "a straightforward demo plus 2-5 dollar full game unlock"; then allowed the native tooling "as long as it doesn't break the web version") |
 | Milestone | M11 (proposed) |
 | Size | L, split in four: the platform layer and the Android shell; native haptics and phone behaviour; the demo and the unlock; iOS |
 | Depends on | [11-release.md](11-release.md) (the PWA, the build); [13-thunk.md](13-thunk.md) (the feel table's haptic column) |
@@ -136,7 +136,22 @@ point.
 - Android allows `ws://` on the local network with a network security
   config.
 
-### Tooling (an exception to CLAUDE.md, the owner's call)
+### Tooling
+
+The owner, 2026-10-27: "We can allow for tooling as long as it doesn't
+break the web version". So the native tooling below is allowed on these
+terms, now in CLAUDE.md and `docs/architecture.md`:
+
+- **Nothing in `src/` imports it.** Only `src/platform/` looks for
+  `window.Capacitor`, and it falls back to the browser.
+- **The web works without it.** `npm run build`, `npm test`, lint, smoke
+  and perf all run without the native tooling installed: Capacitor's
+  packages are installed for the shells only, and CI's web job doesn't
+  need them.
+- **The web is checked as it is now** on every PR. The native shells only
+  repackage `dist/`.
+
+What's allowed:
 
 - **Dev only:**
   - `@capacitor/cli`, `@capacitor/android` and `@capacitor/ios`;
@@ -170,8 +185,8 @@ purchase for the full game. No ads, no currency, no other purchases."
   `src/ui/campaign.js`: the demo's locks.
 - `src/ui/screens.js` / `debrief.js`: the demo card.
 - `capacitor.config.json`, `android/`, `ios/` (new): the shells.
-- `docs/vision.md`, `docs/architecture.md` (tooling), `CLAUDE.md` (the
-  tooling rule).
+- `docs/vision.md`. The tooling rule in `docs/architecture.md` and
+  `CLAUDE.md` is already updated, with this spec.
 
 ## Acceptance criteria
 
