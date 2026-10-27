@@ -1,6 +1,8 @@
 import { wrapA, clampN } from '../util/math.js';
 import { crewOf } from './crew.js';
 import { MINER, haul, halt, walkTo, build } from './miner.js';
+import { think } from './ai.js';
+import { alertEnemy } from './ai/perception.js';
 
 const { atan2, hypot, sin, cos, abs } = Math;
 
@@ -17,17 +19,27 @@ const { atan2, hypot, sin, cos, abs } = Math;
 //   follow  a hauler: wait behind `target`, that digger, and take its loads
 //   build   a digger: build `target`, a construction site's part, until it's
 //           up (docs/specs/23-construction-sites.md)
+//   attack  a fighter: fight `target`, a foe, with the foes' own brain
+//           (ai.js think), until it's dead; then stay
+//   guard   a fighter: stay by `target`, one of your buildings, and fight any
+//           foe that comes within ORDER.guard of it, never chasing it past
+//           ORDER.leash
 //   work    (given, never kept) back to its own job
 export const ORDER = {
   arrive: 4,      // m: this near a GO point, it stays
   standOff: 9,    // m: a digger told to DIG stands this far short of the spot (by its scale)
+  guard: 160,     // m: GUARD fights a foe this near the building
+  leash: 260,     // m: and lets it go past this far from the building
+  post: 18,       // m: off the building's side, where a guard waits
 };
-export const ORDERS = ['go', 'dig', 'follow', 'build', 'stay', 'work'];
-export const SAY = { go: 'Going.', dig: 'Digging.', follow: 'Following.', build: 'Building.', stay: 'Staying.', work: 'Back to work.' };
+export const ORDERS = ['go', 'dig', 'follow', 'build', 'attack', 'guard', 'stay', 'work'];
+export const SAY = { go: 'Going.', dig: 'Digging.', follow: 'Following.', build: 'Building.', attack: 'Attacking.', guard: 'Guarding.', stay: 'Staying.', work: 'Back to work.' };
 
 // Who can take an order: anyone GO and STAY; DIG and BUILD a digger; FOLLOW
-// a hauler; WORK whoever has a job of its own.
+// a hauler; WORK whoever has a job of its own; ATTACK and GUARD a fighter
+// (no hopper: a mech with guns or fists).
 export function can(m, kind) {
+  if (kind === 'attack' || kind === 'guard') return !m.ch.hopper;
   if (kind === 'dig' || kind === 'build') return !!m.ch.tools;
   if (kind === 'follow') return !!m.ch.hopper && !m.ch.tools;
   if (kind === 'work') return !!m.ch.hopper;
@@ -41,12 +53,14 @@ export function give(G, mechs, order) {
   const { kind } = order, crew = crewOf(G);
   if (kind === 'follow' && !(order.target?.alive && order.target.ch.tools && crew.includes(order.target))) return 0;
   if (kind === 'build' && !(order.target?.alive && order.target.site)) return 0;
+  if (kind === 'attack' && !(order.target?.alive && order.target.team !== 0 && G.mechs.includes(order.target))) return 0;
+  if (kind === 'guard' && !(order.target?.alive && order.target.team === 0 && order.target.kind === 'structure')) return 0;
   let n = 0;
   for (const m of mechs) {
     if (!m.alive || !crew.includes(m) || !can(m, kind)) continue;
     if (kind === 'work') m.order = null;
     else if (kind === 'stay') m.order = { kind };
-    else if (kind === 'follow' || kind === 'build') m.order = { kind, target: order.target };
+    else if (kind === 'follow' || kind === 'build' || kind === 'attack' || kind === 'guard') m.order = { kind, target: order.target };
     else if (kind === 'go') m.order = { kind, x: order.x, y: G.ter.height(order.x, order.z), z: order.z };
     else if (kind === 'dig') {
       const yaw = atan2(order.x - m.x, order.z - m.z), d = standAt(G, m, order.x, order.z, yaw);
@@ -84,6 +98,27 @@ export function obey(G, m, dt) {
     haul(G, m, dt, t);
     return true;
   }
+  if (o.kind === 'attack') {
+    if (!o.target.alive) { m.order = { kind: 'stay' }; return obey(G, m, dt); }   // done: it stays where it is
+    m.job = 'ATTACKING';
+    fight(G, m, o.target, dt);
+    return true;
+  }
+  if (o.kind === 'guard') {
+    const b = o.target;
+    if (!b.alive) { m.order = { kind: 'stay' }; return obey(G, m, dt); }   // nothing left to guard
+    m.job = 'GUARDING';
+    let foe = null, fd = ORDER.guard;
+    for (const f of G.mechs) { const d = hypot(f.x - b.x, f.z - b.z); if (f.alive && f.team !== m.team && d < fd) { foe = f; fd = d; } }
+    if (!foe && a.prey?.alive && hypot(a.prey.x - b.x, a.prey.z - b.z) < ORDER.leash && hypot(m.x - b.x, m.z - b.z) < ORDER.leash) foe = a.prey;   // one it's on: until the leash
+    if (foe) { a.prey = foe; fight(G, m, foe, dt); return true; }
+    a.prey = null;
+    // Back to its post: off the building's side toward where it is.
+    const k = b.radius + ORDER.post, d0 = hypot(m.x - b.x, m.z - b.z) || 1, x = b.x + (m.x - b.x) / d0 * k, z = b.z + (m.z - b.z) / d0 * k;
+    if (hypot(x - m.x, z - m.z) > ORDER.arrive * 2) walkTo(G, m, a, x, G.ter.height(x, z), z, dt, () => {});
+    else halt(m, dt);
+    return true;
+  }
   if (o.kind === 'build') {
     if (!o.target.alive || !o.target.site) { m.order = null; return false; }   // up, or gone
     build(G, m, a, o.target, dt);
@@ -117,3 +152,12 @@ export function obey(G, m, dt) {
   m.order = null;
   return false;
 }
+
+// Fight `foe` with the foes' own brain (ai.js think): it knows where the foe
+// is from the order, so it never wanders off looking.
+function fight(G, m, foe, dt) {
+  const a = m.ai;
+  if (!a.aware || a.prey !== foe) { a.prey = foe; alertEnemy(G, m, foe, [foe.x, foe.y, foe.z]); a.belief = { x: foe.x, y: foe.y, z: foe.z, vx: 0, vz: 0, at: G.time }; }
+  think(G, m, dt, foe);
+}
+

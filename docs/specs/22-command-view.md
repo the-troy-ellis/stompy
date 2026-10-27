@@ -76,7 +76,8 @@ wheel zooms, Q/E rotate (the editor's controls). Keys 1–6 press the order
 bar's buttons in order.
 
 New text, in full: `MAP` · `BACK` · `GO` · `DIG` · `FOLLOW` · `STAY` ·
-`WORK` · `DRIVE` · `GOING` · `STAYING` · `FOLLOWING` · voice `Going.` ·
+`WORK` · `DRIVE` · `ATTACK` · `GUARD` · `GOING` · `STAYING` · `FOLLOWING` ·
+`ATTACKING` · `GUARDING` · voice `Attacking.` · `Guarding.` · `Going.` ·
 `Digging.` · `Staying.` · `Following.` · `Back to work.`
 
 ## Design
@@ -179,6 +180,28 @@ mech picks it; foes and buildings can't be picked in this slice. With
 - **Tests:** `test/orders.test.js`. The smoke run `command` also gives a GO
   by a ground click.
 
+### Fighters: ATTACK and GUARD
+
+- **`ATTACK` (key 8):** a fighter (any crew mech without a hopper) goes
+  after the foe you tap, with the foes' own brain: `ai.js` `think`, now
+  given a `prey`. Told where the foe is, it never wanders off looking. When
+  the foe is dead, it stays where it is.
+- **`GUARD` (key 9):** it waits 18 m off the side of one of your buildings
+  (`GUARDING`). It fights the nearest foe that comes within 160 m of the
+  building, and lets it go once either is more than 260 m from it
+  (`ORDER.guard`, `leash`, `post`). With the building gone, it stays.
+- **Taps:** with fighters picked, a bare tap on a foe is ATTACK, and on a
+  built building of yours GUARD. Only foes the map shows (in your crew's
+  radar reach) can be picked.
+- **On the map:** a red line and a ring on the foe for ATTACK; a dashed
+  line and a ring round the building for GUARD. The voice says
+  `Attacking.` and `Guarding.`
+- **How well they fight:** as well as foes do, which is worse than you.
+  On the range, against a JACKAL standing still, a crew KESTREL killed it
+  in 13 s. Against one dodging, it took a couple of minutes to land hits.
+- **Tests:** `test/orders.test.js`, ATTACK and GUARD against a JACKAL on the
+  range.
+
 ## Code touchpoints
 
 - `src/sim/orders.js` (new): `give`, `obey`, and `ORDER` (arrive and
@@ -238,9 +261,8 @@ parked crew mech a frame.
 
 ## Open questions
 
-- **Fighters.** A KESTREL from the factory can GO and STAY here, but not
-  fight on its own. Default: next, an `ATTACK` (a foe) and `GUARD` (a
-  building) order using the foes' own AI (`ai.js` `think`) on your team.
+- **Fighters.** Built: ATTACK and GUARD (§ As built, Fighters). The owner
+  asked for them on 2026-10-27.
 - **Orders from the cockpit.** Default: no; the map is where orders come
   from. Revisit if going up feels slow in a fight.
 - **A minimap in the cockpit.** Default: no; the radar is the cockpit's map.

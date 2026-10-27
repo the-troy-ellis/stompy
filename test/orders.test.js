@@ -115,3 +115,40 @@ test('BUILD: a digger told to build a site goes and builds it, even off its dig;
   assert.equal(d.order, null, 'done: the order ends');
   assert.equal(s.parts[0].prog, 1);
 });
+
+// A KESTREL in the crew and a JACKAL standing still on the range (it doesn't fight back).
+const fightGame = () => {
+  const G = createGame({ fx: recordFx(), seed: 4 });
+  startMatch(G, rangeDef({ ground: 'flat', crew: 'kestrel', base: 'silo', mode: 'still', foes: ['jackal'] }), 4, false, 'digger', { terrainOpts: { flat: true } });
+  commandUp(G);
+  return { G, k: G.crew.find(m => m.type === 'kestrel'), foe: G.mechs.find(m => m.team !== 0) };
+};
+
+test('ATTACK: a fighter goes after the foe it is told to, fights it with the foes\' brain, and stays when it is dead', () => {
+  const { G, k, foe } = fightGame(), hp = foe.hp.T, you = G.player;
+  assert.equal(give(G, [you], { kind: 'attack', target: foe }), 0, 'not a digger');
+  assert.equal(give(G, [k], { kind: 'attack', target: G.base.silo }), 0, 'not one of yours');
+  assert.equal(give(G, [k], { kind: 'attack', target: foe }), 1);
+  assert.ok(said(G).includes(SAY.attack));
+  run(G, 1);
+  assert.equal(k.job, 'ATTACKING');
+  const d0 = Math.hypot(foe.x - k.x, foe.z - k.z);
+  run(G, 60, () => !foe.alive);
+  assert.ok(!foe.alive || foe.hp.T < hp || Math.hypot(foe.x - k.x, foe.z - k.z) < d0 - 50, 'it closed and hurt it');
+  if (!foe.alive) { run(G, 0.5); assert.equal(k.order.kind, 'stay'); }
+});
+
+test('GUARD: a fighter waits by the silo, fights a foe that comes near it, and lets one far off be', () => {
+  const { G, k, foe } = fightGame(), s = G.base.silo;
+  assert.equal(give(G, [k], { kind: 'guard', target: foe }), 0, 'a building of yours');
+  assert.equal(give(G, [k], { kind: 'guard', target: s }), 1);
+  shiftMech(foe, s.x + 900 - foe.x, s.z + 900 - foe.z);   // far off
+  run(G, 30);
+  assert.equal(k.job, 'GUARDING');
+  assert.ok(Math.hypot(k.x - s.x, k.z - s.z) < s.radius + 30, 'at its post by the silo');
+  const hp = foe.hp.T;
+  shiftMech(foe, s.x + 80 - foe.x, s.z + 60 - foe.z);   // comes near
+  run(G, 40, () => !foe.alive);
+  assert.ok(!foe.alive || foe.hp.T < hp, 'it fought');
+  assert.ok(Math.hypot(k.x - s.x, k.z - s.z) < 260, 'on its leash');
+});

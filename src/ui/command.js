@@ -20,7 +20,9 @@ import { footprintAt, placeSite } from '../sim/base.js';
 // picked BUILD. With nothing picked, BUILD places a construction site
 // (docs/specs/23-construction-sites.md): it cycles FACTORY, BAY, WALL and
 // off; the footprint follows the pointer (on touch, a tap puts it there and a
-// second tap on it puts the site down). Two fingers (or the right
+// second tap on it puts the site down). Fighters ATTACK a foe and GUARD one
+// of your buildings; a bare tap on a foe with fighters picked is ATTACK, on
+// a building GUARD. Two fingers (or the right
 // button and the wheel) pan, pinch and twist, as in the mission editor,
 // whose camera, gestures, picking and markers this reuses. The sim side
 // (going up and down) is sim/crew.js; this file is only the page.
@@ -29,7 +31,7 @@ export const COMMAND = { across: 400, finger: 28 };   // m of ground across the 
 const D2R = Math.PI / 180;
 // A building's label on the map; a site (docs/specs/23-construction-sites.md) says so, with its ore.
 const siteLabel = e => { const n = NAMES.buildings[e.tags?.find(t => NAMES.buildings[t])] || ''; return e.site ? `${n} SITE · ORE ${Math.floor(e.site.ore)}/${e.site.need}` : n; };
-export const BAR = ['go', 'dig', 'follow', 'stay', 'work', 'drive', 'build'];   // the order bar, in order (keys 1–7)
+export const BAR = ['go', 'dig', 'follow', 'stay', 'work', 'drive', 'build', 'attack', 'guard'];   // the order bar, in order (keys 1–9)
 
 export function createCommand(app) {
   const G = app.G, wrap = app.wrap;
@@ -51,6 +53,13 @@ export function createCommand(app) {
   const crewAt = (sx, sy) => {
     const g = ground(sx, sy);
     return g && pickNearest(live().map(m => ({ id: m, x: m.x, z: m.z, r: 4 * m.ch.scale })), g.x, g.z, COMMAND.finger * mpp())?.id;
+  };
+  // A foe the map shows (in your crew's radar reach), or one of your built buildings, at a tap.
+  const foes = () => { const reach = RADAR_RANGE * radarOf(G), crew = live(); return G.mechs.filter(f => f.alive && f.team !== 0 && crew.some(m => Math.hypot(f.x - m.x, f.z - m.z) < reach)); };
+  const foeAt = (sx, sy) => { const g = ground(sx, sy); return g && pickNearest(foes().map(f => ({ id: f, x: f.x, z: f.z, r: 4 * f.ch.scale })), g.x, g.z, COMMAND.finger * mpp())?.id; };
+  const buildingAt = (sx, sy) => {
+    const g = ground(sx, sy), ours = G.entities.filter(e => e.alive && e.team === 0 && e.kind === 'structure' && !e.site);
+    return g && pickNearest(ours.map(e => ({ id: e, x: e.x, z: e.z, r: e.radius })), g.x, g.z, COMMAND.finger * mpp())?.id;
   };
   const siteAt = (sx, sy) => {
     const g = ground(sx, sy), parts = (G.base?.sites || []).flatMap(s => s.parts.filter(e => e.alive));
@@ -99,7 +108,15 @@ export function createCommand(app) {
     const m = crewAt(x, y), g = ground(x, y), e = siteAt(x, y);
     if (C.order === 'follow') { if (m) order({ kind: 'follow', target: m }); return; }
     if (C.order === 'build') { if (e) order({ kind: 'build', target: e }); return; }
+    if (C.order === 'attack') { const f = foeAt(x, y); if (f) order({ kind: 'attack', target: f }); return; }
+    if (C.order === 'guard') { const b = buildingAt(x, y); if (b) order({ kind: 'guard', target: b }); return; }
+    const fighters = [...C.picked].some(p => can(p, 'attack'));
     if (!C.order && !m && e && [...C.picked].some(p => can(p, 'build'))) return order({ kind: 'build', target: e });
+    if (!C.order && !m && fighters) {   // a bare tap on a foe is ATTACK, on a building of yours GUARD
+      const f = foeAt(x, y), b = !f && buildingAt(x, y);
+      if (f) return order({ kind: 'attack', target: f });
+      if (b) return order({ kind: 'guard', target: b });
+    }
     if (C.order && g) return order({ kind: C.order, x: g.x, z: g.z });
     if (m) { C.picked = new Set([m]); sync(); return; }
     if (g && C.picked.size) order({ kind: 'go', x: g.x, z: g.z });
@@ -204,20 +221,22 @@ export function createCommand(app) {
   // stands with a tick toward the face, or dashed to the digger a FOLLOW trails.
   function drawOrders(ctx, view, crew, pal) {
     const S = p => view.toScreen(p.x, p.y ?? G.ter.height(p.x, p.z), p.z);
-    ctx.save(); ctx.lineWidth = 1.5; ctx.strokeStyle = ctx.fillStyle = pal.good;
+    ctx.save(); ctx.lineWidth = 1.5;
     for (const m of crew) {
       const o = m.order, a = S(m);
       if (!o || o.kind === 'stay' || !a) continue;
-      const b = S(o.kind === 'follow' ? o.target : o);
+      const b = S(o.target || o);
       if (!b) continue;
-      ctx.setLineDash(o.kind === 'follow' ? [4, 5] : []);
+      ctx.strokeStyle = ctx.fillStyle = o.kind === 'attack' ? pal.bad : pal.good;   // ATTACK in the foes' red
+      ctx.setLineDash(o.kind === 'follow' || o.kind === 'guard' ? [4, 5] : []);
       ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
       ctx.setLineDash([]);
       if (o.kind === 'go') { ctx.beginPath(); ctx.moveTo(b[0], b[1]); ctx.lineTo(b[0], b[1] - 16); ctx.stroke(); ctx.fillRect(b[0], b[1] - 16, 9, 6); }
       else if (o.kind === 'dig') {
         const f = S({ x: o.x + Math.sin(o.yaw) * 8, z: o.z + Math.cos(o.yaw) * 8 });
         if (f) { ctx.beginPath(); ctx.arc(b[0], b[1], 4, 0, 7); ctx.moveTo(b[0], b[1]); ctx.lineTo(f[0], f[1]); ctx.stroke(); }
-      }
+      } else if (o.kind === 'attack') { ctx.beginPath(); ctx.arc(b[0], b[1], 13, 0, 7); ctx.stroke(); }   // crosshairs on it
+      else if (o.kind === 'guard') { ctx.beginPath(); ctx.arc(b[0], b[1], 16, 0, 7); ctx.stroke(); }
     }
     ctx.restore();
   }
