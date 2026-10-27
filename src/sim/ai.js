@@ -35,16 +35,18 @@ export function preyOf(G, e) {
 // A foe that only stands there (e.ai.still: the test range): no throttle, no jets, no shots.
 export function stand(e) { e.throttle = 0; e.jetting = false; }
 
-// One enemy, one frame. State lives in e.ai.
-export function think(G, e, dt) {
-  const P = preyOf(G, e), r = G.rng;
+// One enemy, one frame. State lives in e.ai. `prey`: whom to fight instead
+// of the one preyOf picks: a crew mech's ATTACK or GUARD order uses this same
+// brain against a foe (sim/orders.js, docs/specs/22-command-view.md).
+export function think(G, e, dt, prey = null) {
+  const P = prey || preyOf(G, e), r = G.rng;
   const plan = e.ai.plan || (e.ai.plan = planFor(e)), brawling = plan.brawler;   // how this chassis fights
   if (revealing(G, e)) return entrance(G, e, P, dt);
   // Where it believes the player is: the truth with line of sight, the last fix otherwise.
   const bp = perceive(G, e, P, dt), seen = !!e.ai.seen;
-  const truck = e.ai.aware && convoyTarget(G, e, P);   // an escort mission: the trucks are the point
+  const truck = !prey && e.ai.aware && convoyTarget(G, e, P);   // an escort mission: the trucks are the point
   if (truck) return attackConvoy(G, e, truck, dt);
-  const building = e.ai.raid && raidTarget(G, e);   // a raid: the base is the point (spec 20)
+  const building = !prey && e.ai.raid && raidTarget(G, e);   // a raid: the base is the point (spec 20)
   if (building) return attackConvoy(G, e, building, dt);
   const tx = bp ? bp[0] : P.x, tz = bp ? bp[1] : P.z;
   const dx = tx - e.x, dz = tz - e.z, dist = hypot(dx, dz);
