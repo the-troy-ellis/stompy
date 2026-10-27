@@ -1,6 +1,6 @@
 import { wrapA, clampN } from '../util/math.js';
 import { crewOf } from './crew.js';
-import { MINER, haul, halt, walkTo } from './miner.js';
+import { MINER, haul, halt, walkTo, build } from './miner.js';
 
 const { atan2, hypot, sin, cos, abs } = Math;
 
@@ -15,35 +15,38 @@ const { atan2, hypot, sin, cos, abs } = Math;
 //   dig     a digger: walk to a stand point short of the spot, face it, and
 //           take it as its site (spec 21); its own `mine` goes on from there
 //   follow  a hauler: wait behind `target`, that digger, and take its loads
+//   build   a digger: build `target`, a construction site's part, until it's
+//           up (docs/specs/23-construction-sites.md)
 //   work    (given, never kept) back to its own job
 export const ORDER = {
   arrive: 4,      // m: this near a GO point, it stays
   standOff: 9,    // m: a digger told to DIG stands this far short of the spot (by its scale)
 };
-export const ORDERS = ['go', 'dig', 'follow', 'stay', 'work'];
-export const SAY = { go: 'Going.', dig: 'Digging.', follow: 'Following.', stay: 'Staying.', work: 'Back to work.' };
+export const ORDERS = ['go', 'dig', 'follow', 'build', 'stay', 'work'];
+export const SAY = { go: 'Going.', dig: 'Digging.', follow: 'Following.', build: 'Building.', stay: 'Staying.', work: 'Back to work.' };
 
-// Who can take an order: anyone GO and STAY; DIG a digger; FOLLOW a hauler;
-// WORK whoever has a job of its own.
+// Who can take an order: anyone GO and STAY; DIG and BUILD a digger; FOLLOW
+// a hauler; WORK whoever has a job of its own.
 export function can(m, kind) {
-  if (kind === 'dig') return !!m.ch.tools;
+  if (kind === 'dig' || kind === 'build') return !!m.ch.tools;
   if (kind === 'follow') return !!m.ch.hopper && !m.ch.tools;
   if (kind === 'work') return !!m.ch.hopper;
   return kind === 'go' || kind === 'stay';
 }
 
 // `order`: { kind, x, z } for GO and DIG (the ground point), { kind, target }
-// for FOLLOW, { kind } for STAY and WORK. Each live crew mech in `mechs`
+// for FOLLOW (a digger) and BUILD (a site's part), { kind } for STAY and WORK. Each live crew mech in `mechs`
 // that can take it does; the voice answers once. The number that took it.
 export function give(G, mechs, order) {
   const { kind } = order, crew = crewOf(G);
   if (kind === 'follow' && !(order.target?.alive && order.target.ch.tools && crew.includes(order.target))) return 0;
+  if (kind === 'build' && !(order.target?.alive && order.target.site)) return 0;
   let n = 0;
   for (const m of mechs) {
     if (!m.alive || !crew.includes(m) || !can(m, kind)) continue;
     if (kind === 'work') m.order = null;
     else if (kind === 'stay') m.order = { kind };
-    else if (kind === 'follow') m.order = { kind, target: order.target };
+    else if (kind === 'follow' || kind === 'build') m.order = { kind, target: order.target };
     else if (kind === 'go') m.order = { kind, x: order.x, y: G.ter.height(order.x, order.z), z: order.z };
     else if (kind === 'dig') {
       const yaw = atan2(order.x - m.x, order.z - m.z), d = standAt(G, m, order.x, order.z, yaw);
@@ -79,6 +82,11 @@ export function obey(G, m, dt) {
     const t = o.target;
     if (!t.alive || !(t === G.player || t.site)) { m.order = null; return false; }   // gone, or not digging
     haul(G, m, dt, t);
+    return true;
+  }
+  if (o.kind === 'build') {
+    if (!o.target.alive || !o.target.site) { m.order = null; return false; }   // up, or gone
+    build(G, m, a, o.target, dt);
     return true;
   }
   const d = hypot(o.x - m.x, o.z - m.z);

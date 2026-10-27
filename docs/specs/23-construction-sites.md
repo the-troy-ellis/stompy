@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (the owner, 2026-10-26: "have the command section decide where structures are placed and a construction site pops up but the construction mechs portion is what actually builds the structure"; picked ore carried to the site, parked diggers building on their own, and the cockpit's BUILD placing a site too) |
+| Status | built: parts 1 (#353) and 2 (the owner, 2026-10-26: "have the command section decide where structures are placed and a construction site pops up but the construction mechs portion is what actually builds the structure"; picked ore carried to the site, parked diggers building on their own, and the cockpit's BUILD placing a site too) |
 | Milestone | M10 (proposed, with spec 22) |
 | Size | L, split in two: sites and building; placing from the map |
 | Depends on | [21-mining.md](21-mining.md) (buildings, diggers and haulers on their own); [22-command-view.md](22-command-view.md) (the map, orders) |
@@ -143,6 +143,55 @@ digger off sites; WORK lets it build again.
   silo's starting 20 ore is a third of a factory. Its objectives (keep the
   silo, beat the raids) don't need the factory; building one is how you get
   a second fighter in time, so its pace will want a look in play.
+
+## As built
+
+### Part 1: sites and building (#353)
+
+- **`base.js`:**
+  - `placeSite`, `footprintAt`, `siteProg`, `siteWork`, `buildSwing`,
+    `tipIn`; `G.base.sites`.
+  - A site holds `{ kind, ore, need, work, swings, parts }`. A wall's three
+    slabs share one, `need` 10 and `swings` 6 in all, so there are no
+    fractions of ore.
+  - The silo doesn't take back what a fetching hauler just loaded
+    (`m.fetch`).
+- **`melee.js`:** the bucket targets its own team's sites and builds them.
+  The swing thunks with dust when it builds, and whiffs with `NEEDS ORE` when
+  it can't.
+- **`miner.js`:**
+  - `mine` goes to `siteFor` first: a site with work, or one that needs ore
+    when the hopper is full.
+  - `build` walks to the site, faces it and swings. A trip that gets stuck
+    skips that site for 20 s.
+  - `haul` → `fetch` feeds one site per hauler.
+- **The look:**
+  - Hazard tape and four corner posts round the footprint, drawn after the
+    prop batch (`scene.js` `drawSite`).
+  - `… SITE n% · ORE n/m` on the base panel, under the crosshair in a digger
+    or hauler near one, and on the map.
+- **Smoke:**
+  - The base run checks a free site goes down.
+  - FIRST FACTORY fills its factory site and builds it with `e`.
+
+### Part 2: from the map
+
+- **`BUILD` on the order bar (key 7):**
+  - With nothing picked it places sites: each press cycles `BUILD FACTORY`,
+    `BUILD BAY`, `BUILD WALL`, then off.
+  - With diggers picked it's the order.
+- **The ghost:**
+  - The footprint follows the mouse, facing away from the silo. It's green
+    with `FACTORY · 60 ORE`, or red with `NO ROOM` or `BUILT`.
+  - On touch there's no hover: a tap puts the ghost there, and a second tap
+    on it puts the site down.
+- **The BUILD order** (`orders.js`): `{ kind: 'build', target }` on a site's
+  part. Diggers walk to it and swing (`miner.js` `build`), and the order ends
+  when it's up. A plain tap on a site with diggers picked gives it. The voice
+  says `Building.`
+- **Not done:** a smoke step for placing from the map. The browser was
+  checked by hand on desktop and touch: a factory site went down beside the
+  silo.
 
 ## Code touchpoints
 

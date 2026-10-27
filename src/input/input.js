@@ -148,7 +148,7 @@ export function createInput(app) {
     // Esc only ever pauses: leaving pointer lock already pauses via
     // pointerlockchange, and a toggle here would immediately undo that.
     if (G.command && (e.code === 'Escape' || e.code === 'Tab')) { e.preventDefault(); app.command.close(); return; }   // BACK (ui/command.js)
-    if (G.command && /^Digit[1-6]$/.test(e.code)) { e.preventDefault(); app.command.press(BAR[e.code.slice(5) - 1]); return; }   // the order bar
+    if (G.command && /^Digit[1-7]$/.test(e.code)) { e.preventDefault(); app.command.press(BAR[e.code.slice(5) - 1]); return; }   // the order bar
     if (e.code === 'Tab' && !G.paused) { e.preventDefault(); app.command.open(); return; }   // MAP
     if (e.code === 'Escape') { e.preventDefault(); if (!G.paused) app.ui.pause(true); return; }
     if (e.code === 'KeyP') { e.preventDefault(); app.ui.pause(!G.paused); return; }

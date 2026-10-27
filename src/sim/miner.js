@@ -91,7 +91,7 @@ function siteFor(G, m, a, full) {
 }
 // To a site's part, square on, and swing (melee.js builds it with the
 // bucket; base.js tipIn takes its ore on the way in).
-function build(G, m, a, e, dt) {
+export function build(G, m, a, e, dt) {
   m.job = 'BUILDING';
   const reach = meleeOf(m).reach * m.ch.scale, d = hypot(e.x - m.x, e.z - m.z) - e.radius;
   if (d > reach * 0.7) {
