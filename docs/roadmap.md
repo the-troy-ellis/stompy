@@ -295,6 +295,15 @@ the map (or BUILD in a digger) places a site, ore is carried to it, and
 diggers build it with their buckets. In two parts: sites and building;
 placing from the map.
 
+## M11 — Phone apps and the full-game unlock (proposed)
+
+Goal: Stompy on Android and iOS as native-feeling apps (Capacitor shells
+around the same `dist/`), with real haptics, the back button and pausing
+when you leave; the web version keeps working. A free demo (Act I) and one
+purchase for the full game. Spec:
+[specs/24-apps-and-unlock.md](specs/24-apps-and-unlock.md). In four parts:
+the platform layer and Android shell; native feel; the demo and unlock; iOS.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
