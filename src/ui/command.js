@@ -8,13 +8,19 @@ import { bindPointer } from '../input/pointer.js';
 import { pickNearest, pickInside } from '../sim/pick.js';
 import { crewOf, canCommand, commandUp, commandDown } from '../sim/crew.js';
 import { give, can } from '../sim/orders.js';
+import { PLACE, PLACE_ORDER } from '../data/construct.js';
+import { footprintAt, placeSite } from '../sim/base.js';
 
 // The command view (docs/specs/22-command-view.md): the match from above
 // while the world runs on. MAP (Tab) goes up, BACK comes down into the mech
 // you left, DRIVE into the one you picked. Tap a crew mech to pick it, drag
 // a box round several. Then the order bar: GO, DIG or FOLLOW and a tap on
 // the ground (or a digger), or STAY or WORK at once; a bare tap on the
-// ground with mechs picked is GO (sim/orders.js). Two fingers (or the right
+// ground with mechs picked is GO (sim/orders.js), on a site with diggers
+// picked BUILD. With nothing picked, BUILD places a construction site
+// (docs/specs/23-construction-sites.md): it cycles FACTORY, BAY, WALL and
+// off; the footprint follows the pointer (on touch, a tap puts it there and a
+// second tap on it puts the site down). Two fingers (or the right
 // button and the wheel) pan, pinch and twist, as in the mission editor,
 // whose camera, gestures, picking and markers this reuses. The sim side
 // (going up and down) is sim/crew.js; this file is only the page.
@@ -23,7 +29,7 @@ export const COMMAND = { across: 400, finger: 28 };   // m of ground across the 
 const D2R = Math.PI / 180;
 // A building's label on the map; a site (docs/specs/23-construction-sites.md) says so, with its ore.
 const siteLabel = e => { const n = NAMES.buildings[e.tags?.find(t => NAMES.buildings[t])] || ''; return e.site ? `${n} SITE · ORE ${Math.floor(e.site.ore)}/${e.site.need}` : n; };
-export const BAR = ['go', 'dig', 'follow', 'stay', 'work', 'drive'];   // the order bar, in order (keys 1–6)
+export const BAR = ['go', 'dig', 'follow', 'stay', 'work', 'drive', 'build'];   // the order bar, in order (keys 1–7)
 
 export function createCommand(app) {
   const G = app.G, wrap = app.wrap;
@@ -35,7 +41,7 @@ export function createCommand(app) {
     <div class="cmd-bar">${BAR.map(k => `<button class="cmd-btn" data-c="${k}" hidden>${k.toUpperCase()}</button>`).join('')}</div>`;
   wrap.insertBefore(root, app.ov);
   const surface = root.querySelector('.cmd-surface'), btn = Object.fromEntries(BAR.map(k => [k, root.querySelector(`[data-c="${k}"]`)]));
-  const C = { cam: null, picked: new Set(), box: null, order: null };   // order: GO, DIG or FOLLOW chosen, waiting for its tap
+  const C = { cam: null, picked: new Set(), box: null, order: null, place: null, ghost: null };   // order: GO, DIG, FOLLOW or BUILD chosen, waiting for its tap; place: the kind of site BUILD puts down, ghost: where
 
   const size = () => ({ W: Math.max(1, wrap.clientWidth), H: Math.max(1, wrap.clientHeight) });
   const mpp = () => metresPerPixel(C.cam, size().H);
@@ -46,21 +52,41 @@ export function createCommand(app) {
     const g = ground(sx, sy);
     return g && pickNearest(live().map(m => ({ id: m, x: m.x, z: m.z, r: 4 * m.ch.scale })), g.x, g.z, COMMAND.finger * mpp())?.id;
   };
-  // The order bar shows what the picked mechs can do; DRIVE with exactly one.
+  const siteAt = (sx, sy) => {
+    const g = ground(sx, sy), parts = (G.base?.sites || []).flatMap(s => s.parts.filter(e => e.alive));
+    return g && pickNearest(parts.map(e => ({ id: e, x: e.x, z: e.z, r: e.radius })), g.x, g.z, COMMAND.finger * mpp())?.id;
+  };
+  // The order bar shows what the picked mechs can do; DRIVE with exactly one;
+  // BUILD with diggers picked (the order), or with none (placing a site).
   const sync = () => {
     for (const m of C.picked) if (!m.alive) C.picked.delete(m);
     const p = [...C.picked];
+    if (p.length) C.place = C.ghost = null;
     for (const k of BAR) {
-      const b = btn[k], show = k === 'drive' ? p.length === 1 : p.some(m => can(m, k));
+      const b = btn[k], show = k === 'drive' ? p.length === 1 : k === 'build' && !p.length ? !!G.base : p.some(m => can(m, k));
       if (b.hidden !== !show) b.hidden = !show;
-      b.classList.toggle('on', C.order === k);
+      b.classList.toggle('on', C.order === k || (k === 'build' && !!C.place));
     }
+    const label = C.place ? `BUILD ${NAMES.buildings[C.place]}` : 'BUILD';
+    if (btn.build.textContent !== label) btn.build.textContent = label;
     if (C.order && btn[C.order].hidden) C.order = null;
+  };
+  // A site where the ghost is, facing away from the silo, if it fits.
+  const ghostPrint = () => {
+    const s = G.base?.silo, g = C.ghost, yaw = s ? Math.atan2(g.x - s.x, g.z - s.z) : C.cam.yaw;
+    return footprintAt(G, g.x, g.z, yaw, C.place);
   };
   const order = o => { give(G, [...C.picked], o); C.order = null; sync(); };
   // The bar's buttons (and keys 1–6, in the bar's order).
   function press(k) {
     if (btn[k].hidden) return;
+    if (k === 'build' && !C.picked.size) {   // placing: FACTORY, BAY, WALL, then off
+      const i = C.place ? PLACE_ORDER.indexOf(C.place) + 1 : 0;
+      C.place = PLACE_ORDER[i] || null;
+      if (!C.place) C.ghost = null;
+      sync();
+      return;
+    }
     if (k === 'drive') { if (C.picked.size === 1) close([...C.picked][0]); return; }
     if (k === 'stay' || k === 'work') return order({ kind: k });
     C.order = C.order === k ? null : k;   // GO, DIG, FOLLOW: now tap where (or whom)
@@ -69,12 +95,30 @@ export function createCommand(app) {
   // A tap: with an order chosen, where it goes; else a crew mech picks it,
   // and the ground, with mechs picked, is GO.
   function tapAt(x, y) {
-    const m = crewAt(x, y), g = ground(x, y);
+    if (C.place) return placeAt(x, y);
+    const m = crewAt(x, y), g = ground(x, y), e = siteAt(x, y);
     if (C.order === 'follow') { if (m) order({ kind: 'follow', target: m }); return; }
+    if (C.order === 'build') { if (e) order({ kind: 'build', target: e }); return; }
+    if (!C.order && !m && e && [...C.picked].some(p => can(p, 'build'))) return order({ kind: 'build', target: e });
     if (C.order && g) return order({ kind: C.order, x: g.x, z: g.z });
     if (m) { C.picked = new Set([m]); sync(); return; }
     if (g && C.picked.size) order({ kind: 'go', x: g.x, z: g.z });
   }
+
+  // Placing: a tap on the ghost (or where the pointer put it) puts the site
+  // down if it fits; a tap anywhere else moves the ghost there.
+  function placeAt(x, y) {
+    const g = ground(x, y);
+    if (!g) return;
+    if (!C.ghost || Math.hypot(g.x - C.ghost.x, g.z - C.ghost.z) > Math.max(PLACE[C.place].w, PLACE[C.place].d) / 2) { C.ghost = g; return; }
+    const f = ghostPrint();
+    if (f.why) { app.audio.sfx.beep(); return; }
+    placeSite(G, f);
+    app.audio.sfx.beep();
+    C.place = C.ghost = null;
+    sync();
+  }
+  surface.addEventListener('mousemove', e => { if (C.place) { const r = surface.getBoundingClientRect(), g = ground(e.clientX - r.left, e.clientY - r.top); if (g) C.ghost = g; } });
 
   // Up: the camera over the mech you were in, COMMAND.across metres of ground across the screen.
   function open() {
@@ -82,7 +126,7 @@ export function createCommand(app) {
     const { W, H } = size(), m = G.command.from;
     C.cam = createTopCamera({ x: m.x, z: m.z, dist: COMMAND.across * H / (W * 2 * Math.tan(TOP.fov / 2)), yaw: m.yaw });
     after();
-    C.picked = new Set(); C.box = null; C.order = null;
+    C.picked = new Set(); C.box = null; C.order = null; C.place = C.ghost = null;
     app.input.releaseFingers(); app.input.clearHeld();
     app.input.exitLock();
     root.hidden = false;
@@ -149,6 +193,7 @@ export function createCommand(app) {
     for (const f of G.mechs) if (f.alive && f.team !== 0 && crew.some(m => Math.hypot(f.x - m.x, f.z - m.z) < reach)) things.push({ id: f, kind: 'foe', x: f.x, y: f.y, z: f.z, face: -f.yaw / D2R });
     drawMap(ctx, view, { map: { bound: BOUND, height: G.ter.height, grid: 100 }, things, sel: C.picked, box: C.box, pal });
     drawOrders(ctx, view, crew, pal);
+    if (C.place && C.ghost) drawGhost(ctx, view, pal);
     // The base, as the cockpit's panel has it.
     ctx.font = 'bold 11px "Lucida Console", monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     if (G.base) { ctx.fillStyle = pal.good; ctx.fillText(`ORE ${G.base.ore}  SALVAGE ${G.base.salvage}`, 14, 22); }
@@ -174,6 +219,20 @@ export function createCommand(app) {
         if (f) { ctx.beginPath(); ctx.arc(b[0], b[1], 4, 0, 7); ctx.moveTo(b[0], b[1]); ctx.lineTo(f[0], f[1]); ctx.stroke(); }
       }
     }
+    ctx.restore();
+  }
+
+  // The site BUILD would put down, at the ghost: green where it fits, red where
+  // not, with what and its price, or why not.
+  function drawGhost(ctx, view, pal) {
+    const f = ghostPrint(), hw = f.w / 2, hd = f.d / 2, s = Math.sin(f.yaw), c = Math.cos(f.yaw);
+    const pts = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([u, v]) => { const x = f.x + u * c + v * s, z = f.z - u * s + v * c; return view.toScreen(x, G.ter.height(x, z) + 0.5, z); });
+    if (pts.some(p => !p)) return;
+    const col = f.why ? pal.bad : pal.good, mid = view.toScreen(f.x, G.ter.height(f.x, f.z), f.z);
+    ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+    ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.stroke();
+    ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.font = 'bold 11px "Lucida Console", monospace';
+    if (mid) ctx.fillText(f.why === 'room' ? 'NO ROOM' : f.why === 'built' ? 'BUILT' : `${NAMES.buildings[f.kind]} · ${PLACE[f.kind].ore} ORE`, mid[0], mid[1]);
     ctx.restore();
   }
 
