@@ -290,6 +290,11 @@ picking, and on the crew that already works on its own.
 Spec: [specs/22-command-view.md](specs/22-command-view.md). In three parts:
 the view, orders, polish.
 
+Then construction sites ([specs/23-construction-sites.md](specs/23-construction-sites.md)):
+the map (or BUILD in a digger) places a site, ore is carried to it, and
+diggers build it with their buckets. In two parts: sites and building;
+placing from the map.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
