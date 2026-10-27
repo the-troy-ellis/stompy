@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (the owner, 2026-10-27: wants it to feel like a native app with "more phone accessibility like haptics"; asked that the browser version keeps working; then iOS; then monetisation: "a straightforward demo plus 2-5 dollar full game unlock"; then allowed the native tooling "as long as it doesn't break the web version") |
+| Status | draft (the owner, 2026-10-27: wants it to feel like a native app with "more phone accessibility like haptics"; asked that the browser version keeps working; then iOS; then monetisation: "a straightforward demo plus 2-5 dollar full game unlock"; then allowed the native tooling "as long as it doesn't break the web version"; then set the price: "target a 1.99 price, i want it to be a no brainer just to buy") |
 | Milestone | M11 (proposed) |
 | Size | L, split in four: the platform layer and the Android shell; native haptics and phone behaviour; the demo and the unlock; iOS |
 | Depends on | [11-release.md](11-release.md) (the PWA, the build); [13-thunk.md](13-thunk.md) (the feel table's haptic column) |
@@ -52,7 +52,7 @@ currency, nothing else to buy.
   - The mechlab's FIT.
   - Anything added later.
 - **Where it stops:** after mission 4's debrief, one card in the game's
-  voice: `THAT'S THE DEMO.` · `THE REST OF STOMPY: $3.99` · `UNLOCK` /
+  voice: `THAT'S THE DEMO.` · `THE REST OF STOMPY: $1.99` · `UNLOCK` /
   `LATER`. The same card shows when you pick a locked mission or chassis,
   as the lock line does now: `FULL GAME`.
 - `UNLOCK` opens the store's own purchase sheet. Bought: `UNLOCKED. GO
@@ -67,7 +67,7 @@ currency, nothing else to buy.
   when you pick something locked.
 
 New text, in full: `LEAVE STOMPY?` · `YES` · `NO` · `THAT'S THE DEMO.` ·
-`THE REST OF STOMPY: $3.99` · `UNLOCK` · `LATER` · `FULL GAME` ·
+`THE REST OF STOMPY: $1.99` · `UNLOCK` · `LATER` · `FULL GAME` ·
 `UNLOCKED. GO STOMP.` · `RESTORE` · `FULL GAME IN THE APP` · `LIGHT` ·
 `FULL`
 
@@ -229,7 +229,10 @@ Nothing per frame beyond the haptic call that's already there.
 
 ## Open questions
 
-- **The price.** Default: $3.99, within the owner's $2–5.
+- **The price.** Decided: $1.99 in the US, "a no brainer just to buy".
+  Each store sets the local equivalent in other countries; the card shows
+  the store's own price string (`THE REST OF STOMPY: £1.99`, …), never a
+  number written into the game.
 - **The web version.** Default: the free demo, pointing to the apps. The
   other option is to keep it fully open as a free sampler and make money
   only on the stores.
