@@ -15,17 +15,21 @@ import { msg } from './effects.js';
 // a time. A mission has a base when it says `base: { silo: [bearing°, dist] }`.
 // Spec 21 (docs/specs/21-mining.md § Buildings) adds what else BUILD can put
 // down, picked with BALLISTIC (PLACE_ORDER): repair bays, which mend a crew
-// mech standing on their pad, and walls, slabs side by side. G.base = { ore,
-// salvage, silo, factory, bays, walls, pick, rising }; a building going up
-// carries `prog` (0..1) and its full height; the factory `job` (seconds into
-// a mech, or null).
+// mech standing on their pad, and walls, slabs side by side. Spec 23
+// (docs/specs/23-construction-sites.md): what BUILD puts down is a site, a
+// building at prog 0 with `site = { ore, need, work, swings }`, which rises
+// only as ore is carried to it (`tipIn`) and a digger's bucket works it
+// (`buildSwing`, from melee.js), never past what the ore pays for. A wall's
+// slabs share one site. G.base = { ore, salvage, silo, factory, bays, walls,
+// pick, sites }; a building carries `prog` (0..1) and its full height; the
+// factory `job` (seconds into a mech, or null).
 const { sin, cos, hypot, atan2, abs, max, min } = Math;
 
 export function initBase(G, def) {
   G.base = null;
   if (!def.base) return;
   const { x, z } = polar(def.base.silo), silo = addEntity(G, { ...BUILDINGS.silo, x, z, yaw: atan2(-x, -z), hp: CONSTRUCT.siloHp, id: 'silo' });
-  G.base = { ore: CONSTRUCT.startOre, salvage: 0, silo, factory: null, bays: [], walls: [], pick: 0, rising: [] };
+  G.base = { ore: CONSTRUCT.startOre, salvage: 0, silo, factory: null, bays: [], walls: [], pick: 0, sites: [] };
 }
 
 // Where a building's pad is: in front of it (its nose, +z turned by its yaw).
@@ -39,14 +43,19 @@ export function pickNext(G) {
 
 // A building's footprint in front of the digger (its near edge 14 m off, so
 // you see it go up): w across your view and d along it. `why` is null when
-// it can go there, else 'ore' (not enough), 'room' (not flat, or a mech or a
-// building in it) or 'built' (the one there can be is up).
+// it can go there, else 'room' (not flat, or a mech or a building in it) or
+// 'built' (the one there can be is up, or its site is down). Ore isn't
+// needed: it's carried to the site (spec 23).
 export function footprint(G, m, kind = pickOf(G)) {
-  const P = PLACE[kind], yaw = viewYaw(m), dist = P.d / 2 + 14, x = m.x + sin(yaw) * dist, z = m.z + cos(yaw) * dist, b = G.base;
+  const P = PLACE[kind], yaw = viewYaw(m), dist = P.d / 2 + 14;
+  return footprintAt(G, m.x + sin(yaw) * dist, m.z + cos(yaw) * dist, yaw, kind);
+}
+// The same at a point, `yaw` the way across it faces (the command view's BUILD).
+export function footprintAt(G, x, z, yaw, kind = pickOf(G)) {
+  const P = PLACE[kind], b = G.base;
   const fx = sin(yaw), fz = cos(yaw), rx = cos(yaw), rz = -sin(yaw), hw = P.w / 2, hd = P.d / 2;
   let why = null;
-  if (P.one && kind === 'factory' && b.factory) why = 'built';
-  else if (b.ore < P.ore) why = 'ore';
+  if (P.one && kind === 'factory' && b.factory?.alive) why = 'built';
   else {
     const h0 = G.ter.height(x, z);
     for (let i = -2; i <= 2 && !why; i++) for (let k = -2; k <= 2 && !why; k++) {
@@ -61,12 +70,20 @@ export function footprint(G, m, kind = pickOf(G)) {
   return { x, z, yaw, w: P.w, d: P.d, r: max(hw, hd), kind, why };
 }
 
-// Put the picked building down where the footprint says, paying for it. True if it went up.
+// Put the picked building's site down where the footprint says (spec 23):
+// nothing is paid now. True if it went down.
 export function placeBuilding(G, m, kind = pickOf(G)) {
-  const f = footprint(G, m, kind), P = PLACE[kind], b = G.base;
-  if (f.why) { if (m === G.player) msg(G, f.why === 'ore' ? `${P.ore} ORE` : f.why === 'room' ? 'NO ROOM' : 'BUILT', '#fc3'); return false; }
-  b.ore -= P.ore;
-  const rise = e => { e.full = e.height; e.height = 0.5; e.prog = 0; e.place = kind; b.rising.push(e); return e; };
+  const f = footprint(G, m, kind);
+  if (f.why) { if (m === G.player) msg(G, f.why === 'room' ? 'NO ROOM' : 'BUILT', '#fc3'); return false; }
+  placeSite(G, f);
+  feel(G, 'land', { mech: m, k: 0.6 });
+  return true;
+}
+// A site where footprint `f` says (its x, z, yaw and kind), assumed to fit.
+export function placeSite(G, f) {
+  const kind = f.kind, P = PLACE[kind], b = G.base, site = { kind, ore: 0, need: P.ore, work: 0, swings: P.swings, parts: [] };
+  const rise = e => { e.full = e.height; e.height = 0.5; e.prog = 0; e.place = kind; e.site = site; e.foot = [f.w, f.d, f.yaw]; site.parts.push(e); return e; };
+  b.sites.push(site);
   if (kind === 'wall') {
     // Slabs side by side across your view, facing you.
     const rx = cos(f.yaw), rz = -sin(f.yaw), step = BUILDINGS.wall.radius * 1.9;
@@ -78,7 +95,19 @@ export function placeBuilding(G, m, kind = pickOf(G)) {
     const e = rise(addEntity(G, { ...BUILDINGS[kind], x: f.x, z: f.z, yaw: f.yaw + Math.PI, hp: P.hp, ...(kind === 'factory' ? { id: 'factory' } : {}) }));   // its door or pad toward the digger
     if (kind === 'factory') { e.job = null; b.factory = e; } else b.bays.push(e);
   }
-  feel(G, 'land', { mech: m, k: 0.6 });
+  return site;
+}
+// How far a site is built: its work, never past what the ore in it pays for.
+export const siteProg = s => min(s.work / s.swings, s.ore / s.need);
+// Whether a bucket swing would build it now: the work is behind the ore.
+export const siteWork = s => s.work < s.swings * s.ore / s.need - 1e-9;
+// A bucket swing on a site (melee.js): one swing of work, if the ore allows.
+// True if it built.
+export function buildSwing(G, m, e) {
+  const s = e.site;
+  if (!s || !siteWork(s)) { if (m === G.player) msg(G, 'NEEDS ORE', '#fc3'); return false; }
+  s.work += 1;
+  if (m === G.player) msg(G, 'BUILDING');
   return true;
 }
 export const placeFactory = (G, m) => placeBuilding(G, m, 'factory');
@@ -117,21 +146,24 @@ export function stepBase(G, dt) {
   if (b.silo.alive) {
     const [px, pz] = padOf(b.silo);
     for (const m of G.crew || []) {
-      if (!m.alive || !(m.ore > 0) || hypot(m.x - px, m.z - pz) > CONSTRUCT.unload) continue;
+      if (!m.alive || !(m.ore > 0) || (m.fetch && m.parked) || hypot(m.x - px, m.z - pz) > CONSTRUCT.unload) continue;   // a hauler fetching for a site keeps what it loaded (sim/miner.js)
       b.ore += m.ore; m.ore = 0;
       if (m === G.player) { G.fx.say('Ore in.'); msg(G, 'ORE IN'); }
     }
   }
-  // Going up. A wall's slabs come up together and are called once.
-  for (const e of b.rising) {
-    e.prog = min(1, e.prog + dt / PLACE[e.place].time);
-    e.height = max(0.5, e.full * e.prog);
+  // Sites (spec 23): ore tips in, and each rises as far as it's built. A
+  // wall's slabs share one and come up together; a site with none of its
+  // parts standing is gone, and its ore with it.
+  tipIn(G);
+  b.sites = b.sites.filter(s => s.parts.some(e => e.alive));
+  for (const s of b.sites) {
+    const p = siteProg(s);
+    for (const e of s.parts) { e.prog = p; e.height = max(0.5, e.full * p); }
+    if (p < 1) continue;
+    for (const e of s.parts) e.site = null;
+    G.fx.say(`${NAMES.buildings[s.kind][0]}${NAMES.buildings[s.kind].slice(1).toLowerCase()} up.`);
   }
-  const up = b.rising.filter(e => e.prog >= 1);
-  if (up.length) {
-    b.rising = b.rising.filter(e => e.prog < 1);
-    for (const kind of new Set(up.map(e => e.place))) G.fx.say(`${NAMES.buildings[kind][0]}${NAMES.buildings[kind].slice(1).toLowerCase()} up.`);
-  }
+  b.sites = b.sites.filter(s => siteProg(s) < 1);
   // The bays: a crew mech on a finished bay's pad gets its armour back.
   let mending = false;
   for (const bay of b.bays) {
@@ -171,6 +203,21 @@ export function handover(G) {
       const n = Math.min(room, d.ore);
       d.ore -= n; h.ore = (h.ore || 0) + n;
       if (d === G.player || h === G.player) msg(G, 'ORE ACROSS');
+    }
+  }
+}
+
+// A crew mech with ore near a site that needs it tips in (spec 23), as much
+// as the site still needs: within CONSTRUCT.handover of any of its parts.
+export function tipIn(G) {
+  for (const s of G.base.sites) {
+    for (const m of G.crew || []) {
+      const left = s.need - s.ore;
+      if (!(left > 0)) break;
+      if (!m.alive || !(m.ore > 0) || !s.parts.some(e => e.alive && hypot(m.x - e.x, m.z - e.z) < CONSTRUCT.handover + e.radius)) continue;
+      const n = min(left, m.ore);
+      m.ore -= n; s.ore += n;
+      if (m === G.player) msg(G, 'ORE ACROSS');
     }
   }
 }

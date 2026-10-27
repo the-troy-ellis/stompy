@@ -9,6 +9,7 @@ import { feel } from './feel.js';
 import { fxPunch } from '../net/protocol.js';
 import { damageEntity, solid, sceneryNear } from './entities.js';
 import { bite } from './dig.js';
+import { buildSwing } from './base.js';
 import { particle, msg } from './effects.js';
 import { CONSTRUCT } from '../data/construct.js';
 
@@ -60,7 +61,7 @@ export function meleeTarget(G, m) {
   const E = G.entities, n = sceneryNear(G, m.x, m.z, reach, NEAR);
   for (let i = 0; i < E.length + n; i++) {   // indexed, far ones rejected squared: see pushOutOfEntities
     const e = i < E.length ? E[i] : NEAR[i - E.length];
-    if (!solid(e) || (def.bucket && e.team === m.team)) continue;   // a digger's bucket leaves its own base alone
+    if (!solid(e) || (def.bucket && e.team === m.team && !e.site)) continue;   // a digger's bucket leaves its own base alone, but builds its sites (spec 23)
     const dx = e.x - m.x, dz = e.z - m.z, far = reach + e.radius;
     if (dx * dx + dz * dz > far * far) continue;
     const d = Math.sqrt(dx * dx + dz * dz) - e.radius;
@@ -81,7 +82,15 @@ export function meleeTick(G, m, dt) {
   if (st.phase === 'windup' && st.t >= def.windup) {
     st.phase = 'recover';
     const t = meleeTarget(G, m);
-    if (t && t.kind) {
+    if (t && t.kind && t.site && def.bucket) {
+      // One of your own sites (docs/specs/23-construction-sites.md): the bucket builds it.
+      const dx = t.x - m.x, dz = t.z - m.z, hd = hypot(dx, dz) || 1, p = [t.x - dx / hd * t.radius, t.y + 1, t.z - dz / hd * t.radius];
+      const built = buildSwing(G, m, t);
+      st.hit = { ent: t, p, v: 0, build: built };
+      feel(G, built ? 'punch' : 'whiff', { mech: m, k: 0.8, at: m === G.player ? null : p });
+      G.fx.sfx.punch(m === G.player ? null : p, built);
+      if (built) for (let i = 0; i < 8; i++) particle(G, [p[0] + G.rng.range(-2, 2), p[1], p[2] + G.rng.range(-2, 2)], [G.rng.range(-3, 3), G.rng.range(2, 5), G.rng.range(-3, 3)], G.rng.range(0.8, 1.4), G.rng.range(0.6, 1.2), G.pal.low, 'dust');
+    } else if (t && t.kind) {
       // A structure or vehicle: the blow, the thunk, no knockback (it is bolted down, or a truck).
       const dx = t.x - m.x, dz = t.z - m.z, hd = hypot(dx, dz) || 1;
       const p = [t.x - dx / hd * t.radius, clampN(m.y + 5 * m.ch.scale, t.y + 0.5, t.y + t.height - 0.5), t.z - dz / hd * t.radius];

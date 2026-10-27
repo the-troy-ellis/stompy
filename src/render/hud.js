@@ -588,17 +588,18 @@ export function createHud(app) {
       ctx.fillText(`ORE ${b.ore}  SALVAGE ${b.salvage}`, L.crew.x, y0); y0 += 12;
       if (f) {
         ctx.fillStyle = !f.alive ? '#622' : GREEN;
-        ctx.fillText(!f.alive ? 'FACTORY DOWN' : f.prog < 1 ? `FACTORY ${Math.floor(f.prog * 100)}%` : f.job != null ? `NEW MECH ${Math.ceil(CONSTRUCT.mechTime - f.job)} s` : 'FACTORY', L.crew.x, y0);
+        ctx.fillText(!f.alive ? 'FACTORY DOWN' : f.site ? `FACTORY SITE ${Math.floor(f.prog * 100)}% · ORE ${Math.floor(f.site.ore)}/${f.site.need}` : f.job != null ? `NEW MECH ${Math.ceil(CONSTRUCT.mechTime - f.job)} s` : 'FACTORY', L.crew.x, y0);
         y0 += 12;
       }
-      // What BUILD puts down (docs/specs/21-mining.md): in a digger, with its price; and a bay mending you.
+      // What BUILD puts down (docs/specs/21-mining.md): in a digger, with its price (carried to the site, spec 23); and a bay mending you.
       if (G.player?.ch.tools) {
         const k = PLACE_ORDER[b.pick || 0];
-        ctx.fillStyle = b.ore >= PLACE[k].ore ? GREEN : DIM;
+        ctx.fillStyle = GREEN;
         ctx.fillText(`${G.touchUI ? '' : 'M2 '}BUILDS ${NAMES.buildings[k]} · ${PLACE[k].ore}`, L.crew.x, y0); y0 += 12;
       }
       if (G.mending) { ctx.fillStyle = GREEN; ctx.fillText('REPAIRING', L.crew.x, y0); y0 += 12; }
       if (G.buildAt) drawFootprint(G.buildAt);
+      else if (G.player?.ch.hopper) drawNearSite(b);
     }
     if (!c || c.length < 2) return;
     c.forEach((m, i) => {
@@ -621,6 +622,17 @@ export function createHud(app) {
     ctx.textAlign = 'center'; ctx.fillStyle = col;
     const what = `${NAMES.buildings[f.kind]} · ${PLACE[f.kind].ore} ORE`;
     ctx.fillText(f.why === 'room' ? 'NO ROOM' : f.why === 'built' ? 'BUILT' : `BUILD ${what}`, V.W / 2, V.H * 0.5 + 34);
+    ctx.textAlign = 'right';
+  }
+  // In a digger or a hauler near a site (docs/specs/23-construction-sites.md):
+  // what it is, how far built, and its ore, under the crosshair.
+  function drawNearSite(b) {
+    const P = G.player;
+    let best = null, bd = 40;
+    for (const s of b.sites) for (const e of s.parts) { const d = Math.hypot(e.x - P.x, e.z - P.z) - e.radius; if (e.alive && d < bd) { best = s; bd = d; } }
+    if (!best) return;
+    ctx.textAlign = 'center'; ctx.fillStyle = AMBER;
+    ctx.fillText(`${NAMES.buildings[best.kind]} SITE ${Math.floor(Math.min(best.work / best.swings, best.ore / best.need) * 100)}% · ORE ${Math.floor(best.ore)}/${best.need}`, V.W / 2, V.H * 0.5 + 34);
     ctx.textAlign = 'right';
   }
   const sway = makeSway();
