@@ -310,7 +310,12 @@ changing behaviour. The constraints it worked under:
 - `npm run build` runs esbuild to produce `dist/stompy.js` for releases and
   itch.io: an ES module, with the mission editor and the code it shares split
   into `dist/chunks/` (M7) so normal play never downloads the editor. `npm test` runs `node --test`. `npm run lint` runs
-  ESLint. These are the only dev dependencies.
+  ESLint. These are the only dev dependencies for the web version. The
+  phone apps (spec 24) add native tooling (Capacitor and its plugins, Gradle,
+  Xcode) on the owner's terms: it never breaks the web version. Nothing in
+  `src/` imports it (only `src/platform/` looks for `window.Capacitor`, and
+  falls back to the browser), and `npm run build` and every web check run
+  without it.
 - Pure modules (no `document`, `window`, `gl`, `AudioContext`) are the ones
   tests import. The split is designed around that boundary.
 
