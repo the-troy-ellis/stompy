@@ -24,9 +24,11 @@ import { footprintAt, placeSite } from '../sim/base.js';
 // of your buildings; a bare tap on a foe with fighters picked is ATTACK, on
 // a building GUARD. Two fingers (or the right
 // button and the wheel) pan, pinch and twist, as in the mission editor,
+// and a gamepad works round a crosshair in the middle (`pad`, below),
 // whose camera, gestures, picking and markers this reuses. The sim side
 // (going up and down) is sim/crew.js; this file is only the page.
 export const COMMAND = { across: 400, finger: 28 };   // m of ground across the screen when you go up; px a tap reaches
+export const PADCAM = { pan: 0.9, turn: 1.6, zoom: 2.2 };   // a stick at full tilt: screen heights a second, rad/s, x nearer or further a second
 
 const D2R = Math.PI / 180;
 // A building's label on the map; a site (docs/specs/23-construction-sites.md) says so, with its ore.
@@ -43,7 +45,7 @@ export function createCommand(app) {
     <div class="cmd-bar">${BAR.map(k => `<button class="cmd-btn" data-c="${k}" hidden>${k.toUpperCase()}</button>`).join('')}</div>`;
   wrap.insertBefore(root, app.ov);
   const surface = root.querySelector('.cmd-surface'), btn = Object.fromEntries(BAR.map(k => [k, root.querySelector(`[data-c="${k}"]`)]));
-  const C = { cam: null, picked: new Set(), box: null, order: null, place: null, ghost: null };   // order: GO, DIG, FOLLOW or BUILD chosen, waiting for its tap; place: the kind of site BUILD puts down, ghost: where
+  const C = { cam: null, picked: new Set(), box: null, order: null, place: null, ghost: null, padAt: 0 };   // order: GO, DIG, FOLLOW or BUILD chosen, waiting for its tap; place: the kind of site BUILD puts down, ghost: where; padAt: the bar's button a gamepad has lit
 
   const size = () => ({ W: Math.max(1, wrap.clientWidth), H: Math.max(1, wrap.clientHeight) });
   const mpp = () => metresPerPixel(C.cam, size().H);
@@ -79,6 +81,8 @@ export function createCommand(app) {
     const label = C.place ? `BUILD ${NAMES.buildings[C.place]}` : 'BUILD';
     if (btn.build.textContent !== label) btn.build.textContent = label;
     if (C.order && btn[C.order].hidden) C.order = null;
+    const shown = BAR.filter(k => !btn[k].hidden), lit = G.padActive && shown.length ? shown[C.padAt % shown.length] : null;
+    for (const k of BAR) btn[k].classList.toggle('pad-focus', k === lit);
   };
   // A site where the ghost is, facing away from the silo, if it fits.
   const ghostPrint = () => {
@@ -215,6 +219,21 @@ export function createCommand(app) {
     ctx.font = 'bold 11px "Lucida Console", monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     if (G.base) { ctx.fillStyle = pal.good; ctx.fillText(`ORE ${G.base.ore}  SALVAGE ${G.base.salvage}`, 14, 22); }
     drawCompass(ctx, 34, H - 34, C.cam.yaw, pal);
+    if (G.padActive) drawPadAim(ctx, W, H, pal);
+  }
+
+  // With a gamepad: the crosshair a press of A taps at, and the buttons.
+  function drawPadAim(ctx, W, H, pal) {
+    const x = W / 2, y = H / 2;
+    ctx.save(); ctx.strokeStyle = pal.good; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x - 12, y); ctx.lineTo(x - 4, y); ctx.moveTo(x + 4, y); ctx.lineTo(x + 12, y);
+    ctx.moveTo(x, y - 12); ctx.lineTo(x, y - 4); ctx.moveTo(x, y + 4); ctx.lineTo(x, y + 12); ctx.stroke();
+    const hint = 'A: TAP. X: NEXT MECH. ◀ ▶ AND Y: ORDERS. B: LET GO.';
+    ctx.textAlign = 'center'; ctx.font = 'bold 11px "Lucida Console", monospace';
+    const w = ctx.measureText(hint).width;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(x - w / 2 - 6, 13, w + 12, 17);   // a dark band, so it reads on pale ground
+    ctx.fillStyle = pal.good; ctx.fillText(hint, x, 22);
+    ctx.restore();
   }
 
   // Each crew mech's order, from it: a line to a GO flag, to where a DIG
@@ -255,6 +274,33 @@ export function createCommand(app) {
     ctx.restore();
   }
 
-  const screenOf = m => { const { W, H } = size(); return C.cam && groundToScreen(C.cam, { x: m.x, y: m.y, z: m.z }, W, H); };   // where a mech is on the screen (the smoke test taps it)
-  return { C, open, close, toggle, press, draw, view, screenOf, can: () => canCommand(G) };
+  // A gamepad up here: the left stick pans and the right stick turns and
+  // zooms, round a crosshair in the middle of the screen. A taps at the
+  // crosshair (so a site's ghost sits on it), X picks the next crew mech and
+  // looks at it, the D-pad's left and right walk the order bar and Y presses
+  // the lit button, B lets go: the order waiting for its tap or the site,
+  // then the picks. View (BACK) comes down; input/input.js routes the pad here.
+  function pad(p, dt) {
+    const { W, H } = size(), a = p.axes, k = p.pressed, mid = () => ground(W / 2, H / 2);
+    if (a.turn || a.thr) panBy(C.cam, a.turn * PADCAM.pan * H * dt, a.thr * PADCAM.pan * H * dt, H);
+    if (a.twist) rotateAbout(C.cam, a.twist * PADCAM.turn * dt, mid());
+    if (a.pitch) zoomAt(C.cam, Math.pow(PADCAM.zoom, -a.pitch * dt), mid());
+    after();
+    if (C.place) { const g = mid(); if (g) C.ghost = g; }
+    if (k.back) { close(); return; }
+    if (k.a) tapAt(W / 2, H / 2);
+    if (k.x) {
+      const crew = live(), now = C.picked.size === 1 ? crew.indexOf([...C.picked][0]) : -1, m = crew[(now + 1) % crew.length];
+      if (m) { C.picked = new Set([m]); C.cam.x = m.x; C.cam.z = m.z; after(); }
+    }
+    const shown = BAR.filter(b => !btn[b].hidden), n = shown.length;
+    if (n) C.padAt = (C.padAt % n + (k.right ? 1 : k.left ? n - 1 : 0)) % n;
+    if (k.y && n) press(shown[C.padAt]);
+    if (k.b) { if (C.order) C.order = null; else if (C.place) C.place = C.ghost = null; else C.picked = new Set(); }
+    sync();
+  }
+
+  const screenOf = m => { const { W, H } = size(); return C.cam && groundToScreen(C.cam, { x: m.x, y: m.y ?? G.ter.height(m.x, m.z), z: m.z }, W, H); };   // where a mech (or a ground point) is on the screen (the smoke test taps it)
+  const ghost = () => (C.place && C.ghost ? ghostPrint() : null);   // the site BUILD would put down, and why not (the smoke test looks for room)
+  return { C, open, close, toggle, press, pad, draw, view, screenOf, ghost, can: () => canCommand(G) };
 }

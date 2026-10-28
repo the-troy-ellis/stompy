@@ -295,6 +295,10 @@ the map (or BUILD in a digger) places a site, ore is carried to it, and
 diggers build it with their buckets. In two parts: sites and building;
 placing from the map.
 
+- **Built:** the command view's three parts (the view, orders with ATTACK and
+  GUARD, and the polish: the gamepad and smoke runs), and both parts of
+  construction sites.
+
 ## M11 — Phone apps and the full-game unlock (proposed)
 
 Goal: Stompy on Android and iOS as native-feeling apps (Capacitor shells

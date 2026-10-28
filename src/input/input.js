@@ -354,6 +354,8 @@ export function createInput(app) {
     const p = pad.pressed, P = G.player;
     if (G.state === 'play' && !G.paused && !G.lobby && !G.summary) {
       for (const b of ov.querySelectorAll('.pad-focus')) b.classList.remove('pad-focus');
+      if (G.command) { if (p.start) app.ui.pause(true); else app.command.pad(pad, dt); return; }   // up in the command view: the map takes the pad (ui/command.js)
+      if (p.back && app.command?.can()) { app.command.open(); return; }   // View: MAP, with a crew
       if (p.start || p.back) { app.ui.pause(true); return; }
       if (G.spectate) orbitSpectate(G, pad.axes.twist * 2.5 * dt, -pad.axes.pitch * 2 * dt * (prefs.invert ? -1 : 1));   // waiting to respawn: look around
       if (p.missile) missileTap = true;

@@ -189,7 +189,8 @@ digger off sites; WORK lets it build again.
   part. Diggers walk to it and swing (`miner.js` `build`), and the order ends
   when it's up. A plain tap on a site with diggers picked gives it. The voice
   says `Building.`
-- **Not done:** a smoke step for placing from the map. The browser was
+- **Smoke:** `command-build` (spec 22's polish) places a factory site from
+  the map with the mouse. Before it, the browser was
   checked by hand on desktop and touch: a factory site went down beside the
   silo.
 
