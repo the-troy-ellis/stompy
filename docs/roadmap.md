@@ -307,6 +307,16 @@ the platform layer and Android shell; native feel; the demo and unlock; iOS.
 - **Part 1, the platform layer and the Android shell:** built. `src/platform/`,
   the Capacitor shell in `app/`, and a debug APK from the Android workflow.
 
+## M12 — Hold to dig (proposed)
+
+Goal: digging that's fun to hold. A DIG button the digger holds down: the
+bucket scoops in a rhythm, each scoop felt, the face sliding back smoothly
+and chunky clods tumbling out and sinking away. DIG is the first tool on a
+button every construction mech will share, each with its own. Spec:
+[specs/25-hold-to-dig.md](specs/25-hold-to-dig.md). In three parts: the tool
+button and the scoop; the sliding face and the clods; the bucket's load and
+the pour.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
