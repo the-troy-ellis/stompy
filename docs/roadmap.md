@@ -323,6 +323,15 @@ the pour.
 
 - **Part 1, the tool button, the spin and the scoop:** built.
 
+## M13 — Blast-off jets (proposed)
+
+Goal: jump jets that thunk. Hold JUMP to charge (the mech crouches, the jets
+build), let go to blast off like a rocket with a smoke streak, a big thunk, a
+dust ring and a shockwave. Steer a little in the air with the view tipped
+down and a ring where you'll land; land on a mech and it's flattened. Spec:
+[specs/26-blast-off.md](specs/26-blast-off.md). In three parts: charge and
+blast-off; the flight; the insta-stomp, the AI and online.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
