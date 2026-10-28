@@ -6,8 +6,8 @@ import { KINDS } from '../sim/particles.js';
 // effect is a small solid, one shape per kind, drawn instanced (one draw per
 // shape) and coloured per instance, so the shapes are built white. Unit size:
 // about 1 across, centred on the origin. ≤ 16 triangles each.
-export const SHAPE_OF = { smoke: 'cube', dust: 'flat', fire: 'tetra', flame: 'tetra', debris: 'chunk', spark: 'sliver', rain: 'streak', snow: 'flake', shock: 'ring' };
-export const EFFECT_SHAPES = ['cube', 'tetra', 'chunk', 'sliver', 'flake', 'flat', 'streak', 'ring'];
+export const SHAPE_OF = { smoke: 'cube', dust: 'flat', fire: 'tetra', flame: 'tetra', debris: 'chunk', spark: 'sliver', rain: 'streak', snow: 'flake', shock: 'ring', clod: 'clod' };
+export const EFFECT_SHAPES = ['cube', 'tetra', 'chunk', 'sliver', 'flake', 'flat', 'streak', 'ring', 'clod'];
 export const shapeOf = kind => SHAPE_OF[kind] || 'cube';
 // The same, by the particle pool's kind number (sim/particles.js KINDS).
 export const SHAPE_BY_KIND = KINDS.map(shapeOf);
@@ -32,6 +32,10 @@ const BUILD = {
   flat: b => b.cube(M.S(1, 0.35, 1), W),           // dust that streams sideways
   // Fire: a tetrahedron is far less solid than a cube the same width, so it is
   // drawn ~1.4x wider to keep a fireball's weight.
+  // A clod of dug ground (docs/specs/25-hold-to-dig.md): a lopsided
+  // octahedron, wider than tall, eight facets that catch the light unevenly.
+  clod: b => solid(b, [[0, 0.42, 0.05], [0.55, 0.05, 0.1], [-0.1, -0.05, 0.58], [-0.5, 0.1, -0.05], [0.12, -0.08, -0.5], [0.05, -0.38, -0.02]],
+    [[0, 1, 2], [0, 2, 3], [0, 3, 4], [0, 4, 1], [5, 2, 1], [5, 3, 2], [5, 4, 3], [5, 1, 4]]),
   tetra: b => solid(b, [[0, 0.87, 0], [0.76, -0.43, 0.43], [-0.76, -0.43, 0.43], [0, -0.43, -0.87]], [[0, 1, 2], [0, 2, 3], [0, 3, 1], [1, 3, 2]]),
   // The shockwave: a flat ring, eight segments, facing up; its outer edge a
   // little raised (a shallow dish), so it still shows seen edge-on from a cockpit.

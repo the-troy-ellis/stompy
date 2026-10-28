@@ -93,6 +93,7 @@ export function bite(G, m, p, r = CONSTRUCT.bucket) {
   m.ore = (m.ore || 0) + ore;
   m.seamBite = seams > 0;
   m.biteCorners = tally.soft + tally.rock;   // none: the bucket scraped the hole's side (sim/miner.js moves on)
+  m.biteRock = tally.rock > 0;   // what its clods look like (sim/tools.js)
   m.dirt = Math.min(CONSTRUCT.dirtMax, (m.dirt || 0) + (tally.soft + tally.rock) * CONSTRUCT.dirtPerCorner);   // what it digs out stays in the bucket as dirt (DUMP, below)
   return ore;
 }

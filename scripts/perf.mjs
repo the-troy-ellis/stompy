@@ -92,6 +92,9 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   run 95 · fight 180 · deaths 164 · wrecks 112 · away 73 · dig 53 ·
 //   rain 76 · snow 76 · dust 74 (dust was 89-94, on its 90 KB budget).
 //   Budgets left where they were.
+// Hold to dig (spec 25 part 2), first measured: scoop 15/16 31.9k, particles
+//   28 (53 at most: dirt, sparks and the clods), 45 KB a frame, with the
+//   chunks rebuilding two and a half times a second in the worker.
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
   menu:           { meanDraws: 14, peakDraws: 14, tris: 38000, allocKB: 38 },   // the menu's 60 frames are too few for drawWorld to be optimized, so its sums box a little
@@ -103,6 +106,7 @@ export const BUDGETS = {
   'bench-wrecks': { meanDraws: 91, peakDraws: 113, tris: 45500, allocKB: 145 },
   'bench-away':   { meanDraws: 43, peakDraws: 102, tris: 47500, allocKB: 100 },
   'bench-dig':    { meanDraws: 18, peakDraws: 19, tris: 44500, allocKB: 80 },   // three digs: the main thread only copies corners out and uploads what comes back
+  scoop:          { meanDraws: 18, peakDraws: 19, tris: 37000, allocKB: 55 },   // DIG held 10 s at the range's mesa (spec 25): clods are particles, so no draws of their own
   rain:           { meanDraws: 21, peakDraws: 21, tris: 36000, allocKB: 110 },   // free-start in a downpour: one more draw (the rain), no more garbage
   snow:           { meanDraws: 19, peakDraws: 19, tris: 27000, allocKB: 95 },   // and in snow
   dust:           { meanDraws: 14, peakDraws: 14, tris: 21000, allocKB: 90 },   // and in a dust storm (2,500 grains)
@@ -168,13 +172,14 @@ try {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('HeapProfiler.enable');
 
-  // Run `frames` frames and record them as scene `name` (after `warm` unrecorded ones).
-  const scene = async (name, frames, warm = 0) => {
+  // Run `frames` frames and record them as scene `name` (after `warm` unrecorded
+  // ones), with `input` held (merged over noInput()) if given.
+  const scene = async (name, frames, warm = 0, input = null) => {
     if (warm) await page.evaluate(n => window.__frames(n), warm);
     await cdp.send('HeapProfiler.collectGarbage');
     await cdp.send('HeapProfiler.startSampling', { samplingInterval: 512, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });   // count garbage too, not just survivors
     if (process.env.PERF_CPU) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 100 }); await cdp.send('Profiler.start'); }
-    const f = await page.evaluate(n => window.__frames(n), frames);
+    const f = await page.evaluate(([n, inp]) => window.__frames(n, inp), [frames, input]);
     if (process.env.PERF_CPU) {   // PERF_CPU=1 npm run perf: each scene's busiest functions, by self time
       const { profile } = await cdp.send('Profiler.stop'), self = {}, byId = new Map(profile.nodes.map(n => [n.id, n])), dt = profile.timeDeltas;
       profile.samples.forEach((id, i) => { const cf = byId.get(id).callFrame, key = `${cf.functionName || '(anon)'} ${cf.url.split('/src/').pop()}:${cf.lineNumber + 1}`; self[key] = (self[key] || 0) + (dt[i] || 0); });
@@ -226,6 +231,25 @@ try {
   });
   let from = 0;
   for (const s of segs) { await scene(`bench-${s.key}`, Math.round((s.to - from) * 60)); from = s.to; }
+  // Hold to dig (docs/specs/25-hold-to-dig.md): the range's mesa in the
+  // digger, DIG held 10 s at its face. Its chunks rebuild in the worker two
+  // and a half times a second, and the clods fly, land and sink.
+  await page.evaluate(async () => {
+    const { startMatch } = await import('/src/sim/state.js');
+    const { rangeDef } = await import('/src/data/range.js');
+    const { shiftMech } = await import('/src/sim/walkView.js');
+    const G = window.__stompy.game, app = window.__stompy.app;
+    startMatch(G, rangeDef({ ground: 'mesa' }), 7, false, 'digger');
+    G.kind = 'range'; G.diff = 'normal';
+    app.scene.uploadWorld(); app.ui.launch();
+    await app.scene.groundReady();
+    window.requestAnimationFrame = () => 0;
+    const D = G.player;
+    let z = 0;
+    while (G.ter.height(0, z) < G.ter.height(0, 0) + 4) z++;
+    shiftMech(D, -D.x, z - 8 - D.z); Object.assign(D, { pitch: 0, yaw: 0, twist: 0 });
+  });
+  await scene('scoop', 600, 0, { held: { energy: true, ballistic: false, missile: false, fusion: false } });
   // Weather on its own: the free-start match again, in rain and in snow, to
   // compare with free-start (spec 07: the box of drops is one more draw and
   // no garbage).

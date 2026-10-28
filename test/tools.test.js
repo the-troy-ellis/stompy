@@ -13,6 +13,8 @@ import { rangeDef } from '../src/data/range.js';
 import { shiftMech } from '../src/sim/walkView.js';
 import { placeBuilding } from '../src/sim/base.js';
 import { TOOL } from '../src/data/tools.js';
+import { listParticles, CLOD_SINK } from '../src/sim/particles.js';
+import { spawnClods, CLOD_MAX } from '../src/sim/effects.js';
 
 const DT = 1 / 60, TAU = 2 * Math.PI;
 const DIG = { held: { ...noInput().held, energy: true } };
@@ -111,4 +113,35 @@ test('held DIG at a face brings ore in at the old punch\'s pace (80 seeds)', () 
     }
   }
   assert.ok(Math.abs(ore / 10380 - 1) < 0.1, `${ore} ore against the punch's 10380`);
+});
+
+// Clods (docs/specs/25-hold-to-dig.md § Clods): particles of kind 'clod'.
+const clods = G => listParticles(G).filter(p => p.kind === 'clod');
+test('each scoop throws clods out of the face, in the ground\'s colours; they land, lie, then sink away', () => {
+  const G = game(), D = atMesa(G);
+  frames(G, 60, DIG);
+  const c = clods(G), cols = [G.pal.low, G.pal.rock, G.pal.ore];
+  assert.ok(c.length >= TOOL.dig.clods[0], `clods: ${c.length}`);
+  assert.ok(c.every(p => cols.some(k => p.col.every((v, i) => Math.abs(v / k[i] - 1) < 0.16))), 'soil, rock or seam colours');
+  assert.ok(c.every(p => Math.hypot(p.p[0] - D.x, p.p[2] - D.z) < 30));
+  frames(G, 90);   // let go: 1.5 s on
+  const lying = clods(G);
+  assert.ok(lying.length && lying.every(p => Math.hypot(...p.v) < 0.5), 'at rest on the ground (bar a frame of gravity)');
+  assert.ok(lying.every(p => Math.abs(p.p[1] - G.ter.groundBelow(p.p[0], p.p[1] + 2, p.p[2])) < 2), 'on it, not floating');
+  frames(G, 300);   // 5 s more: past the longest life
+  assert.equal(clods(G).length, 0, 'sunk and gone');
+});
+
+test('never more than CLOD_MAX clods at once: past it, the oldest sink', () => {
+  const G = game(), D = atMesa(G);
+  for (let i = 0; i < 30; i++) spawnClods(G, [D.x, D.y + 2, D.z + 8], 5, G.pal.low, [D.x, D.y, D.z]);
+  assert.ok(clods(G).filter(p => p.life > CLOD_SINK).length <= CLOD_MAX);
+  frames(G, 75);   // the extra ones sink inside a second
+  assert.ok(clods(G).length <= CLOD_MAX, `${clods(G).length}`);
+  // A held DIG stays under the cap on its own.
+  const H = game(), E = atMesa(H);
+  let most = 0;
+  for (let i = 0; i < 600; i++) { frames(H, 1, DIG); most = Math.max(most, clods(H).length); }
+  assert.ok(most <= CLOD_MAX && most > 20, `most at once: ${most}`);
+  void E;
 });

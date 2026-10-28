@@ -4,7 +4,7 @@ import { viewYaw } from './geom.js';
 import { bite } from './dig.js';
 import { buildSwing } from './base.js';
 import { feel } from './feel.js';
-import { particle, msg } from './effects.js';
+import { particle, msg, spawnClods } from './effects.js';
 
 const { atan2, hypot, sin, cos, min, abs, PI } = Math;
 const TAU = 2 * PI;
@@ -75,7 +75,11 @@ export function scoop(G, m) {
   if (m.biteCorners) { if (m.parked && m.site) m.site.t = G.time; else m.site = { x: m.x, y: m.y, z: m.z, yaw: viewYaw(m), pitch: m.pitch || 0, t: G.time }; }
   feel(G, 'scoop', { mech: m, k: 1, at: m === G.player ? null : p });
   G.fx.sfx.scoop(m === G.player ? null : p, m.seamBite);
-  for (let i = 0; i < 5; i++) particle(G, [p[0] + G.rng.range(-1.5, 1.5), p[1] + 0.5, p[2] + G.rng.range(-1.5, 1.5)], [G.rng.range(-3, 3), G.rng.range(3, 7), G.rng.range(-3, 3)], G.rng.range(0.5, 0.9), G.rng.range(0.4, 0.8), G.pal.low, 'debris', 26);
+  // Clods out of the face toward the digger, in what it cut: a seam's colour,
+  // rock, or soil. A scoop that turned no corner throws what the run last cut.
+  const run = m.digRun;
+  if (m.biteCorners) run.kind = m.seamBite ? 'ore' : m.biteRock ? 'rock' : 'low';
+  spawnClods(G, p, T.clods[0] + Math.floor(G.rng.next() * (T.clods[1] - T.clods[0] + 1)), G.pal[run.kind || 'low'] || G.pal.low, [m.x, m.y + 2, m.z]);
   if (m.seamBite) {   // a seam (docs/specs/21-mining.md): a sparkle in its colour
     for (let i = 0; i < 4; i++) particle(G, [p[0] + G.rng.range(-1.5, 1.5), p[1] + 1, p[2] + G.rng.range(-1.5, 1.5)], [G.rng.range(-3, 3), G.rng.range(5, 10), G.rng.range(-3, 3)], G.rng.range(0.5, 0.9), G.rng.range(0.3, 0.6), G.pal.ore || G.pal.high, 'spark', 26);
     if (m === G.player && !full) msg(G, 'ORE SEAM', '#7fd');
