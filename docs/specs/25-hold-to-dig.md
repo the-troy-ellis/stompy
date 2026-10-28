@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (the owner, 2026-10-28: "the punch to dig mechanic gets old fast and the way the polygons change isn't very satisfying"; asked for holding a button to dig, and for digging to look and feel better without costing too much; then: "It should get its own dig button. We will have specialized construction mechs for different tasks") |
+| Status | draft (the owner, 2026-10-28: "the punch to dig mechanic gets old fast and the way the polygons change isn't very satisfying"; asked for holding a button to dig, and for digging to look and feel better without costing too much; then: "It should get its own dig button. We will have specialized construction mechs for different tasks"; then: "No punch for the digger. Also its arms should spin when digging.") |
 | Milestone | M12 (proposed) |
 | Size | L, split in three: the tool button and the scoop; the sliding face and the clods; the bucket's load and the pour |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md) (the ground, digs, chunks); [20-build-and-fight.md](20-build-and-fight.md) and [21-mining.md](21-mining.md) (the digger, ore, dirt, DUMP); [13-thunk.md](13-thunk.md) (feel) |
@@ -11,7 +11,8 @@
 ## Summary
 
 Digging stops being a punch. The digger gets a **DIG** button: hold it and
-the bucket works the ground in a steady rhythm, scoop after scoop. Each scoop
+its arms spin like a wheel, each bucket biting the ground as it comes
+round, scoop after scoop. Each scoop
 is felt. The face slides back as you dig instead of popping, and chunky clods
 tumble out, roll and then sink into the ground. DIG is the first **tool**:
 the button is the same for every construction mech, and what it does is the
@@ -21,11 +22,16 @@ chassis's own.
 
 ### Digging
 
-- **Hold DIG** with the ground in reach and the bucket goes in: one **scoop**
-  every 0.4 s for as long as you hold it. Let go and it stops at the end of
-  the scoop. A tap is one scoop.
+- **Hold DIG** and the arms **spin**:
+  - both arms turn full circles at the shoulders, half a turn apart, like a
+    paddle wheel;
+  - each time a bucket comes round into the ground it bites: one **scoop**
+    every 0.4 s for as long as you hold it;
+  - they get up to speed in a moment;
+  - let go and they finish their turn and stop, buckets down;
+  - a tap is one turn of a bucket: one scoop.
 - **Each scoop:**
-  - the arm swings in and out;
+  - a bucket comes round and bites;
   - a small thunk: the camera nudges, there's a short sub-bass knock, and on
     a phone a tick;
   - the face moves back a little;
@@ -41,7 +47,7 @@ chassis's own.
   - they tumble out, bounce once and come to rest in front of the face;
   - after a few seconds they sink into the ground and are gone.
   - You walk through them. They're for looking at, not for standing on.
-- **Nothing in reach:** the bucket swings at air, and the line under the
+- **Nothing in reach:** the arms spin in the air, and the line under the
   crosshair says `NOTHING TO DIG`.
 - **Hopper full:** it still digs (dirt still comes in), and says
   `HOPPER FULL` as now.
@@ -67,10 +73,10 @@ didn't use (it has no fusion cannon).
 | keyboard and mouse | left button, `1` | `Space`, `3` | right button, `2` | `G`, `4` |
 | gamepad | RT | LT | RB | LB |
 
-- **The punch** (`E`, the touch double tap, the right stick's click) is a
-  whack again: it hits mechs and buildings and no longer digs.
-- **By the crosshair:** where a fist and `PUNCH` show when a mech or
-  building is in reach, a digger with ground in reach shows `DIG`.
+- **No punch.** A digger can't punch. `E`, the touch double tap and the
+  right stick's click do nothing in it, and the fist never shows.
+- **By the crosshair:** where other mechs show a fist and `PUNCH` with
+  something in reach, a digger with ground in reach shows `DIG`.
 
 New text, in full: `DIG` (the button, and by the crosshair) ·
 `NOTHING TO DIG`.
@@ -89,9 +95,27 @@ New text, in full: `DIG` (the button, and by the crosshair) ·
 - A parked digger at work (`miner.js`) holds the same input, and the same
   scoop does the work.
 
+### The spin
+
+- **`m.spin`:** `{ a, w }`, the arms' angle and how fast they turn.
+  - Held, `w` eases up to a full turn every `TOOL.dig.turn` (0.8 s) within
+    `TOOL.dig.spinUp` (0.15 s).
+  - Let go, the arms keep turning to their rest angle (buckets down) and
+    stop.
+- **The two arms are half a turn apart,** so a bucket comes round every
+  0.4 s. **The scoop fires as a bucket passes its bite angle** (low and
+  ahead), so the knock, the dirt and the picture land together.
+- **Drawn** in `scene.js`: a chassis with the dig tool sets each arm's
+  shoulder angle from `m.spin.a` (and half a turn on for the other arm),
+  instead of from the aim and the melee pose. The wheel turns in the torso's
+  pitch, so it follows where you look.
+- **A tap** gives one bucket's pass: the arms turn until the next bite
+  angle, scoop, then come to rest.
+
 ### The scoop
 
-`sim/tools.js` `scoop(G, m)`, every `TOOL.dig.every` seconds while held:
+`sim/tools.js` `scoop(G, m)`, as each bucket passes its bite angle while
+held (every `TOOL.dig.every` seconds at full speed):
 
 1. **Aim** as the bite does now (`melee.js` `bucketBite`'s rays, moved here):
    level first (a face), then tipped down (a pit). Parked diggers look only
@@ -115,7 +139,9 @@ measuring against today's bite in the headless test.
 
 | | value | why |
 |---|---|---|
-| `every` | 0.4 s | three scoops in the time of one punch cycle |
+| `turn` | 0.8 s | a full turn of the arms at speed |
+| `every` | 0.4 s | half a turn: two buckets, three scoops in the time of one punch cycle |
+| `spinUp` | 0.15 s | up to speed |
 | `r` | 4.5 m | a smaller bite, three times as often |
 | `into` | 2 m | centred just past the surface, so it reaches the corners behind |
 | `step` | 0.8 m | how far each scoop goes further in |
@@ -176,8 +202,10 @@ see one 8 m grid as now. The one cost is rebuilding the chunk more often
 
 ### Edge cases
 
-- **SWAP or the command view mid-scoop:** the scoop finishes and the hold
-  ends.
+- **SWAP or the command view mid-scoop:** the hold ends; the arms finish
+  their turn and stop.
+- **An arm shot off:** the other still spins, so a scoop every 0.8 s. With
+  both gone, it can't dig.
 - **Heat:** a scoop adds its heat. At shutdown the bucket stops as the guns
   do.
 - **A scoop that frees an overhang:** it falls as any dig's does (spec 18).
@@ -188,13 +216,16 @@ see one 8 m grid as now. The one cost is rebuilding the chunk more often
 
 - `src/data/tools.js` (new): `TOOL.dig` and the clods' numbers.
 - `src/data/chassis.js`: `tool: 'dig'` on the digger, which replaces
-  `tools: true`; everything that asks `ch.tools` asks `ch.tool`.
+  `tools: true`; everything that asks `ch.tools` asks `ch.tool`. The
+  digger's `melee: BUCKET_MELEE` goes.
 - `src/data/names.js`: `NAMES.tools.dig = 'DIG'`.
 - `src/data/feel.js`: the `scoop` row.
 - `src/sim/tools.js` (new): `stepTool`, `scoop`, the aim (moved from
   `melee.js` `bucketBite`), and the run of scoops into a face.
-- `src/sim/melee.js`: the bucket no longer digs. It still whacks and
-  targets.
+- `src/sim/melee.js`: the bucket goes. The digger has no `melee`, so
+  `canPunch` is false for it, and finding your own sites moves to
+  `sim/tools.js`.
+- `src/render/scene.js`: the digger's arms turn with `m.spin`.
 - `src/sim/dig.js`: `bite` takes a radius; `dump` pours.
 - `src/sim/effects.js`: `G.clods`, `spawnClods` and `stepClods`.
 - `src/sim/miner.js`: parked diggers hold the tool instead of punching.
@@ -213,15 +244,16 @@ see one 8 m grid as now. The one cost is rebuilding the chunk more often
 
 ## Acceptance criteria
 
-1. Holding DIG at a face scoops every 0.4 s until you let go. A tap is one
-   scoop.
+1. Holding DIG spins the arms. At a face they scoop every 0.4 s, each scoop
+   as a bucket comes round, until you let go. Then they stop, buckets down.
+   A tap is one scoop.
 2. Over 30 s of held DIG, ore and dirt come in within 10% of today's punch
    at full pace, at the same face.
 3. The face moves back smoothly. Screenshots every scoop show it creep, not
    jump.
 4. Each scoop throws clods in the ground's colours, or a seam's. They land,
    lie, sink and are gone, and never more than 60 are alive.
-5. The punch no longer digs. DUMP is on the fourth button and pours.
+5. A digger has no punch. DUMP is on the fourth button and pours.
 6. Holding DIG at your own site builds it at today's pace.
 7. Parked diggers dig and build with scoops, as before.
 8. On a phone held sideways: DIG under the right thumb, held while the left
@@ -238,7 +270,9 @@ see one 8 m grid as now. The one cost is rebuilding the chunk more often
   - Building a site with DIG.
   - The clod cap and life.
 - Update `test/miner.test.js`, `test/sites.test.js` and the digger's tests:
-  the bucket digs by scoop, and the punch no longer digs.
+  the bucket digs by scoop, and a digger has no punch.
+- `test/tools.test.js` also: the spin's speed and rest, and a scoop at each
+  bucket's pass.
 - Smoke: the digger run holds the primary button for 3 s at the mesa and
   checks ore came in and clods are alive. The touch run holds DIG the same
   way.
@@ -262,7 +296,7 @@ see one 8 m grid as now. The one cost is rebuilding the chunk more often
    - `ch.tool`, `data/tools.js`, `sim/tools.js` and the scoop at today's
      pace;
    - DIG on the primary button and DUMP on the fourth;
-   - the punch stops digging;
+   - the arms spin, and the digger's punch goes;
    - parked diggers and sites use the scoop;
    - the feel row and the sounds.
 2. **The sliding face and the clods:** the run of scoops into a face, the
@@ -289,8 +323,6 @@ brings its own. Some candidates, each its own spec, with names the owner's:
   8 m cells. Default: not now. It touches the feet rule, falls and the
   network, and the settle would move ground under anything standing on it.
   Revisit after playing the sliding face and the clods.
-- **The punch on a digger.** Default: a whack, as other mechs have. Or drop
-  it, so the digger can't fight at all.
 - **Clods that matter.** Default: only for looking at. They could become
   dirt you can scoop up again, or pile into a berm if enough land in one
   place.
