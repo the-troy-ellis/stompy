@@ -18,8 +18,9 @@ let failed = false;
 try {
   const browser = await chromium.launch({ executablePath, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
   const errors = [];
-  const run = async (name, url, body) => {
+  const run = async (name, url, body, init = null) => {   // init: a script for the page before it loads (a faked gamepad)
     const page = await browser.newPage({ viewport: { width: 1024, height: 640 }, hasTouch: name.startsWith('touch') });
+    if (init) await page.addInitScript(init);
     page.on('pageerror', e => errors.push(`${name}: ${e.message}`));
     page.on('console', m => { if (m.type() === 'error') errors.push(`${name}: console ${m.text()}`); });
     await page.goto(url);
@@ -306,6 +307,76 @@ try {
     const now = await page.evaluate(() => [!!window.__stompy.game.command, window.__stompy.game.player.type]);
     console.log(`command: Tab up ${up}; picked ${picked}; a ground click gave it ${go}; DRIVE -> ${now[1]} (still up ${now[0]})`);
     if (!up || picked !== 'kestrel' || go !== 'go' || now[0] || now[1] !== 'kestrel') { failed = true; console.error('FAIL: the command view'); }
+  });
+  // The command view on touch: MAP goes up, a tap picks the KESTREL, a tap on the ground sends it, DRIVE drops you in.
+  await run('touch-command', URL_ + '&touch=1', async page => {
+    await page.tap('[data-sel="debug"]'); await page.tap('[data-dsec="jump"]');
+    await page.tap('[data-dj="base"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'base' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    await page.waitForTimeout(300);
+    await page.tap('[data-t="map"]'); await page.waitForTimeout(500);
+    const up = await page.evaluate(() => !!window.__stompy.game.command && document.querySelector('.touch-ui').hidden);
+    const at = await page.evaluate(() => { const G = window.__stompy.game; return window.__stompy.app.command.screenOf(G.crew.find(m => m.type === 'kestrel')); });
+    if (at) await page.touchscreen.tap(at[0], at[1]);
+    await page.waitForTimeout(300);
+    const picked = await page.evaluate(() => [...window.__stompy.app.command.C.picked].map(m => m.type).join());
+    if (at) await page.touchscreen.tap(at[0] + 120, at[1] + 40);
+    await page.waitForTimeout(300);
+    const go = await page.evaluate(() => window.__stompy.game.crew.find(m => m.type === 'kestrel').order?.kind);
+    await page.tap('[data-c="drive"]'); await page.waitForTimeout(400);
+    const now = await page.evaluate(() => [!!window.__stompy.game.command, window.__stompy.game.player.type, !document.querySelector('.touch-ui').hidden]);
+    console.log(`touch-command: MAP up ${up}; tap picked ${picked}; a ground tap gave it ${go}; DRIVE -> ${now[1]} (still up ${now[0]}, touch controls back ${now[2]})`);
+    if (!up || picked !== 'kestrel' || go !== 'go' || now[0] || now[1] !== 'kestrel' || !now[2]) { failed = true; console.error('FAIL: the command view on touch'); }
+  });
+  // Placing from the map (spec 23): up, 7 is BUILD FACTORY, the ghost follows the mouse to a spot with room, a click puts the site down.
+  await run('command-build', URL_, async page => {
+    await page.click('[data-sel="debug"]'); await page.click('[data-dsec="jump"]');
+    await page.click('[data-dj="base"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'base' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    await page.keyboard.press('Tab'); await page.waitForTimeout(400);
+    await page.keyboard.press('7'); await page.waitForTimeout(200);
+    const label = await page.evaluate(() => document.querySelector('[data-c="build"]').textContent);
+    let spot = null;
+    for (let i = 0; i < 24 && !spot; i++) {   // round the silo, out to 80 m, until a footprint fits
+      const p = await page.evaluate(i => { const s = window.__stompy.game.base.silo, a = i * 0.9, r = 40 + (i % 3) * 20; return window.__stompy.app.command.screenOf({ x: s.x + Math.sin(a) * r, z: s.z + Math.cos(a) * r }); }, i);
+      if (!p) continue;
+      await page.mouse.move(p[0], p[1]); await page.waitForTimeout(60);
+      if (await page.evaluate(() => { const g = window.__stompy.app.command.ghost(); return g && !g.why; })) spot = p;
+    }
+    if (spot) await page.mouse.click(spot[0], spot[1]);
+    await page.waitForTimeout(300);
+    const r = await page.evaluate(() => { const G = window.__stompy.game; return { sites: G.base.sites.map(s => s.kind).join(), ore: G.base.ore, place: window.__stompy.app.command.C.place }; });
+    console.log(`command-build: 7 lit ${label}; room found ${!!spot}; sites ${r.sites || '-'}, placing still ${r.place}`);
+    if (label !== 'BUILD FACTORY' || !spot || r.sites !== 'factory' || r.place) { failed = true; console.error('FAIL: placing a site from the map'); }
+  });
+  // The command view on a gamepad: View goes up, X picks a crew mech and looks
+  // at it, the left stick pans, A at the crosshair sends it (GO), the D-pad
+  // lights DRIVE and Y presses it.
+  await run('command-pad', URL_, async page => {
+    const press = async i => { await page.evaluate(i => window.__pad.set(i, true), i); await page.waitForTimeout(250); await page.evaluate(i => window.__pad.set(i, false), i); await page.waitForTimeout(250); };   // held over a few frames, slow machines too
+    await page.click('[data-sel="debug"]'); await page.click('[data-dsec="jump"]');
+    await page.click('[data-dj="base"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'base' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    await press(8);   // View
+    const up = await page.evaluate(() => !!window.__stompy.game.command);
+    await press(2); await press(2);   // X twice: the KESTREL (the digger you left is first)
+    const picked = await page.evaluate(() => [...window.__stompy.app.command.C.picked].map(m => m.type).join());
+    const cam0 = await page.evaluate(() => { const c = window.__stompy.app.command.C.cam; return [c.x, c.z]; });
+    await page.evaluate(() => window.__pad.axis(0, 1)); await page.waitForTimeout(500); await page.evaluate(() => window.__pad.axis(0, 0));
+    const cam1 = await page.evaluate(() => { const c = window.__stompy.app.command.C.cam; return [c.x, c.z]; });
+    await press(0);   // A at the crosshair: GO there
+    const go = await page.evaluate(() => window.__stompy.game.crew.find(m => m.type === 'kestrel').order?.kind);
+    let lit = '';
+    for (let i = 0; i < 9 && lit !== 'DRIVE'; i++) { await press(15); lit = await page.evaluate(() => document.querySelector('.cmd .pad-focus')?.textContent); }
+    await press(3);   // Y
+    const now = await page.evaluate(() => [!!window.__stompy.game.command, window.__stompy.game.player.type]);
+    const moved = Math.hypot(cam1[0] - cam0[0], cam1[1] - cam0[1]);
+    console.log(`command-pad: View up ${up}; X picked ${picked}; the stick panned ${moved.toFixed(0)} m; A gave ${go}; lit ${lit}, Y -> ${now[1]} (still up ${now[0]})`);
+    if (!up || picked !== 'kestrel' || !(moved > 20) || go !== 'go' || lit !== 'DRIVE' || now[0] || now[1] !== 'kestrel') { failed = true; console.error('FAIL: the command view on a gamepad'); }
+  }, () => {
+    const pad = { id: 'smoke pad', index: 0, connected: true, mapping: 'standard', timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
+    window.__pad = { set: (i, on) => { pad.buttons[i] = { pressed: on, value: on ? 1 : 0 }; }, axis: (i, v) => { pad.axes[i] = v; } };
+    Object.defineProperty(window.navigator, 'getGamepads', { value: () => [pad] });
   });
   // SWAP on touch (spec 20): the digger shows BUILD and no guns; TGT held swaps into the KESTREL, whose fire buttons appear.
   await run('touch-swap', URL_ + '&touch=1', async page => {

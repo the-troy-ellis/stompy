@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress: parts 1 and 2 built (the owner, 2026-10-25: "start working on the top down view so we can start sending commands to autonomous mechs like in an RTS game"; picked time keeps running, and crew jobs first) |
+| Status | built: parts 1 to 3 (the owner, 2026-10-25: "start working on the top down view so we can start sending commands to autonomous mechs like in an RTS game"; picked time keeps running, and crew jobs first) |
 | Milestone | M10 (proposed) |
 | Size | L, split in three: the view, orders, then polish |
 | Depends on | [15-mission-editor.md](15-mission-editor.md) (the shared top camera, gestures, picking and map markers it built for this); [20-build-and-fight.md](20-build-and-fight.md) (the crew, SWAP); [21-mining.md](21-mining.md) (diggers and haulers that work on their own) |
@@ -72,12 +72,23 @@ this is how you tell it which jobs.
 ### Desktop
 
 Left click picks and orders, left drag boxes, right or middle drag pans, the
-wheel zooms, Q/E rotate (the editor's controls). Keys 1–6 press the order
+wheel zooms, Q/E rotate (the editor's controls). Keys 1–9 press the order
 bar's buttons in order.
+
+### Gamepad
+
+View goes up and comes down. Up there, a crosshair in the middle of the
+screen is where you tap: the left stick pans the ground under it, the right
+stick turns (sideways) and zooms (up and down). `A` taps at the crosshair,
+`X` picks the next crew mech and looks at it, the D-pad's left and right
+light the order bar's buttons in turn and `Y` presses the lit one, `B` lets
+go (the order waiting for its tap, or the site, then the picks). Start
+pauses. A line at the top says so: `A: TAP. X: NEXT MECH. ◀ ▶ AND Y:
+ORDERS. B: LET GO.`
 
 New text, in full: `MAP` · `BACK` · `GO` · `DIG` · `FOLLOW` · `STAY` ·
 `WORK` · `DRIVE` · `ATTACK` · `GUARD` · `GOING` · `STAYING` · `FOLLOWING` ·
-`ATTACKING` · `GUARDING` · voice `Attacking.` · `Guarding.` · `Going.` ·
+`ATTACKING` · `GUARDING` · `A: TAP. X: NEXT MECH. ◀ ▶ AND Y: ORDERS. B: LET GO.` · voice `Attacking.` · `Guarding.` · `Going.` ·
 `Digging.` · `Staying.` · `Following.` · `Back to work.`
 
 ## Design
@@ -201,6 +212,23 @@ mech picks it; foes and buildings can't be picked in this slice. With
   in 13 s. Against one dodging, it took a couple of minutes to land hits.
 - **Tests:** `test/orders.test.js`, ATTACK and GUARD against a JACKAL on the
   range.
+
+### Part 3: polish
+
+- Box picking and the keys (1–9) were already in from parts 1 and 2.
+- **The gamepad** (§ Gamepad above): `ui/command.js` `pad(pad, dt)`, which
+  `input.js` hands the pad to while you're up. In the cockpit, View goes up
+  when there's a crew and pauses when not (it paused before). `gamepad.js`
+  reads X and Y as presses of their own too. `PADCAM` sets the sticks'
+  speeds.
+- **Smoke runs:**
+  - `touch-command`: MAP, a tap on the KESTREL, a tap on the ground (GO),
+    DRIVE, and the touch controls come back.
+  - `command-build`: up, `7` (`BUILD FACTORY`), the ghost follows the mouse
+    round the silo until it fits, and a click puts the factory site down.
+    It's spec 23's missing step.
+  - `command-pad`: View, X twice to the KESTREL, the stick pans, A gives GO
+    at the crosshair, the D-pad lights DRIVE and Y drives it.
 
 ## Code touchpoints
 

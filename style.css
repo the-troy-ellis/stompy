@@ -405,7 +405,7 @@ html, body {
 }
 
 /* A gamepad's highlight on a screen's buttons (input.js): D-pad to move, A to press. */
-.mech-overlay .pad-focus { outline: 3px solid #fc3; outline-offset: 2px; }
+.mech-overlay .pad-focus, .cmd .pad-focus { outline: 3px solid #fc3; outline-offset: 2px; }
 
 /* SETTINGS in sections (ui/screens.js): a small heading over each one's toggles and dials. */
 .set-group { margin: 2px 0 8px; }

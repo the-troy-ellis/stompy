@@ -51,6 +51,13 @@ test('a press is the frame the button went down, not every frame it is held', ()
   assert.equal(held.hold.missile, true, 'still held: the missiles fly while LT is down');
 });
 
+test('up in the command view, X, Y and View are presses of their own (spec 22)', () => {
+  const p = readPad(pad({ on: [PAD.X, PAD.Y, PAD.BACK] }));
+  assert.deepEqual([p.pressed.x, p.pressed.y, p.pressed.back], [true, true, true]);
+  const held = readPad(pad({ on: [PAD.X, PAD.Y, PAD.BACK] }), p.held);
+  assert.deepEqual([held.pressed.x, held.pressed.y, held.pressed.back], [false, false, false]);
+});
+
 test('the standard-mapped pad is the one used; empty slots are skipped', () => {
   const other = { ...pad(), mapping: '' }, std = pad();
   assert.equal(firstPad([null, other, std]), std);
