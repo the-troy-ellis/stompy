@@ -141,7 +141,8 @@ try {
     console.log(`debug cheats: pause shows ${before}, then ${after[0]} (G.cheats.digs ${after[1]})`);
     if (before !== 'BIG DIGS: ON' || after[0] !== 'BIG DIGS: OFF' || after[1] !== false) { failed = true; console.error('FAIL: the pause menu\'s cheat switch'); }
   });
-  // The digger (spec 20, #308): ?debug=1's selector offers it; on the range its punch bites the mesa and fills the hopper.
+  // The digger (spec 20, #308): ?debug=1's selector offers it; on the range DIG held (1, its primary button;
+  // docs/specs/25-hold-to-dig.md) spins its arms, scoops the mesa and fills the hopper.
   await run('digger', URL_, async page => {
     for (let i = 0; i < 8 && (await page.evaluate(() => window.__stompy.app.prefs.chassis)) !== 'digger'; i++) await page.click('[data-mech="1"]');
     const menu = await page.evaluate(() => [window.__stompy.app.prefs.chassis, document.querySelector('.mm-role')?.textContent, !!document.querySelector('.mm-fit')]);
@@ -150,11 +151,13 @@ try {
     await page.click('[data-a="go"]');
     await page.waitForFunction(() => window.__stompy.game.kind === 'range' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
     await page.evaluate(() => { const G = window.__stompy.game, P = G.player; P.z = 182; P.y = G.ter.groundBelow(0, 5, 182); P.yaw = 0; P.twist = 0; });
-    for (let i = 0; i < 3; i++) { await page.keyboard.press('e'); await page.waitForTimeout(1400); }
-    const r = await page.evaluate(() => ({ ore: window.__stompy.game.player.ore, guns: window.__stompy.game.player.weapons.length }));
+    await page.keyboard.down('Digit1'); await page.waitForTimeout(3000);
+    const spun = await page.evaluate(() => window.__stompy.game.player.spin?.w > 0);
     await page.screenshot({ path: 'test-results/smoke-digger.png' });
-    console.log(`digger: ${menu[1]} (FIT shown ${menu[2]}); three bites into the mesa, ${r.ore} ore, ${r.guns} guns`);
-    if (menu[0] !== 'digger' || menu[1] !== 'IT DIGS.' || menu[2] || !(r.ore > 0) || r.guns) { failed = true; console.error(`FAIL: the digger (${menu}, ${JSON.stringify(r)})`); }
+    await page.keyboard.up('Digit1'); await page.waitForTimeout(1500);
+    const r = await page.evaluate(() => { const P = window.__stompy.game.player; return { ore: P.ore, guns: P.weapons.length, scoops: P.scoops || 0, rest: P.spin.L === 0 && P.spin.R === 0 }; });
+    console.log(`digger: ${menu[1]} (FIT shown ${menu[2]}); DIG held 3 s at the mesa: arms spinning ${spun}, ${r.scoops} scoops, ${r.ore} ore, ${r.guns} guns; let go, at rest ${r.rest}`);
+    if (menu[0] !== 'digger' || menu[1] !== 'IT DIGS.' || menu[2] || !spun || !(r.scoops >= 3) || !(r.ore > 0) || r.guns || !r.rest) { failed = true; console.error(`FAIL: the digger (${menu}, ${JSON.stringify(r)})`); }
   });
   // TUNING and the overlays (spec 19, #299): a FEEL number edited on the page takes at once; NAV and DIGS AND FALLS
   // drawn over the range's arch after its leg is cut; the same pages in the pause menu.
@@ -271,16 +274,18 @@ try {
     const start = await page.evaluate(() => { const G = window.__stompy.game; return [G.player.type, G.crew.length, G.base.ore]; });
     // To the mesa's face (data/missions.js BASE_MISSION: at [10, 190], r 60), facing it.
     await page.evaluate(() => { const G = window.__stompy.game, P = G.player, b = 10 * Math.PI / 180, cx = -Math.sin(b) * 190, cz = Math.cos(b) * 190; P.x = cx; P.z = cz - 71; P.y = G.ter.groundBelow(P.x, 30, P.z); P.yaw = 0; P.twist = 0; });
-    for (let i = 0; i < 3; i++) { await page.keyboard.press('e'); await page.waitForTimeout(1400); }
+    await page.keyboard.down('Digit1'); await page.waitForTimeout(3500); await page.keyboard.up('Digit1');   // DIG held
     const dug = await page.evaluate(() => window.__stompy.game.player.ore);
     await page.evaluate(() => { const G = window.__stompy.game, P = G.player, s = G.base.silo; P.x = s.x + Math.sin(s.yaw) * s.radius * 0.9; P.z = s.z + Math.cos(s.yaw) * s.radius * 0.9; P.y = G.ter.groundBelow(P.x, 30, P.z); });
     await page.waitForTimeout(500);
     const unloaded = await page.evaluate(() => [window.__stompy.game.player.ore, window.__stompy.game.base.ore]);
     await page.evaluate(() => { const G = window.__stompy.game, P = G.player; G.base.ore = Math.max(G.base.ore, 60); P.x = 0; P.z = 0; P.y = G.ter.groundBelow(0, 30, 0); P.yaw = Math.PI; P.twist = 0; });
     await page.keyboard.down('Space'); await page.waitForTimeout(400); await page.keyboard.up('Space');
-    // Its site (spec 23): its ore in, then the bucket builds it, a swing a press, from just in front.
+    // Its site (spec 23): its ore in, then DIG held builds it, from just in front.
     await page.evaluate(() => { const G = window.__stompy.game, P = G.player, f = G.base.factory; f.site.ore = f.site.need; const d = f.radius + 6; P.x = f.x - Math.sin(P.yaw) * d; P.z = f.z - Math.cos(P.yaw) * d; P.y = G.ter.groundBelow(P.x, 30, P.z); });
-    for (let i = 0; i < 40 && (await page.evaluate(() => window.__stompy.game.base.factory?.prog)) < 1; i++) { await page.keyboard.press('e'); await page.waitForTimeout(700); }
+    await page.keyboard.down('Digit1');
+    for (let i = 0; i < 60 && (await page.evaluate(() => window.__stompy.game.base.factory?.prog)) < 1; i++) await page.waitForTimeout(500);
+    await page.keyboard.up('Digit1');
     const prog = await page.evaluate(() => window.__stompy.game.base.factory?.prog);
     await page.keyboard.press('q'); await page.waitForTimeout(500);
     const now = await page.evaluate(() => window.__stompy.game.player.type);
@@ -378,22 +383,27 @@ try {
     window.__pad = { set: (i, on) => { pad.buttons[i] = { pressed: on, value: on ? 1 : 0 }; }, axis: (i, v) => { pad.axes[i] = v; } };
     Object.defineProperty(window.navigator, 'getGamepads', { value: () => [pad] });
   });
-  // SWAP on touch (spec 20): the digger shows BUILD and no guns; TGT held swaps into the KESTREL, whose fire buttons appear.
+  // SWAP on touch (spec 20): the digger shows DIG, BUILD, NEXT and DUMP and no guns (spec 25), and DIG held
+  // with a finger spins its arms; TGT held swaps into the KESTREL, whose fire buttons appear.
   await run('touch-swap', URL_ + '&touch=1', async page => {
     await page.tap('[data-sel="debug"]'); await page.tap('[data-dsec="jump"]');
     await page.tap('[data-dj="base"]');
     await page.waitForFunction(() => window.__stompy.game.kind === 'base' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
     await page.waitForTimeout(300);
     const btns = () => page.evaluate(() => Object.fromEntries(['missile', 'energy', 'ballistic', 'fusion'].map(c => { const b = document.querySelector(`[data-t="${c}"]`); return [c, b.hidden ? '-' : b.firstChild.textContent]; })));
-    const dig = await btns();
-    const box = await (await page.$('[data-t="tgt"]')).boundingBox(), cdp = await page.context().newCDPSession(page), pt = [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }];
+    const dig = await btns(), cdp = await page.context().newCDPSession(page);
+    const db = await (await page.$('[data-t="energy"]')).boundingBox(), dp = [{ x: db.x + db.width / 2, y: db.y + db.height / 2 }];
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: dp }); await page.waitForTimeout(1200);   // DIG, held
+    const spun = await page.evaluate(() => window.__stompy.game.player.spin?.w > 0 && window.__stompy.game.player.scoops > 0);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await page.waitForTimeout(300);
+    const box = await (await page.$('[data-t="tgt"]')).boundingBox(), pt = [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }];
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt }); await page.waitForTimeout(800);   // a real finger, held
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await page.waitForTimeout(300);
     const kes = await btns(), now = await page.evaluate(() => window.__stompy.game.player.type);
     await page.screenshot({ path: 'test-results/smoke-touch-swap.png' });
-    console.log(`touch-swap: digger ${JSON.stringify(dig)}; TGT held -> ${now} ${JSON.stringify(kes)}`);
-    if (dig.missile !== 'BUILD FACTORY' || dig.energy !== 'DUMP' || dig.ballistic !== 'NEXT' || now !== 'kestrel' || kes.missile !== 'MISSILE' || kes.energy !== 'ENERGY') { failed = true; console.error('FAIL: touch buttons after SWAP'); }
+    console.log(`touch-swap: digger ${JSON.stringify(dig)}, DIG held spins and scoops ${spun}; TGT held -> ${now} ${JSON.stringify(kes)}`);
+    if (dig.missile !== 'BUILD FACTORY' || dig.energy !== 'DIG' || dig.fusion !== 'DUMP' || dig.ballistic !== 'NEXT' || !spun || now !== 'kestrel' || kes.missile !== 'MISSILE' || kes.energy !== 'ENERGY') { failed = true; console.error('FAIL: touch buttons after SWAP'); }
   });
   await run('touch', URL_ + '&touch=1', async page => {
     // Taps, not clicks: a mouse click would switch the game back to mouse mode.

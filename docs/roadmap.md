@@ -321,6 +321,8 @@ button every construction mech will share, each with its own. Spec:
 button and the scoop; the sliding face and the clods; the bucket's load and
 the pour.
 
+- **Part 1, the tool button, the spin and the scoop:** built.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
