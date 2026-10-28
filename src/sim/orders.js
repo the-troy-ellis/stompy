@@ -40,8 +40,8 @@ export const SAY = { go: 'Going.', dig: 'Digging.', follow: 'Following.', build:
 // (no hopper: a mech with guns or fists).
 export function can(m, kind) {
   if (kind === 'attack' || kind === 'guard') return !m.ch.hopper;
-  if (kind === 'dig' || kind === 'build') return !!m.ch.tools;
-  if (kind === 'follow') return !!m.ch.hopper && !m.ch.tools;
+  if (kind === 'dig' || kind === 'build') return !!m.ch.tool;
+  if (kind === 'follow') return !!m.ch.hopper && !m.ch.tool;
   if (kind === 'work') return !!m.ch.hopper;
   return kind === 'go' || kind === 'stay';
 }
@@ -51,7 +51,7 @@ export function can(m, kind) {
 // that can take it does; the voice answers once. The number that took it.
 export function give(G, mechs, order) {
   const { kind } = order, crew = crewOf(G);
-  if (kind === 'follow' && !(order.target?.alive && order.target.ch.tools && crew.includes(order.target))) return 0;
+  if (kind === 'follow' && !(order.target?.alive && order.target.ch.tool && crew.includes(order.target))) return 0;
   if (kind === 'build' && !(order.target?.alive && order.target.site)) return 0;
   if (kind === 'attack' && !(order.target?.alive && order.target.team !== 0 && G.mechs.includes(order.target))) return 0;
   if (kind === 'guard' && !(order.target?.alive && order.target.team === 0 && order.target.kind === 'structure')) return 0;
@@ -145,7 +145,7 @@ export function obey(G, m, dt) {
     if (abs(wrapA(o.yaw - m.yaw)) > MINER.face) return true;
     // Square on: this is its site now, as if it had bitten here; its own job digs it.
     m.site = { x: m.x, y: m.y, z: m.z, yaw: o.yaw, pitch: 0, t: G.time };
-    a.aim = a.dry = 0; a.swung = null;
+    a.aim = a.dry = 0;
     m.order = null;
     return false;
   }

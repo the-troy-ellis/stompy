@@ -30,7 +30,7 @@ test('the hauler: four legs, a tub four times a hopper, no guns, debug only', ()
   assert.equal(ch.legs, 'quad');
   assert.equal(ch.hopper, CONSTRUCT.haul);
   assert.equal(CONSTRUCT.haul, 4 * CONSTRUCT.hopper);
-  assert.ok(!ch.tools && ch.hardpoints.length === 0);
+  assert.ok(!ch.tool && ch.hardpoints.length === 0);
   assert.deepEqual(weaponList('hauler', stockLoadout('hauler')), [], 'no fusion cannon either');
   assert.ok(PILOTABLE.includes('hauler') && !MECH_ORDER.includes('hauler'));
   assert.ok(NAMES.chassis.hauler && NAMES.roles.hauler);

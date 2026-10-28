@@ -1,16 +1,17 @@
 import { clampN, wrapA } from '../util/math.js';
 import { CONSTRUCT } from '../data/construct.js';
-import { canPunch, meleePress, meleeTarget } from './melee.js';
+import { siteInReach, siteReach } from './tools.js';
+import { TOOL } from '../data/tools.js';
 import { routeYaw, feelers } from './ai/nav.js';
 import { padOf, siteWork } from './base.js';
-import { meleeOf } from '../data/melee.js';
 
 const { atan2, hypot, sin, cos, abs, min } = Math;
 
 // A digger you leave keeps digging (docs/specs/21-mining.md § Diggers on
-// their own). Every bite remembers where the digger stood and looked
-// (`m.site`, set in melee.js), whoever was driving. Parked, it walks back
-// there and bites until the hopper is full, walks the ore to the silo's pad
+// their own). Every scoop that digs remembers where the digger stood and
+// looked (`m.site`, set in sim/tools.js), whoever was driving. Parked, it
+// walks back there and holds DIG (`m.toolHold`, docs/specs/25-hold-to-dig.md)
+// until the hopper is full, walks the ore to the silo's pad
 // (base.js stepBase empties it), and goes back. A digger that has never
 // bitten has nowhere to go and stands. With a hauler in the crew that has
 // room, a full digger walks to the hauler instead, and a parked hauler waits
@@ -21,18 +22,18 @@ const { atan2, hypot, sin, cos, abs, min } = Math;
 // ore for one (`fetch`). `m.job` says which, for the crew strip: 'DIGGING',
 // 'HAULING', 'LOADING', 'BUILDING', 'FETCHING', 'DELIVERING' or null.
 export const MINER = {
-  arrive: 3,      // m: this near its site it stops and bites
-  face: 0.12,     // rad: this square to the site's heading before it swings
+  arrive: 3,      // m: this near its site it stops and digs
+  face: 0.12,     // rad: this square to the site's heading before it holds DIG
   follow: 4,      // m: when no aim digs, the site moves this far ahead, after the face
   moves: 3,       // moves ahead in a row that dig nothing, and it gives the site up
-  level: 0.12,    // rad: it aims this far up, so the bucket's own tilt (melee.js) bites level and it tunnels on, not down
+  level: 0.12,    // rad: it aims this far up, so the aim's own tilt (sim/tools.js) digs level and it tunnels on, not down
   deep: 16,       // m: and never moves ahead onto ground this far under where you left it digging
   stuck: 8,       // s: no metre nearer its goal for this long, and it gives up the trip
   behind: 12,     // m: a hauler waits this far behind a digger at work, inside the handover
 };
 
-// When a bite digs nothing (a miss, or the bucket scraping the hole's side),
-// the next aims off the site's, in turn: [yaw, pitch] in radians.
+// When TOOL.dig.dry scoops in a row dig nothing (a miss, or the buckets
+// scraping the hole's side), it aims off the site's, in turn: [yaw, pitch] in radians.
 const AIMS = [[0, 0], [0.4, 0], [-0.4, 0], [0, 0.25]];
 
 export function mine(G, m, dt) {
@@ -56,23 +57,22 @@ export function mine(G, m, dt) {
   const s = m.site;
   if (!s || full) { m.job = null; return halt(m, dt); }   // nowhere to dig, or full with no silo to take it
   m.job = 'DIGGING';
-  // A swing it threw has ended: did it dig? (melee.js stamps the site at each bite that turns ground to air.)
-  if (a.swung != null && !m.melee) {
-    if (s.t >= a.swung) a.aim = a.dry = 0;   // it dug
-    else if ((a.aim = (a.aim || 0) + 1) >= AIMS.length) {   // dry, and every way round the hole tried: the face has moved back, so after it, unless that is down a hole
+  // A scoop since the last look: did it dig? (sim/tools.js counts them, and the dry ones in a row.)
+  if (a.seen !== (m.scoops || 0)) {
+    a.seen = m.scoops || 0;
+    if (!m.dryScoops) a.aim = a.dry = 0;   // it dug
+    else if (m.dryScoops % TOOL.dig.dry === 0 && (a.aim = (a.aim || 0) + 1) >= AIMS.length) {   // dry, and every way round the hole tried: the face has moved back, so after it, unless that is down a hole
       const x = s.x + sin(s.yaw) * MINER.follow, z = s.z + cos(s.yaw) * MINER.follow;
-      if ((a.dry = (a.dry || 0) + 1) > MINER.moves || G.ter.groundBelow(x, s.y + 4, z) < s.y - MINER.deep) { m.site = null; m.job = null; a.swung = null; return halt(m, dt); }   // dug out, or nothing in reach: it stops
+      if ((a.dry = (a.dry || 0) + 1) > MINER.moves || G.ter.groundBelow(x, s.y + 4, z) < s.y - MINER.deep) { m.site = null; m.job = null; return halt(m, dt); }   // dug out, or nothing in reach: it stops
       a.aim = 0; s.x = x; s.z = z;
     }
-    a.swung = null;
   }
   if (hypot(s.x - m.x, s.z - m.z) > MINER.arrive) return walkTo(G, m, a, s.x, s.y, s.z, dt, () => { m.site = null; m.job = null; });   // s.y: a site down its own tunnel, not on the mesa's top
   halt(m, dt);
   const [dy, dp] = AIMS[a.aim || 0], yaw = s.yaw + dy;
   m.yaw += clampN(wrapA(yaw - m.yaw), -m.ch.turn * dt, m.ch.turn * dt);
   m.pitch = MINER.level + dp;
-  // Square on, nothing (a crewmate, a building) in reach to hit instead: bite.
-  if (!m.melee && abs(wrapA(yaw - m.yaw)) < MINER.face && canPunch(G, m) && !meleeTarget(G, m) && meleePress(G, m)) a.swung = G.time;
+  m.toolHold = abs(wrapA(yaw - m.yaw)) < MINER.face;   // square on: DIG
 }
 
 // The nearest part of a site this digger should go to: one its bucket can
@@ -89,11 +89,11 @@ function siteFor(G, m, a, full) {
   }
   return best;
 }
-// To a site's part, square on, and swing (melee.js builds it with the
-// bucket; base.js tipIn takes its ore on the way in).
+// To a site's part, square on, and hold DIG (sim/tools.js builds it with the
+// buckets; base.js tipIn takes its ore on the way in).
 export function build(G, m, a, e, dt) {
   m.job = 'BUILDING';
-  const reach = meleeOf(m).reach * m.ch.scale, d = hypot(e.x - m.x, e.z - m.z) - e.radius;
+  const reach = siteReach(m), d = hypot(e.x - m.x, e.z - m.z) - e.radius;
   if (d > reach * 0.7) {
     const k = e.radius + reach * 0.5, x = e.x + (m.x - e.x) / (d + e.radius) * k, z = e.z + (m.z - e.z) / (d + e.radius) * k;
     return walkTo(G, m, a, x, G.ter.height(x, z), z, dt, () => { a.skip = { e, until: G.time + 20 }; m.job = null; });
@@ -102,14 +102,14 @@ export function build(G, m, a, e, dt) {
   const yaw = atan2(e.x - m.x, e.z - m.z);
   m.yaw += clampN(wrapA(yaw - m.yaw), -m.ch.turn * dt, m.ch.turn * dt);
   m.pitch = 0;
-  if (!m.melee && abs(wrapA(yaw - m.yaw)) < MINER.face * 2 && canPunch(G, m) && meleeTarget(G, m) === e) meleePress(G, m);
+  m.toolHold = abs(wrapA(yaw - m.yaw)) < MINER.face * 2 && siteInReach(G, m) === e;
 }
 
 // The nearest live crew hauler with room in its tub, or null.
 function hauler(G, m) {
   let best = null, bd = Infinity;
   for (const h of G.crew || []) {
-    if (h === m || !h.alive || h.ch.tools || !h.ch.hopper || (h.ore || 0) >= h.ch.hopper) continue;
+    if (h === m || !h.alive || h.ch.tool || !h.ch.hopper || (h.ore || 0) >= h.ch.hopper) continue;
     const d = hypot(h.x - m.x, h.z - m.z);
     if (d < bd) { best = h; bd = d; }
   }
@@ -126,7 +126,7 @@ export function haul(G, m, dt, follow = null) {
   m.jetting = false; m.beamOn = false;
   let dig = follow, bd = Infinity;
   if (!follow) for (const d of G.crew || []) {
-    if (d === m || !d.alive || !d.ch.tools || !(d === G.player || d.site)) continue;   // at work: yours, or parked with a site
+    if (d === m || !d.alive || !d.ch.tool || !(d === G.player || d.site)) continue;   // at work: yours, or parked with a site
     const k = hypot(d.x - m.x, d.z - m.z);
     if (k < bd) { dig = d; bd = k; }
   }

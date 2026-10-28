@@ -3,7 +3,7 @@
 // ground, rock fills the hopper with ore and soft ground gives none.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTestGame, stepFor, foes, freeze } from './helpers.js';
+import { createTestGame, stepFor, foes, freeze, input } from './helpers.js';
 import { CHASSIS } from '../src/data/chassis.js';
 import { CONSTRUCT } from '../src/data/construct.js';
 import { stockLoadout, validate, weaponList } from '../src/sim/loadout.js';
@@ -21,7 +21,7 @@ test('the digger carries no guns and no fusion cannon, and its stock fit is fine
   assert.ok(validate('digger', lo).ok);
   const G = digger();
   assert.equal(G.player.weapons.length, 0);
-  assert.ok(CHASSIS.digger.melee.bucket && CHASSIS.digger.hopper);
+  assert.ok(CHASSIS.digger.tool === 'dig' && !CHASSIS.digger.melee && CHASSIS.digger.hopper);
 });
 
 test('a bite in rock fills the hopper; a bite in soft ground gives nothing', () => {
@@ -50,26 +50,25 @@ test('two bites give the same ground and the same ore in either order', () => {
   assert.equal(a.player.ore, b.player.ore);
 });
 
-test('the punch bites the face of a mesa in front of it, and fills the hopper', () => {
+test('holding DIG bites the face of a mesa in front of it, and fills the hopper', () => {
   const G = digger(), P = G.player, c = polar([0, 300]);
   G.ter = makeGround(1, { flat: true }, { ground: { landmarks: [{ kind: 'mesa', at: [0, 300], r: 66, top: 120, lip: 1 }] } });
   Object.assign(P, { x: c.x, z: c.z - 66 - 11, yaw: 0, twist: 0, pitch: 0.2 }); P.y = G.ter.groundBelow(P.x, 5, P.z); initFeet(G, P);
   const h = G.ter.hash();
-  meleePress(G, P);
-  stepFor(G, 1.5);
+  stepFor(G, 1.5, input({ held: { energy: true } }));
   assert.notEqual(G.ter.hash(), h, 'the wall has a bite out of it');
   assert.ok(P.ore > 0, `ore from the mesa's rock: ${P.ore}`);
 });
 
-test('the bucket still shoves a mech in reach, and digs nothing then', () => {
+test('a digger has no punch: a press does nothing, to a mech in reach or the ground', () => {
   const G = createTestGame({ chassis: 'digger', foes: ['jackal'] }), P = G.player, e = foes(G)[0];
   freeze(e);
   Object.assign(e, { x: 0, z: 10 }); e.y = 0; initFeet(G, e);
   Object.assign(P, { x: 0, z: 0, yaw: 0, twist: 0 });
-  const h = G.ter.hash(), hp = e.hp.T;
-  meleePress(G, P);
-  stepFor(G, 1.5);
-  assert.ok(e.z > 12 || e.hp.T < hp, 'shoved');
+  const h = G.ter.hash(), hp = e.hp.T, z = e.z;
+  assert.equal(meleePress(G, P), false);
+  stepFor(G, 1.5, input({ punch: true }));
+  assert.ok(!P.melee && e.z === z && e.hp.T === hp, 'not touched');
   assert.equal(G.ter.hash(), h, 'no bite');
 });
 

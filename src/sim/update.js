@@ -31,6 +31,7 @@ import { tickTutorial } from './tutorial.js';
 import { benchStep } from './bench.js';
 import { walkStep } from './walkView.js';
 import { dig, dump, stepFalls } from './dig.js';
+import { stepTool, siteInReach, aimGround } from './tools.js';
 import { DIG } from '../data/weapons.js';
 
 const { sin, abs, min, max, hypot, cos } = Math;
@@ -100,15 +101,17 @@ export function update(G, input, dt) {
 
   const live = P.alive && !G.paused && !G.roundOver;
   if (live && input.punch) meleePress(G, P);
-  G.punchReady = live && !P.melee && !!meleeTarget(G, P);   // the HUD's fist by the crosshair lights up
+  G.punchReady = live && !P.melee && !P.ch.tool && !!meleeTarget(G, P);   // the HUD's fist by the crosshair lights up
+  G.digReady = live && P.ch.tool === 'dig' && !!(siteInReach(G, P) || aimGround(G, P));   // a digger's DIG there instead (sim/tools.js)
   const armed = live && !P.melee;   // no guns during a swing or its recovery
   P.beamOn = armed && input.held.energy && !G.guide;
   fusionTick(G, P, dt, armed && input.held.fusion && !G.guide);
   if (armed && input.held.energy && !G.guide) fireCat(G, 'energy');   // energy weapons that are not beams (bolts); beams skip themselves
   if (armed && input.held.ballistic) fireCat(G, 'ballistic');
-  if (P.ch.tools) {
+  if (P.ch.tool) {
+    P.toolHold = armed && input.held.energy;   // its energy button is its tool: DIG, held (sim/tools.js, docs/specs/25-hold-to-dig.md)
     buildTrigger(G, P, armed && input.held.missile);   // a digger's missile button is BUILD (sim/base.js)
-    const tip = armed && input.held.energy;   // its energy button is DUMP, once a press (sim/dig.js)
+    const tip = armed && input.held.fusion;   // its fusion button is DUMP, once a press (sim/dig.js)
     if (tip && !G.dumpHeld) dump(G, P);
     G.dumpHeld = tip;
     const pick = armed && input.held.ballistic;   // its ballistic button picks what BUILD puts down (sim/base.js)
@@ -128,8 +131,9 @@ export function update(G, input, dt) {
       continue;
     }
     if (m.parked && (m !== P || G.command) && m.alive) {   // a crew mech you left (or all of them, up in the command view)
+      m.toolHold = false;   // its job holds its tool (sim/miner.js)
       if (!obey(G, m, dt)) {   // its order from the command view (sim/orders.js), else its own job:
-        if (m.ch.tools) mine(G, m, dt);   // a digger digs, a hauler carries (sim/miner.js),
+        if (m.ch.tool) mine(G, m, dt);   // a digger digs, a hauler carries (sim/miner.js),
         else if (m.ch.hopper) haul(G, m, dt);
         else stand(m);   // the rest stand (sim/crew.js)
       }
@@ -139,6 +143,7 @@ export function update(G, input, dt) {
       else { if (m.ai.frozen) { m.ai.frozen = false; m.ai.aware = true; } think(G, m, dt); }   // unfrozen: awake, and after you
     }
     if (m.alive) { stepMech(G, m, dt); meleeTick(G, m, dt); }
+    if (m.ch.tool) stepTool(G, m, dt);   // DIG: the arms' spin and its scoops (sim/tools.js)
     if (m.alive && m.beamOn) beamTick(G, m, dt, m === P ? G.aim : m.ai.beamAim);
     else m.beaming = false;
     if (m !== P) m.beamOn = false;

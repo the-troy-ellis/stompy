@@ -8,10 +8,6 @@ import { hitQueue, sendFx } from './hitqueue.js';
 import { feel } from './feel.js';
 import { fxPunch } from '../net/protocol.js';
 import { damageEntity, solid, sceneryNear } from './entities.js';
-import { bite } from './dig.js';
-import { buildSwing } from './base.js';
-import { particle, msg } from './effects.js';
-import { CONSTRUCT } from '../data/construct.js';
 
 const { atan2, hypot, sin, cos } = Math;
 
@@ -19,7 +15,7 @@ const { atan2, hypot, sin, cos } = Math;
 // reach and arc takes the blow and the knockback; then a recovery during
 // which the mech cannot fire and turns at half rate. Miss and it whiffs.
 
-export const canPunch = (G, m) => m.alive && !m.shutdown && !m.melee && !(m.meleeCd > 0) && !(m === G.player && G.guide);
+export const canPunch = (G, m) => !m.ch.tool && m.alive && !m.shutdown && !m.melee && !(m.meleeCd > 0) && !(m === G.player && G.guide);
 
 export function meleePress(G, m) {
   if (!canPunch(G, m)) return false;
@@ -61,7 +57,7 @@ export function meleeTarget(G, m) {
   const E = G.entities, n = sceneryNear(G, m.x, m.z, reach, NEAR);
   for (let i = 0; i < E.length + n; i++) {   // indexed, far ones rejected squared: see pushOutOfEntities
     const e = i < E.length ? E[i] : NEAR[i - E.length];
-    if (!solid(e) || (def.bucket && e.team === m.team && !e.site)) continue;   // a digger's bucket leaves its own base alone, but builds its sites (spec 23)
+    if (!solid(e)) continue;
     const dx = e.x - m.x, dz = e.z - m.z, far = reach + e.radius;
     if (dx * dx + dz * dz > far * far) continue;
     const d = Math.sqrt(dx * dx + dz * dz) - e.radius;
@@ -82,15 +78,7 @@ export function meleeTick(G, m, dt) {
   if (st.phase === 'windup' && st.t >= def.windup) {
     st.phase = 'recover';
     const t = meleeTarget(G, m);
-    if (t && t.kind && t.site && def.bucket) {
-      // One of your own sites (docs/specs/23-construction-sites.md): the bucket builds it.
-      const dx = t.x - m.x, dz = t.z - m.z, hd = hypot(dx, dz) || 1, p = [t.x - dx / hd * t.radius, t.y + 1, t.z - dz / hd * t.radius];
-      const built = buildSwing(G, m, t);
-      st.hit = { ent: t, p, v: 0, build: built };
-      feel(G, built ? 'punch' : 'whiff', { mech: m, k: 0.8, at: m === G.player ? null : p });
-      G.fx.sfx.punch(m === G.player ? null : p, built);
-      if (built) for (let i = 0; i < 8; i++) particle(G, [p[0] + G.rng.range(-2, 2), p[1], p[2] + G.rng.range(-2, 2)], [G.rng.range(-3, 3), G.rng.range(2, 5), G.rng.range(-3, 3)], G.rng.range(0.8, 1.4), G.rng.range(0.6, 1.2), G.pal.low, 'dust');
-    } else if (t && t.kind) {
+    if (t && t.kind) {
       // A structure or vehicle: the blow, the thunk, no knockback (it is bolted down, or a truck).
       const dx = t.x - m.x, dz = t.z - m.z, hd = hypot(dx, dz) || 1;
       const p = [t.x - dx / hd * t.radius, clampN(m.y + 5 * m.ch.scale, t.y + 0.5, t.y + t.height - 0.5), t.z - dz / hd * t.radius];
@@ -113,48 +101,12 @@ export function meleeTick(G, m, dt) {
       feel(G, 'punched', { mech: t, k: 1, roll: -side, at: t === G.player ? null : p });
       G.fx.sfx.punch(m === G.player ? null : p, true);
       G.farthestShove = Math.max(G.farthestShove || 0, v);
-    } else if (def.bucket && bucketBite(G, m, def)) {
-      m.heat += def.heat;   // the digger's bucket found ground: a bite (sim/dig.js)
     } else {
       feel(G, 'whiff', { mech: m });
       G.fx.sfx.punch(m === G.player ? null : center(m), false);
     }
   }
   if (st.phase === 'recover' && st.t >= def.windup + def.recover) m.melee = null;
-}
-
-// The digger's bucket with no mech or structure in reach: rays from the
-// bucket's height along where the mech looks find the ground within reach,
-// first nearly level (the face of a wall or a mesa: mining) and then tipped
-// well down (the floor in front: a pit), and the bucket bites it there: the
-// thunk, a spray of dirt, ore into the hopper. False when there is no ground
-// in reach (it whiffs).
-const BITE_DIR = [0, 0, 0], BITE_TILT = [-0.12, -0.75];
-function bucketBite(G, m, def) {
-  const s = m.ch.scale, yaw = viewYaw(m), reach = def.reach * s * 1.3, o = [m.x, m.y + 4 * s, m.z];
-  let t = null;
-  for (let i = 0; i < (m.parked ? 1 : BITE_TILT.length) && t == null; i++) {   // parked (sim/miner.js): only ahead, never the floor it stands on
-    const down = (m.pitch || 0) + BITE_TILT[i];
-    BITE_DIR[0] = sin(yaw) * cos(down); BITE_DIR[1] = sin(down); BITE_DIR[2] = cos(yaw) * cos(down);
-    t = G.ter.ray(o, BITE_DIR, reach);
-  }
-  if (t == null) return false;
-  t += CONSTRUCT.bucket * 0.5;   // the bucket goes in: centred on the surface, a 6 m bite often reaches no solid corner (8 m apart)
-  const p = [o[0] + BITE_DIR[0] * t, o[1] + BITE_DIR[1] * t, o[2] + BITE_DIR[2] * t], full = (m.ore || 0) >= m.ch.hopper;
-  const got = bite(G, m, p);
-  // Where it stood to dig: a parked digger comes back here (sim/miner.js), and
-  // keeps its own heading there, only noting that the bite dug.
-  if (m.biteCorners) { if (m.parked && m.site) m.site.t = G.time; else m.site = { x: m.x, y: m.y, z: m.z, yaw, pitch: m.pitch || 0, t: G.time }; }
-  m.melee.hit = { ground: true, p, ore: got };
-  feel(G, 'punch', { mech: m, k: 1, at: m === G.player ? null : p });
-  G.fx.sfx.punch(m === G.player ? null : p, true);
-  for (let i = 0; i < 10; i++) particle(G, [p[0] + G.rng.range(-2, 2), p[1] + 0.5, p[2] + G.rng.range(-2, 2)], [G.rng.range(-4, 4), G.rng.range(4, 9), G.rng.range(-4, 4)], G.rng.range(0.6, 1.1), G.rng.range(0.5, 1.0), G.pal.low, 'debris', 26);
-  if (m.seamBite) {   // a seam (docs/specs/21-mining.md): a sparkle in its colour
-    for (let i = 0; i < 8; i++) particle(G, [p[0] + G.rng.range(-1.5, 1.5), p[1] + 1, p[2] + G.rng.range(-1.5, 1.5)], [G.rng.range(-3, 3), G.rng.range(5, 10), G.rng.range(-3, 3)], G.rng.range(0.5, 0.9), G.rng.range(0.3, 0.6), G.pal.ore || G.pal.high, 'spark', 26);
-    if (m === G.player && !full) msg(G, 'ORE SEAM', '#7fd');
-  }
-  if (m === G.player && full) msg(G, 'HOPPER FULL', '#fc3');
-  return true;
 }
 
 // Landing on a mech: a stomp. Called from the landing branch with how long
