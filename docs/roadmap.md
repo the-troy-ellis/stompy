@@ -304,6 +304,9 @@ purchase for the full game. Spec:
 [specs/24-apps-and-unlock.md](specs/24-apps-and-unlock.md). In four parts:
 the platform layer and Android shell; native feel; the demo and unlock; iOS.
 
+- **Part 1, the platform layer and the Android shell:** built. `src/platform/`,
+  the Capacitor shell in `app/`, and a debug APK from the Android workflow.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):

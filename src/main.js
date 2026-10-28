@@ -34,6 +34,7 @@ import { SETTINGS, SETTING_KEYS, readSetting, particleScales } from './data/sett
 import { createMechlab } from './ui/mechlab.js';
 import { normalRelay, resolveRelay } from './net/relay.js';
 import { registerServiceWorker } from './ui/pwa.js';
+import { platform } from './platform/index.js';
 
 // Settings and progress, from localStorage. Each screen writes back the key
 // it owns (store.set) when the player changes something.
@@ -129,7 +130,7 @@ function start(root) {
     requestAnimationFrame(loop);
     const dt = Math.min(0.05, (ts - last) / 1000 || 0);
     last = ts;
-    if (document.hidden) { quiet(); return; }
+    if (platform.hidden()) { quiet(); return; }
     if (ts - lastAudioCheck > 1000) {
       lastAudioCheck = ts;
       const c = app.audio.Sound.ctx;

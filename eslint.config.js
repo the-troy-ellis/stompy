@@ -15,7 +15,16 @@ export default [
   {
     files: ['src/**/*.js'],
     languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: browserGlobals },
-    rules: { 'no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrors: 'none' }], 'no-empty': ['error', { allowEmptyCatch: true }] },
+    rules: {
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrors: 'none' }], 'no-empty': ['error', { allowEmptyCatch: true }],
+      // Only src/platform/ knows about the phone apps' shells (docs/specs/24-apps-and-unlock.md).
+      'no-restricted-globals': ['error', { name: 'Capacitor', message: 'Ask src/platform/ instead.' }],
+      'no-restricted-properties': ['error', { object: 'window', property: 'Capacitor', message: 'Ask src/platform/ instead.' }],
+    },
+  },
+  {
+    files: ['src/platform/**/*.js'],
+    rules: { 'no-restricted-globals': 'off', 'no-restricted-properties': 'off' },
   },
   {
     // The service worker runs in its own scope, not the page's.

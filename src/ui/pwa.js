@@ -1,11 +1,14 @@
 // The service worker's page side (docs/specs/11-release.md § PWA). Only the
 // built game registers it (the build defines __PWA__), and only where a
 // browser allows one: https, or localhost. `onUpdate(apply)` is called when a
-// new version is waiting; `apply()` swaps it in and reloads.
+// new version is waiting; `apply()` swaps it in and reloads. Not in the phone
+// apps: their files ship inside the app, and a cache would outlive an update.
 /* global __PWA__ */
+import { platform } from '../platform/index.js';
+
 export function registerServiceWorker(onUpdate) {
   const sw = navigator.serviceWorker;
-  if (typeof __PWA__ === 'undefined' || !sw) return;
+  if (typeof __PWA__ === 'undefined' || !sw || platform.isApp) return;
   if (location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(location.hostname)) return;
   let swapping = false;
   sw.addEventListener('controllerchange', () => { if (swapping) location.reload(); });

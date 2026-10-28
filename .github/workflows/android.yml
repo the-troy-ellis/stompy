@@ -1,0 +1,29 @@
+# The Android app's debug APK (docs/specs/24-apps-and-unlock.md): the web
+# build wrapped in the Capacitor shell in app/. Its own workflow, so the web
+# checks (ci.yml) never need the native tooling. Runs on PRs that touch the
+# shell or the platform layer, and by hand (Actions > Android > Run workflow);
+# the APK is the run's `stompy-debug-apk` artifact, to sideload on a phone.
+name: Android
+on:
+  pull_request:
+    paths: ['app/**', 'src/platform/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: '**/package-lock.json' }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21', cache: gradle }
+      - run: npm ci
+      - run: npm run build
+      - run: npm ci
+        working-directory: app
+      - run: npx cap sync android
+        working-directory: app
+      - run: ./gradlew assembleDebug --no-daemon
+        working-directory: app/android
+      - uses: actions/upload-artifact@v4
+        with: { name: stompy-debug-apk, path: app/android/app/build/outputs/apk/debug/*.apk, if-no-files-found: error }

@@ -5,6 +5,7 @@ import { MELT_MAX, beamMult, meltFrac } from '../sim/beams.js';
 import { BEAM_CONTACT_GAP } from '../sim/combat.js';
 import { createThump } from './thump.js';
 import { createAmbience } from './ambience.js';
+import { platform } from '../platform/index.js';
 import { HEAT, hotFrac, FEEL } from '../data/feel.js';
 
 const { sin, cos, atan2, min, max, abs, PI, random, hypot, floor } = Math;
@@ -459,7 +460,7 @@ export function createAudio(app) {
   function thump(bass, duck, haptic, at) {
     thumper.hit(bass, at);
     thumper.duck(duck);
-    if (haptic > 2 && G.touchUI && prefs.haptics !== false) { try { navigator.vibrate?.(min(100, Math.round(haptic))); } catch { /* unsupported */ } }
+    if (haptic > 2 && G.touchUI && prefs.haptics !== false) platform.haptic(min(100, Math.round(haptic)));
   }
   return { Sound, settings, loadSamples, play, loopSet, loops, sfx, say, beamSound, meltSound, fusionSound, thump, tick: audioTick, ambience };
 }

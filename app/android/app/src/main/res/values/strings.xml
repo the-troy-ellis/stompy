@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Stompy</string>
+    <string name="title_activity_main">Stompy</string>
+    <string name="package_name">com.troyellis.stompy</string>
+    <string name="custom_url_scheme">com.troyellis.stompy</string>
+</resources>
