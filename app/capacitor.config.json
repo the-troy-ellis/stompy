@@ -1,0 +1,10 @@
+{
+  "appId": "com.troyellis.stompy",
+  "appName": "Stompy",
+  "webDir": "../dist",
+  "backgroundColor": "#000000",
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true
+  }
+}

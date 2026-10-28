@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (the owner, 2026-10-27: wants it to feel like a native app with "more phone accessibility like haptics"; asked that the browser version keeps working; then iOS; then monetisation: "a straightforward demo plus 2-5 dollar full game unlock"; then allowed the native tooling "as long as it doesn't break the web version"; then set the price: "target a 1.99 price, i want it to be a no brainer just to buy") |
+| Status | part 1 built (spec merged in #356; the owner, 2026-10-27: wants it to feel like a native app with "more phone accessibility like haptics"; asked that the browser version keeps working; then iOS; then monetisation: "a straightforward demo plus 2-5 dollar full game unlock"; then allowed the native tooling "as long as it doesn't break the web version"; then set the price: "target a 1.99 price, i want it to be a no brainer just to buy") |
 | Milestone | M11 (proposed) |
 | Size | L, split in four: the platform layer and the Android shell; native haptics and phone behaviour; the demo and the unlock; iOS |
 | Depends on | [11-release.md](11-release.md) (the PWA, the build); [13-thunk.md](13-thunk.md) (the feel table's haptic column) |
@@ -226,6 +226,40 @@ Nothing per frame beyond the haptic call that's already there.
    RESTORE, and the web as the demo.
 4. **iOS:** the shell, haptics, `wss://` and local network, TestFlight.
    Needs a Mac.
+
+## As built
+
+### Part 1: the platform layer and the Android shell
+
+- **`src/platform/index.js`:** `createPlatform(win)` and the `platform` the
+  game uses:
+  - `isApp` and `os` (`'android'`, `'ios'` or `'web'`), from
+    `window.Capacitor.isNativePlatform()`;
+  - `haptic(ms)`, still milliseconds and `navigator.vibrate`, so the feel is
+    as now (part 2 makes it `haptic(kind, k)`);
+  - `hidden()`, which the frame loop asks instead of `document.hidden`.
+  - Lint stops anything else in `src/` from touching `window.Capacitor`.
+- **What asks it:** `sound.js` `thump` buzzes through it, the frame loop
+  goes quiet when it's hidden, and the service worker isn't registered in
+  an app (the files ship inside it, and a cache would outlive an update). The
+  settings footer adds the platform in an app: `v0.1.0 · … · ANDROID`.
+- **`app/`:** its own `package.json` with `@capacitor/cli`, `core` and
+  `android`, so the root `npm ci` never installs them.
+  - `capacitor.config.json`: the app id `com.troyellis.stompy` (a
+    placeholder: the owner's to pick, and fixed once it's in a store), the
+    name `Stompy`, `../dist` as the page, and `allowMixedContent` for `ws://`
+    arenas on the local network.
+  - `android/`: Capacitor's project, with landscape only
+    (`sensorLandscape`) and the VIBRATE permission.
+- **The APK:** `.github/workflows/android.yml` builds the web, syncs it into
+  the shell and runs Gradle, on PRs that touch `app/` or `src/platform/` and
+  by hand. The APK is the run's `stompy-debug-apk` artifact. `app/README.md`
+  has the steps.
+- **Known gaps, for part 2:**
+  - Android's WebView doesn't offer `speechSynthesis`, so the cockpit voice
+    is likely silent in the app. It needs a text-to-speech plugin.
+  - Capacitor's default icon and splash, and the status bar still shows.
+- **Not done here:** the owner on a real phone (acceptance criterion 2).
 
 ## Open questions
 

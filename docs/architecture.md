@@ -400,6 +400,10 @@ src/
     client.js      Net, join, onNet, send cadence
     interp.js      netInterp
     coop.js        (M5b)
+  platform/
+    index.js       platform: the device layer, the only code that knows about the phone apps' shells (M11, spec 24)
+app/               the phone apps' Capacitor shells around dist/, with their own package.json (M11, spec 24)
+  android/         the Android project; .github/workflows/android.yml builds its debug APK
 server/
   server.py        the relay (moved; same code)
   test_server.py   unittest for handshake and message handling

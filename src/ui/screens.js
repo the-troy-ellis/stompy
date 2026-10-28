@@ -1,6 +1,7 @@
 import { $, esc } from '../util/dom.js';
 import { store } from '../util/store.js';
 import { clampN } from '../util/math.js';
+import { platform } from '../platform/index.js';
 import { normalRelay } from '../net/relay.js';
 import { CATS, CAT_OF } from '../data/weapons.js';
 import { CHASSIS, MECH_ORDER, MECH_INFO, PILOTABLE } from '../data/chassis.js';
@@ -237,7 +238,7 @@ export function createUi(app) {
     return `${options()}
       <div class="mm-controls">${controls()}</div>
       <p class="credits">Original game, raw WebGL. Sound effects by <a href="https://kenney.nl" target="_blank" rel="noopener">Kenney</a> (CC0).
-        The cockpit voice is your browser's speech engine. <span class="dim version">v${VERSION}</span></p>`;
+        The cockpit voice is your browser's speech engine. <span class="dim version">v${VERSION}${platform.isApp ? ` · ${platform.os.toUpperCase()}` : ''}</span></p>`;
   }
 
   function renderMenu(status = '') {
