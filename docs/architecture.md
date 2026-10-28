@@ -340,6 +340,7 @@ src/
     range.js       the DEBUG tab's test range: grounds, foe arc, rangeDef (M8, spec 19)
     debug.js       the DEBUG tab's cheat keys and labels, BIG_DIG (M8, spec 19)
     construct.js   CONSTRUCT: the bucket, hopper, ore, the base's prices and times; BUILDINGS (M9, spec 20)
+    tools.js       TOOL: the construction mechs' tools (DIG's spin and scoops; M12, spec 25)
     colors.js      MP_COLORS
     names.js       every display name, keyed; the only place a name lives
   world/
@@ -359,6 +360,7 @@ src/
     combat.js      sectionHit, damage, destroy, fire, blast
     cheats.js      cheat(G, key): the DEBUG tab's cheats, single player only (M8, spec 19)
     crew.js        G.crew, swap(G), park, nextCrew: the mechs you drive and SWAP between (M9, spec 20)
+    tools.js       stepTool: a construction mech's tool held; DIG's spinning arms, runs of scoops, sites (M12, spec 25)
     base.js        the base: silo, unloading, BUILD (footprint, placeFactory), the factory's queue (M9, spec 20)
     raid.js        raids and salvage: the raid's call, what a raider goes for, wrecks' salvage to the silo (M9, spec 20)
     beams.js       melt, beamTick, coolArmour

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (the owner, 2026-10-28: "the punch to dig mechanic gets old fast and the way the polygons change isn't very satisfying"; asked for holding a button to dig, and for digging to look and feel better without costing too much; then: "It should get its own dig button. We will have specialized construction mechs for different tasks"; then: "No punch for the digger. Also its arms should spin when digging.") |
+| Status | part 1 built (spec merged in #359; the owner, 2026-10-28: "the punch to dig mechanic gets old fast and the way the polygons change isn't very satisfying"; asked for holding a button to dig, and for digging to look and feel better without costing too much; then: "It should get its own dig button. We will have specialized construction mechs for different tasks"; then: "No punch for the digger. Also its arms should spin when digging.") |
 | Milestone | M12 (proposed) |
 | Size | L, split in three: the tool button and the scoop; the sliding face and the clods; the bucket's load and the pour |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md) (the ground, digs, chunks); [20-build-and-fight.md](20-build-and-fight.md) and [21-mining.md](21-mining.md) (the digger, ore, dirt, DUMP); [13-thunk.md](13-thunk.md) (feel) |
@@ -303,6 +303,62 @@ see one 8 m grid as now. The one cost is rebuilding the chunk more often
    clods (sim, shapes, drawing), and `bench-scoop`.
 3. **The bucket's load and the pour:** the heap in the bucket, and DUMP
    pouring.
+
+## As built
+
+### Part 1: the tool button, the spin and the scoop
+
+- **The tool:**
+  - `ch.tool: 'dig'` on the digger replaces `tools: true`. The digger has
+    no `melee`, and `canPunch` is false for a chassis with a tool.
+  - `data/tools.js` holds `TOOL.dig`, and `NAMES.tools.dig` is `DIG`.
+  - `update.js` sets `P.toolHold` from the primary button. A parked
+    digger's job sets its own (`miner.js`).
+  - `sim/tools.js` `stepTool` runs every tool mech each frame.
+- **The spin** is as the spec says: 0.8 s a turn, the right arm setting off
+  as the left passes half a turn, and a scoop as a bucket passes 1 rad
+  forward of hanging down. One rule the spec didn't have: an arm finishing
+  its turn keeps spinning up, so a tap is a whole bucket's pass at speed.
+  `scene.js` turns the shoulders forward with `m.spin`.
+- **The scoop: a run into the face.** The spec's single small scoops didn't
+  work on the 8 m ground. A point can be up to about 7 m from the nearest
+  corner, so a scoop much smaller than that often turns nothing to air, and
+  a slope's foot never dug. Instead each scoop belongs to a run:
+  - the first is centred `into` (2 m) past the surface the aim finds,
+    `r0` (3 m) across;
+  - each next one keeps that centre and reaches `grow` (1 m) further, for
+    `steps` (6) scoops, so the last ones always take a corner;
+  - the run starts again when it's done, the aim's line leaves the centre
+    by more than `drift` (4 m), the digger moves, or the aim finds no
+    ground.
+  - The hole widens one scoop at a time, which part 2's sliding face builds
+    on.
+- **The pace.** Over 80 seeds at the range's mesa face, held DIG brings in
+  2% more ore than the punch did (`test/tools.test.js` keeps it within 10%).
+  - **Dirt comes in at about 70% of the punch's.** The punch's big bite
+    took the soft top (no ore) as well as rock; the scoops cut deeper rock.
+    So the same ore is fewer corners, and fewer corners is less dirt.
+  - Matching ore and dirt both would need a change to `dirtPerCorner`,
+    which is a balance number, so it's left to a balance issue.
+- **Sites:** a scoop with your own site in reach (35° either side, 11 m)
+  builds instead of digging; three scoops make one swing of work
+  (`perSwing`), the punch's pace. `buildSwing` takes a `work` flag, so the
+  scoops in between only say `BUILDING` or `NEEDS ORE`.
+- **Parked diggers** hold DIG square on to their site. Three dry scoops in a
+  row (`dry`) count as one dry bite did before.
+- **The buttons:** DIG on the energy button (`DIG` on touch, `LMB 1  DIG`
+  on the desktop panel, lit while held), and DUMP on the fusion button
+  (`G 4  DIRT`). `DIG` shows by the crosshair with ground or a site in reach
+  (`G.digReady`).
+- **Feel and sound:** the `scoop` feel row, `sfx.scoop` (a crunch and a low
+  knock, a clink in a seam), and `dig_loop`: the servo's clip, low, with
+  the arms' speed.
+- **Tests:** `test/tools.test.js`. The digger, sites, miner, command, dirt
+  and voxel-walk tests now dig by holding DIG. Smoke: the digger run holds
+  `1`, FIRST FACTORY digs and builds with `1` held, and the touch run holds
+  DIG with a finger.
+- **Not yet (parts 2 and 3):** clods, the bucket's load, the pour, and
+  `bench-scoop`.
 
 ## Room to grow: other tools
 

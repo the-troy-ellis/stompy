@@ -121,7 +121,7 @@ test('walking into a pocket the bucket dug, the cockpit stops short of its roof'
   const G = world([MESA], 0, polar([0, 400]).z - 80 - 12, 0, 'digger'), P = G.player;
   let worst = Infinity;
   for (let t = 0; t < 14; t += 0.25) {
-    stepFor(G, 0.25, input({ thrUp: true, punch: t > 1 && t % 1 === 0 }));
+    stepFor(G, 0.25, input({ thrUp: true, held: { energy: t > 1 } }));
     const e = eyeOf(P), a = P.yaw + P.twist;
     for (let r = 0.1; r <= 0.6; r += 0.1) for (const up of [0, 0.3]) if (G.ter.solid(e[0] + Math.sin(a) * r, e[1] + up, e[2] + Math.cos(a) * r)) worst = Math.min(worst, r);
   }
@@ -136,7 +136,7 @@ test('turning against a face the bucket dug, the view still never shows the insi
   const G = world([MESA], 0, polar([0, 400]).z - 80 - 12, 0, 'digger'), P = G.player;
   let raw = 0, seen = 0;
   for (let t = 0; t < 20; t += 0.1) {
-    stepFor(G, 0.1, input({ thrUp: true, punch: Math.round(t * 10) % 7 === 0, turn: t > 6 ? 1 : 0 }));
+    stepFor(G, 0.1, input({ thrUp: true, held: { energy: true }, turn: t > 6 ? 1 : 0 }));
     const e = eyeOf(P), a = P.yaw + P.twist, d = [Math.sin(a) * Math.cos(P.pitch), Math.sin(P.pitch), Math.cos(a) * Math.cos(P.pitch)];
     const near = q => G.ter.solid(q[0], q[1], q[2]) || G.ter.solid(q[0] + d[0] * 0.6, q[1] + d[1] * 0.6, q[2] + d[2] * 0.6);
     if (near(e)) raw++;

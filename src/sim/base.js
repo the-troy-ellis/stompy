@@ -103,10 +103,10 @@ export const siteProg = s => min(s.work / s.swings, s.ore / s.need);
 export const siteWork = s => s.work < s.swings * s.ore / s.need - 1e-9;
 // A bucket swing on a site (melee.js): one swing of work, if the ore allows.
 // True if it built.
-export function buildSwing(G, m, e) {
+export function buildSwing(G, m, e, work = true) {   // work false: a scoop between swings (sim/tools.js), only the word
   const s = e.site;
   if (!s || !siteWork(s)) { if (m === G.player) msg(G, 'NEEDS ORE', '#fc3'); return false; }
-  s.work += 1;
+  if (work) s.work += 1;
   if (m === G.player) msg(G, 'BUILDING');
   return true;
 }
@@ -115,7 +115,7 @@ export const placeFactory = (G, m) => placeBuilding(G, m, 'factory');
 // BUILD (the missile button while you drive a digger): held, the footprint
 // shows (G.buildAt, drawn by the HUD); let go, the picked building goes there.
 export function buildTrigger(G, m, held) {
-  if (!G.base || !m.ch.tools) { G.buildAt = null; return; }
+  if (!G.base || !m.ch.tool) { G.buildAt = null; return; }
   if (held) G.buildAt = footprint(G, m);
   else if (G.buildAt) { G.buildAt = null; placeBuilding(G, m); }
 }
@@ -195,11 +195,11 @@ export function stepBase(G, dt) {
 export function handover(G) {
   const crew = G.crew || [];
   for (const h of crew) {
-    if (!h.alive || h.ch.tools || !h.ch.hopper) continue;   // a hauler: a hopper and no bucket
+    if (!h.alive || h.ch.tool || !h.ch.hopper) continue;   // a hauler: a hopper and no bucket
     for (const d of crew) {
       const room = h.ch.hopper - (h.ore || 0);
       if (!(room > 0)) break;
-      if (!d.alive || !d.ch.tools || !(d.ore > 0) || hypot(d.x - h.x, d.z - h.z) > CONSTRUCT.handover) continue;
+      if (!d.alive || !d.ch.tool || !(d.ore > 0) || hypot(d.x - h.x, d.z - h.z) > CONSTRUCT.handover) continue;
       const n = Math.min(room, d.ore);
       d.ore -= n; h.ore = (h.ore || 0) + n;
       if (d === G.player || h === G.player) msg(G, 'ORE ACROSS');

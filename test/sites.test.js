@@ -44,12 +44,12 @@ test('the bucket builds a site, a swing at a time, never past the ore in it; the
   const s = G.base.sites[0], e = s.parts[0];
   shiftMech(P, 0, e.z - e.radius - 6 - P.z);   // in the bucket's reach
   s.ore = s.need / 2;
-  run(G, 40, () => false, i => ({ ...noInput(), punch: i % 80 === 0 }));
+  run(G, 40, () => false, () => ({ ...noInput(), held: { ...noInput().held, energy: true } }));
   assert.equal(s.work, s.swings / 2, 'half the ore: half built');
   assert.ok(Math.abs(e.prog - 0.5) < 1e-9 && e.height < e.full);
   assert.ok(G.msgs.some(m => m.text === 'NEEDS ORE'));
   s.ore = s.need;
-  run(G, 40, () => !G.base.sites.length, i => ({ ...noInput(), punch: i % 80 === 0 }));
+  run(G, 40, () => !G.base.sites.length, () => ({ ...noInput(), held: { ...noInput().held, energy: true } }));
   assert.equal(e.prog, 1); assert.equal(e.site, null);
   assert.ok(G.fx.calls('say').some(c => c.args[0] === 'Factory up.'));
   assert.equal(G.base.factory, e);

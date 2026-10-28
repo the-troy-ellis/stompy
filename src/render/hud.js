@@ -592,7 +592,7 @@ export function createHud(app) {
         y0 += 12;
       }
       // What BUILD puts down (docs/specs/21-mining.md): in a digger, with its price (carried to the site, spec 23); and a bay mending you.
-      if (G.player?.ch.tools) {
+      if (G.player?.ch.tool) {
         const k = PLACE_ORDER[b.pick || 0];
         ctx.fillStyle = GREEN;
         ctx.fillText(`${G.touchUI ? '' : 'M2 '}BUILDS ${NAMES.buildings[k]} · ${PLACE[k].ore}`, L.crew.x, y0); y0 += 12;
@@ -698,6 +698,9 @@ export function createHud(app) {
       for (let i = 0; i < 4; i++) ctx.fillRect(fx0 + i * 3, fy0, 2, 5);     // the knuckles
       ctx.fillRect(fx0 - 3, fy0 + 7, 3, 5);                                 // the thumb
       ctx.textAlign = 'left'; ctx.fillText(winding ? 'SWING' : 'PUNCH', fx0 + 16, fy0 + 9);
+    } else if (G.digReady) {   // a digger with ground (or a site of its own) in reach (docs/specs/25-hold-to-dig.md)
+      ctx.fillStyle = P.toolHold ? '#fff' : AMBER;
+      ctx.textAlign = 'left'; ctx.fillText(NAMES.tools.dig, ch[0] + 24, ch[1] + 27);
     }
     // Fusion scan: a violet ring filling over the scan, a frequency readout
     // that settles as it converges, and LOCK at the end.
@@ -872,12 +875,14 @@ export function createHud(app) {
       ctx.fillStyle = '#031203'; ctx.fillRect(wx + 150, wy - 3, 40, 6);
       ctx.fillStyle = full ? AMBER : GREEN; ctx.fillRect(wx + 150, wy - 3, 40 * ore / cap, 6);
     }
-    if (P.ch.tools) {
-      // The bucket's dirt (docs/specs/21-mining.md): enough for a DUMP lights it up.
+    if (P.ch.tool) {
+      // The tool (docs/specs/25-hold-to-dig.md), lit while held; then the
+      // bucket's dirt (docs/specs/21-mining.md): enough for a DUMP lights it up.
+      if (!G.touchUI) { wy += 14; ctx.fillStyle = P.toolHold ? AMBER : GREEN; ctx.fillText(`${CAT_KEY.energy.padEnd(6)}${NAMES.tools[P.ch.tool]}`, wx, wy); }
       const dirt = P.dirt || 0, can = dirt >= CONSTRUCT.dumpCost;
       wy += 14;
       ctx.fillStyle = can ? GREEN : DIM;
-      ctx.fillText(G.touchUI ? 'DIRT' : 'M1    DIRT', wx, wy);
+      ctx.fillText(G.touchUI ? 'DIRT' : `${CAT_KEY.fusion.padEnd(6)}DIRT`, wx, wy);
       ctx.fillText(String(dirt).padStart(3), wx + 118, wy);
       ctx.fillStyle = '#031203'; ctx.fillRect(wx + 150, wy - 3, 40, 6);
       ctx.fillStyle = can ? GREEN : DIM; ctx.fillRect(wx + 150, wy - 3, 40 * dirt / CONSTRUCT.dirtMax, 6);

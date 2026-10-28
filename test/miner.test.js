@@ -27,7 +27,7 @@ function digAtMesa(G) {
   while (G.ter.height(0, z) < G.ter.height(0, 0) + 4) z++;
   shiftMech(D, -D.x, z - 9 - D.z);
   D.pitch = 0;
-  for (let i = 0; i < 240; i++) frame(G, { punch: i % 80 === 0 });
+  for (let i = 0; i < 240; i++) frame(G, { held: { ...noInput().held, energy: true } });
   return D;
 }
 
@@ -77,7 +77,7 @@ test('a full digger with no silo stands; one you drive is yours', () => {
 test('left with nothing more to dig, it gives the site up, and never digs the floor under it', () => {
   const G = game('flat'), D = G.player, h0 = G.ter.height(D.x, D.z);
   D.pitch = -0.3;   // the floor ahead: a pit
-  for (let i = 0; i < 120; i++) frame(G, { punch: i % 60 === 0 });
+  for (let i = 0; i < 120; i++) frame(G, { held: { ...noInput().held, energy: true } });
   assert.ok(D.site);
   frame(G, { swap: true });
   run(G, 120, () => !D.site);

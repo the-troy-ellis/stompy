@@ -57,7 +57,7 @@ test('the mech you left does its job while you are up: a digger digs', () => {
   while (G.ter.height(0, z) < G.ter.height(0, 0) + 4) z++;
   shiftMech(D, -D.x, z - 9 - D.z);
   D.pitch = 0;
-  for (let i = 0; i < 240; i++) frame(G, { punch: i % 80 === 0 });
+  for (let i = 0; i < 240; i++) frame(G, { held: { ...noInput().held, energy: true } });
   const ore = D.ore;
   commandUp(G);
   run(G, 30);

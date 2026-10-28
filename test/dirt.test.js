@@ -42,13 +42,13 @@ test('with too little dirt DUMP does nothing and says so', () => {
   assert.ok(G.msgs.some(m => m.text === 'NO DIRT'));
 });
 
-test('the ENERGY button is DUMP for a digger: one mound a press, however long it is held', () => {
+test('the FUSION button is DUMP for a digger: one mound a press, however long it is held', () => {
   const G = digger(), P = G.player;
   P.dirt = CONSTRUCT.dirtMax;
-  stepFor(G, 0.5, input({ held: { energy: true } }));
+  stepFor(G, 0.5, input({ held: { fusion: true } }));
   assert.equal(P.dirt, CONSTRUCT.dirtMax - CONSTRUCT.dumpCost, 'one while held');
   update(G, input({}), 1 / 60);
-  update(G, input({ held: { energy: true } }), 1 / 60);
+  update(G, input({ held: { fusion: true } }), 1 / 60);
   assert.equal(P.dirt, CONSTRUCT.dirtMax - 2 * CONSTRUCT.dumpCost, 'again on the next press');
 });
 

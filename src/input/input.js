@@ -38,19 +38,22 @@ export function createInput(app) {
   const hasCrew = () => (G.crew?.length || 0) > 1;
 
   // Only show fire buttons for the kinds of weapon this mech carries. A
-  // digger's MISSILE button is BUILD (sim/base.js), shown where there is a
-  // base, and its ENERGY button DUMP (sim/dig.js, docs/specs/21-mining.md).
+  // chassis with a tool has it on the ENERGY button, held (DIG, sim/tools.js,
+  // docs/specs/25-hold-to-dig.md). A digger's MISSILE button is BUILD
+  // (sim/base.js), shown where there is a base, and its FUSION button DUMP
+  // (sim/dig.js, docs/specs/21-mining.md).
   // Run again whenever the mech you are in changes (SWAP, spec 20).
   let buttonsFor = null, builds = null;
   const buildLabel = () => `BUILD ${NAMES.buildings[PLACE_ORDER[G.base?.pick || 0]]}`;   // what BUILD puts down (sim/base.js, docs/specs/21-mining.md)
   function syncWeaponButtons() {
-    const P = (buttonsFor = G.player), build = !!(P.ch.tools && G.base);
+    const P = (buttonsFor = G.player), build = !!(P.ch.tool && G.base);
     for (const c of CATS) {
       const btn = $(`[data-t="${c}"]`, tui);
       if (!btn) continue;
-      btn.hidden = !(P.weapons.some(w => CAT_OF[w.type] === c) || ((c === 'missile' || c === 'ballistic') && build) || (c === 'energy' && P.ch.tools));
+      btn.hidden = !(P.weapons.some(w => CAT_OF[w.type] === c) || ((c === 'missile' || c === 'ballistic') && build) || ((c === 'energy' || c === 'fusion') && P.ch.tool));
       if (c === 'missile') btn.firstChild.textContent = builds = build ? buildLabel() : 'MISSILE';
-      if (c === 'energy') btn.firstChild.textContent = P.ch.tools ? 'DUMP' : 'ENERGY';
+      if (c === 'energy') btn.firstChild.textContent = P.ch.tool ? NAMES.tools[P.ch.tool] : 'ENERGY';
+      if (c === 'fusion') btn.firstChild.textContent = P.ch.tool ? 'DUMP' : 'FUSION';
       if (c === 'ballistic') btn.firstChild.textContent = build ? 'NEXT' : 'BALLISTIC';
     }
   }
@@ -61,7 +64,7 @@ export function createInput(app) {
   const fireLast = {}, fireBtn = {};
   function fireStatus() {
     const P = G.player;
-    if (P.ch.tools && G.base && buildLabel() !== builds) { builds = buildLabel(); const b = $('[data-t="missile"]', tui); if (b) b.firstChild.textContent = builds; }   // NEXT picked another
+    if (P.ch.tool && G.base && buildLabel() !== builds) { builds = buildLabel(); const b = $('[data-t="missile"]', tui); if (b) b.firstChild.textContent = builds; }   // NEXT picked another
     for (const c of CATS) {
       const btn = fireBtn[c] || (fireBtn[c] = $(`[data-t="${c}"]`, tui));   // found once
       if (!btn || btn.hidden) continue;

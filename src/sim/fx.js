@@ -4,12 +4,12 @@
 //
 // @typedef {object} Fx
 // @property {(text: string, force?: boolean) => void} say        cockpit voice
-// @property {object} sfx                                           one-shot sounds: laser(at, small), cannon(at), thunderclap / bonker / peashooter / toaster(at) (a weapon's `sfx`), missile(at), boom(at, big), clang(), step(m, vol), land(force), fusionCrack(), fusion(at), beep(), powerdown(), powerup(), thunder(dist 0..1), lock() (a missile lock, as it comes on)
+// @property {object} sfx                                           one-shot sounds: laser(at, small), cannon(at), thunderclap / bonker / peashooter / toaster(at) (a weapon's `sfx`), missile(at), boom(at, big), clang(), step(m, vol), land(force), fusionCrack(), fusion(at), beep(), powerdown(), powerup(), thunder(dist 0..1), lock() (a missile lock, as it comes on), scoop(at, seam) (a digger's bucket in the ground)
 // @property {(on: boolean, p: number) => void} fusionSound        scan whine
 // @property {(obj: object) => void} netSend                        arena message (ignored outside the arena)
 // @property {(bass: number, duck: number, haptic: number, at?: number[]) => void} thump   the feel table's sound and haptic columns
 
-const SFX = ['laser', 'cannon', 'missile', 'boom', 'clang', 'step', 'land', 'fusionCrack', 'fusion', 'beep', 'powerdown', 'powerup', 'whine', 'punch', 'thunderclap', 'bonker', 'peashooter', 'toaster', 'thunder', 'lock'];
+const SFX = ['laser', 'cannon', 'missile', 'boom', 'clang', 'step', 'land', 'fusionCrack', 'fusion', 'beep', 'powerdown', 'powerup', 'whine', 'punch', 'thunderclap', 'bonker', 'peashooter', 'toaster', 'thunder', 'lock', 'scoop'];
 
 export const nullFx = Object.freeze({
   say() {}, fusionSound() {}, netSend() {}, thump() {},

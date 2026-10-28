@@ -12,6 +12,7 @@ import { solveKnee, limb } from '../sim/gait.js';
 import { meltFrac } from '../sim/beams.js';
 import { FEEL, HEAT, hotFrac } from '../data/feel.js';
 import { meleeOf } from '../data/melee.js';
+import { spinPose } from '../sim/tools.js';
 import { BARREL_AT, styleOf, BONE, BONE_COUNT } from '../mesh/mechParts.js';
 import { darkness, HEADLIGHTS } from '../data/palettes.js';
 import { fogOf, flashOf, WEATHER } from '../data/weather.js';
@@ -285,13 +286,14 @@ export function createScene(app) {
     const sq = m.squash ? m.squash.x : 0, wp = (m.wob ? m.wob.p.x : 0) + sin(swt) * sway, wr = (m.wob ? m.wob.r.x : 0) + cos(swt * 0.8) * sway * 0.7;
     const pose = meleePose(m);
     const fists = parts.fist && meleeOf(m).fists ? fistPose(m) : null;   // with both arms gone it shoves like anyone else
+    const spin = spinPose(m);   // a digger's arms turning like a paddle wheel, DIG held (sim/tools.js)
     const TB = chain(B, M.T(0, g.torsoY + (m.torsoDrop || 0), 0), M.S(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5), M.RY(m.twist + (fists ? fists.twist : 0)), M.T(0, 0, pose.lunge), M.RX(wp - pose.lean + (m.torsoNod || 0) + (m.runLean || 0)), M.RZ(wr));   // torsoDrop, torsoNod: the pendulum body; runLean: a run's lean forward (sim/gait.js)
     if (DARK > 0.05 && parts.lamps) { const l = m.lampAt || (m.lampAt = [[0, 0, 0], [0, 0, 0]]); placeInto(TB, parts.lamps[0], l[0]); placeInto(TB, parts.lamps[1], l[1]); }   // the headlamps, drawn after the run
     put(BONE.torso, parts.torso, TB);
     for (const [s, k, side] of [[1, 'LA', 0], [-1, 'RA', 1]]) {
       if (m.hp[k] <= 0) continue;
       // Fists follow the aim only a little; guns follow it all the way.
-      const AM = chain(TB, M.T(s * g.armX, g.armY, 0), M.RX(fists ? -m.pitch * 0.3 + fists[k] : -m.pitch + pose.arm));
+      const AM = chain(TB, M.T(s * g.armX, g.armY, 0), M.RX(spin ? -m.pitch * 0.3 + FIST_REST - spin[k] : fists ? -m.pitch * 0.3 + fists[k] : -m.pitch + pose.arm));
       put(BONE.arm[side], parts.arm, AM);
       if (parts.fist && grab) grab(BONE.arm[side], parts.fist, AM);
       else if (parts.fist && !R.skinned) R.draw(parts.fist, AM, tint);   // skinned, the fist rides on the arm's bone

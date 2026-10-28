@@ -6,6 +6,7 @@ import { BEAM_CONTACT_GAP } from '../sim/combat.js';
 import { createThump } from './thump.js';
 import { createAmbience } from './ambience.js';
 import { platform } from '../platform/index.js';
+import { TOOL } from '../data/tools.js';
 import { HEAT, hotFrac, FEEL } from '../data/feel.js';
 
 const { sin, cos, atan2, min, max, abs, PI, random, hypot, floor } = Math;
@@ -196,14 +197,15 @@ export function createAudio(app) {
     return true;
   }
 
-  // Continuous layers: reactor hum (tracks speed), jump-jet roar, torso servo whine.
-  const loops = {};
+  // Continuous layers: reactor hum (tracks speed), jump-jet roar, torso servo
+  // whine, and a digger's arms grinding round (the servo's clip, low).
+  const loops = {}, LOOP_CLIP = { dig_loop: 'servo_loop' };
   function loopSet(name, gain, rate = 1) {
     const c = ac();
     let l = loops[name];
     if (!c) { if (l) l.g.gain.value = 0; return; }
     if (!l) {
-      const buf = buffers[name]?.[0];
+      const buf = buffers[LOOP_CLIP[name] || name]?.[0];
       if (!buf) return;
       const src = c.createBufferSource(), g = c.createGain();
       src.buffer = buf; src.loop = true;   // already made seamless at load: loop the whole buffer
@@ -349,6 +351,13 @@ export function createAudio(app) {
       if (hit) { play('punch', { ...o, vol: 1.0, rate: 0.8 }); play('crunch', { ...o, vol: 0.4, rate: 1.1 }); this.osc('sine', 90, 30, 0.3, 0.3, o); }
       else { play('punch', { ...o, vol: 0.3, rate: 1.3, vary: 0.04 }); this.noise(0.25, 0.08, 1200, 300, 'bandpass', o); }
     },
+    // A digger's bucket coming round into the ground (docs/specs/25-hold-to-dig.md):
+    // a short crunch and a low knock, and in a seam a bright clink on top.
+    scoop(at, seam) {
+      const o = { at, ref: 40 };
+      play('crunch', { ...o, vol: 0.35, rate: 0.7, vary: 0.08 }); this.osc('sine', 70, 35, 0.16, 0.22, o);
+      if (seam) this.osc('triangle', 2400, 2300, 0.12, 0.05, o);
+    },
     // The beat before a mech blows: a rising whine and nothing else.
     whine(at) { const o = { at, ref: 60 }; this.osc('sawtooth', 320, 1500, 0.26, 0.05, o); this.osc('sine', 160, 900, 0.26, 0.06, o); },
   };
@@ -448,6 +457,8 @@ export function createAudio(app) {
     loopSet('jet_loop', jetting ? 0.32 : G.guide ? 0.24 : 0, jetting ? 0.85 : G.guide ? 1.7 : 0.85);
     const twistRate = G.twistRate || 0;
     loopSet('servo_loop', live ? min(0.13, twistRate * 0.07) : 0, 0.75 + min(0.6, twistRate * 0.25));
+    const spin = P.spin?.w ? P.spin.w * TOOL.dig.turn / (2 * Math.PI) : 0;   // a digger's arms, 0 to 1 of full speed (sim/tools.js)
+    loopSet('dig_loop', live ? 0.16 * spin : 0, 0.4 + 0.2 * spin);
     beamSound(P.beaming && !G.paused, beamMult(P));
     meltSound(beamOnYou(G), meltFrac(P));
     ambience.tick(G, !G.paused);   // the biome's bed and the weather's layer (audio/ambience.js)

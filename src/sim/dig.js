@@ -82,8 +82,7 @@ export function dig(G, p, r, owned = true) {
 // sets `m.seamBite` when a seam paid for it (the sparkle, melee.js) and
 // `m.biteCorners` to how many corners it turned to air.
 export const seamOre = depth => CONSTRUCT.orePerSeam * Math.min(CONSTRUCT.seamMax, 1 + Math.max(0, depth) / CONSTRUCT.seamDeep);
-export function bite(G, m, p) {
-  const r = CONSTRUCT.bucket;
+export function bite(G, m, p, r = CONSTRUCT.bucket) {
   m.seamBite = false; m.biteCorners = 0;
   if (!G.ter || online(G)) { dig(G, p, r, ownsDigs(G, m)); return 0; }
   const x = q(p[0], 0.25), y = q(p[1], 0.25), z = q(p[2], 0.25), seed = G.ter.seed;

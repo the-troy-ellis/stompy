@@ -57,6 +57,8 @@ export const FEEL = {
   punch:       { kick: 1.0, shake: 0.8, flash: 0, white: 0, squash: 0.1, wobble: 0.5, bass: 1.0, duck: 0.5, dust: 2, haptic: 60, push: 0 },
   punched:     { kick: 0.4, shake: 1.2, flash: 0.2, white: 0, squash: 0.15, wobble: 1.2, bass: 0.8, duck: 0.4, dust: 2, haptic: 60, push: 0 },
   stomp:       { kick: 1.2, shake: 1.0, flash: 0, white: 0, squash: 0.3, wobble: 0.8, bass: 1.2, duck: 0.6, dust: 4, haptic: 80, push: 0 },
+  // a digger's bucket coming round into the ground (docs/specs/25-hold-to-dig.md): a punch's knock, smaller, and two and a half a second
+  scoop:       { kick: 0.35, shake: 0.25, flash: 0, white: 0, squash: 0.04, wobble: 0.15, bass: 0.55, duck: 0.2, dust: 1, haptic: 15, push: 0 },
   whiff:       { kick: 0.3, shake: 0, flash: 0, white: 0, squash: 0, wobble: 0.2, bass: 0, duck: 0, dust: 0, haptic: 0, push: 0 },
   // a missile blast's shove, k = 1 - distance / BLAST_R (the camera response is the explosion row)
   blast:       { kick: 0, shake: 0, flash: 0, white: 0, squash: 0, wobble: 0, bass: 0, duck: 0, dust: 0, haptic: 0, push: 4 },
