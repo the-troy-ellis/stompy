@@ -31,6 +31,7 @@ export const JETS = [null,
   { charge: 0.75, vy: [15, 44], fwd: 16, recharge: 2, heat: [4, 12], tap: 0.2, steer: 7, tilt: 0.3, reach: 90, aimFwd: 22, assist: 4, assistMax: 10, letGo: 0.5, stompFall: 8 }];
 // steerOver: m/s the steering may add over a blast's own speed along; cone:
 // rad off the view a lock may be (the missiles' lock); escape: m a locked
-// flight may miss by before the lock lets go (it got away).
-export const JETS_FLIGHT = { steerOver: 6, tiltAt: 40, cone: 0.3, escape: 35 };
+// flight may miss by before the lock lets go (it got away); lockTilt: rad
+// the view may tip down to keep a locked target in sight (render/scene.js).
+export const JETS_FLIGHT = { steerOver: 6, tiltAt: 40, cone: 0.3, escape: 35, lockTilt: 1.1 };
 export const KNUCKLES_MULT = 1.5;                       // melee dmg and knock with KNUCKLES fitted

@@ -7,7 +7,7 @@ import { buildGroundExtras } from '../world/terrainMesh.js';
 import { createGround } from './ground.js';
 import { createFalls } from './falls.js';
 import { Builder } from '../mesh/builder.js';
-import { viewYaw } from '../sim/geom.js';
+import { center, viewYaw } from '../sim/geom.js';
 import { solveKnee, limb } from '../sim/gait.js';
 import { meltFrac } from '../sim/beams.js';
 import { FEEL, HEAT, hotFrac } from '../data/feel.js';
@@ -354,12 +354,19 @@ export function createScene(app) {
 
   // A blast-off's flight (docs/specs/26-blast-off.md): the view tips down with
   // the height, up to the jets' tilt at JETS_FLIGHT.tiltAt m, and eases back
-  // level on landing; and a ring on the ground where it will come down, red
-  // when that's on a mech's top (a stomp).
+  // level on landing. With a lock it tips down further, as far as it takes to
+  // keep the target in the middle of the view (up to JETS_FLIGHT.lockTilt), so
+  // you watch it all the way down. Only the view: the guns aim where the
+  // torso points.
+  // The cockpit's dash covers the bottom of the screen: the windscreen's middle
+  // is about this far (rad) above the screen's, so a lock is kept there.
+  const WINDOW_MID = 0.12;
   let tiltNow = 0, tiltT = 0;
   function flightTilt(P) {
-    const T = JETS[P.jets ?? 1], up = P.air && P.jet?.blasted && T ? P.y - G.ter.groundBelow(P.x, P.y, P.z) : 0;
-    const want = T ? T.tilt * clampN(up / JETS_FLIGHT.tiltAt, 0, 1) : 0, dt = clampN(G.time - tiltT, 0, 0.1);
+    const T = JETS[P.jets ?? 1], flying = !!(T && P.air && P.jet?.blasted), up = flying ? P.y - G.ter.groundBelow(P.x, P.y, P.z) : 0, o = flying ? P.jet.lock : null;
+    let want = T ? T.tilt * clampN(up / JETS_FLIGHT.tiltAt, 0, 1) : 0;
+    if (o?.alive) want = Math.max(want, clampN(P.pitch + Math.atan2(G.eye[1] - center(o)[1], Math.hypot(o.x - G.eye[0], o.z - G.eye[2])) + WINDOW_MID, 0, JETS_FLIGHT.lockTilt));
+    const dt = clampN(G.time - tiltT, 0, 0.1);
     tiltT = G.time;
     tiltNow += (want - tiltNow) * Math.min(1, dt * 5);
     return tiltNow;
