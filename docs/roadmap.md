@@ -329,9 +329,10 @@ the pour.
 Goal: jump jets that thunk. Hold JUMP to charge (the mech crouches, the jets
 build), let go to blast off like a rocket with a smoke streak, a big thunk, a
 dust ring and a shockwave. Steer a little in the air with the view tipped
-down and a ring where you'll land; land on a mech and it's flattened. Spec:
-[specs/26-blast-off.md](specs/26-blast-off.md). In three parts: charge and
-blast-off; the flight; the insta-stomp, the AI and online.
+down and a ring where you'll land; lock a foe while you charge and the blast
+is aimed at it, with a gentle auto-steer; land on a mech and it's flattened.
+Spec: [specs/26-blast-off.md](specs/26-blast-off.md). In four parts: charge
+and blast-off; the flight; targeting and the insta-stomp; the AI and online.
 
 - **Part 1, charge and blast-off:** built.
 - **Part 2, the flight:** built.
