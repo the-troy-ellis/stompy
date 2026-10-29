@@ -299,7 +299,37 @@ frame, about 40 ground samples. Nothing else measurable.
 - **Not yet:**
   - Online, other pilots see the flight but not the crouch, the ring or the
     thunk (`jc` and `fx blast` are part 3).
-  - Air steering, the view's tilt and the landing ring are part 2.
+  - The flight is part 2 (below).
+
+### Part 2: the flight
+
+- **`jets.js` `airSteer`**, from the player's block in `update.js` while
+  blasted and in the air:
+  - throttle (W/S, the stick or the touch throttle) pushes the flight along
+    the legs' heading, turn (A/D) across it, `steer × dt` m/s a second;
+  - the speed along is capped at the blast's own (`j.base`, taken at the first
+    push) + `JETS_FLIGHT.steerOver` (6 m/s), so it shifts a landing, never
+    turns a hop into a long jump. Turn still turns the legs as well, so the
+    push goes the way you turn.
+- **`JETS`** gains `steer` (6, 7 with the upgraded jets) and `tilt` (0.3 rad,
+  about 17°); `JETS_FLIGHT` holds `steerOver` and `tiltAt` (25 m).
+- **`landingAt(G, m)`** steps the flight at 20 a second for up to 6 s, the
+  same gravity, no more steering, until it meets the ground or a live mech's
+  top: `{ x, y, z, mech }`.
+- **The ring** is drawn in the world by `render/scene.js` `drawLanding`, not
+  the HUD: the effects ring, flat on the ground at the landing point, about a
+  mech's width and breathing. Green, or red over a mech.
+- **The view** (`scene.js` `flightTilt`): the pitch drops by `tilt × height
+  above the ground / 25 m, up to 1`, eased (a fifth of a second), and eases
+  back level on landing. Only the view: the guns aim where the torso points.
+- **Measured** (`test/jets.test.js`):
+  - holding forward the whole flight lands more than 8 m further on than
+    not steering;
+  - `landingAt` at the top of a flight is within 2.5 m of where it really
+    comes down;
+  - it names the mech under a flight.
+- **Not yet:** the red ring is only a warning. Landing there is still the old
+  stomp until part 3.
 
 ## Open questions
 

@@ -1,8 +1,9 @@
-import { JETS } from '../data/systems.js';
+import { JETS, JETS_FLIGHT } from '../data/systems.js';
+import { geoOf } from '../data/geo.js';
 import { feel } from './feel.js';
 import { particle, scorch } from './effects.js';
 
-const { min, max, sin, cos } = Math;
+const { min, max, sin, cos, hypot } = Math;
 
 // Blast-off jets (docs/specs/26-blast-off.md). Hold JUMP (`m.jetting`) on
 // the ground with the jets ready and they charge (`m.jet.charge`, 0 to 1 in
@@ -37,7 +38,7 @@ export function blastOff(G, m, T = JETS[m.jets ?? 1]) {
   m.y += 0.5; m.air = true;
   m.heat += T.heat[0] + (T.heat[1] - T.heat[0]) * k;
   m.fuel = 0;
-  j.blasted = true; j.top = m.y;
+  j.blasted = true; j.top = m.y; j.base = null;
   feel(G, 'blastoff', { mech: m, k: 0.4 + 0.6 * c, at: m === G.player ? null : [m.x, m.y, m.z] });
   blastRing(G, [m.x, m.y, m.z], c, m.ch.scale);
   G.fx.sfx.blastoff(m === G.player ? null : [m.x, m.y, m.z], c);
@@ -55,6 +56,40 @@ export function blastRing(G, p, c, s = 1) {
     particle(G, [p[0] + sin(a) * 2 * s, gy + 0.6, p[2] + cos(a) * 2 * s], [sin(a) * v, r.range(0.5, 2.5), cos(a) * v], r.range(0.7, 1.3), r.range(1, 2) * s, G.pal.low, 'dust');
   }
   for (let i = 0; i < 6; i++) particle(G, [p[0] + r.range(-2, 2), gy + 1, p[2] + r.range(-2, 2)], [r.range(-1, 1), r.range(1, 3), r.range(-1, 1)], r.range(1.2, 2), r.range(1.5, 2.5) * s, [0.3, 0.28, 0.26], 'smoke');
+}
+
+// In the air after a blast: the movement controls (`along`, `across`, each
+// -1 to 1: forward and to the left) push the flight a little, up to
+// steerOver m/s past the blast's own speed along.
+export function airSteer(m, along, across, dt) {
+  const j = m.jet, T = JETS[m.jets ?? 1];
+  if (!T || !j?.blasted || !m.air || (!along && !across)) return;
+  if (j.base == null) j.base = hypot(j.fly[0], j.fly[1]);
+  const fx = sin(m.yaw), fz = cos(m.yaw), k = T.steer * dt;
+  j.fly[0] += (fx * along + fz * across) * k; j.fly[1] += (fz * along - fx * across) * k;
+  const cap = j.base + JETS_FLIGHT.steerOver, sp = hypot(j.fly[0], j.fly[1]);
+  if (sp > cap) { j.fly[0] *= cap / sp; j.fly[1] *= cap / sp; }
+}
+
+// Where a flight comes down, as it goes now (no more steering): stepped at
+// 20 a second for up to 6 s until it meets the ground or a mech's top.
+// { x, y, z, mech } (mech: the one it would land on: a stomp), or null.
+export function landingAt(G, m) {
+  if (!m.air) return null;
+  const fly = m.jet?.blasted ? m.jet.fly : [0, 0], vx = sin(m.yaw) * m.speed + fly[0] + (m.push?.[0] || 0) * 0.4, vz = cos(m.yaw) * m.speed + fly[1] + (m.push?.[1] || 0) * 0.4;
+  const rm = geoOf(m).radius * m.ch.scale, h = 0.05;
+  let x = m.x, y = m.y, z = m.z, vy = m.vy;
+  for (let t = 0; t < 6; t += h) {
+    vy -= 18 * h; x += vx * h; y += vy * h; z += vz * h;
+    if (vy < 0) for (const o of G.mechs) {
+      if (o === m || !o.alive) continue;
+      const go = geoOf(o), top = o.y + go.height * o.ch.scale;
+      if (y <= top + 0.5 && y > top - 2 && hypot(o.x - x, o.z - z) < go.radius * o.ch.scale + rm * 0.6) return { x, y: top, z, mech: o };
+    }
+    const g = G.ter.groundBelow(x, y + 2, z);
+    if (y <= g) return { x, y: g, z, mech: null };
+  }
+  return null;
 }
 
 // The climb's streak: flame at the nozzles and smoke left hanging behind, as

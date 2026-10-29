@@ -13,6 +13,8 @@ import { meltFrac } from '../sim/beams.js';
 import { FEEL, HEAT, hotFrac } from '../data/feel.js';
 import { meleeOf } from '../data/melee.js';
 import { spinPose } from '../sim/tools.js';
+import { landingAt } from '../sim/jets.js';
+import { JETS, JETS_FLIGHT } from '../data/systems.js';
 import { BARREL_AT, styleOf, BONE, BONE_COUNT } from '../mesh/mechParts.js';
 import { darkness, HEADLIGHTS } from '../data/palettes.js';
 import { fogOf, flashOf, WEATHER } from '../data/weather.js';
@@ -350,6 +352,28 @@ export function createScene(app) {
     R.draw(R.meshes.beam, chain(M.T(...fl.p), M.RY(yw), M.RX(-pt), M.S(w, w, L)), [1, 0.9, 0.5], 1, 1);
   }
 
+  // A blast-off's flight (docs/specs/26-blast-off.md): the view tips down with
+  // the height, up to the jets' tilt at JETS_FLIGHT.tiltAt m, and eases back
+  // level on landing; and a ring on the ground where it will come down, red
+  // when that's on a mech's top (a stomp).
+  let tiltNow = 0, tiltT = 0;
+  function flightTilt(P) {
+    const T = JETS[P.jets ?? 1], up = P.air && P.jet?.blasted && T ? P.y - G.ter.groundBelow(P.x, P.y, P.z) : 0;
+    const want = T ? T.tilt * clampN(up / JETS_FLIGHT.tiltAt, 0, 1) : 0, dt = clampN(G.time - tiltT, 0, 0.1);
+    tiltT = G.time;
+    tiltNow += (want - tiltNow) * Math.min(1, dt * 5);
+    return tiltNow;
+  }
+  const LAND_OK = [0.45, 1, 0.5], LAND_STOMP = [1, 0.3, 0.25];
+  function drawLanding() {
+    const P = G.player;
+    if (!P?.alive || !P.air || !P.jet?.blasted) return;
+    const at = landingAt(G, P);
+    if (!at) return;
+    const d = geoOf(P).radius * P.ch.scale * 2.4 + Math.sin(G.time * 9) * 0.4;   // a mech's width, breathing
+    R.draw(R.meshes.fx.ring, chain(M.T(at.x, at.y + 0.35, at.z), M.S(d, 1, d)), at.mech ? LAND_STOMP : LAND_OK, 1);
+  }
+
   // render()'s per-object loops live in their own functions: render() is too big
   // for the optimizing compiler, and unoptimized code boxes every number.
   function drawRemains() {
@@ -606,6 +630,7 @@ export function createScene(app) {
       yaw = viewYaw(P) + rnd(-sh, sh) + wr * wv * 0.5; pitch = P.pitch + rnd(-sh, sh) - (P.alive || P.dying || P.fallen ? 0 : 0.15) + wp * wv;
       // Your own weight: the view dips as you brake and lifts as you pull away (FEEL.inertia.view).
       if (P.tilt) pitch -= P.tilt.p.x * FEEL.inertia.view * (G.reducedMotion ? FEEL.view.reducedScale : 1);
+      pitch -= flightTilt(P);   // up on a blast-off, the view tips down to the ground below (docs/specs/26-blast-off.md)
       // Running hot: the view swims, a slow breath in the field of view and a sway, until the reactor trips.
       const hot = hotFrac(P.heat) * (P.shutdown ? 0 : 1) * (G.reducedMotion ? FEEL.view.reducedScale : 1);
       if (hot > 0) { fov *= 1 + HEAT.fov * hot * sin(G.time * 2.6); yaw += HEAT.sway * hot * sin(G.time * 1.9); pitch += HEAT.sway * 0.6 * hot * cos(G.time * 1.3); }
@@ -684,6 +709,7 @@ export function createScene(app) {
     for (const w of G.wrecks) if (w.t < WRECK_BURN && seen(w.x, w.y + 2 * w.scale, w.z, 9 * w.scale)) drawBurn(w);
     for (const m of G.mechs) if (shown(m)) drawFlash(m);
     drawRemains();
+    drawLanding();
     drawEntities(eye);
     drawShotsAndBeams(eye, gd);
     // Effects: one instanced draw per shape (spec 14 P1), each particle a
