@@ -331,9 +331,10 @@ export function createAudio(app) {
     // deep falling boom, bigger with the charge `c`.
     blastoff(at, c) {
       const o = { at, ref: 60 };
-      play('missile', { ...o, vol: 0.5 + 0.4 * c, rate: 0.6, vary: 0.04 });
-      play('boom_low', { ...o, vol: 0.4 + 0.5 * c, rate: 1.2 });
-      this.osc('sine', 80, 24, 0.6, 0.3 * (0.5 + c), o);
+      play('missile', { ...o, vol: 0.6 + 0.4 * c, rate: 0.55, vary: 0.04 });
+      play('boom_low', { ...o, vol: 0.5 + 0.5 * c, rate: 1.1 });
+      play('boom_low', { ...o, vol: 0.3 + 0.5 * c, rate: 0.7 });   // the deeper second layer: the ground answering
+      this.osc('sine', 70, 20, 0.8, 0.4 * (0.5 + c), o);
     },
     land(force) {
       this.osc('sine', 62, 28, 0.32, 0.22 * force);

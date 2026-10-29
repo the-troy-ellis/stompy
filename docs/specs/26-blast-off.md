@@ -36,7 +36,8 @@ it's flattened: an **insta-stomp**.
 
 - **Let go** and the mech shoots up, and forward the way it was walking.
   - Height and distance grow with the charge: a hop is about 5 m up; a full
-    charge is about 25 m up and 40 m along.
+    charge is about 44 m up and 55 m along (the owner, after part 2:
+    "they need to fly higher and blast off more intensely").
 - **The thunk** (a new `blastoff` row, about a landing's size):
   - a hard kick down and back, shake, a deep bass boom, a long buzz on
     phones;
@@ -88,7 +89,7 @@ level (0 none, 1 STOCK, 2 BOOSTED):
 | | STOCK | BOOSTED | what |
 |---|---|---|---|
 | `charge` | 0.9 s | 0.75 s | empty to full |
-| `vy` | 14 to 30 m/s | 15 to 33 m/s | upward speed at blast-off, by charge |
+| `vy` | 14 to 40 m/s | 15 to 44 m/s | upward speed at blast-off, by charge |
 | `fwd` | 0 to 14 m/s | 0 to 16 m/s | added along the legs' heading, by charge times throttle (backing up blasts back) |
 | `recharge` | 3 s | 2 s | the ring refilling after a blast |
 | `heat` | 4 to 12 | 4 to 12 | added at blast-off, by charge |
@@ -96,8 +97,8 @@ level (0 none, 1 STOCK, 2 BOOSTED):
 | `tilt` | 0.3 rad | 0.3 rad | the view's tip down at the top |
 | `stompFall` | 8 m | 8 m | the fall after a blast-off that makes an insta-stomp |
 
-Gravity stays 18 m/s², so a full STOCK blast tops out at 30² / 36 = 25 m and
-lands about 3.3 s later.
+Gravity stays 18 m/s², so a full STOCK blast tops out at 40² / 36 = 44 m and
+lands about 4.4 s later.
 
 These are new numbers for a new mechanic, set in this spec. Tuning them later
 is a balance issue.
@@ -136,7 +137,7 @@ is a balance issue.
   (the same gravity, no steering) until it meets the ground or a mech's top.
   The HUD draws the ring there, red when a mech's top is under it.
 - **The view:** `render/scene.js` adds `−tilt × (height above the ground /
-  25 m, up to 1)` to the eye's pitch while blasted. It's only the view: the
+  40 m, up to 1)` to the eye's pitch while blasted. It's only the view: the
   guns still aim where the torso points. The view eases back in 0.3 s on
   landing.
 
@@ -278,8 +279,9 @@ frame, about 40 ground samples. Nothing else measurable.
   - The crouch: the body squash and the cockpit's eye sink with the charge.
   - The jet loop: a whine rising with the charge, the roar up the climb.
 - **Measured** (`test/jets.test.js`):
-  - a tap goes 5–8 m up, a full charge 22–28 m;
-  - at a run a full blast lands more than 40 m on; standing still it goes
+  - a tap goes 5–8 m up, a full charge 40–48 m (22–28 m before part 2's
+    change);
+  - at a run a full blast lands more than 50 m on; standing still it goes
     straight up;
   - a hop is down in about 1.5 s, long before the 3 s refill.
 - **Foes:** the harass jump holds the jets for 1.2 s and lets go, which is now
@@ -299,7 +301,50 @@ frame, about 40 ground samples. Nothing else measurable.
 - **Not yet:**
   - Online, other pilots see the flight but not the crouch, the ring or the
     thunk (`jc` and `fx blast` are part 3).
-  - Air steering, the view's tilt and the landing ring are part 2.
+  - The flight is part 2 (below).
+
+### Part 2: the flight
+
+- **`jets.js` `airSteer`**, from the player's block in `update.js` while
+  blasted and in the air:
+  - throttle (W/S, the stick or the touch throttle) pushes the flight along
+    the legs' heading, turn (A/D) across it, `steer × dt` m/s a second;
+  - the speed along is capped at the blast's own (`j.base`, taken at the first
+    push) + `JETS_FLIGHT.steerOver` (6 m/s), so it shifts a landing, never
+    turns a hop into a long jump. Turn still turns the legs as well, so the
+    push goes the way you turn.
+- **`JETS`** gains `steer` (6, 7 with the upgraded jets) and `tilt` (0.3 rad,
+  about 17°); `JETS_FLIGHT` holds `steerOver` and `tiltAt` (40 m).
+- **`landingAt(G, m)`** steps the flight at 20 a second for up to 6 s, the
+  same gravity, no more steering, until it meets the ground or a live mech's
+  top: `{ x, y, z, mech }`.
+- **The ring** is drawn in the world by `render/scene.js` `drawLanding`, not
+  the HUD: the effects ring, flat on the ground at the landing point, about a
+  mech's width and breathing. Green, or red over a mech.
+- **The view** (`scene.js` `flightTilt`): the pitch drops by `tilt × height
+  above the ground / 40 m, up to 1`, eased (a fifth of a second), and eases
+  back level on landing. Only the view: the guns aim where the torso points.
+- **Measured** (`test/jets.test.js`):
+  - holding forward the whole flight lands more than 8 m further on than
+    not steering;
+  - `landingAt` at the top of a flight is within 2.5 m of where it really
+    comes down;
+  - it names the mech under a flight.
+- **Higher and harder** (the owner, after seeing part 2: "they need to fly
+  higher and blast off more intensely"):
+  - a full charge goes up at 40 m/s (44 with BOOSTED jets): about 44 m up,
+    4.4 s in the air and past 50 m along at a run. A tap is the same hop.
+  - The `blastoff` feel row is harder than a stomp: kick 1.6, the shake at its
+    cap, a quarter white-out, more squash and wobble, bass 1.6, a 110 ms
+    buzz.
+  - `blastRing` is bigger: a wider shockwave and, past half a charge, a second
+    wider, slower one; more and faster dust; chunks of ground thrown up; a
+    burst of flame where it stood; twice the smoke; a bigger scorch.
+  - The streak is thicker, with a bright flame core. The sound adds a second,
+    deeper boom and a longer sub-bass drop.
+  - The view tips down over 40 m now, not 25.
+- **Not yet:** the red ring is only a warning. Landing there is still the old
+  stomp until part 3.
 
 ## Open questions
 

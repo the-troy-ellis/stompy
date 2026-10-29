@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestGame, stepFor, input, foes } from './helpers.js';
 import { JETS } from '../src/data/systems.js';
+import { landingAt } from '../src/sim/jets.js';
 
 const DT = 1 / 60;
 const game = () => { const G = createTestGame(); for (const e of foes(G)) e.alive = false; return G; };
@@ -29,15 +30,15 @@ test('the charge fills in 0.9 s, crouched on the ground', () => {
 test('fuller charges blast higher; a tap is a hop', () => {
   const hop = blast(game(), 2 * DT), half = blast(game(), 0.45), full = blast(game(), 1);
   assert.ok(hop.up > 3 && hop.up < 8, `a hop: ${hop.up.toFixed(1)} m`);
-  assert.ok(full.up > 22 && full.up < 28, `full: ${full.up.toFixed(1)} m`);
+  assert.ok(full.up > 40 && full.up < 48, `full: ${full.up.toFixed(1)} m`);
   assert.ok(hop.up < half.up && half.up < full.up);
 });
 
-test('blasting off at a run carries you along: about 40 m at full charge and throttle', () => {
+test('blasting off at a run carries you along: past 50 m at full charge and throttle', () => {
   const G = game(), P = G.player;
   P.throttle = 1; stepFor(G, 2, input({ thrUp: true }));   // up to speed
   const r = blast(G, 1, { thrUp: true });
-  assert.ok(r.along > 40, `along ${r.along.toFixed(1)} m in ${r.t.toFixed(1)} s`);
+  assert.ok(r.along > 50, `along ${r.along.toFixed(1)} m in ${r.t.toFixed(1)} s`);
   const still = blast(game(), 1);
   assert.ok(still.along < 2, 'standing still: straight up');
 });
@@ -75,4 +76,32 @@ test('no jets fitted: holding JUMP does nothing', () => {
   P.jets = 0;
   const r = blast(G, 1);
   assert.ok(r.up < 0.5 && !P.jet?.charge);
+});
+
+// The flight (part 2): steering, and where it will land.
+test('in the air the movement controls steer the flight: forward and to the side', () => {
+  const plain = blast(game(), 1), G = game(), P = G.player, x0 = P.x, z0 = P.z;
+  stepFor(G, 1, input({ jets: true }));
+  stepFor(G, DT);
+  while (P.air) stepFor(G, DT, input({ thrUp: true, turn: 0 }));
+  const fwd = Math.hypot(P.x - x0, P.z - z0);
+  assert.ok(fwd > plain.along + 8, `steered forward ${fwd.toFixed(1)} m against ${plain.along.toFixed(1)} m`);
+});
+
+test('the landing ring is where it comes down, and names the mech it would stomp', () => {
+  const G = game(), P = G.player;
+  P.throttle = 1; stepFor(G, 2, input({ thrUp: true }));
+  stepFor(G, 1, input({ jets: true, thrUp: true }));
+  stepFor(G, 0.3);   // let go of everything: no more steering, the throttle stays where it was
+  const at = landingAt(G, P);
+  assert.ok(at && !at.mech);
+  while (P.air) stepFor(G, DT);
+  assert.ok(Math.hypot(P.x - at.x, P.z - at.z) < 2.5, `predicted ${at.x.toFixed(1)},${at.z.toFixed(1)}; landed ${P.x.toFixed(1)},${P.z.toFixed(1)}`);
+  // A mech standing under the predicted spot: the ring says stomp.
+  const H = game(), Q = H.player, e = H.mechs.find(m => m !== Q);
+  stepFor(H, 1, input({ jets: true }));
+  stepFor(H, 0.3);
+  Object.assign(e, { alive: true, x: Q.x, z: Q.z, y: H.ter.height(Q.x, Q.z) });
+  const hit = landingAt(H, Q);
+  assert.equal(hit?.mech, e);
 });

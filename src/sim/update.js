@@ -32,6 +32,7 @@ import { benchStep } from './bench.js';
 import { walkStep } from './walkView.js';
 import { dig, dump, stepFalls } from './dig.js';
 import { stepTool, siteInReach, aimGround } from './tools.js';
+import { airSteer } from './jets.js';
 import { DIG } from '../data/weapons.js';
 
 const { sin, abs, min, max, hypot, cos } = Math;
@@ -83,6 +84,8 @@ export function update(G, input, dt) {
       if (P.centring && abs(P.twist) < 0.01) { P.twist = 0; P.centring = false; }
     }
     P.jetting = !!input.jets;
+    // A blast-off's flight (sim/jets.js): the movement controls steer it a little.
+    if (P.air && P.jet?.blasted) airSteer(P, clampN((input.thrUp ? 1 : 0) - (input.thrDown ? 1 : 0) + (input.thr || 0), -1, 1), clampN(input.turn, -1, 1), dt);
   } else { P.jetting = false; G.turnByUsed = 0; }
   if (G.tut && !G.paused) tickTutorial(G, input, dt);   // mission 1's prompts (sim/tutorial.js)
 
