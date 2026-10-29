@@ -141,6 +141,9 @@ function groundApi(G) {
   function touched(i0, i1, j0, j1, k0, k1) {
     retop(i0, i1, k0, k1);
     chunks(i0, i1, j0, j1, k0, k1);
+    // A patch reads the 8 m ground too (never rock where it's air): its tops again.
+    const P = G.patches;
+    if (P && P.length) for (const p of P) if (overlaps(p, [i0 - 1, i1 + 1, j0 - 1, j1 + 1, k0 - 1, k1 + 1])) topsOf(p);
   }
   function chunks(i0, i1, j0, j1, k0, k1) {
     // A corner is read by the cells on both sides of it: the chunks one corner out rebuild too.
@@ -160,7 +163,7 @@ function groundApi(G) {
     }
     touched(i0, i1, j0, j1, k0, k1);
   }
-  const carve = (p, r) => { fine(p, r, (d, x, y, z) => min(d, (hypot(x - p[0], y - p[1], z - p[2]) - r) / DS)); shape(p, r, (d, dist) => min(d, (dist - r) / DS)); clampFine(p, r); };
+  const carve = (p, r) => { fine(p, r, (d, x, y, z) => min(d, (hypot(x - p[0], y - p[1], z - p[2]) - r) / DS)); shape(p, r, (d, dist) => min(d, (dist - r) / DS)); };
   // A blast's dig (spec 18 § Digging in play): soft ground, the top SOFT
   // metres of the ground as built, goes to radius r; the rock band under it
   // only to r × `rock` (battle weapons: half); bedrock not at all. Each corner's
@@ -187,7 +190,6 @@ function groundApi(G) {
       }
     }
     touched(i0, i1, j0, j1, k0, k1);
-    clampFine(p, r);
     return [i0, i1, j0, j1, k0, k1];
   }
   // Falling ground (spec 18 § Falling ground). A solid corner is held up if a
@@ -332,7 +334,7 @@ function groundApi(G) {
     for (let n = 0; n < D.length; n++) { h ^= D[n]; h = Math.imul(h, 0x01000193); }
     return (h >>> 0).toString(16).padStart(8, '0');
   }
-  const build = (p, r) => { fine(p, r, (d, x, y, z) => max(d, (r - hypot(x - p[0], y - p[1], z - p[2])) / DS)); shape(p, r, (d, dist) => max(d, (r - dist) / DS)); clampFine(p, r); };
+  const build = (p, r) => { fine(p, r, (d, x, y, z) => max(d, (r - hypot(x - p[0], y - p[1], z - p[2])) / DS)); shape(p, r, (d, dist) => max(d, (r - dist) / DS)); };
   // A pile (the digger's DUMP, docs/specs/21-mining.md § Dirt): a cone of
   // ground `h` high and `r` across its foot, raised column by column off
   // whatever each column's top is, so its height comes out exact on the 8 m
@@ -353,7 +355,6 @@ function groundApi(G) {
       j0 = min(j0, ja); j1 = max(j1, jb);
     }
     if (j0 <= j1) touched(i0, i1, j0, j1, k0, k1);
-    clampFine([x, t0 + h / 2, z], max(r, h));
   }
   // Smooth: each corner in reach eases toward the mean of its six neighbours (read from a copy).
   function smooth(p, r) {
@@ -427,19 +428,8 @@ function groundApi(G) {
     // Only where the 8 m grid may change too: not bedrock, not the map's edge.
     const lo = Y0 + BEDROCK * VS, xs = -HALF + VS, xe = HALF - VS, ys = Y0 + (NY - 1) * VS;
     const g = (d, x, y, z) => (y <= lo || y > ys || x < xs || x > xe || z < xs || z > xe ? d : fn(d, x, y, z));
-    for (const p of P) if (overlaps(p, b)) { editPatch(p, c, reach, g, csample); topsOf(p); }
+    for (const p of P) if (overlaps(p, b)) editPatch(p, c, reach, g, csample);   // their tops come when the 8 m grid has taken it too (touched)
     G.rev++;
-  }
-  // After the 8 m grid has taken an edit: the fine ground it reached is never
-  // rock where the 8 m ground is air. So the fine ground is the 8 m ground
-  // with round bites out of it: what's open on one is open on the other, ore
-  // (8 m corners, sim/dig.js bite) is never counted twice, and a settle only
-  // fills the bites back in.
-  function clampFine(c, r) {
-    const P = G.patches;
-    if (!P || !P.length) return;
-    const reach = r + 2 * FS, b = fineBox(c, reach);
-    for (const p of P) if (overlaps(p, b)) { editPatch(p, c, reach + VS, (d, x, y, z) => min(d, csample(x, y, z)), csample); topsOf(p); }
   }
   const chunksOf = p => chunks(p.i0, p.i1, p.j0, p.j1, p.k0, p.k1);
   // A patch's fine column tops again (after an edit, or as it slumps).

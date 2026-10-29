@@ -1,6 +1,7 @@
 import { TOOL } from '../data/tools.js';
 import { wrapA } from '../util/math.js';
 import { viewYaw } from './geom.js';
+import { STEP } from './mech.js';
 import { bite } from './dig.js';
 import { buildSwing } from './base.js';
 import { feel } from './feel.js';
@@ -119,11 +120,12 @@ function offLine(c, o, d) {
 const DIR = [0, 0, 0], TILT = [-0.12, -0.75], AIM = { o: [0, 0, 0], d: [[0, 0, 1], [0, 0, 1]], hit: 0 };   // AIM: the rays the last aim cast, and which hit, for runPoint
 export function aimGround(G, m) {
   // On the 8 m ground (docs/specs/27-fine-dig.md), from the bucket's height
-  // over it: the face a scoop's ore is counted on, so the pace is the punch's
-  // as before. The fine ground is that ground with the scoops' round bites out
-  // of it (world/voxels.js clampFine), so the bites land on the face you see.
+  // over where the mech would stand on it (a step up at most, as it walks:
+  // sim/mech.js groundUnder): the face a scoop's ore is counted on, so the pace
+  // is the punch's as before. The fine ground is that ground with the scoops' round bites out
+  // of it (world/finePatch.js patchSample), so the bites land on the face you see.
   const T = TOOL.dig, s = m.ch.scale, yaw = viewYaw(m), reach = T.reach * s;
-  const o = [m.x, Math.max(m.y, G.ter.groundBelow(m.x, m.y + 4 * s, m.z, m.y - 4 * s, true)) + 4 * s, m.z];
+  const o = [m.x, Math.max(m.y, G.ter.groundBelow(m.x, m.y + STEP * s, m.z, m.y - 4 * s, true)) + 4 * s, m.z];
   let t = null;
   AIM.o = o;
   for (let i = 0; i < TILT.length; i++) { const down = (m.pitch || 0) + TILT[i]; AIM.d[i] = [sin(yaw) * cos(down), sin(down), cos(yaw) * cos(down)]; }

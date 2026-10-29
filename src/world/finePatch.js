@@ -46,17 +46,21 @@ export const overlaps = (p, b) => b[0] < p.i1 && b[1] > p.i0 && b[2] < p.j1 && b
 export const union = (p, b) => [min(p.i0, b[0]), max(p.i1, b[1]), min(p.j0, b[2]), max(p.j1, b[3]), min(p.k0, b[4]), max(p.k1, b[5])];
 export const fits = b => b[1] - b[0] <= PATCH.maxSide && b[5] - b[4] <= PATCH.maxSide;
 
-// A patch's own density at a point inside it, by trilinear blend of its
-// corners; while it settles, blended toward `coarse(x, y, z)` (the map's 8 m
-// ground there) by `blend`.
+// The ground at a point inside a patch: its own corners' density by trilinear
+// blend, but never rock where `coarse(x, y, z)` (the map's 8 m ground there)
+// is air. So the fine ground is the 8 m ground with round bites out of it,
+// whatever order the digs came in: what's open on one is open on the other,
+// ore (counted on the 8 m corners, sim/dig.js bite) is never counted twice,
+// and a settle only fills the bites back in. Settling, it blends toward the
+// 8 m ground by `blend`.
 export function patchSample(p, x, y, z, coarse) {
   const fx = (x - p.x0) / FS, fy = (y - p.y0) / FS, fz = (z - p.z0) / FS, nx = p.nx, nxy = nx * p.ny, D = p.D;
   const i = min(fx | 0, nx - 2), j = min(fy | 0, p.ny - 2), k = min(fz | 0, p.nz - 2), u = fx - i, v = fy - j, w = fz - k;
   const o = i + nx * j + nxy * k, oy = o + nx, oz = o + nxy, oyz = oz + nx;
   const a = (D[o] * (1 - u) + D[o + 1] * u) * (1 - v) + (D[oy] * (1 - u) + D[oy + 1] * u) * v;
   const b = (D[oz] * (1 - u) + D[oz + 1] * u) * (1 - v) + (D[oyz] * (1 - u) + D[oyz + 1] * u) * v;
-  const d = ((a * (1 - w) + b * w) - 128) / 127;
-  return p.blend > 0 ? d + (coarse(x, y, z) - d) * p.blend : d;
+  const c = coarse(x, y, z), d = min(((a * (1 - w) + b * w) - 128) / 127, c);
+  return p.blend > 0 ? d + (c - d) * p.blend : d;
 }
 
 // An edit in the patch: `fn(d, x, y, z)` gives each fine corner within `reach`
@@ -79,18 +83,17 @@ export function editPatch(p, c, reach, fn, coarse) {
 export function bake(p, coarse) {
   const D = p.D, nx = p.nx, nxy = nx * p.ny;
   for (let k = 0; k < p.nz; k++) for (let j = 0; j < p.ny; j++) for (let i = 0; i < nx; i++) {
-    const o = i + nx * j + nxy * k, d = (D[o] - 128) / 127;
-    D[o] = Q(d + (coarse(p.x0 + i * FS, p.y0 + j * FS, p.z0 + k * FS) - d) * p.blend);
+    const o = i + nx * j + nxy * k, c = coarse(p.x0 + i * FS, p.y0 + j * FS, p.z0 + k * FS), d = min((D[o] - 128) / 127, c);
+    D[o] = Q(d + (c - d) * p.blend);
   }
   p.blend = 0; p.rev++;
 }
-// The bytes the mesher sees (render/ground.js): the patch's own, or the slump so far.
+// The bytes the mesher sees (render/ground.js): the ground at each corner as patchSample reads it.
 export function patchBytes(p, coarse) {
-  if (!(p.blend > 0)) return p.D;
   const out = p.D.slice(), nx = p.nx, nxy = nx * p.ny;
   for (let k = 0; k < p.nz; k++) for (let j = 0; j < p.ny; j++) for (let i = 0; i < nx; i++) {
-    const o = i + nx * j + nxy * k, d = (out[o] - 128) / 127;
-    out[o] = Q(d + (coarse(p.x0 + i * FS, p.y0 + j * FS, p.z0 + k * FS) - d) * p.blend);
+    const o = i + nx * j + nxy * k, c = coarse(p.x0 + i * FS, p.y0 + j * FS, p.z0 + k * FS), d = min((out[o] - 128) / 127, c);
+    out[o] = Q(d + (c - d) * p.blend);
   }
   return out;
 }

@@ -242,7 +242,7 @@ function land(G, f, seen) {
 // over settleTime its ground blends into the 8 m ground's, with a rumble and
 // dust, then it goes and what stood on it settles. Stood on, it waits up to
 // settleWait s more. The fine ground is never rock where the 8 m ground is
-// air (world/voxels.js clampFine), so a slump only fills bites back in: a
+// air (world/finePatch.js patchSample), so a slump only fills bites back in: a
 // mech standing in one is lifted as it fills, never dropped. One pushed out
 // by too many patches (`force`) doesn't wait.
 export function stepFinePatches(G, dt) {
