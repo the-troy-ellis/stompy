@@ -20,8 +20,17 @@ export const ARMOUR_HP = 0.1, ARMOUR_SPEED = 0.04;     // per level: hp up, spee
 //   tap       a charge under this is a hop
 //   steer     m/s² the movement controls push a flight along and across
 //   tilt      rad the view tips down at a flight's height of `tiltAt` m and up
+//   reach     m the jets lock a foe from while charging (sim/jets.js jetLock)
+//   aimFwd    m/s the most speed along an aimed blast may take to reach its lock
+//   assist    m/s² the auto-steer's pull toward the lock in the air
+//   assistMax m/s the most the auto-steer may add over one flight
+//   letGo     s of steering away from the lock that drops it
+//   stompFall m fallen from a blast's top that makes a stomp an insta-stomp
 export const JETS = [null,
-  { charge: 0.9, vy: [14, 40], fwd: 14, recharge: 3, heat: [4, 12], tap: 0.2, steer: 6, tilt: 0.3 },
-  { charge: 0.75, vy: [15, 44], fwd: 16, recharge: 2, heat: [4, 12], tap: 0.2, steer: 7, tilt: 0.3 }];
-export const JETS_FLIGHT = { steerOver: 6, tiltAt: 40 };   // steerOver: m/s the steering may add over a blast's own speed along
+  { charge: 0.9, vy: [14, 40], fwd: 14, recharge: 3, heat: [4, 12], tap: 0.2, steer: 6, tilt: 0.3, reach: 80, aimFwd: 20, assist: 4, assistMax: 10, letGo: 0.5, stompFall: 8 },
+  { charge: 0.75, vy: [15, 44], fwd: 16, recharge: 2, heat: [4, 12], tap: 0.2, steer: 7, tilt: 0.3, reach: 90, aimFwd: 22, assist: 4, assistMax: 10, letGo: 0.5, stompFall: 8 }];
+// steerOver: m/s the steering may add over a blast's own speed along; cone:
+// rad off the view a lock may be (the missiles' lock); escape: m a locked
+// flight may miss by before the lock lets go (it got away).
+export const JETS_FLIGHT = { steerOver: 6, tiltAt: 40, cone: 0.3, escape: 35 };
 export const KNUCKLES_MULT = 1.5;                       // melee dmg and knock with KNUCKLES fitted

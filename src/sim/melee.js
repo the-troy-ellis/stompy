@@ -1,6 +1,8 @@
 import { clampN, wrapA } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { meleeOf, punchArm } from '../data/melee.js';
+import { JETS } from '../data/systems.js';
+import { HIT_STOP } from '../data/feel.js';
 import { center, viewYaw } from './geom.js';
 import { damage } from './combat.js';
 import { knock } from './knock.js';
@@ -122,7 +124,12 @@ export function tryStomp(G, m, airT) {
     if (hd > (rm + gt.radius * t.ch.scale) * 1.2 || m.y < top - 1.5 || m.y > top + 1.0) continue;
     const nx = hd > 0.01 ? dx / hd : 1, nz = hd > 0.01 ? dz / hd : 0;
     t.lastHitMelee = 'stomp';
-    damage(G, t, [t.x, top - 0.5, t.z], def.stompDmg, m, false, true);
+    // Down from a blast-off, from high enough: an insta-stomp, flattened
+    // whatever its armour (docs/specs/26-blast-off.md). Online it's the old
+    // stomp until the arena carries it.
+    const J = JETS[m.jets ?? 1], insta = !!(J && m.jet?.blasted && m.jet.top - m.y >= J.stompFall && !t.remote);
+    damage(G, t, [t.x, top - 0.5, t.z], insta ? 1e4 : def.stompDmg, m, false, true);
+    if (insta && m === G.player && m.jet.lock === t) G.hitStop = 2 * HIT_STOP;   // an aimed one: the clock stops for a beat
     knock(G, { target: t, attacker: m, base: def.stompKnock, dir: [nx, nz] });
     if (t.remote) { const q = hitQueue(G, t); if (q) q.st = 1; }
     m.vy = 4; m.push[0] -= nx * def.stompKnock * 0.5; m.push[1] -= nz * def.stompKnock * 0.5;

@@ -328,6 +328,30 @@ try {
     console.log(`blastoff: J held, on the ground ${!charged[0]}, charge ${(charged[1] ?? 0).toFixed(2)}; let go: in the air ${flying.air}, ${flying.up.toFixed(1)} m up, jets ${flying.fuel.toFixed(2)}`);
     if (charged[0] || !(charged[1] > 0.5) || !flying.air || !flying.blasted || !(flying.up > 5) || !(flying.fuel < 1)) { failed = true; console.error('FAIL: blast-off'); }
   });
+  // Blast-off targeting (spec 26 § Targeting): a foe standing still on the range, 55 m ahead; J held
+  // locks it and the charge reaches it, let go is aimed at it, and the landing flattens it.
+  await run('blastoff-lock', URL_, async page => {
+    await page.click('[data-sel="debug"]'); await page.click('[data-dsec="range"]');
+    await page.click('[data-drg="foes"][data-d="1"]');
+    await page.click('[data-a="go"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'range' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    await page.evaluate(() => {
+      const G = window.__stompy.game, P = G.player, e = G.mechs.find(m => m.team !== P.team && m.alive);
+      const dx = e.x - P.x, dz = e.z - P.z, d = Math.hypot(dx, dz), k = (d - 55) / d;
+      P.x += dx * k; P.z += dz * k; P.y = G.ter.height(P.x, P.z);
+      Object.assign(P, { yaw: Math.atan2(dx, dz), twist: 0, pitch: 0 });
+    });
+    await page.waitForTimeout(200);
+    await page.keyboard.down('KeyJ');
+    await page.waitForFunction(() => window.__stompy.game.player.jet?.on, null, { timeout: 8000 }).catch(() => {});
+    const lock = await page.evaluate(() => { const j = window.__stompy.game.player.jet; return [j?.lock?.type, !!j?.on]; });
+    await page.keyboard.up('KeyJ');
+    await page.waitForFunction(() => { const P = window.__stompy.game.player; return P.jet?.blasted === false && !P.air; }, null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(300);
+    const after = await page.evaluate(() => { const G = window.__stompy.game; return { left: G.mechs.filter(m => m.team !== G.player.team && m.alive).length, kills: G.stats.kills }; });
+    console.log(`blastoff-lock: J held locks ${lock[0]}, reaches ${lock[1]}; let go: foes left ${after.left}, kills ${after.kills}`);
+    if (!lock[0] || !lock[1] || after.left !== 0 || after.kills !== 1) { failed = true; console.error('FAIL: an aimed blast-off onto a standing foe'); }
+  });
   // The command view on touch: MAP goes up, a tap picks the KESTREL, a tap on the ground sends it, DRIVE drops you in.
   await run('touch-command', URL_ + '&touch=1', async page => {
     await page.tap('[data-sel="debug"]'); await page.tap('[data-dsec="jump"]');
