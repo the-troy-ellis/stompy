@@ -21,7 +21,7 @@ export const ARMOUR_HP = 0.1, ARMOUR_SPEED = 0.04;     // per level: hp up, spee
 //   steer     m/s² the movement controls push a flight along and across
 //   tilt      rad the view tips down at a flight's height of `tiltAt` m and up
 export const JETS = [null,
-  { charge: 0.9, vy: [14, 30], fwd: 14, recharge: 3, heat: [4, 12], tap: 0.2, steer: 6, tilt: 0.3 },
-  { charge: 0.75, vy: [15, 33], fwd: 16, recharge: 2, heat: [4, 12], tap: 0.2, steer: 7, tilt: 0.3 }];
-export const JETS_FLIGHT = { steerOver: 6, tiltAt: 25 };   // steerOver: m/s the steering may add over a blast's own speed along
+  { charge: 0.9, vy: [14, 40], fwd: 14, recharge: 3, heat: [4, 12], tap: 0.2, steer: 6, tilt: 0.3 },
+  { charge: 0.75, vy: [15, 44], fwd: 16, recharge: 2, heat: [4, 12], tap: 0.2, steer: 7, tilt: 0.3 }];
+export const JETS_FLIGHT = { steerOver: 6, tiltAt: 40 };   // steerOver: m/s the steering may add over a blast's own speed along
 export const KNUCKLES_MULT = 1.5;                       // melee dmg and knock with KNUCKLES fitted

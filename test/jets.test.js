@@ -30,15 +30,15 @@ test('the charge fills in 0.9 s, crouched on the ground', () => {
 test('fuller charges blast higher; a tap is a hop', () => {
   const hop = blast(game(), 2 * DT), half = blast(game(), 0.45), full = blast(game(), 1);
   assert.ok(hop.up > 3 && hop.up < 8, `a hop: ${hop.up.toFixed(1)} m`);
-  assert.ok(full.up > 22 && full.up < 28, `full: ${full.up.toFixed(1)} m`);
+  assert.ok(full.up > 40 && full.up < 48, `full: ${full.up.toFixed(1)} m`);
   assert.ok(hop.up < half.up && half.up < full.up);
 });
 
-test('blasting off at a run carries you along: about 40 m at full charge and throttle', () => {
+test('blasting off at a run carries you along: past 50 m at full charge and throttle', () => {
   const G = game(), P = G.player;
   P.throttle = 1; stepFor(G, 2, input({ thrUp: true }));   // up to speed
   const r = blast(G, 1, { thrUp: true });
-  assert.ok(r.along > 40, `along ${r.along.toFixed(1)} m in ${r.t.toFixed(1)} s`);
+  assert.ok(r.along > 50, `along ${r.along.toFixed(1)} m in ${r.t.toFixed(1)} s`);
   const still = blast(game(), 1);
   assert.ok(still.along < 2, 'standing still: straight up');
 });

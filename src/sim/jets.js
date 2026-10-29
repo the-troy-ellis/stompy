@@ -48,14 +48,21 @@ export function blastOff(G, m, T = JETS[m.jets ?? 1]) {
 // racing out along the ground and a puff of smoke, bigger with the charge.
 export function blastRing(G, p, c, s = 1) {
   const r = G.rng, gy = G.ter ? G.ter.groundBelow(p[0], p[1] + 1, p[2]) : p[1];
-  particle(G, [p[0], gy + 0.3, p[2]], [0, 0, 0], 0.45, (9 + 14 * c) * s, [0.95, 0.86, 0.66], 'shock', 0, 0);
-  scorch(G, p[0], p[2], (1.8 + 2.4 * c) * s, gy);
-  const n = Math.round(14 + 18 * c);
+  particle(G, [p[0], gy + 0.3, p[2]], [0, 0, 0], 0.45, (12 + 22 * c) * s, [0.95, 0.86, 0.66], 'shock', 0, 0);
+  if (c > 0.5) particle(G, [p[0], gy + 0.2, p[2]], [0, 0, 0], 0.8, (20 + 26 * c) * s, [0.85, 0.7, 0.5], 'shock', 0, 0);   // a full charge: a second, wider, slower ring
+  scorch(G, p[0], p[2], (2.2 + 3.2 * c) * s, gy);
+  const n = Math.round(18 + 30 * c);
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2 + r.range(-0.1, 0.1), v = r.range(8, 16) * (0.6 + 0.6 * c);
-    particle(G, [p[0] + sin(a) * 2 * s, gy + 0.6, p[2] + cos(a) * 2 * s], [sin(a) * v, r.range(0.5, 2.5), cos(a) * v], r.range(0.7, 1.3), r.range(1, 2) * s, G.pal.low, 'dust');
+    const a = (i / n) * Math.PI * 2 + r.range(-0.1, 0.1), v = r.range(10, 20) * (0.6 + 0.7 * c);
+    particle(G, [p[0] + sin(a) * 2 * s, gy + 0.6, p[2] + cos(a) * 2 * s], [sin(a) * v, r.range(0.5, 3), cos(a) * v], r.range(0.8, 1.5), r.range(1.2, 2.4) * s, G.pal.low, 'dust');
   }
-  for (let i = 0; i < 6; i++) particle(G, [p[0] + r.range(-2, 2), gy + 1, p[2] + r.range(-2, 2)], [r.range(-1, 1), r.range(1, 3), r.range(-1, 1)], r.range(1.2, 2), r.range(1.5, 2.5) * s, [0.3, 0.28, 0.26], 'smoke');
+  // The ground kicked up: chunks thrown out and up, a pillar of flame where it stood.
+  for (let i = 0; i < Math.round(4 + 8 * c); i++) {
+    const a = r.range(0, Math.PI * 2), v = r.range(6, 14) * (0.5 + 0.5 * c);
+    particle(G, [p[0], gy + 0.8, p[2]], [sin(a) * v, r.range(6, 14) * (0.5 + 0.5 * c), cos(a) * v], r.range(0.9, 1.6), r.range(0.4, 0.8) * s, G.pal.low, 'debris', 18);
+  }
+  for (let i = 0; i < Math.round(3 + 6 * c); i++) particle(G, [p[0] + r.range(-1, 1) * s, gy + 0.5, p[2] + r.range(-1, 1) * s], [r.range(-2, 2), r.range(2, 8), r.range(-2, 2)], r.range(0.25, 0.5), r.range(1.4, 2.4) * s, [1, 0.6, 0.2], 'fire');
+  for (let i = 0; i < 12; i++) particle(G, [p[0] + r.range(-3, 3), gy + 1, p[2] + r.range(-3, 3)], [r.range(-2, 2), r.range(1, 4), r.range(-2, 2)], r.range(1.6, 2.6), r.range(1.8, 3.2) * s, [0.3, 0.28, 0.26], 'smoke');
 }
 
 // In the air after a blast: the movement controls (`along`, `across`, each
@@ -96,6 +103,7 @@ export function landingAt(G, m) {
 // a missile's trail.
 function streak(G, m) {
   const r = G.rng, s = m.ch.scale, at = [m.x + r.range(-0.6, 0.6) * s, m.y + 0.8 * s, m.z + r.range(-0.6, 0.6) * s];
-  particle(G, at, [r.range(-1, 1), -10 - m.vy * 0.3, r.range(-1, 1)], 0.3, 0.9 * s, [1, 0.6, 0.2], 'fire');
+  particle(G, at, [r.range(-1, 1), -10 - m.vy * 0.3, r.range(-1, 1)], 0.3, 1.2 * s, [1, 0.6, 0.2], 'fire');
+  particle(G, at, [r.range(-1.5, 1.5), -14 - m.vy * 0.4, r.range(-1.5, 1.5)], 0.18, 0.7 * s, [1, 0.9, 0.5], 'flame');
   particle(G, at, [r.range(-0.6, 0.6), r.range(-1, 0.5), r.range(-0.6, 0.6)], r.range(1.4, 2.2), r.range(0.9, 1.5) * s, [0.62, 0.6, 0.58], 'smoke');
 }

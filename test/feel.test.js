@@ -74,7 +74,7 @@ test('in play: landing squashes and thumps, a hit wobbles toward the blow, footf
   const P = G.player, e = foes(G)[0];
   Object.assign(e, { x: 60, z: 0 }); initFeet(G, e); freeze(e);
   stepFor(G, 1.2, input({ jets: true }));
-  stepFor(G, 3);
+  stepFor(G, 5);   // a full blast-off is about 4.5 s up and down
   const land = G.fx.calls('thump').filter(c => c.args[0] >= FEEL.land.bass * 0.25);
   assert.ok(land.length >= 1, 'no landing thump');
   // A hit from the mech's right (−x in torso space when facing +z) rolls it left.
