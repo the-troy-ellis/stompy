@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (the owner, 2026-10-29: "The digging still isn't satisfying enough. The low poly is too chunky. I still want to try the dig and then settle into low poly approach") |
+| Status | ready; defaults confirmed (see Decided). The owner, 2026-10-29: "The digging still isn't satisfying enough. The low poly is too chunky. I still want to try the dig and then settle into low poly approach") |
 | Milestone | M12 (hold to dig), a follow-on |
 | Size | L, split in three: fine patches in the sim; drawing them and the settle; online |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md) (the ground); [25-hold-to-dig.md](25-hold-to-dig.md) (DIG, the scoop, clods) |
@@ -236,13 +236,12 @@ fine or coarse.
 3. **Online:** patches from others' digs, local settles, and a smoke run with
    two clients.
 
-## Open questions
+## Decided
 
-- **How fine.** Default 2 m. 1 m would look rounder still, at about eight
-  times the corners and four times the triangles. Try 2 m on a phone first.
-- **How long before it settles.** Default 15 s after the last dig. Longer
-  keeps your work crisp while you look at it; shorter keeps the world cheap.
-- **Blasts too.** Default yes: craters get fine patches like scoops do.
-  Alternatively only the digger's scoops, so fights stay as they are.
-- **The settle's look.** Default a slump with dust and a rumble. It could be
-  a quicker drop with a bigger thunk, more in the thunk pillar.
+The owner, 2026-10-29: "Lets do 2m, 15s, include craters, and a slow slump".
+- **How fine:** 2 m (`FS`). 1 m would be rounder, at about eight times the
+  corners; 4 m stays the fallback if a phone can't hold 2 m.
+- **When it settles:** 15 s after the last dig (`settleAfter`).
+- **Craters:** yes. Missile, shell and fusion craters get fine patches, as
+  scoops do.
+- **The settle's look:** the slow slump: 1.5 s, with dust and a low rumble.
