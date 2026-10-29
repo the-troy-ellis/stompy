@@ -1,6 +1,6 @@
 import { add, clampN, len, mul, norm, sub, TAU } from '../util/math.js';
 import { feel } from './feel.js';
-import { spawn } from './particles.js';
+import { spawn, KINDS, CLOD_SINK } from './particles.js';
 
 export function msg(G, text, col = '#7f7') {
   G.msgs.push({ text, col, t: 3.5 });
@@ -8,6 +8,26 @@ export function msg(G, text, col = '#7f7') {
 }
 // One particle into the pool (particles.js), which copies what it needs.
 export function particle(G, p, v, life, size, col, kind, grav = 0, spin = null) { spawn(G, p, v, life, size, col, kind, grav, spin); }
+// Clods of dug ground thrown out of a scoop's face (docs/specs/25-hold-to-dig.md):
+// `n` of them from `p`, out toward `to` (the digger) and up, in colour `col`
+// a little lighter or darker each. They're particles (sim/particles.js 'clod'):
+// they tumble, land and lie, then sink. Past CLOD_MAX not yet sinking, the
+// oldest start to sink. Their life is set so a held DIG (some 12 a second)
+// stays under that. Only for looking at: nothing stands on them.
+export const CLOD_MAX = 60, CLOD_LIFE = 3.5;
+const OLD = [];
+export function spawnClods(G, p, n, col, to) {
+  const P = G.parts, r = G.rng, dx = to[0] - p[0], dz = to[2] - p[2], d = Math.hypot(dx, dz) || 1;
+  for (let k = 0; k < n; k++) {
+    const out = r.range(3, 7), f = r.range(0.85, 1.15), c = [col[0] * f, col[1] * f, col[2] * f];
+    spawn(G, [p[0] + r.range(-1.5, 1.5), p[1] + r.range(0, 1.5), p[2] + r.range(-1.5, 1.5)], [dx / d * out + r.range(-2, 2), r.range(4, 8), dz / d * out + r.range(-2, 2)], CLOD_LIFE + r.range(0, 1), r.range(0.6, 1.4), c, 'clod', 18);
+  }
+  OLD.length = 0;
+  for (let i = 0; i < P.n; i++) if (KINDS[P.kind[i]] === 'clod' && P.life[i] > CLOD_SINK) OLD.push(i);
+  if (OLD.length <= CLOD_MAX) return;
+  OLD.sort((a, b) => P.life[a] - P.life[b]);
+  for (let k = 0; k < OLD.length - CLOD_MAX; k++) P.life[OLD[k]] = CLOD_SINK;
+}
 // A piece of a mech (an arm, a thigh, a shin, a foot) that fell off: it
 // tumbles, bounces once, and lies there for `life` seconds. Drawn from the
 // mech's own part meshes by the renderer. Capped so a long fight stays cheap.

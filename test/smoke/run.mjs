@@ -153,11 +153,12 @@ try {
     await page.evaluate(() => { const G = window.__stompy.game, P = G.player; P.z = 182; P.y = G.ter.groundBelow(0, 5, 182); P.yaw = 0; P.twist = 0; });
     await page.keyboard.down('Digit1'); await page.waitForTimeout(3000);
     const spun = await page.evaluate(() => window.__stompy.game.player.spin?.w > 0);
+    const clods = await page.evaluate(() => { const P = window.__stompy.game.parts; let n = 0; for (let i = 0; i < P.n; i++) if (P.kind[i] === 9) n++; return n; });   // 'clod' (sim/particles.js KINDS)
     await page.screenshot({ path: 'test-results/smoke-digger.png' });
     await page.keyboard.up('Digit1'); await page.waitForTimeout(1500);
     const r = await page.evaluate(() => { const P = window.__stompy.game.player; return { ore: P.ore, guns: P.weapons.length, scoops: P.scoops || 0, rest: P.spin.L === 0 && P.spin.R === 0 }; });
-    console.log(`digger: ${menu[1]} (FIT shown ${menu[2]}); DIG held 3 s at the mesa: arms spinning ${spun}, ${r.scoops} scoops, ${r.ore} ore, ${r.guns} guns; let go, at rest ${r.rest}`);
-    if (menu[0] !== 'digger' || menu[1] !== 'IT DIGS.' || menu[2] || !spun || !(r.scoops >= 3) || !(r.ore > 0) || r.guns || !r.rest) { failed = true; console.error(`FAIL: the digger (${menu}, ${JSON.stringify(r)})`); }
+    console.log(`digger: ${menu[1]} (FIT shown ${menu[2]}); DIG held 3 s at the mesa: arms spinning ${spun}, ${r.scoops} scoops, ${clods} clods, ${r.ore} ore, ${r.guns} guns; let go, at rest ${r.rest}`);
+    if (menu[0] !== 'digger' || menu[1] !== 'IT DIGS.' || menu[2] || !spun || !(clods > 0) || !(r.scoops >= 3) || !(r.ore > 0) || r.guns || !r.rest) { failed = true; console.error(`FAIL: the digger (${menu}, ${JSON.stringify(r)})`); }
   });
   // TUNING and the overlays (spec 19, #299): a FEEL number edited on the page takes at once; NAV and DIGS AND FALLS
   // drawn over the range's arch after its leg is cut; the same pages in the pause menu.

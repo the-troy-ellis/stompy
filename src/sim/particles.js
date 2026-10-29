@@ -8,7 +8,7 @@ import { TAU } from '../util/math.js';
 // approximates replacing the oldest. `length` is `n`, so code that only
 // counted particles still works.
 export const PARTICLE_CAP = 4000;   // room for weather (spec 07: up to 2,500 at once) on top of a fight
-export const KINDS = ['smoke', 'fire', 'flame', 'debris', 'spark', 'dust', 'rain', 'snow', 'shock'];
+export const KINDS = ['smoke', 'fire', 'flame', 'debris', 'spark', 'dust', 'rain', 'snow', 'shock', 'clod'];
 const KIND_ID = Object.fromEntries(KINDS.map((k, i) => [k, i]));
 
 export class Particles {
@@ -61,8 +61,12 @@ export function spawn(G, p, v, life, size, col, kind, grav = 0, spin = null) {
 }
 
 // One frame: age, fall, drag (smoke slows and drifts with the wind), move,
-// bounce (debris on the ground), spin; then drop the expired ones.
-const SMOKE = KIND_ID.smoke, DEBRIS = KIND_ID.debris;
+// bounce (debris and clods on the ground), spin; then drop the expired ones.
+// A clod (docs/specs/25-hold-to-dig.md) comes to rest where it lands and
+// stops turning; dig the ground from under it and it falls again. Over its
+// last CLOD_SINK seconds it sinks into the ground and is gone.
+const SMOKE = KIND_ID.smoke, DEBRIS = KIND_ID.debris, CLOD = KIND_ID.clod;
+export const CLOD_SINK = 1;
 export function stepParticles(G, dt) {
   const P = G.parts, wind = G.weather?.wind, wx = wind ? wind[0] : 0, wz = wind ? wind[1] : 0, windy = wx !== 0 || wz !== 0;
   for (let i = 0; i < P.n; i++) {
@@ -73,12 +77,14 @@ export function stepParticles(G, dt) {
       const d = 1 - dt * 0.6; P.vel[i3] *= d; P.vel[i3 + 1] *= d; P.vel[i3 + 2] *= d;
       if (windy) { P.vel[i3] += (wx - P.vel[i3]) * dt * 0.8; P.vel[i3 + 2] += (wz - P.vel[i3 + 2]) * dt * 0.8; }   // and drifts with the wind
     }
+    if (k === CLOD && P.life[i] < CLOD_SINK) { P.vel[i3] = P.vel[i3 + 1] = P.vel[i3 + 2] = 0; P.pos[i3 + 1] -= dt * P.size[i]; continue; }   // sinking: no more falling or turning
     P.pos[i3] += P.vel[i3] * dt; P.pos[i3 + 1] += P.vel[i3 + 1] * dt; P.pos[i3 + 2] += P.vel[i3 + 2] * dt;
-    if (k === DEBRIS) {
+    if (k === DEBRIS || k === CLOD) {
       // Into rock (a floor, a wall or a roof): back out to where it was and bounce off.
       if (G.ter.solid(P.pos[i3], P.pos[i3 + 1], P.pos[i3 + 2])) {
         P.pos[i3] -= P.vel[i3] * dt; P.pos[i3 + 1] -= P.vel[i3 + 1] * dt; P.pos[i3 + 2] -= P.vel[i3 + 2] * dt;
         P.vel[i3] *= 0.5; P.vel[i3 + 1] *= -0.35; P.vel[i3 + 2] *= 0.5;
+        if (k === CLOD && P.vel[i3] * P.vel[i3] + P.vel[i3 + 1] * P.vel[i3 + 1] + P.vel[i3 + 2] * P.vel[i3 + 2] < 6) { P.vel[i3] = P.vel[i3 + 1] = P.vel[i3 + 2] = 0; continue; }   // at rest
       }
     }
     P.spin[i] += dt * 3;

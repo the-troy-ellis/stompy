@@ -322,6 +322,7 @@ button and the scoop; the sliding face and the clods; the bucket's load and
 the pour.
 
 - **Part 1, the tool button, the spin and the scoop:** built.
+- **Part 2, the sliding face and the clods:** built.
 
 ## Parked
 

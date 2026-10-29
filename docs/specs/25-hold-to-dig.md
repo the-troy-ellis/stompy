@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | part 1 built (spec merged in #359; the owner, 2026-10-28: "the punch to dig mechanic gets old fast and the way the polygons change isn't very satisfying"; asked for holding a button to dig, and for digging to look and feel better without costing too much; then: "It should get its own dig button. We will have specialized construction mechs for different tasks"; then: "No punch for the digger. Also its arms should spin when digging.") |
+| Status | parts 1 and 2 built (#360 and the clods; spec merged in #359; the owner, 2026-10-28: "the punch to dig mechanic gets old fast and the way the polygons change isn't very satisfying"; asked for holding a button to dig, and for digging to look and feel better without costing too much; then: "It should get its own dig button. We will have specialized construction mechs for different tasks"; then: "No punch for the digger. Also its arms should spin when digging.") |
 | Milestone | M12 (proposed) |
 | Size | L, split in three: the tool button and the scoop; the sliding face and the clods; the bucket's load and the pour |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md) (the ground, digs, chunks); [20-build-and-fight.md](20-build-and-fight.md) and [21-mining.md](21-mining.md) (the digger, ore, dirt, DUMP); [13-thunk.md](13-thunk.md) (feel) |
@@ -357,8 +357,35 @@ see one 8 m grid as now. The one cost is rebuilding the chunk more often
   and voxel-walk tests now dig by holding DIG. Smoke: the digger run holds
   `1`, FIRST FACTORY digs and builds with `1` held, and the touch run holds
   DIG with a finger.
-- **Not yet (parts 2 and 3):** clods, the bucket's load, the pour, and
-  `bench-scoop`.
+- **Not yet (part 3):** the bucket's load and the pour.
+
+### Part 2: the sliding face and the clods
+
+- **The sliding face** came with part 1's runs: each scoop of a run reaches
+  further from the same centre, so the hole widens scoop by scoop.
+- **Clods are particles,** a new kind `clod` in `sim/particles.js`, not a
+  `G.clods` list of their own.
+  - So they're drawn with every other effect, instanced and coloured per
+    instance, and add no draws.
+  - The particle step gives them their rules: they fly and bounce off the
+    ground as debris does. Under about 2.4 m/s after a bounce they're at
+    rest and stop turning; dig the ground from under one and it falls again.
+    Over their last second (`CLOD_SINK`) they sink and are gone.
+  - Their shape, `clod` in `mesh/effects.js`, is a lopsided octahedron:
+    eight facets.
+- **`spawnClods`** (`sim/effects.js`): a scoop throws 4 to 6 (`TOOL.dig.clods`)
+  out of the face toward the digger and up, 0.6 to 1.4 m.
+  - Colour: the seam's, the palette's rock, or its low ground, by what the
+    run last cut (`bite` notes `m.biteRock`), each a little lighter or darker.
+  - They live 3.5 to 4.5 s, shorter than the spec's 4 s lying plus 1 s
+    sinking, so a held DIG (some 12 a second) settles near 50 at once.
+  - Past `CLOD_MAX` (60) not yet sinking, the oldest start to sink.
+- **`npm run perf` scene `scoop`:** the range's mesa, DIG held 10 s at the
+  face: 15 draws (16 at most), 31.9k triangles, 45 KB a frame, and 53
+  particles at most.
+- **Tests:** `test/tools.test.js` checks the clods' colours, that they land
+  and lie, that they're gone in time, and the cap, alone and with DIG held.
+  Smoke: the digger run sees clods alive.
 
 ## Room to grow: other tools
 
