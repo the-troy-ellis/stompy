@@ -67,7 +67,7 @@ export const harass = (G, e, ctx, dt, { stomp = false } = {}) => {
     if (e.air) return { moveYaw: a.jump.yaw, thr: 1, jets: false };   // carry through the landing
     a.jump = null; a.jumpCd = G.time + B.jumpCooldown;
   }
-  if (seen && dist < B.jumpWithin && !e.air && e.fuel > 0.5 && !(a.jumpCd > G.time) && !e.melee) {
+  if (seen && dist < B.jumpWithin && !e.air && e.fuel >= 1 && !(a.jumpCd > G.time) && !e.melee) {
     a.jump = { until: G.time + B.jumpFor, yaw: toYaw };
     return { moveYaw: toYaw, thr: 1, jets: true };
   }

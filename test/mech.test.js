@@ -45,14 +45,17 @@ test('heat sinks at the chassis rate and faster while shut down', () => {
   assert.ok(Math.abs(P.heat - 70) < 0.5);
 });
 
-test('jump jets lift the mech, burn fuel and heat, and landing jolts the cockpit', () => {
+test('jump jets charged and let go blast the mech off, spend the jets and heat, and landing jolts the cockpit', () => {
   const G = createTestGame();
   for (const e of foes(G)) e.alive = false;
   const P = G.player;
-  stepFor(G, 1.5, input({ jets: true }));
+  stepFor(G, 1, input({ jets: true }));   // charging on the ground (docs/specs/26-blast-off.md)
+  assert.ok(!P.air && P.jet.charge === 1, 'charged, still standing');
+  stepFor(G, 0.5);   // let go
   assert.ok(P.y > 3, `only ${P.y} m up`);
-  assert.ok(P.air);
-  assert.ok(P.fuel < 1);   // (jet heat is 10/s, exactly what a KESTREL sinks, so heat stays at 0)
+  assert.ok(P.air && P.jet.blasted);
+  assert.ok(P.fuel < 1 && P.heat > 0, 'the jets spent, and hot');
+  assert.equal(G.fx.calls('sfx.blastoff').length, 1);
   stepFor(G, 4);
   assert.equal(P.air, false);
   assert.ok(Math.abs(P.y) < 0.05);   // on the voxel ground, to a few cm

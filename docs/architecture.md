@@ -360,6 +360,7 @@ src/
     combat.js      sectionHit, damage, destroy, fire, blast
     cheats.js      cheat(G, key): the DEBUG tab's cheats, single player only (M8, spec 19)
     crew.js        G.crew, swap(G), park, nextCrew: the mechs you drive and SWAP between (M9, spec 20)
+    jets.js        stepJets: blast-off jets, charge, blastOff, blastRing (M13, spec 26)
     tools.js       stepTool: a construction mech's tool held; DIG's spinning arms, runs of scoops, sites (M12, spec 25)
     base.js        the base: silo, unloading, BUILD (footprint, placeFactory), the factory's queue (M9, spec 20)
     raid.js        raids and salvage: the raid's call, what a raider goes for, wrecks' salvage to the silo (M9, spec 20)

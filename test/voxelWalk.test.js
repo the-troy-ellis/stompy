@@ -64,8 +64,9 @@ test('the jets stop at a ceiling', () => {
   P.y = G.ter.groundBelow(0, 20, 0); initFeet(G, P);
   const roof = 20 + 24, head = geoOf(P).height * P.ch.scale;
   let highest = -Infinity;
-  for (let t = 0; t < 4; t += 0.1) { stepFor(G, 0.1, input({ jets: true })); highest = max(highest, P.y + head); }
-  assert.ok(P.y > 10, `the jets did lift it: ${P.y.toFixed(1)}`);
+  stepFor(G, 1, input({ jets: true }));   // a full charge, then let go (docs/specs/26-blast-off.md)
+  for (let t = 0; t < 4; t += 0.1) { stepFor(G, 0.1); highest = max(highest, P.y + head); }
+  assert.ok(highest - head > 10, `the jets did lift it: ${(highest - head).toFixed(1)}`);
   assert.ok(highest < roof + 1.5, `its head stays under the roof: ${highest.toFixed(1)} vs ${roof}`);
 });
 

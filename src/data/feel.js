@@ -34,6 +34,8 @@ export const FEEL = {
   // Another mech's footfall felt through the ground: k = (1 - d / 40) * scale^2, heavies only
   nearStep:    { kick: 0.15, shake: 0.12, flash: 0, white: 0, squash: 0, wobble: 0.05, bass: 0.3, duck: 0, dust: 0, haptic: 8, push: 0 },
   // k = landing force 0.25..1
+  // a blast-off (docs/specs/26-blast-off.md), k = 0.4 + 0.6 * charge: a landing's size, a deeper boom and a longer buzz
+  blastoff:    { kick: 1.1, shake: 0.9, flash: 0, white: 0, squash: 0.3, wobble: 0.5, bass: 1.2, duck: 0.6, dust: 4, haptic: 70, push: 0 },
   land:        { kick: 1.0, shake: 0.6, flash: 0, white: 0, squash: 0.25, wobble: 0.4, bass: 1.0, duck: 0.3, dust: 3, haptic: 40, push: 0 },
   // k = 1 per shot (the player's own weapons)
   fireAc:      { kick: 0.5, shake: 0.2, flash: 0, white: 0, squash: 0, wobble: 0.3, bass: 0.6, duck: 0, dust: 0, haptic: 20, push: 0.4 },   // 0.4 m/s decays to a 0.16 m step back

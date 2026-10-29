@@ -283,7 +283,7 @@ export function createScene(app) {
     // about the feet) and a wobble of the torso about the hips.
     // Armour under a beam doesn't jolt per frame; the whole mech sways slowly as it melts.
     const sway = meltFrac(m) * 0.03, swt = G.time * 2.4;
-    const sq = m.squash ? m.squash.x : 0, wp = (m.wob ? m.wob.p.x : 0) + sin(swt) * sway, wr = (m.wob ? m.wob.r.x : 0) + cos(swt * 0.8) * sway * 0.7;
+    const sq = (m.squash ? m.squash.x : 0) + (m.jet?.charge || 0) * 0.14, wp = (m.wob ? m.wob.p.x : 0) + sin(swt) * sway, wr = (m.wob ? m.wob.r.x : 0) + cos(swt * 0.8) * sway * 0.7;
     const pose = meleePose(m);
     const fists = parts.fist && meleeOf(m).fists ? fistPose(m) : null;   // with both arms gone it shoves like anyone else
     const spin = spinPose(m);   // a digger's arms turning like a paddle wheel, DIG held (sim/tools.js)
@@ -612,7 +612,7 @@ export function createScene(app) {
       const drop = G.kick + (G.bob ? G.bob.x : 0);   // the instant kick plus the eased bob
       const fall = P.dying || P.fallen;
       const lurch = (P.surge || 0) * P.ch.scale * (G.reducedMotion ? FEEL.view.reducedScale : 1);   // and lurches with each step
-      eye = add(G.eye, [Math.sin(P.yaw) * lurch, -drop * 0.35 - (P.squash ? P.squash.x * 2 : 0) - (P.sag ? P.sag.x : 0) - (fall ? fall.drop || 0 : 0), Math.cos(P.yaw) * lurch]); dir = dirOf(yaw, pitch - drop * 0.016);
+      eye = add(G.eye, [Math.sin(P.yaw) * lurch, -drop * 0.35 - (P.squash ? P.squash.x * 2 : 0) - (P.jet?.charge || 0) * 1.1 * P.ch.scale - (P.sag ? P.sag.x : 0) - (fall ? fall.drop || 0 : 0), Math.cos(P.yaw) * lurch]); dir = dirOf(yaw, pitch - drop * 0.016);
       if (G.ter && !fall) eye = clearEye(G.ter, eye, dir, P.x, P.y + geoOf(P).torsoY * P.ch.scale, P.z);   // never see the inside of the ground
       // Going down: the view goes with the body, turned by the same topple
       // (so a fall to the side rolls the horizon), and stays there once it's

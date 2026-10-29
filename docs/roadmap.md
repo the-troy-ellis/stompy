@@ -333,6 +333,8 @@ down and a ring where you'll land; land on a mech and it's flattened. Spec:
 [specs/26-blast-off.md](specs/26-blast-off.md). In three parts: charge and
 blast-off; the flight; the insta-stomp, the AI and online.
 
+- **Part 1, charge and blast-off:** built.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):

@@ -90,7 +90,8 @@ test('JUMP JETS 0 never lifts, 2 climbs higher and longer than stock', () => {
     const G = createTestGame({ foes: [] });
     G.player.jets = jets;
     let top = 0;
-    for (let i = 0; i < 180; i++) { stepFor(G, 1 / 60, input({ jets: true })); top = Math.max(top, G.player.y); }
+    stepFor(G, 1, input({ jets: true }));   // a full charge (docs/specs/26-blast-off.md), then let go
+    for (let i = 0; i < 240; i++) { stepFor(G, 1 / 60); top = Math.max(top, G.player.y); }
     return top;
   };
   const none = flight(0), stock = flight(1), boosted = flight(2);

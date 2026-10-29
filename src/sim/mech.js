@@ -1,6 +1,6 @@
 import { cheat } from './cheats.js';
 import { WEATHER } from '../data/weather.js';
-import { add, clampN, mul } from '../util/math.js';
+import { clampN, mul } from '../util/math.js';
 import { BOUND } from '../world/terrain.js';
 import { particle } from './effects.js';
 import { gait } from './gait.js';
@@ -9,13 +9,14 @@ import { FEEL } from '../data/feel.js';
 import { WALK } from '../data/walk.js';
 import { tryStomp } from './melee.js';
 import { voice } from './voice.js';
-import { JETS_CLIMB, JETS_FUEL } from '../data/systems.js';
+import { stepJets } from './jets.js';
 import { geoOf } from '../data/geo.js';
 
 const { sin, cos, min, max } = Math;
 
 // How fast a push dies out, per second: an impulse of v m/s moves the mech about v / PUSH_DECAY metres.
 export const PUSH_DECAY = 2.5;
+const NO_FLY = [0, 0];
 
 // The highest rise a mech walks up without a jump, times its scale (spec 18):
 // anything taller is a wall.
@@ -80,11 +81,12 @@ export function stepMech(G, m, dt) {
   // Walls: each axis moves only if the body fits there, so a mech slides
   // along a wall it meets at an angle. One already in rock (a roof dug lower,
   // a step up under a low ceiling) may only move to where it is less so.
-  const x0 = m.x, z0 = m.z, nx = clampN(m.x + (sin(m.yaw) * m.speed + push[0]) * dt, -BOUND, BOUND), nz = clampN(m.z + (cos(m.yaw) * m.speed + push[1]) * dt, -BOUND, BOUND);
+  const fly = m.air && m.jet?.blasted ? m.jet.fly : NO_FLY;   // a blast-off's speed along (sim/jets.js): it carries the flight, undying, until it lands
+  const x0 = m.x, z0 = m.z, nx = clampN(m.x + (sin(m.yaw) * m.speed + push[0] + fly[0]) * dt, -BOUND, BOUND), nz = clampN(m.z + (cos(m.yaw) * m.speed + push[1] + fly[1]) * dt, -BOUND, BOUND);
   const here = rockAt(G, m, x0, z0, 0, 0), fits = r => r <= 0 || r < here;
   let walled = false;
-  if (nx !== x0 && !fits(rockAt(G, m, nx, z0, Math.sign(nx - x0), 0))) { walled = true; push[0] = 0; } else m.x = nx;
-  if (nz !== z0 && !fits(rockAt(G, m, m.x, nz, 0, Math.sign(nz - z0)))) { walled = true; push[1] = 0; } else m.z = nz;
+  if (nx !== x0 && !fits(rockAt(G, m, nx, z0, Math.sign(nx - x0), 0))) { walled = true; push[0] = 0; if (fly !== NO_FLY) fly[0] = 0; } else m.x = nx;
+  if (nz !== z0 && !fits(rockAt(G, m, m.x, nz, 0, Math.sign(nz - z0)))) { walled = true; push[1] = 0; if (fly !== NO_FLY) fly[1] = 0; } else m.z = nz;
   // Against a wall the legs walk only as fast as the body goes (gait.js reads
   // `slide`), so planted feet stay put; the throttle's speed is kept for when it's clear.
   m.walled = walled;
@@ -99,16 +101,11 @@ export function stepMech(G, m, dt) {
   }
 
   const ground = groundUnder(G, m);
-  // Jets by the JUMP JETS level: none at 0, stock at 1, more fuel and climb at 2.
-  const jl = m.jets ?? 1, jets = jl > 0 && m.jetting && m.fuel > 0 && !m.shutdown && m.alive;
-  if (jets) {
-    m.vy = min(m.vy + 30 * JETS_CLIMB[jl] * dt, 12 * JETS_CLIMB[jl]);
-    m.fuel = max(0, m.fuel - dt * 0.32 / JETS_FUEL[jl]);
-    m.heat += 10 * dt;
-    if (r.chance(0.6)) particle(G, add([m.x, m.y + 1.5, m.z], [r.range(-1, 1), 0, r.range(-1, 1)]), [r.range(-1, 1), -8, r.range(-1, 1)], 0.35, 0.7, [1, 0.6, 0.2], 'fire');
-  } else m.fuel = min(1, m.fuel + dt * 0.12);
+  // Blast-off jets (sim/jets.js, docs/specs/26-blast-off.md): held, they
+  // charge; let go, the mech blasts off. No thrust after that: it flies.
+  stepJets(G, m, dt);
   m.vy -= 18 * dt;
-  // A ceiling: the jets push the head into rock no further.
+  // A ceiling: a blast-off takes the head into rock no further.
   if (m.vy > 0 && G.ter.solid(m.x, m.y + geoOf(m).height * m.ch.scale + m.vy * dt, m.z)) m.vy = 0;
   m.y += m.vy * dt;
   if (m.air) {
@@ -117,9 +114,9 @@ export function stepMech(G, m, dt) {
     const w = G.weather, push = w && WEATHER[w.kind].push;
     if (push) { const s = Math.hypot(w.wind[0], w.wind[1]) || 1; m.x += w.wind[0] / s * push * w.intensity * dt; m.z += w.wind[1] / s * push * w.intensity * dt; }
     // Coming down onto a mech: a stomp, and a bounce back up off it.
-    if (m.vy < 0 && !jets && tryStomp(G, m, m.airT)) m.airT = 0;
+    if (m.vy < 0 && tryStomp(G, m, m.airT)) m.airT = 0;
   }
-  if (!jets && m.vy <= 0 && m.y - ground < 1.2) {
+  if (m.vy <= 0 && m.y - ground < 1.2) {
     if (m.air) {
       const force = clampN(-m.vy / 20, 0.25, 1);
       m.airT = 0;

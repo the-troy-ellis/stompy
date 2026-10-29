@@ -99,7 +99,7 @@ Mission 1 only, first time only (`store` key `tut.done`), each prompt shown
 once in the HUD font near the relevant instrument, fading when the player
 does the thing. In the house voice, at most three words plus the key or
 gesture: `W: GO. S: LESS GO.` · `A / D: LEGS` · `MOUSE: TORSO` · `HOLD LMB:
-MELT IT` · `RMB: THUMP` · `SPACE: MISSILES (HOLD TO FLY)` · `J: UP` · `E:
+MELT IT` · `RMB: THUMP` · `SPACE: MISSILES (HOLD TO FLY)` · `HOLD J. LET GO: UP.` (spec 26) · `E:
 PUNCH` (when a JACKAL is in reach) · `HEAT: TOO MUCH` (first over 60) · `T:
 NEXT ONE` (when a second enemy appears). Touch variants name the gesture. Skippable by pausing (the pause
 screen gains `SKIP TUTORIAL`).

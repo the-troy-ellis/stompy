@@ -327,6 +327,14 @@ export function createAudio(app) {
       this.osc('sine', 72 / m.ch.scale, 36, 0.16, 0.14 * v, at);
       this.noise(0.07, 0.035 * v, 170, 60, 'lowpass', at);
     },
+    // A blast-off (docs/specs/26-blast-off.md): a missile's whoosh, low, on a
+    // deep falling boom, bigger with the charge `c`.
+    blastoff(at, c) {
+      const o = { at, ref: 60 };
+      play('missile', { ...o, vol: 0.5 + 0.4 * c, rate: 0.6, vary: 0.04 });
+      play('boom_low', { ...o, vol: 0.4 + 0.5 * c, rate: 1.2 });
+      this.osc('sine', 80, 24, 0.6, 0.3 * (0.5 + c), o);
+    },
     land(force) {
       this.osc('sine', 62, 28, 0.32, 0.22 * force);
       this.noise(0.14, 0.08 * force, 200, 50);
@@ -453,8 +461,9 @@ export function createAudio(app) {
     const P = G.player, live = P.alive && !P.shutdown, pace = min(1, abs(P.speed) / (P.maxSpeed ?? P.ch.speed));
     const hot = P.shutdown ? 0 : hotFrac(P.heat);   // the reactor hum rises as it runs hot
     loopSet('hum_loop', P.alive ? (P.shutdown ? 0.03 : (0.07 + 0.13 * pace) * (1 + HEAT.hum * hot)) : 0, P.shutdown ? 0.5 : (0.72 + 0.4 * pace) * (1 + HEAT.humRate * hot));
-    const jetting = live && P.jetting && P.fuel > 0;
-    loopSet('jet_loop', jetting ? 0.32 : G.guide ? 0.24 : 0, jetting ? 0.85 : G.guide ? 1.7 : 0.85);
+    // The jets (sim/jets.js): a whine rising with the charge, then the roar up a blast-off's climb.
+    const charge = live ? P.jet?.charge || 0 : 0, climb = live && P.jet?.blasted && P.vy > 0;
+    loopSet('jet_loop', charge ? 0.08 + 0.2 * charge : climb ? 0.34 : G.guide ? 0.24 : 0, charge ? 1.1 + 0.9 * charge : climb ? 0.85 : G.guide ? 1.7 : 0.85);
     const twistRate = G.twistRate || 0;
     loopSet('servo_loop', live ? min(0.13, twistRate * 0.07) : 0, 0.75 + min(0.6, twistRate * 0.25));
     const spin = P.spin?.w ? P.spin.w * TOOL.dig.turn / (2 * Math.PI) : 0;   // a digger's arms, 0 to 1 of full speed (sim/tools.js)

@@ -247,7 +247,10 @@ export function createHud(app) {
     if (browned) ctx.globalAlpha = 1 - HEAT.flicker * hot;
     const heatCol = P.heat > 85 ? (floor(G.time * 6) % 2 ? RED : AMBER) : P.heat > 80 ? RED : P.heat > 55 ? AMBER : GREEN;
     ringArc(R, LOWER_L + RING_GAP, UP + TAU - RING_GAP, clampN(P.heat / 100, 0, 1), heatCol);   // left: from the lower left, up
-    ringArc(R, LOWER_R - RING_GAP, UP + RING_GAP, clampN(P.fuel, 0, 1), '#3cf');   // right: from the lower right, up (anticlockwise)
+    // Right, from the lower right up (anticlockwise): the jets (sim/jets.js). Charging, the charge,
+    // blinking white when full; otherwise how ready they are, filling back up after a blast.
+    const charge = P.jet?.charge || 0;
+    ringArc(R, LOWER_R - RING_GAP, UP + RING_GAP, charge ? charge : clampN(P.fuel, 0, 1), charge >= 1 && floor(G.time * 8) % 2 ? '#fff' : charge ? AMBER : '#3cf');
     ctx.globalAlpha = 1;
     // Bottom: speed. Its scale runs from full reverse (left) to 1.35 x top speed (right), zero at 0.35 / 1.35.
     const b0 = LOWER_L - RING_GAP, b1 = LOWER_R + RING_GAP, span = b1 - b0, at = v => b0 + span * clampN((v + 0.35) / 1.35, 0, 1);
