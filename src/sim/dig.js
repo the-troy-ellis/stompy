@@ -3,6 +3,7 @@ import { cheat } from './cheats.js';
 import { BIG_DIG } from '../data/debug.js';
 import { DIG, CRUSH, TORQUE, WEAPONS } from '../data/weapons.js';
 import { CONSTRUCT } from '../data/construct.js';
+import { FINE_DIG } from '../data/fineDig.js';
 import { sceneryNear, destroyEntity } from './entities.js';
 import { particle, msg } from './effects.js';
 import { viewYaw } from './geom.js';
@@ -233,6 +234,54 @@ function land(G, f, seen) {
   const dust = min(40, 6 + f.n);
   for (let i = 0; i < dust; i++) particle(G, [p[0] + r.range(-1, 1) * f.reach, bottom + 1, p[2] + r.range(-1, 1) * f.reach], [r.range(-4, 4), r.range(1, 5), r.range(-4, 4)], r.range(1.5, 3), r.range(1.5, 3.5), [0.42, 0.36, 0.3], 'smoke');
   if (!f.heap) for (let i = 0; i < 14; i++) particle(G, [p[0], bottom + 3, p[2]], [r.range(-9, 9), r.range(4, 14), r.range(-9, 9)], r.range(1.2, 2.2), r.range(0.6, 1.4), [0.35, 0.3, 0.26], 'debris', 26);   // a small piece shatters
+}
+
+// Fine patches settling (docs/specs/27-fine-dig.md; the patches are
+// world/finePatch.js's). Dug again, a patch's clock starts over. FINE_DIG
+// settleAfter s after its last edit, with no mech standing on it, it slumps:
+// over settleTime its ground blends into the 8 m ground's, with a rumble and
+// dust, then it goes and what stood on it settles. Stood on, it waits up to
+// settleWait s more. The fine ground is never rock where the 8 m ground is
+// air (world/voxels.js clampFine), so a slump only fills bites back in: a
+// mech standing in one is lifted as it fills, never dropped. One pushed out
+// by too many patches (`force`) doesn't wait.
+export function stepFinePatches(G, dt) {
+  const P = G.ter?.patches;
+  if (!P || !P.length) return;
+  const F = FINE_DIG;
+  for (const p of [...P]) {
+    if (p.seen !== p.edits) { p.seen = p.edits; p.at = G.time; p.settling = false; }
+    if (!p.settling) {
+      const idle = G.time - p.at, on = standing(G, p);
+      if (!p.force && (idle < F.settleAfter || (on.length && idle < F.settleAfter + F.settleWait))) continue;
+      p.settling = true; p.blend = 0;
+      settleFx(G, p);
+    }
+    p.blend = min(1, p.blend + dt / F.settleTime);
+    p.rev++;
+    if (!(G.time - (p.topsAt ?? -1) < 0.1) || p.blend >= 1) { G.ter.topsOf(p); p.topsAt = G.time; }
+    if (p.blend >= 1) {
+      G.ter.dropPatch(p);
+      settle(G, (p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2, hypot(p.x1 - p.x0, p.z1 - p.z0) / 2);
+    }
+  }
+}
+// The mechs on the ground over a patch.
+const standing = (G, p) => G.mechs.filter(m => {
+  if (!m.alive || m.air) return false;
+  const r = geoOf(m).radius * m.ch.scale;
+  return m.x > p.x0 - r && m.x < p.x1 + r && m.z > p.z0 - r && m.z < p.z1 + r && m.y < p.y1 + 2 && m.y > p.y0 - 2;
+});
+// The slump starting: a low rumble and a soft thump, felt by how near, and dust along the patch's ground.
+function settleFx(G, p) {
+  const r = G.rng, cx = (p.x0 + p.x1) / 2, cz = (p.z0 + p.z1) / 2, at = [cx, G.ter.height(cx, cz), cz];
+  const near = G.player ? max(0, 1 - hypot(G.player.x - cx, G.player.z - cz) / 120) : 0;
+  if (near > 0) feel(G, 'settle', { mech: null, k: near, at });
+  G.fx.sfx.settle(at);
+  for (let i = 0; i < FINE_DIG.dust; i++) {
+    const x = r.range(p.x0 + VS, p.x1 - VS), z = r.range(p.z0 + VS, p.z1 - VS), y = G.ter.groundBelow(x, p.y1, z);
+    particle(G, [x, y + 0.5, z], [r.range(-1.5, 1.5), r.range(0.5, 2), r.range(-1.5, 1.5)], r.range(1.4, 2.4), r.range(1.2, 2.4), G.pal.low, 'dust');
+  }
 }
 
 // What stood in reach of a dig: scorches, wrecks and debris move down onto

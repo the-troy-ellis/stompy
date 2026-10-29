@@ -30,7 +30,7 @@ import { tickCoopRespawn } from './coopRules.js';
 import { tickTutorial } from './tutorial.js';
 import { benchStep } from './bench.js';
 import { walkStep } from './walkView.js';
-import { dig, dump, stepFalls } from './dig.js';
+import { dig, dump, stepFalls, stepFinePatches } from './dig.js';
 import { stepTool, siteInReach, aimGround } from './tools.js';
 import { airSteer, jetLock } from './jets.js';
 import { DIG } from '../data/weapons.js';
@@ -184,6 +184,7 @@ export function update(G, input, dt) {
   stepParticles(G, dt);
   stepDebris(G, dt);
   stepFalls(G, dt);   // ground coming down (sim/dig.js)
+  stepFinePatches(G, dt);   // fine dug ground settling back into the 8 m ground (sim/dig.js)
   for (const w of G.wrecks) {
     w.t += dt;
     w.settle = min(1, w.t / WRECK_SETTLE);   // it rocks and sinks for a moment after it lands

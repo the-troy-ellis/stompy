@@ -6,6 +6,6 @@ import { meshChunk, boundsOf } from '../world/mesher.js';
 let pal = null;
 self.onmessage = ({ data: d }) => {
   if (d.pal) { pal = d.pal; return; }
-  const f = meshChunk(d.D, d.T, d.dims, d.o, d.s, pal);
+  const f = meshChunk(d.D, d.T, d.dims, d.o, d.s, pal, d.skip);
   self.postMessage({ id: d.id, ver: d.ver, world: d.world, f, box: boundsOf(f) }, [f.buffer]);
 };

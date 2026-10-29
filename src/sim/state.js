@@ -64,6 +64,7 @@ export function resetMatch(G, { def, seed, pal, terrainOpts }) {
   G.palRamp = r ? { from: palAt(biome, r[0]), to: palAt(biome, r[1]), secs: r[2] } : null;
   G.weather = makeWeather(def.weather, seed);   // fog, radar and wind (data/weather.js)
   G.ter = makeGround(seed, { ...terrainOpts, zones: flatZones(def) }, def);   // the voxel ground (world/voxels.js)
+  G.ter.fineOn();   // edits in play dig fine patches from now on (world/finePatch.js)
   G.worldKind = 'match';
   G.mechs = []; G.entities = []; G.scenery = []; G.sceneryGrid = null; G.waves = []; G.shots = []; G.beams = []; G.cbeams = []; G.parts.clear(); G.debris = []; G.scorches = []; G.scorchId = 0; G.scorchRev++; G.wrecks = []; G.msgs = []; G.pulses = []; G.pendingHits.clear(); G.pendingEHits.clear(); G.pendingDigs = []; G.digSeq = 0; G.falls = []; G.unechoed = []; G.terC = null; G.crew = null; G.handover = null; G.swapT = null; G.command = null; G.base = null; G.buildAt = null;
   G.target = null; G.aimMech = null; G.flash = 0; G.shake = 0; G.kick = 0; G.bob = null; G.bobIn = null; G.whiteFlash = 0; G.zoom = false; G.endT = 0; G.time = 0; G.frame = 0; G.beamOnAt = null; G.bench = null; G.walk = null;   // bench, walk: sim/bench.js and sim/walkView.js set them after; beamOnAt: the last beam hit on you (sim/combat.js), on this clock

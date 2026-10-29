@@ -1,7 +1,8 @@
 import { chunkCorners, farCorners, CX, CY, CZ, CS, CN, VS, PX, PY } from '../world/voxels.js';
 import { HALF } from '../world/terrain.js';
 import { meshChunk, boundsOf } from '../world/mesher.js';
-import { boxVisible } from '../util/math.js';
+import { boxVisible, M as Mat } from '../util/math.js';
+import { FS } from '../world/finePatch.js';
 
 // The voxel ground on the GPU (docs/specs/18-voxel-ground.md § Rendering).
 // The map is cut into groups of 2 × 2 chunk columns (256 m squares). A group
@@ -56,6 +57,7 @@ export function createGround(R) {
   const corners = id => {
     if (id >= FAR) { const g = id - FAR; return farCorners(ground, (g % GX) * G2, ((g / GX) | 0) * G2, G2); }
     const cx = id % CX, cy = ((id / CX) | 0) % CY, cz = (id / (CX * CY)) | 0, c = chunkCorners(ground, cx, cy, cz);
+    c.skip = ground.skipIn ? ground.skipIn(cx * CS - 1, cy * CS - 1, cz * CS - 1, c.dims) : null;   // a fine patch's inside: its own mesh draws it
     for (const f of falling) {
       if (!f.heap) continue;
       f.cells.forEach((o, n) => {
@@ -73,7 +75,7 @@ export function createGround(R) {
     if (id >= FAR) rows[((id - FAR) / GX) | 0].dirty = true; else gr.near.dirty = true;
   }
   function meshHere(id) {
-    const c = corners(id), f = meshChunk(c.D, c.T, c.dims, c.o, c.s, pal);
+    const c = corners(id), f = meshChunk(c.D, c.T, c.dims, c.o, c.s, pal, c.skip);
     took(id, ver[id], f, boundsOf(f));
   }
   // Queue a job (again, if it was done or is in the worker: a dig; what's in the worker is stale then).
@@ -87,6 +89,8 @@ export function createGround(R) {
   // A new world: far meshes for everything, chunks for what's near `eye`.
   function load(g, p, eye = [0, 0, 0]) {
     ground = g; pal = plain(p, g.seed); world++; inFlight = 0;
+    for (const m of patches.values()) if (m.part.buf) gl.deleteBuffer(m.part.buf);
+    patches.clear();
     mesh.fill(null); ver.fill(0); waiting.fill(0); queue = [];
     for (const gr of groups) { gr.wanted = false; gr.left = 0; gr.near.dirty = true; }
     for (const row of rows) row.dirty = true;
@@ -133,7 +137,7 @@ export function createGround(R) {
         for (let n = 0; n < SEND_MAX && queue.length && inFlight < SEND_MAX * 2; n++) {
           const id = queue.shift(), c = corners(id);
           waiting[id] = 2;
-          worker.postMessage({ id, ver: ver[id], world, D: c.D, T: c.T, dims: c.dims, o: c.o, s: c.s }, [c.D.buffer, c.T.buffer]);
+          worker.postMessage({ id, ver: ver[id], world, D: c.D, T: c.T, dims: c.dims, o: c.o, s: c.s, skip: c.skip }, [c.D.buffer, c.T.buffer]);
           inFlight++;
         }
       } else {
@@ -142,7 +146,45 @@ export function createGround(R) {
       }
     }
     upload();
+    tickPatches();
   }
+
+  // Fine patches (world/finePatch.js, docs/specs/27-fine-dig.md): each meshed
+  // whole at 2 m, here for now, at most 10 times a second while it changes
+  // (being dug, or slumping as it settles). The coarse chunks skip its inside.
+  // A patch that's gone stays drawn until the chunks round it have been
+  // meshed again without the gap (or 2 s), so the ground never shows a hole.
+  const patches = new Map(), REMESH_MS = 100, GONE_MS = 2000;
+  function tickPatches() {
+    const P = ground.patches || [], now = performance.now();
+    for (const p of P) {
+      let m = patches.get(p.id);
+      if (!m) { m = { part: newPart(), rev: -1, t: -Infinity, gone: 0, groups: [] }; patches.set(p.id, m); }
+      m.gone = 0;
+      m.groups = groupsOver(p.x0, p.z0, p.x1, p.z1);
+      if (m.rev === p.rev || now - m.t < REMESH_MS) continue;
+      m.rev = p.rev; m.t = now;
+      const f = meshChunk(ground.bytesOf(p), p.top, [p.nx, p.ny, p.nz], [p.x0, p.y0, p.z0], FS, pal), b = boundsOf(f);
+      m.part.count = f.length / 9;
+      if (!b) continue;
+      m.part.lo = b[0]; m.part.hi = b[1];
+      if (!m.part.buf) m.part.buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, m.part.buf);
+      gl.bufferData(gl.ARRAY_BUFFER, f, gl.DYNAMIC_DRAW);
+      R.curMesh = null;
+    }
+    for (const [id, m] of patches) {
+      if (P.some(p => p.id === id)) continue;
+      if (!m.gone) m.gone = now;
+      const meshed = m.groups.every(gi => !groups[gi].left && !groups[gi].near.dirty);
+      if ((meshed && now - m.gone > 50) || now - m.gone > GONE_MS) { if (m.part.buf) gl.deleteBuffer(m.part.buf); patches.delete(id); }
+    }
+  }
+  const groupsOver = (x0, z0, x1, z1) => {
+    const out = [], g = v => Math.floor((v + HALF) / SIZE);
+    for (let gz = Math.max(0, g(z0)); gz <= Math.min(GZ - 1, g(z1)); gz++) for (let gx = Math.max(0, g(x0)); gx <= Math.min(GX - 1, g(x1)); gx++) out.push(gx + GX * gz);
+    return out;
+  };
   // A part's buffer is its meshes end to end, re-sent whole when any of them changes.
   function fill(part, ids) {
     part.dirty = false;
@@ -211,7 +253,16 @@ export function createGround(R) {
       RUN.buf = part.buf; RUN.first = part.first; RUN.count = part.count;
     }
     if (RUN.count) R.draw(RUN, Mfar);
+    // The fine patches, near ones only, a hair low: where a patch's outer ring
+    // and the coarse ground's overlap, the coarse one shows (no flicker).
+    for (const m of patches.values()) {
+      const part = m.part;
+      if (!part.count || !part.lo || !boxVisible(planes, part.lo, part.hi)) continue;
+      if (Math.hypot(Math.max(part.lo[0] - eye[0], 0, eye[0] - part.hi[0]), Math.max(part.lo[2] - eye[2], 0, eye[2] - part.hi[2])) > Math.min(LOD_AT, fogEnd)) continue;
+      R.draw(part, PATCH_M);
+    }
   }
+  const PATCH_M = Mat.T(0, -0.15, 0);
 
   // Resolves when everything wanted is meshed and uploaded (the perf harness and the smoke test wait on it).
   async function ready(eye = lastEye) {

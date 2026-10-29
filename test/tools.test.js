@@ -101,13 +101,15 @@ test('at your own site, DIG builds it: three scoops a swing of work, the punch\'
 // The old punch's pace (main at bc24e12): over these 80 seeds, 30 s of a bite
 // every 1.2 s at the range's mesa face, walked up to keep it 8 m ahead and the
 // hopper emptied as it came in, took 10380 ore. Held DIG must stay within 10%.
+// The 8 m is to the 8 m ground's face, the one the bucket aims at and the ore
+// is counted on (docs/specs/27-fine-dig.md): a fine patch's bites sit behind it.
 test('held DIG at a face brings ore in at the old punch\'s pace (80 seeds)', () => {
   let ore = 0;
   for (let seed = 1; seed <= 80; seed++) {
     const G = game('mesa', seed), D = atMesa(G);
     D.ch = { ...D.ch, hopper: 1e9 };
     for (let i = 0; i < 30 / DT; i++) {
-      if (i % 30 === 0) { const t = G.ter.ray([D.x, D.y + 4 * D.ch.scale, D.z], [0, 0, 1], 60); if (t != null && Math.abs(t - 8) > 1) shiftMech(D, 0, t - 8); }
+      if (i % 30 === 0) { const t = G.ter.ray([D.x, D.y + 4 * D.ch.scale, D.z], [0, 0, 1], 60, true); if (t != null && Math.abs(t - 8) > 1) shiftMech(D, 0, t - 8); }
       update(G, { ...noInput(), ...DIG }, DT);
       ore += D.ore || 0; D.ore = 0; D.dirt = 0; D.heat = 0;
     }

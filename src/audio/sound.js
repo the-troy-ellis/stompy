@@ -336,6 +336,12 @@ export function createAudio(app) {
       play('boom_low', { ...o, vol: 0.3 + 0.5 * c, rate: 0.7 });   // the deeper second layer: the ground answering
       this.osc('sine', 70, 20, 0.8, 0.4 * (0.5 + c), o);
     },
+    // A fine patch settling (docs/specs/27-fine-dig.md): a low rumble under a soft, deep thump.
+    settle(at) {
+      const o = { at, ref: 50 };
+      this.noise(1.4, 0.07, 140, 40, 'lowpass', o);
+      this.osc('sine', 48, 26, 0.9, 0.18, o);
+    },
     land(force) {
       this.osc('sine', 62, 28, 0.32, 0.22 * force);
       this.noise(0.14, 0.08 * force, 200, 50);
