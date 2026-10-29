@@ -81,8 +81,10 @@ test('a dust storm shoves a mech up on its jets 0.5 m/s with the wind, never one
   const run = (weather, air) => {
     const G = createTestGame({ foes: [] }), P = G.player;
     G.weather = makeWeather(weather, 77);
+    stepFor(G, 1, input({ jets: air }));   // charging, on the ground (docs/specs/26-blast-off.md)
+    stepFor(G, 1 / 60);   // let go: off
     const x0 = P.x, z0 = P.z;
-    stepFor(G, 1, input({ jets: air }));
+    stepFor(G, 1);
     return [P.x - x0, P.z - z0, G.weather.wind, P.air];
   };
   const [dx, dz, w, up] = run('dust', true);

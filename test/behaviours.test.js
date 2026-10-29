@@ -78,7 +78,7 @@ test('harass jumps over a player within 60 m and comes down behind them', () => 
   place(G, e, 0, 30, Math.PI); e.ai.aware = true; e.fuel = 1;
   e.ai.plan = { drive: [harass], shape: [] };
   let flew = false, behind = false, minD = 1e9;
-  frames(G, 6, () => { if (e.air && e.jetting) flew = true; if (e.z < -5) behind = true; minD = Math.min(minD, hypot(e.x, e.z)); });
+  frames(G, 6, () => { if (e.air && e.jet?.blasted) flew = true; if (e.z < -5) behind = true; minD = Math.min(minD, hypot(e.x, e.z)); });
   assert.ok(flew, 'never used the jets');
   // Landing on the player instead is a stomp, which is also fine by Stompy.
   const stomped = G.fx.calls('sfx.punch').some(c => c.args[1] === true);

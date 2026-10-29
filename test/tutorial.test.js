@@ -60,7 +60,7 @@ test('a prompt the pilot ignores gives way in the end, and nothing shows twice',
   wait(G);
   assert.equal(up(G), 'legs', 'W gave up waiting');
   const shown = [];
-  for (let i = 0; i < 400; i++) { stepFor(G, 0.25, input({ thrUp: true, turn: 1, twist: 1, held: { energy: true, ballistic: true }, missileTap: true, jets: true })); const id = up(G); if (id && shown.at(-1) !== id) shown.push(id); }
+  for (let i = 0; i < 400; i++) { stepFor(G, 0.25, input({ thrUp: true, turn: 1, twist: 1, held: { energy: true, ballistic: true }, missileTap: true, jets: i % 2 === 0 })); const id = up(G); if (id && shown.at(-1) !== id) shown.push(id); }
   assert.equal(new Set(shown).size, shown.length, `each once: ${shown}`);
   assert.ok(!shown.includes('go'));
 });

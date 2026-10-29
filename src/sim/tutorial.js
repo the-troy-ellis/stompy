@@ -44,7 +44,7 @@ function did(G, T, id, input) {
     case 'melt': return T.held > TUT.melted;
     case 'thump': return !!input.held?.ballistic;
     case 'missiles': return !!input.missileTap || !!input.held?.missile;
-    case 'jump': return !!P.jetting;
+    case 'jump': return !!P.jet?.blasted;   // a blast-off (sim/jets.js), not just a charge
     case 'punch': return !!input.punch || !!P.melee;
     case 'heat': return P.heat < TUT.heatAt - 20;
     case 'target': return (G.cycles || 0) > T.cycles;

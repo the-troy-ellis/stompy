@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (the owner, 2026-10-28: "Instead of a continuous jet like in mechwarrior it should be more like a blast off mechanic where you hold down the jump jet to charge it and when you let go you shoot off like a rocket with a streak like the missiles make and a large thunk with a dust cloud and shockwave. You should be able to guide your trajectory a bit while in the air, the view should tilt down a bit so you can see below you better. If you aim right you can land on a mech and insta stomp it") |
+| Status | part 1 built (spec merged in #362; the owner, 2026-10-28: "Instead of a continuous jet like in mechwarrior it should be more like a blast off mechanic where you hold down the jump jet to charge it and when you let go you shoot off like a rocket with a streak like the missiles make and a large thunk with a dust cloud and shockwave. You should be able to guide your trajectory a bit while in the air, the view should tilt down a bit so you can see below you better. If you aim right you can land on a mech and insta stomp it") |
 | Milestone | M13 (proposed) |
 | Size | L, split in three: charge and blast-off; the flight, the view and the landing spot; the insta-stomp, the AI and online |
 | Depends on | [12-melee.md](12-melee.md) (the stomp); [13-thunk.md](13-thunk.md) (the feel table) |
@@ -73,7 +73,7 @@ it's flattened: an **insta-stomp**.
 
 New text, in full:
 - tutorial, keyboard: `HOLD J. LET GO: UP.`
-- tutorial, touch: `UPPER STICK: TAP, HOLD, LET GO: UP.`
+- tutorial, touch: `UPPER STICK: TAP, HOLD, LET GO` (the 30-letter limit)
 - tutorial, gamepad: `HOLD A. LET GO: UP.`
 - (no new voice: a stomp kill's lines are there already, and being stomped
   yourself gives the debrief's existing `FLATTENED.`)
@@ -245,6 +245,61 @@ frame, about 40 ground samples. Nothing else measurable.
 2. **The flight:** air steering, the view's tilt, the landing ring.
 3. **The insta-stomp, the AI and online:** the stomp, AI charge and release,
    the protocol, and the arena.
+
+## As built
+
+### Part 1: charge and blast-off
+
+- **`sim/jets.js` `stepJets`** runs in `stepMech` in place of the old thrust:
+  - held on the ground with the jets ready, it charges in `JETS[level].charge`;
+  - let go, `blastOff`;
+  - shut down, in the air or not ready, a charge is lost.
+- **Two names kept with new meanings,** where the spec said they'd go, so the
+  AI, the HUD and the tests needed little change:
+  - `m.jetting` is JUMP held (charging);
+  - `m.fuel` is how ready the jets are (0 after a blast, 1 again after
+    `recharge`).
+- **`m.jet`** holds `{ charge, blasted, top, fly }`. `fly` is the blast's
+  speed along: `stepMech` carries the flight with it, undying, until it
+  lands. A push (knockback) would have died out in a second.
+- **`blastOff`:**
+  - up by `vy[tap..full]` and along the legs' heading by `fwd × charge ×
+    throttle`;
+  - the heat; the `blastoff` feel row and `sfx.blastoff` (the missile's
+    whoosh, slow, on `boom_low` and a falling sine);
+  - `blastRing`: the shockwave, a scorch, a ring of dust racing out and a
+    puff of smoke.
+  - The climb trails flame and hanging smoke (`streak`).
+- **`JETS`** in `data/systems.js` replaces `JETS_FUEL` and `JETS_CLIMB`, with
+  the spec's numbers.
+- **What you see and hear:**
+  - The HUD's jets ring: amber with the charge, blinking white when full;
+    otherwise cyan, how ready the jets are.
+  - The crouch: the body squash and the cockpit's eye sink with the charge.
+  - The jet loop: a whine rising with the charge, the roar up the climb.
+- **Measured** (`test/jets.test.js`):
+  - a tap goes 5–8 m up, a full charge 22–28 m;
+  - at a run a full blast lands more than 40 m on; standing still it goes
+    straight up;
+  - a hop is down in about 1.5 s, long before the 3 s refill.
+- **Foes:** the harass jump holds the jets for 1.2 s and lets go, which is now
+  a full charge and a blast over you. It waits for the jets to be ready
+  (`fuel >= 1`). Their landing is still the old stomp until part 3.
+- **The tutorial:** the jump step completes on a blast-off, not on holding
+  the button. The touch line is `UPPER STICK: TAP, HOLD, LET GO`, to fit the
+  30-letter limit.
+- **Smoke:**
+  - `blastoff`: `J` held 1.1 s on the range is a full charge on the ground,
+    and letting go is 17 m up 0.5 s later, the jets spent.
+  - The touch run charges with a tap and a hold, and lets go to blast off.
+- **The bench** (`sim/bench.js`): its "hop while still rolling" at 9 s is now
+  a tap of the jets (5.4 m up), about the old jets' 0.8 s burst. Held for
+  0.8 s it became a 25 m blast that changed what the camera saw, and
+  `bench-deaths` went 3 draws over its budget.
+- **Not yet:**
+  - Online, other pilots see the flight but not the crouch, the ring or the
+    thunk (`jc` and `fx blast` are part 3).
+  - Air steering, the view's tilt and the landing ring are part 2.
 
 ## Open questions
 

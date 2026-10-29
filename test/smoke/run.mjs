@@ -314,6 +314,20 @@ try {
     console.log(`command: Tab up ${up}; picked ${picked}; a ground click gave it ${go}; DRIVE -> ${now[1]} (still up ${now[0]})`);
     if (!up || picked !== 'kestrel' || go !== 'go' || now[0] || now[1] !== 'kestrel') { failed = true; console.error('FAIL: the command view'); }
   });
+  // Blast-off jets (spec 26): on the range, J held charges (crouched, still on the ground), let go blasts off
+  // with the ring and the thunk; up there it's flying, and the jets are spent.
+  await run('blastoff', URL_, async page => {
+    await page.click('[data-sel="debug"]'); await page.click('[data-dsec="range"]');
+    await page.click('[data-a="go"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'range' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    await page.keyboard.down('KeyJ'); await page.waitForTimeout(1100);
+    const charged = await page.evaluate(() => { const p = window.__stompy.game.player; return [p.air, p.jet?.charge]; });
+    await page.keyboard.up('KeyJ'); await page.waitForTimeout(500);
+    await page.screenshot({ path: 'test-results/smoke-blastoff.png' });
+    const flying = await page.evaluate(() => { const G = window.__stompy.game, p = G.player; return { air: p.air, up: p.y - G.ter.height(p.x, p.z), blasted: !!p.jet?.blasted, fuel: p.fuel }; });
+    console.log(`blastoff: J held, on the ground ${!charged[0]}, charge ${(charged[1] ?? 0).toFixed(2)}; let go: in the air ${flying.air}, ${flying.up.toFixed(1)} m up, jets ${flying.fuel.toFixed(2)}`);
+    if (charged[0] || !(charged[1] > 0.5) || !flying.air || !flying.blasted || !(flying.up > 5) || !(flying.fuel < 1)) { failed = true; console.error('FAIL: blast-off'); }
+  });
   // The command view on touch: MAP goes up, a tap picks the KESTREL, a tap on the ground sends it, DRIVE drops you in.
   await run('touch-command', URL_ + '&touch=1', async page => {
     await page.tap('[data-sel="debug"]'); await page.tap('[data-dsec="jump"]');
@@ -455,19 +469,21 @@ try {
     await Promise.all([touch('touchStart', 200, 560), touch('touchEnd'), touch('touchStart', 200, 560), touch('touchEnd')]);
     await page.waitForTimeout(150);
     const punched = await page.evaluate(() => !!window.__stompy.game.player.melee);
-    // Tap, then tap and hold, on the upper stick: the jets burn while it's held.
+    // Tap, then tap and hold, on the upper stick: the jets charge while it's held, and letting go blasts off (spec 26).
     await page.waitForTimeout(800);
     await Promise.all([touch('touchStart', 200, 300), touch('touchEnd'), touch('touchStart', 200, 300)]);
     await page.waitForTimeout(700);
-    const jumped = await page.evaluate(() => { const p = window.__stompy.game.player; return !!p.air && p.jetting; });
+    const charged = await page.evaluate(() => { const p = window.__stompy.game.player; return !p.air && p.jet?.charge > 0.3; });
     await touch('touchEnd');
+    await page.waitForTimeout(300);
+    const jumped = charged && await page.evaluate(() => { const p = window.__stompy.game.player; return !!p.air && !!p.jet?.blasted; });
     // A tap on the compass: the torso swings back over the legs.
     await page.evaluate(() => { window.__stompy.game.player.twist = 1.2; });
     await Promise.all([touch('touchStart', 512, 24), touch('touchEnd')]);
     await page.waitForTimeout(800);
     const centred = Math.abs((await P()).twist) < 0.1;
     const gone = await page.evaluate(() => !document.querySelector('[data-t="jump"]') && !document.querySelector('[data-t="punch"]'));
-    console.log(`touch: the lower stick keeps turning the legs while held ${aimOk}, the upper stick sets throttle and twists ${stickOk}, right side only buttons ${rightOk}, double tap lower punches ${punched}, tap then hold upper jumps ${jumped}, compass tap centres ${centred}, no JUMP or PUNCH buttons ${gone}`);
+    console.log(`touch: the lower stick keeps turning the legs while held ${aimOk}, the upper stick sets throttle and twists ${stickOk}, right side only buttons ${rightOk}, double tap lower punches ${punched}, tap then hold upper charges and letting go blasts off ${jumped}, compass tap centres ${centred}, no JUMP or PUNCH buttons ${gone}`);
     if (!(aimOk && stickOk && rightOk && punched && jumped && centred && gone)) { failed = true; console.error('FAIL: the touch layout did not behave'); }
   });
   // The mission editor (#246): ?edit=1 shows a mission from above; a tap on a
