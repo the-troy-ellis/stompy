@@ -292,6 +292,10 @@ frame, about 40 ground samples. Nothing else measurable.
   - `blastoff`: `J` held 1.1 s on the range is a full charge on the ground,
     and letting go is 17 m up 0.5 s later, the jets spent.
   - The touch run charges with a tap and a hold, and lets go to blast off.
+- **The bench** (`sim/bench.js`): its "hop while still rolling" at 9 s is now
+  a tap of the jets (5.4 m up), about the old jets' 0.8 s burst. Held for
+  0.8 s it became a 25 m blast that changed what the camera saw, and
+  `bench-deaths` went 3 draws over its budget.
 - **Not yet:**
   - Online, other pilots see the flight but not the crouch, the ring or the
     thunk (`jc` and `fx blast` are part 3).

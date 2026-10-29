@@ -120,7 +120,7 @@ export function benchStep(G, inp, dt) {
     if (t < 6.2) { turnTo(P, -PI / 2, dt); P.throttle = 0; }
     else if (t < 8.5) P.throttle = 1;
     else P.throttle = 0;   // brake: the body pitches forward
-    inp.jets = t >= 9 && t < 9.8;   // a hop while still rolling
+    inp.jets = t >= 9 && t < 9.05;   // a hop while still rolling: a tap of the blast-off jets (sim/jets.js), about the old jets' 0.8 s burst
     if (t >= 10) turnTo(P, 0, dt);
   } else if (t < 22) {
     const tgt = ORDER.map(k => G.mechs.find(m => m.alive && m.type === k)).find(Boolean);
