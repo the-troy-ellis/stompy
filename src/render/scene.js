@@ -364,14 +364,18 @@ export function createScene(app) {
     tiltNow += (want - tiltNow) * Math.min(1, dt * 5);
     return tiltNow;
   }
-  const LAND_OK = [0.45, 1, 0.5], LAND_STOMP = [1, 0.3, 0.25];
+  // The ring: where this flight lands (sim/jets.js keeps `jet.at`), and while
+  // charging with a lock, where this charge would. Green over ground, red on
+  // a mech (a stomp); amber while a locked charge doesn't reach yet.
+  const LAND_OK = [0.45, 1, 0.5], LAND_STOMP = [1, 0.3, 0.25], LAND_SHORT = [1, 0.75, 0.2];
   function drawLanding() {
-    const P = G.player;
-    if (!P?.alive || !P.air || !P.jet?.blasted) return;
-    const at = landingAt(G, P);
+    const P = G.player, j = P?.jet;
+    if (!P?.alive || !j) return;
+    const flying = P.air && j.blasted, charging = !P.air && j.charge > 0 && j.lock;
+    const at = flying ? j.at || landingAt(G, P) : charging ? j.at : null;
     if (!at) return;
     const d = geoOf(P).radius * P.ch.scale * 2.4 + Math.sin(G.time * 9) * 0.4;   // a mech's width, breathing
-    R.draw(R.meshes.fx.ring, chain(M.T(at.x, at.y + 0.35, at.z), M.S(d, 1, d)), at.mech ? LAND_STOMP : LAND_OK, 1);
+    R.draw(R.meshes.fx.ring, chain(M.T(at.x, at.y + 0.35, at.z), M.S(d, 1, d)), at.mech ? LAND_STOMP : charging ? LAND_SHORT : LAND_OK, 1);
   }
 
   // render()'s per-object loops live in their own functions: render() is too big

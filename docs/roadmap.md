@@ -336,6 +336,7 @@ and blast-off; the flight; targeting and the insta-stomp; the AI and online.
 
 - **Part 1, charge and blast-off:** built.
 - **Part 2, the flight:** built.
+- **Part 3, targeting and the insta-stomp:** built (single player).
 
 ## Parked
 

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | parts 1 and 2 built (#363, #364); targeting added for part 3 (the owner, 2026-10-29: "I want the blast off mechanic to be fun. I want it to have some slight targeting and auto steering to make it a viable combat mechanic. Players should generally control it but there should be a targeting mechanic"). Spec merged in #362; the owner, 2026-10-28: "Instead of a continuous jet like in mechwarrior it should be more like a blast off mechanic where you hold down the jump jet to charge it and when you let go you shoot off like a rocket with a streak like the missiles make and a large thunk with a dust cloud and shockwave. You should be able to guide your trajectory a bit while in the air, the view should tilt down a bit so you can see below you better. If you aim right you can land on a mech and insta stomp it") |
+| Status | parts 1 to 3 built (#363, #364, part 3 below); targeting added for part 3 in #365 (the owner, 2026-10-29: "I want the blast off mechanic to be fun. I want it to have some slight targeting and auto steering to make it a viable combat mechanic. Players should generally control it but there should be a targeting mechanic"). Spec merged in #362; the owner, 2026-10-28: "Instead of a continuous jet like in mechwarrior it should be more like a blast off mechanic where you hold down the jump jet to charge it and when you let go you shoot off like a rocket with a streak like the missiles make and a large thunk with a dust cloud and shockwave. You should be able to guide your trajectory a bit while in the air, the view should tilt down a bit so you can see below you better. If you aim right you can land on a mech and insta stomp it") |
 | Milestone | M13 (proposed) |
 | Size | L, split in four: charge and blast-off; the flight, the view and the landing spot; targeting and the insta-stomp; the AI and online |
 | Depends on | [12-melee.md](12-melee.md) (the stomp); [13-thunk.md](13-thunk.md) (the feel table) |
@@ -142,7 +142,7 @@ level (0 none, 1 STOCK, 2 BOOSTED):
 | `reach` | 80 m | 90 m | how far the jets will lock |
 | `aimFwd` | 20 m/s | 22 m/s | the most speed along an aimed blast may take, to reach the target |
 | `assist` | 4 m/s² | 4 m/s² | the auto-steer's pull (your own steering is 6 or 7) |
-| `assistMax` | 6 m/s | 6 m/s | the most speed the auto-steer may add over a flight |
+| `assistMax` | 10 m/s | 10 m/s | the most speed the auto-steer may add over a flight (6 in the first draft; see As built) |
 | `letGo` | 0.5 s | 0.5 s | steering away from the target this long drops the lock |
 
 Gravity stays 18 m/s², so a full STOCK blast tops out at 40² / 36 = 44 m and
@@ -216,7 +216,7 @@ is a balance issue.
   - The player's own steering is applied first and isn't capped by it.
   - Steering whose direction is more than 90° off the miss for `letGo` s
     sets `j.lock = null`.
-  - The lock also drops if the target dies, or if the miss grows past 25 m
+  - The lock also drops if the target dies, or if the miss grows past 35 m (`JETS_FLIGHT.escape`)
     (it got away).
 - **The view** is unchanged: no camera pull. The brackets and the ring tell
   you.
@@ -450,6 +450,66 @@ frame, about 40 ground samples. Nothing else measurable.
 - **Not yet:** the red ring is only a warning. Landing there is still the old
   stomp until part 3.
 
+### Part 3: targeting and the insta-stomp
+
+- **`jets.js` `jetLock(G, P)`**, from `update.js` each frame after the aim:
+  - while charging on the ground, it locks `G.target` if that's a live foe
+    within `reach` and the lock cone (`JETS_FLIGHT.cone`, 0.3 rad);
+  - otherwise it locks the foe nearest the crosshair that is, and makes it
+    `G.target`, so the brackets, the missiles and the jets all agree;
+  - it works out this charge's flight as `blastOff` would make it: `j.at`
+    is where it lands, and `j.on` is true when that's on the lock.
+    `sfx.lock` chirps as `on` comes true.
+- **`aimBlast`** solves for the time down onto the target's top at this
+  charge's `vy`. It leads the target by its speed over the ground, takes off
+  the mech's own walk, and caps the result at `aimFwd`. `blastOff` uses it
+  with a lock unless the throttle is back.
+- **The flight stepper** (`flight`, shared by `landingAt` and the charge's
+  ring) now walks the other mechs on at their pace as it steps. That keeps
+  the ring right over a moving target. It also returns the time to landing,
+  `t`.
+- **`airSteer(G, m, …)`** runs every frame of the player's flight, steering
+  or not, and keeps `j.at` for the renderer, so `landingAt` runs once a
+  frame. With a lock:
+  - the miss is the target's place at `t` − the landing now;
+  - the pull is up to `assist × dt` a frame and `assistMax` over the flight;
+  - **letting go is "steering away from the target"**: the steer's direction
+    against the line to the target, not against the miss. On target, the
+    miss is near zero and has no direction, so steering there would have
+    dropped the lock at random.
+- **Tuned on the headless range** (`test/jetsTarget.test.js`). The foes turn
+  at their own chassis's rate (a WARDEN 0.7 rad/s, a JACKAL 1.6). With the
+  first draft's `assistMax` 6 and a 25 m `escape`, a WARDEN that turned 90°
+  early in the flight walked out from under. At `assistMax` 10 and `escape`
+  35:
+  - a WARDEN at 7 m/s turning 90° at 0.5, 1.5 or 2.4 s into a full flight is
+    stomped;
+  - with no auto-steer, it walks out from under;
+  - a JACKAL at 19 m/s breaking sideways at 1.5 or 2.4 s into the flight
+    (about 3 and 2 s to go) gets away;
+  - one that keeps coming is flattened.
+  - The pull stays 4 m/s², under your own steering's 6.
+- **The ring** (`scene.js` `drawLanding`) is drawn from `j.at`, and now also
+  while charging with a lock: amber while it falls short, red on the target.
+  In flight it's green over ground and red on a mech, as in part 2.
+- **The HUD:** the brackets on the jets' lock close to the missile lock's
+  diamond, amber, and red when it'll land on it (`render/hud.js`).
+- **The insta-stomp** (`melee.js` `tryStomp`): after a blast-off, `stompFall`
+  (8 m) below the flight's top, the stomp deals 10,000. The first section
+  goes, and the rest runs on into the torso. It counts as a stomp kill:
+  `TARGET STOMPED.`, and the debrief's `FLATTENED.` when it's you. An aimed one
+  (the lock is the mech stomped) sets the hit-stop to twice a hit's. A remote
+  pilot takes the old stomp until part 4 carries it.
+- **Foes** never call `jetLock`, so their blasts are part 1's and their
+  landings can't insta-stomp. That's the spec's default.
+- **Smoke:** `blastoff-lock` puts a standing foe 55 m ahead on the range.
+  `J` held locks it and reaches; letting go flattens it (one kill, no foes
+  left).
+- **Seen on the range:** going down onto the target, it's below the view.
+  The 17° tilt doesn't reach it, so the diamond and the ring go out of sight
+  for the last second or so. It still lands (the auto-steer has it), but you
+  watch it on faith. Open questions: tip the view further with a lock.
+
 ## Open questions
 
 - **The AI and the insta-stomp.** Default: foes never aim blast-offs at you,
@@ -460,9 +520,14 @@ frame, about 40 ground samples. Nothing else measurable.
   it take the target's legs instead of its life.
 - **Heavies.** Default: an insta-stomp flattens anything, a WARDEN or a
   PURPLE PUNCHER too. Could need more fall for a heavy.
-- **How much help.** The auto-steer's `assist` and `assistMax` are a guess:
-  enough to stick a slow foe, not a quick one that dodges late. They're tuned
-  on the range against a walking JACKAL and WARDEN once it's built.
+- **How much help.** The auto-steer's `assist` 4 and `assistMax` 10 are
+  tuned headless: enough to stick a slow foe, not a quick one that dodges
+  late (see As built, part 3). Hands-on play may move them, as a balance
+  issue.
+- **Seeing the target on the way down.** Default: the view tips 17°, as
+  now, and the target drops out of sight under you near the end. Option:
+  with a lock, tip further as you come down (to about 45°), or pull the view
+  toward the target. Only the view would move, never the guns.
 - **A dive.** An option for later: at the top, tap JUMP again to cut the
   flight short and slam straight down on the lock. It's quicker, so harder
   to dodge, but a smaller stomp. Not in this spec.

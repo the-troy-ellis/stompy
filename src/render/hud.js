@@ -757,7 +757,9 @@ export function createHud(app) {
     const scr = P.scramble > 0, t = scr ? null : G.target, sees = sightLine(G);
     if (t !== bracketFor) { bracketFor = t; lockSnap.x = 0; lockSnap.v = 0; }   // a new target starts open
     const nowB = performance.now();
-    stepSpring(lockSnap, lastBracketAt ? min(0.05, (nowB - lastBracketAt) / 1000) : 0, G.lockOn ? 1 : 0);
+    // The jets' lock (sim/jets.js, charging or in a locked flight) shuts them too: amber, red when it'll land on it.
+    const jl = !!(t && P.jet?.lock === t && (P.jet.charge > 0 || P.jet.blasted)), jOn = jl && (P.jet.blasted ? P.jet.at?.mech === t : P.jet.on);
+    stepSpring(lockSnap, lastBracketAt ? min(0.05, (nowB - lastBracketAt) / 1000) : 0, G.lockOn || jl ? 1 : 0);
     lastBracketAt = nowB;
     if (t && t.alive && hypot(t.x - P.x, t.z - P.z) < sees) {
       const f = t.kind ? t.hp / t.max : t.hp.T / t.max.T, col = f < BRACKET_LOW && floor(G.time * 6) % 2 ? '#fff' : hpCol(f);   // the target's torso: the brackets' and the lead's colour
@@ -765,7 +767,7 @@ export function createHud(app) {
       if (a && b) {
         const hgt = max(14, b[1] - a[1]), wdt = hgt * 0.75, x0 = a[0] - wdt / 2, y0 = a[1], k = min(10, wdt / 3);
         const sn = clampN(lockSnap.x, 0, 1.25), mx = a[0], my = y0 + hgt / 2, dx = wdt * 0.72, dy = hgt * 0.7;   // the diamond reaches round the whole mech
-        ctx.strokeStyle = col; ctx.lineWidth = 2 + sn * 0.5;
+        ctx.strokeStyle = jOn ? RED : jl ? AMBER : col; ctx.lineWidth = 2 + sn * 0.5;
         ctx.beginPath();
         // Each corner is three points (its two arms' ends and the corner); shut, they are a diamond's
         // top or bottom point, the middle of its side, and its left or right point.
