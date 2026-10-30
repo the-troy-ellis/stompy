@@ -328,6 +328,10 @@ the pour.
   craters leave round bites. Left alone for 15 s it slumps back into the
   usual low-poly ground. In three parts: fine patches in the sim; drawing
   them and the settle; online.
+- **The ground on a 4 m grid** ([specs/29-ground-4m.md](specs/29-ground-4m.md),
+  ready): the voxel ground goes from 8 m cells to 4 m, so craters and bites
+  stay round and a fine patch settles into ground only twice as coarse.
+  Ore, dirt, falls and the dig's pace rescaled to stay as today.
 - **How digging feels** ([specs/28-dig-feel.md](specs/28-dig-feel.md),
   built): each scoop by what the bucket met (soil a swish, rock a clunk,
   rock breaking loose a crack), and a run of scoops building to the crack.
