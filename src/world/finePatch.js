@@ -14,7 +14,7 @@ const { max, min } = Math;
 // The grid's own numbers (cell size, origin) come in `g`, the ground's
 // `grid`, so this file never imports voxels.js back.
 export const FS = 2;
-export const PATCH = { margin: 1, maxSide: 8, max: 6 };   // coarse cells; maxSide in x and z
+export const PATCH = { margin: 2, maxSide: 16, max: 6 };   // coarse cells (4 m); maxSide in x and z
 
 let SEQ = 0;
 

@@ -24,7 +24,8 @@ const { atan2, hypot, sin, cos, abs, min } = Math;
 export const MINER = {
   arrive: 3,      // m: this near its site it stops and digs
   face: 0.12,     // rad: this square to the site's heading before it holds DIG
-  follow: 4,      // m: when no aim digs, the site moves this far ahead, after the face
+  follow: 4,      // m: when no aim digs, the site moves this far ahead, after the face; or, if the face is in sight further on,
+  stand: 8,       // m: to this far short of it (the face a run digs back runs well past the bucket's reach on the 4 m grid, docs/specs/29-ground-4m.md)
   moves: 3,       // moves ahead in a row that dig nothing, and it gives the site up
   level: 0.12,    // rad: it aims this far up, so the aim's own tilt (sim/tools.js) digs level and it tunnels on, not down
   deep: 16,       // m: and never moves ahead onto ground this far under where you left it digging
@@ -62,7 +63,8 @@ export function mine(G, m, dt) {
     a.seen = m.scoops || 0;
     if (!m.dryScoops) a.aim = a.dry = 0;   // it dug
     else if (m.dryScoops % TOOL.dig.dry === 0 && (a.aim = (a.aim || 0) + 1) >= AIMS.length) {   // dry, and every way round the hole tried: the face has moved back, so after it, unless that is down a hole
-      const x = s.x + sin(s.yaw) * MINER.follow, z = s.z + cos(s.yaw) * MINER.follow;
+      const t = G.ter.coarse.ray([s.x, s.y + 4 * m.ch.scale, s.z], [sin(s.yaw), 0, cos(s.yaw)], 60), ahead = t != null && t - MINER.stand > MINER.follow ? t - MINER.stand : MINER.follow;
+      const x = s.x + sin(s.yaw) * ahead, z = s.z + cos(s.yaw) * ahead;
       if ((a.dry = (a.dry || 0) + 1) > MINER.moves || G.ter.coarse.groundBelow(x, s.y + 4, z) < s.y - MINER.deep) { m.site = null; m.job = null; return halt(m, dt); }   // dug out, or nothing in reach: it stops (the 8 m ground: a fine scoop's pit isn't a hole, docs/specs/27-fine-dig.md)
       a.aim = 0; s.x = x; s.z = z;
     }

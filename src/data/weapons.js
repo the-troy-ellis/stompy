@@ -70,7 +70,7 @@ export const CRUSH = { perCell: 3, max: 40 };
 // an arch on both legs 26, a mesa's 24 m lip 35, a ball on a whole pillar
 // 22 stand; an arch on one leg 110, a thinned pillar 84 break. `rounds`: a
 // break can leave a new overhang, checked again this many times a dig.
-export const TORQUE = { rock: 50, rounds: 4 };
+export const TORQUE = { rock: 500, rounds: 4 };   // rock: 50 on the 8 m grid (holding up to 34, breaking from 110); on the 4 m one, holding up to 326, breaking from 894 (spec 29)
 
 // Three fire controls, one per kind of weapon: lasers are energy (no ammo,
 // lots of heat), the autocannon is ballistic, LRMs are missiles.

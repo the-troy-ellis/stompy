@@ -11,7 +11,7 @@ const { abs, floor, hypot, max, min } = Math;
 // moves past the feelers' reach. Digs and falls mark squares to look at again
 // (sim/dig.js). Built per ground, at first use, in a few ms.
 export const SQ = 32, N = (2 * HALF) / SQ, CLIFF = 1.6, HEADROOM = 9, MAX_FLOORS = 4;
-const PER = SQ / VS, STEP_M = 4;   // corner columns a square spans; the walk between squares, in metres
+const PER = SQ / VS, STEP_M = 2;   // corner columns a square spans; the walk between squares, in metres: half a 4 m cell, so a wall that rises inside one cell is seen (docs/specs/29-ground-4m.md)
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
 export function makeNav(ter) {

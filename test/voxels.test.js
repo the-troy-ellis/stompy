@@ -44,11 +44,11 @@ test('carving is the same in any order; it marks the chunks it touched and lower
 test('bedrock and the edges hold, whatever is dug or built', () => {
   const g = makeGround(3, { flat: true });
   g.carve([0, Y0 + VS, 0], 40);
-  for (let i = NX / 2 - 3; i <= NX / 2 + 3; i++) for (let j = 0; j <= 1; j++) assert.equal(g.D[cornerIndex(i, j, NZ / 2)], 255, 'bedrock');
+  for (let i = NX / 2 - 3; i <= NX / 2 + 3; i++) for (let j = 0; j * VS <= 8; j++) assert.equal(g.D[cornerIndex(i, j, NZ / 2)], 255, 'bedrock: 8 m of it');
   assert.ok(g.groundBelow(0, 50, 0) > Y0 + VS);
   g.build([-HALF + 4, 20, 0], 30);
   g.build([0, Y0 + NY * VS - 4, 0], 30);
-  for (let j = 0; j <= NY; j++) assert.ok(g.D[cornerIndex(0, j, NZ / 2)] === (j <= 1 ? 255 : 1), 'the edge stays air');
+  for (let j = 0; j <= NY; j++) assert.ok(g.D[cornerIndex(0, j, NZ / 2)] === (j * VS <= 8 ? 255 : 1), 'the edge stays air');
   for (let i = 0; i <= NX; i += 16) assert.equal(g.D[cornerIndex(i, NY, NZ / 2)], 1, 'and so does the top');
 });
 

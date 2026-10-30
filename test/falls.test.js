@@ -11,7 +11,7 @@ import { initFeet } from '../src/sim/gait.js';
 import { CRUSH } from '../src/data/weapons.js';
 
 const game = () => { const G = createTestGame(); for (const e of foes(G)) { freeze(e); e.x = 900; e.z = 900; } return G; };
-// A ball of rock on a one-cell stem at (x, z): cut the stem and the ball falls two cells.
+// A ball of rock on a stem at (x, z): cut the stem and the ball falls to the ground, 12 m.
 function mushroom(G, x = 0, z = 0) {
   G.ter.block(x - 4, x + 4, z - 4, z + 4, 30);
   G.ter.build([x, 40, z], 14);
@@ -20,7 +20,7 @@ function mushroom(G, x = 0, z = 0) {
 const cut = (G, x = 0, z = 0) => dig(G, [x, 8, z], 7);
 const ci = (x, y, z) => cornerIndex(Math.round((x + 1152) / VS), Math.round((y - Y0) / VS), Math.round((z + 1152) / VS));
 
-test('a ball whose stem is blown out falls two cells and lands as a heap', () => {
+test('a ball whose stem is blown out falls to the ground and lands as a heap', () => {
   const G = game();
   mushroom(G);
   assert.equal(G.falls.length, 0);
@@ -28,9 +28,9 @@ test('a ball whose stem is blown out falls two cells and lands as a heap', () =>
   assert.equal(G.falls.length, 1, 'it comes down');
   const f = G.falls[0];
   assert.ok(f.n >= SHATTER && f.heap, `a heap: ${f.n} corners`);
-  assert.equal(f.drop, 2);
+  assert.equal(f.drop * VS, 12, 'whole cells: as far as it can without going into the ground');
   assert.ok(!G.ter.solid(0, 44, 0), 'the grid has it gone from up there at once');
-  assert.ok(G.ter.D[ci(0, 4, 0)] > 128 && G.ter.D[ci(0, 12, 0)] > 128, 'and in its heap, two cells down: the stem\'s top where its foot was');
+  assert.ok(G.ter.D[ci(0, 4, 0)] > 128 && G.ter.D[ci(0, 12, 0)] > 128, 'and in its heap, 12 m down: the stem\'s top where its foot was');
   assert.ok(G.ter.D[ci(0, 52, 0)] <= 128, 'the ball\'s crown is lower too');
   stepFor(G, 2);
   assert.equal(G.falls.length, 0, 'drawn falling, then landed');
@@ -42,21 +42,21 @@ test('ground the land holds up does not fall; a dig in a hillside drops nothing'
   assert.equal(G.falls.length, 0);
 });
 
-test('an unheld island past 4,096 corners counts as land; a small one shatters', () => {
+test('an unheld island past ISLAND_MAX corners counts as land; a small one shatters', () => {
   const G = game(), D = G.ter.D, j = 20;
   const slab = (n, i0) => { for (let k = 100; k < 100 + n; k++) for (let i = i0; i < i0 + n; i++) D[cornerIndex(i, j, k)] = 200; };
-  slab(70, 20);   // 4,900 corners floating
-  assert.ok(70 * 70 > ISLAND_MAX);
+  slab(190, 20);   // 36,100 corners floating
+  assert.ok(190 * 190 > ISLAND_MAX);
   assert.deepEqual(G.ter.islands([20, 30, j, j, 100, 110]), [], 'too big to be anything but land');
-  slab(40, 120);   // 1,600: an island
-  const isl = G.ter.islands([120, 125, j, j, 100, 105]);
+  slab(40, 220);   // 1,600: an island
+  const isl = G.ter.islands([220, 225, j, j, 100, 105]);
   assert.equal(isl.length, 1);
   assert.equal(isl[0].length, 1600);
-  for (let i = 200; i < 202; i++) for (let k = 200; k < 202; k++) D[cornerIndex(i, j, k)] = 200;   // four corners
-  const tiny = G.ter.fall(G.ter.islands([200, 201, j, j, 200, 201])[0]);
-  assert.equal(tiny.heap, false, 'under 8 corners: it shatters');
-  assert.ok(D[cornerIndex(200, j, 200)] <= 128 && D[cornerIndex(200, j - tiny.drop, 200)] <= 128 || tiny.drop === 0, 'and leaves nothing behind');
-  assert.ok(NX > 202 && NZ > 202);
+  for (let i = 400; i < 402; i++) for (let k = 400; k < 402; k++) D[cornerIndex(i, j, k)] = 200;   // four corners
+  const tiny = G.ter.fall(G.ter.islands([400, 401, j, j, 400, 401])[0]);
+  assert.equal(tiny.heap, false, 'under SHATTER corners: it shatters');
+  assert.ok(D[cornerIndex(400, j, 400)] <= 128 && D[cornerIndex(400, j - tiny.drop, 400)] <= 128 || tiny.drop === 0, 'and leaves nothing behind');
+  assert.ok(NX > 402 && NZ > 402);
 });
 
 test('a mech under it takes the crush; one standing on it rides it down', () => {

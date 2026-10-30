@@ -91,7 +91,12 @@ export function bite(G, m, p, r = CONSTRUCT.bucket) {
   let got = 0, seams = 0;
   const tally = { rock: 0, soft: 0, corner: (cx, cy, cz, depth) => { if (seamAt(seed, cx, cy, cz)) { got += seamOre(depth); seams++; } else got += CONSTRUCT.orePerCorner; } };
   confirmDig(G, [0, x, y, z, r], true, 1, tally);
-  const ore = Math.max(0, Math.min(m.ch.hopper - (m.ore || 0), Math.round(got)));
+  // Whole ore into the hopper; the fraction rides on to the next bite (a 4 m
+  // corner is an eighth of an 8 m one, docs/specs/29-ground-4m.md), so the
+  // sum is the same in any order.
+  const want = got + (m.oreCarry || 0), whole = Math.floor(want + 1e-9);
+  m.oreCarry = want - whole;
+  const ore = Math.max(0, Math.min(m.ch.hopper - (m.ore || 0), whole));
   m.ore = (m.ore || 0) + ore;
   m.seamBite = seams > 0;
   m.biteCorners = tally.soft + tally.rock;   // none: the bucket scraped the hole's side (sim/miner.js moves on)

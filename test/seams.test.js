@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestGame } from './helpers.js';
-import { makeGround, VS, Y0, NX, NZ, CX, CY, CZ, SOFT, chunkCorners } from '../src/world/voxels.js';
+import { makeGround, VS, Y0, NX, NY, NZ, CX, CY, CZ, SOFT, chunkCorners } from '../src/world/voxels.js';
 import { HALF } from '../src/world/terrain.js';
 import { seamAt, SEAM_PITCH } from '../src/world/seams.js';
 import { meshChunk } from '../src/world/mesher.js';
@@ -42,7 +42,7 @@ function corner(G, want, deep) {
   for (let i = 1; i < NX; i++) for (let k = 1; k < NZ; k++) {
     const x = -HALF + i * VS, z = -HALF + k * VS, b = g.base[i + (NX + 1) * k];
     if (b < 60) continue;   // inside the mesa
-    for (let j = 3; j < 30; j++) {
+    for (let j = 3; j < NY; j++) {
       const y = Y0 + j * VS, depth = b - y;
       if (depth < SOFT + 1 || g.sample(x, y, z) < 0.9) continue;
       if ((deep ? depth > 60 : depth < 30) && seamAt(seed, x, y, z) === want) return { p: [x, y, z], depth };
@@ -60,13 +60,16 @@ test('a bite into a seam gives four times plain rock and more; a deeper seam giv
   const G = digger(), P = G.player;
   const plain = corner(G, false, false), seam = corner(G, true, false), deep = corner(G, true, true);
   assert.ok(plain && seam && deep, 'found them');
-  P.ore = 0; const a = bite(G, P, plain.p);
+  // A 2 m bite turns just the one corner (they're 4 m apart). What it got:
+  // the whole ore and the fraction carried to the next bite (sim/dig.js).
+  const take = p => { P.ore = 0; P.oreCarry = 0; bite(G, P, p, 2); return P.ore + P.oreCarry; };
+  const a = take(plain.p);
   assert.equal(P.seamBite, false);
-  P.ore = 0; const b = bite(G, P, seam.p);
+  const b = take(seam.p);
   assert.equal(P.seamBite, true);
-  P.ore = 0; const c = bite(G, P, deep.p);
-  assert.equal(a, CONSTRUCT.orePerCorner);
-  assert.equal(b, Math.round(seamOre(seam.depth)));
+  const c = take(deep.p);
+  assert.ok(Math.abs(a - CONSTRUCT.orePerCorner) < 1e-9, `plain ${a}`);
+  assert.ok(Math.abs(b - seamOre(seam.depth)) < 1e-9, `seam ${b}`);
   assert.ok(b >= 4 * a, `seam ${b}, plain ${a}`);
   assert.ok(c > b, `deep ${c}, shallow ${b}`);
   assert.ok(seamOre(1000) === CONSTRUCT.orePerSeam * CONSTRUCT.seamMax, 'capped');

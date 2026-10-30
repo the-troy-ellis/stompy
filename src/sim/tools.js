@@ -73,7 +73,7 @@ export function scoop(G, m, arm = 'L') {
     return;
   }
   const full = (m.ore || 0) >= m.ch.hopper;
-  bite(G, m, p, m.digRun.r);
+  bite(G, m, floored(m, p), m.digRun.r);
   m.dryScoops = m.biteCorners ? 0 : (m.dryScoops || 0) + 1;
   // Where it stood to dig: a parked digger comes back here (sim/miner.js), and
   // keeps its own heading there, only noting that the scoop dug.
@@ -130,6 +130,16 @@ function runPoint(G, m) {
   m.digRun = { c: a, r: T.r0, k: 1, at: [m.x, m.z], tilt: AIM.hit };
   return a;
 }
+// A face's scoop (the level aim) keeps the floor: its sphere's bottom comes
+// down to the digger's feet and no further, so it tunnels on level, with no
+// toe of rock left at the face and no pit under it (on the 4 m grid a corner
+// under the floor is in reach, docs/specs/29-ground-4m.md). Aimed at the
+// floor in front, it digs down, as it always did.
+const FLOOR = 0.5;
+function floored(m, p) {
+  const r = m.digRun.r, low = m.y - FLOOR + r;
+  return m.digRun.tilt === 0 ? [p[0], low, p[2]] : p;
+}
 // How far a point is off a ray (o, unit d), ahead of its start; behind it is far.
 function offLine(c, o, d) {
   const vx = c[0] - o[0], vy = c[1] - o[1], vz = c[2] - o[2], t = vx * d[0] + vy * d[1] + vz * d[2];
@@ -150,7 +160,7 @@ export function aimGround(G, m) {
   // is the punch's as before. The fine ground is that ground with the scoops' round bites out
   // of it (world/finePatch.js patchSample), so the bites land on the face you see.
   const T = TOOL.dig, s = m.ch.scale, yaw = viewYaw(m), reach = T.reach * s;
-  const o = [m.x, Math.max(m.y, G.ter.coarse.groundBelow(m.x, m.y + STEP * s, m.z, m.y - 4 * s)) + 4 * s, m.z];
+  const o = [m.x, Math.max(m.y, G.ter.coarse.groundBelow(m.x, m.y + STEP * s, m.z, m.y - 4 * s)) + T.lift * s, m.z];
   let t = null;
   AIM.o = o;
   for (let i = 0; i < TILT.length; i++) { const down = (m.pitch || 0) + TILT[i]; AIM.d[i] = [sin(yaw) * cos(down), sin(down), cos(yaw) * cos(down)]; }

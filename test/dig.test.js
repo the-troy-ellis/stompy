@@ -52,9 +52,12 @@ test('soft ground digs to the full radius, the rock band to half, bedrock not at
   assert.ok(G.ter.solid(100, -40, 100) && G.ter.solid(100, -38, 100));
 });
 
+// Overlapping digs, none inside another: a dig that finds no ground within
+// its reach is skipped (nothing to send), so one swallowed by an earlier,
+// bigger hole would make the order matter.
 test('digs give the same ground in any order', () => {
   const a = createTestGame(), b = createTestGame();
-  const holes = [[[10, 0, 10], 4], [[13, -2, 11], 7], [[-20, 0, 5], 2.5], [[12, -6, 12], 6]];
+  const holes = [[[6, 0, 8], 4], [[13, -2, 11], 7], [[-20, 0, 5], 2.5], [[12, -6, 12], 6]];
   holes.forEach(([p, r]) => dig(a, p, r));
   [...holes].reverse().forEach(([p, r]) => dig(b, p, r));
   assert.equal(a.ter.hash(), b.ter.hash());

@@ -10,7 +10,7 @@ const { floor, ceil, hypot, max, min } = Math;
 // hills are its base (makeTerrain's heights, so every mission keeps its shape);
 // a mission's landmarks and the editor's strokes are laid on top, in order.
 // Bedrock (the bottom two layers) never changes; outside the map is air.
-export const VS = 8, Y0 = -44, NX = (2 * HALF) / VS, NY = 38, NZ = NX;
+export const VS = 4, Y0 = -44, NX = (2 * HALF) / VS, NY = 76, NZ = NX;   // 4 m cells (docs/specs/29-ground-4m.md; 8 m and 38 layers before)
 export const CS = 16, CX = ceil(NX / CS), CY = ceil(NY / CS), CZ = ceil(NZ / CS);
 export const PX = NX + 1, PY = NY + 1, PZ = NZ + 1;
 const STEPS = new Int32Array([1, -1, PX * PY, -PX * PY, PX, -PX]);   // the six face neighbours; down last, so it is tried first
@@ -20,10 +20,10 @@ export const DS = 2 * VS;
 // The soft ground over the rock band: this deep under the ground as built (digging: spec 18).
 export const SOFT = 6;
 const Q = d => (d <= -1 ? 1 : d >= 1 ? 255 : Math.round(d * 127) + 128);   // never 0, so 128 is the one boundary byte
-const BEDROCK = 1;   // corners j <= 1 stay solid
+const BEDROCK = 2;   // corners j <= 2 stay solid: 8 m of bedrock
 // A fill past this many corners is part of the land (held up); an island under SHATTER corners breaks up as it lands.
-export const ISLAND_MAX = 4096, SHATTER = 8, TORQUE_GROW = 6;   // TORQUE_GROW: the torque rule's check box, cells around a dig
-const LIST_MAX = 1 << 19;
+export const ISLAND_MAX = 32768, SHATTER = 64, TORQUE_GROW = 12;   // TORQUE_GROW: the torque rule's check box, cells around a dig. All three the same metres as on the 8 m grid (spec 29)
+const LIST_MAX = 1 << 22;
 let MARK = null, LIST = null, STACK = null;   // the support check's scratch (groundApi islands)
 
 // Builds the ground for a seed and a mission definition. `def.ground` (all
@@ -655,10 +655,11 @@ export function blockCorners(ground, i0, j0, k0, dims, step = 1) {
 export const CN = CS + 2, CHUNK_DIMS = [CN, CN, CN];
 export const chunkCorners = (ground, cx, cy, cz) => blockCorners(ground, cx * CS - 1, cy * CS - 1, cz * CS - 1, CHUNK_DIMS);
 // The far version of a square of `size` chunks a side (docs/specs/18-voxel-ground.md
-// § Level of detail): every other corner, so 16 m cells, the whole height, and
-// one coarse cell more on each side, so it tucks under its near neighbours
+// § Level of detail): every FAR-th corner, so 16 m cells, the whole height,
+// and two far cells more on each side, so it tucks under its near neighbours
 // with no gap between.
+export const FAR_STEP = 16 / VS;
 export function farCorners(ground, cx0, cz0, size) {
-  const n = size * CS / 2 + 4;
-  return blockCorners(ground, cx0 * CS - 4, -2, cz0 * CS - 4, [n, Math.ceil(NY / 2) + 3, n], 2);
+  const F = FAR_STEP, n = size * CS / F + 4;
+  return blockCorners(ground, cx0 * CS - 2 * F, -F, cz0 * CS - 2 * F, [n, Math.ceil(NY / F) + 3, n], F);
 }

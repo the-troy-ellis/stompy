@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeGround, chunkCorners, farCorners, CX, CY, CZ } from '../src/world/voxels.js';
+import { makeGround, chunkCorners, farCorners, CX, CY, CZ, CS, VS } from '../src/world/voxels.js';
 import { meshChunk, boundsOf } from '../src/world/mesher.js';
 import { PALS } from '../src/data/palettes.js';
 
@@ -28,13 +28,13 @@ test('the drawn top is the ground height: 97% of it within 0.6 m, all of it with
   assert.ok(worst < 2.5, `worst ${worst.toFixed(2)} m`);
 });
 
-test('chunks join with no holes: every edge inside is shared by two triangles', () => {
-  // Craters and a tunnel across chunk borders (a chunk is 128 m), meshed chunk by chunk.
+test('chunks join with no holes: every edge inside is shared by two triangles (four at a pinch)', () => {
+  // Craters and a tunnel across chunk borders (a chunk is CS × VS, 64 m), meshed chunk by chunk.
   const g = makeGround(5, {}, { ground: { landmarks: [{ kind: 'tunnel', from: [90, 100, 10], to: [90, 160, 10], r: 12 }] } });
   for (const p of [[0, 0, 0], [128, 10, 0], [-128, 5, 128], [64, 0, -64]]) g.carve(p, 18);
   const key = (f, p) => `${f[p].toFixed(3)},${f[p + 1].toFixed(3)},${f[p + 2].toFixed(3)}`, edges = new Map();
-  const inside = (f, p) => Math.abs(f[p]) < 300 && Math.abs(f[p + 2]) < 300;
-  for (const f of meshAll(g, (cx, cz) => Math.abs(cx - CX / 2) <= 3 && Math.abs(cz - CZ / 2) <= 3)) for (let p = 0; p < f.length; p += 27) {
+  const inside = (f, p) => Math.abs(f[p]) < 300 && Math.abs(f[p + 2]) < 300, reach = Math.ceil(300 / (CS * VS)) + 1;   // chunks out past 300 m, so no edge inside is the meshed block's own
+  for (const f of meshAll(g, (cx, cz) => Math.abs(cx - CX / 2) <= reach && Math.abs(cz - CZ / 2) <= reach)) for (let p = 0; p < f.length; p += 27) {
     const v = [p, p + 9, p + 18];
     for (let e = 0; e < 3; e++) {
       const a = v[e], b = v[(e + 1) % 3];
@@ -43,9 +43,9 @@ test('chunks join with no holes: every edge inside is shared by two triangles', 
       edges.set(k, (edges.get(k) || 0) + 1);
     }
   }
-  const open = [...edges].filter(([, c]) => c !== 2);
+  const open = [...edges].filter(([, c]) => c % 2);   // a hole leaves an edge on one triangle; a pinch (two sheets touching at an edge, which 4 m cells meet now and then) shares it among four
   assert.ok(edges.size > 1000);
-  assert.equal(open.length, 0, `open edges: ${open.slice(0, 3).map(([k]) => k).join(' ')}`);
+  assert.equal(open.length, 0, `open edges: ${open.slice(0, 3).map(([k, c]) => k + "x" + c).join(" ")} of ${open.length}`);
 });
 
 test('normals face the air, and colours are the palette\'s', () => {
