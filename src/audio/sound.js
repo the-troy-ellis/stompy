@@ -366,11 +366,22 @@ export function createAudio(app) {
       if (hit) { play('punch', { ...o, vol: 1.0, rate: 0.8 }); play('crunch', { ...o, vol: 0.4, rate: 1.1 }); this.osc('sine', 90, 30, 0.3, 0.3, o); }
       else { play('punch', { ...o, vol: 0.3, rate: 1.3, vary: 0.04 }); this.noise(0.25, 0.08, 1200, 300, 'bandpass', o); }
     },
-    // A digger's bucket coming round into the ground (docs/specs/25-hold-to-dig.md):
-    // a short crunch and a low knock, and in a seam a bright clink on top.
-    scoop(at, seam) {
-      const o = { at, ref: 40 };
-      play('crunch', { ...o, vol: 0.35, rate: 0.7, vary: 0.08 }); this.osc('sine', 70, 35, 0.16, 0.22, o);
+    // A digger's bucket coming round into the ground (docs/specs/25-hold-to-dig.md,
+    // 28-dig-feel.md), by what it met (`tier`): soil, a soft swish and a light
+    // crunch; rock, a crunch, a low knock and the arm's motor straining; rock
+    // breaking loose, a big crunch, a sharp crack and a deep thump. `into`, 0
+    // to 1 through a run, drops the pitch, so a run sounds like a face giving
+    // way. In a seam a bright clink on top.
+    scoop(at, seam, tier = 1, into = 0) {
+      const o = { at, ref: 40 }, low = 1 - 0.25 * into;
+      if (tier === 0) { this.noise(0.18, 0.05, 900, 250, 'bandpass', o); play('crunch', { ...o, vol: 0.15, rate: 1.0 * low, vary: 0.08 }); }
+      else if (tier === 1) {
+        play('crunch', { ...o, vol: 0.4, rate: 0.7 * low, vary: 0.08 }); this.osc('sine', 75 * low, 35, 0.18, 0.26, o);
+        this.osc('sawtooth', 140 * low, 90 * low, 0.14, 0.03, o);   // the arm's motor, bogging
+      } else {
+        play('crunch', { ...o, vol: 0.9, rate: 0.5, vary: 0.05 }); play('punch', { ...o, vol: 0.6, rate: 0.6 });
+        this.noise(0.08, 0.12, 3000, 1200, 'highpass', o); this.osc('sine', 85, 25, 0.35, 0.4, o);
+      }
       if (seam) this.osc('triangle', 2400, 2300, 0.12, 0.05, o);
     },
     // The beat before a mech blows: a rising whine and nothing else.

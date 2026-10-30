@@ -433,6 +433,7 @@ function groundApi(G) {
     const B = G.base || top, gx = clampN((x + HALF) / VS, 0, NX - 1e-4), gz = clampN((z + HALF) / VS, 0, NZ - 1e-4), i = gx | 0, k = gz | 0, u = gx - i, w = gz - k, o = i + PX * k;
     return (B[o] * (1 - u) + B[o + 1] * u) * (1 - w) + (B[o + PX] * (1 - u) + B[o + PX + 1] * u) * w;
   };
+  const inRock = (x, y, z) => y < baseAt(x, z) - SOFT;   // below the soft band: what a bucket clunks on (sim/tools.js)
   // The coarse corners a patch needs to hold an edit reaching `reach` m from c: its box, the margin round it.
   const fineBox = (c, reach) => {
     const m = PATCH.margin;
@@ -566,7 +567,7 @@ function groundApi(G) {
   // The 8 m grid's ground alone, under any fine patch: what the AI walks by
   // (sim/ai/nav.js), so a scoop's round pits never read as drops or walls.
   const coarse = { D, top, sample: csample, height: cheight, solid: (x, y, z) => csample(x, y, z) > 0, groundBelow: cgroundBelow, ray: cray };
-  return { coarse, sample, csample, height, cheight, solid, groundBelow, ray, carve, dig, islands, overhangs, fall, copyBox, mark, build, pile, smooth, block, stroke, retop, hash, fineOn, dropPatch, topsOf, skipIn, bytesOf, inPatch };
+  return { coarse, inRock, sample, csample, height, cheight, solid, groundBelow, ray, carve, dig, islands, overhangs, fall, copyBox, mark, build, pile, smooth, block, stroke, retop, hash, fineOn, dropPatch, topsOf, skipIn, bytesOf, inPatch };
 }
 
 // A landmark, as a distance shape laid onto the ground: positive inside rock.

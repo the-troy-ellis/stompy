@@ -60,8 +60,13 @@ export const FEEL = {
   punched:     { kick: 0.4, shake: 1.2, flash: 0.2, white: 0, squash: 0.15, wobble: 1.2, bass: 0.8, duck: 0.4, dust: 2, haptic: 60, push: 0 },
   stomp:       { kick: 1.2, shake: 1.0, flash: 0, white: 0, squash: 0.3, wobble: 0.8, bass: 1.2, duck: 0.6, dust: 4, haptic: 80, push: 0 },
   // a digger's bucket coming round into the ground (docs/specs/25-hold-to-dig.md): a punch's knock, smaller, and two and a half a second
+  // Three of them, by what the bucket met (docs/specs/28-dig-feel.md): soil or air, a swish;
+  // rock, a clunk; rock breaking loose (the scoop that takes ore), a crack a punch's size.
+  // k = 1 - dig.ramp + dig.ramp * how far into its run the scoop is, so a run builds to the crack (crack: k 1).
+  scoopSoft:   { kick: 0.1, shake: 0.05, flash: 0, white: 0, squash: 0.02, wobble: 0.05, bass: 0.15, duck: 0, dust: 0.5, haptic: 6, push: 0 },
+  scoop:       { kick: 0.45, shake: 0.3, flash: 0, white: 0, squash: 0.05, wobble: 0.3, bass: 0.7, duck: 0.25, dust: 1, haptic: 20, push: 0 },
+  scoopCrack:  { kick: 1.0, shake: 0.8, flash: 0, white: 0, squash: 0.12, wobble: 0.7, bass: 1.1, duck: 0.5, dust: 3, haptic: 60, push: 0 },
   settle:      { kick: 0.05, shake: 0.12, flash: 0, white: 0, squash: 0, wobble: 0.1, bass: 0.5, duck: 0.1, dust: 0, haptic: 15, push: 0 },   // a fine patch slumping back (docs/specs/27-fine-dig.md), by how near
-  scoop:       { kick: 0.35, shake: 0.25, flash: 0, white: 0, squash: 0.04, wobble: 0.15, bass: 0.55, duck: 0.2, dust: 1, haptic: 15, push: 0 },
   whiff:       { kick: 0.3, shake: 0, flash: 0, white: 0, squash: 0, wobble: 0.2, bass: 0, duck: 0, dust: 0, haptic: 0, push: 0 },
   // a missile blast's shove, k = 1 - distance / BLAST_R (the camera response is the explosion row)
   blast:       { kick: 0, shake: 0, flash: 0, white: 0, squash: 0, wobble: 0, bass: 0, duck: 0, dust: 0, haptic: 0, push: 4 },
@@ -81,10 +86,14 @@ export const FEEL = {
   // per m/s x rad/s), never past `max`. k / scale^2 and zeta: the spring, so a bigger mech swings slower.
   // view: how much of the pitch your own view takes.
   inertia: { pitch: 0.012, roll: 0.005, max: 0.1, k: 28, zeta: 0.4, view: 0.6 },
+  // Digging (docs/specs/28-dig-feel.md): ramp, how much of a scoop row the run builds up (above);
+  // hitchRock and hitchCrack, how far (radians) the arm that bit lags behind its spin, drawn only,
+  // so the dig's pace is the same; hitchBack, how fast it catches up (per s).
+  dig: { ramp: 0.5, hitchRock: 0.25, hitchCrack: 0.6, hitchBack: 7 },
   // Sound levels: sizzle, the sustained sound of being melted while a beam is on you (audio/sound.js meltSound).
   sound: { sizzle: 1 },
 };
-const TUNING = new Set(['view', 'spring', 'knock', 'inertia', 'sound']);   // blocks of constants, not event rows
+const TUNING = new Set(['view', 'spring', 'knock', 'inertia', 'dig', 'sound']);   // blocks of constants, not event rows
 export const FEEL_EVENTS = Object.keys(FEEL).filter(k => !TUNING.has(k));
 export const FEEL_COLS = ['kick', 'bob', 'shake', 'flash', 'white', 'squash', 'wobble', 'bass', 'duck', 'dust', 'haptic', 'push'];
 // Rows leave out columns they don't use; fill them so every row has every column.

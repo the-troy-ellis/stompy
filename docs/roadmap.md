@@ -328,6 +328,9 @@ the pour.
   craters leave round bites. Left alone for 15 s it slumps back into the
   usual low-poly ground. In three parts: fine patches in the sim; drawing
   them and the settle; online.
+- **How digging feels** ([specs/28-dig-feel.md](specs/28-dig-feel.md),
+  built): each scoop by what the bucket met (soil a swish, rock a clunk,
+  rock breaking loose a crack), and a run of scoops building to the crack.
 
 ## M13 — Blast-off jets (proposed)
 
