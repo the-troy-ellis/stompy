@@ -44,8 +44,9 @@ dig"), now picked by the owner.
     shape. Sharp edges round off and the hole relaxes into its chunky,
     low-poly self.
 - Then it's plain ground again, the same as anywhere else on the map.
-- A patch someone is standing on waits until they step off, so the ground
-  never moves under a mech's feet (see Edge cases).
+- A patch someone is standing on waits for them to step off, up to 45 s.
+  Then it settles anyway. Settling only fills the bites in, so it can lift a
+  mech standing in one, never drop it.
 
 ### Text
 
@@ -97,6 +98,20 @@ otherwise. `height(x, z)` reads a fine `top` kept per patch the same way.
 So **the ground queries match what's drawn** (architecture's invariant),
 fine or coarse.
 
+**The fine ground is the 8 m ground with round bites out of it.** A patch
+reads its own corners, but never rock where the 8 m ground is air
+(`min(fine, coarse)`, taken live as it's read). Found while building part 1:
+without this the two grounds disagreed both ways, and a digger aiming at one
+and counting ore on the other bored a narrow tunnel past the corners and
+gave up, or walked into rock the 8 m ground said was open. With it:
+- what's open on the 8 m ground is open on the fine one, so nothing the
+  AI plans is blocked;
+- ore is never counted twice: redigging settled ground finds only what the
+  8 m corners still hold;
+- a settle only fills bites back in. It never drops ground from under
+  anyone, so nothing has to be held up for a mech standing there;
+- it doesn't depend on the order of the digs.
+
 ### What still reads the coarse grid
 
 - **The economy:** `bite`'s tally (ore for rock corners, dirt) counts coarse
@@ -106,12 +121,27 @@ fine or coarse.
   grid. A coarse fall in a patch's box settles that patch at once, first, so
   the two never disagree about a falling lump.
 - **The network:** digs go on the wire as now; nothing about patches does.
+- **The digger's aim** (`sim/tools.js` `aimGround`): it looks for the 8 m
+  ground's face, from the bucket's height over where the mech would stand
+  on that ground (a step up at most, as it walks). That's the face the ore is
+  counted on, so the pace is the punch's as before. The bites still land on
+  the face you see, because the fine ground is that face with bites out of it.
+- **The AI's walking** (`sim/ai/nav.js`: routes, feelers, `walkable`): the 8 m
+  ground, so a bite's round pit is never a drop or a wall to a foe or a
+  parked digger.
+- **Climbing out of a bite** (`sim/mech.js` `rockAt`): a mech's body is
+  weighed from the higher of its feet and the 8 m ground under it. A bite
+  deeper than a step is never a wall; a mech walks out of one step by step,
+  wherever the 8 m ground lets it walk.
 
 ### The settle
 
 `stepFinePatches(G, dt)` (in `sim/dig.js`'s step):
-1. A patch whose last edit is `settleAfter` old, with no live mech's feet,
-   wreck or building in its box, starts settling.
+1. A patch whose last edit is `settleAfter` old, with no live mech standing
+   in its box, starts settling. Stood on, it waits up to `settleWait` more,
+   then settles anyway: a settle only fills bites in, so a mech standing in
+   one is lifted out as it fills. Wrecks and buildings don't hold it up;
+   `settle()` puts them back on the ground after.
 2. For `settleTime` the fine densities blend toward the coarse field
    (trilinear) at each fine corner; `sample` reads the blend, and its chunks
    re-mesh about 10 times a second. The surface slumps smoothly into the
@@ -145,11 +175,9 @@ fine or coarse.
 ### Edge cases
 
 - **Stood on past `settleWait`** (a digger parked at its face; a mech asleep
-  in a crater): the patch settles everywhere except a column round each foot
-  (2 cells), which settles when the foot lifts. The ground never moves under
-  a planted foot.
-- **A seventh patch:** the oldest settles at once, waiting or not, with the
-  same column rule.
+  in a crater): it settles anyway. The bites fill in under the mech and lift
+  it; ground never drops from under a foot.
+- **A seventh patch:** the oldest settles at once, waiting or not.
 - **Digging during a settle:** the settle stops where it is. The blend's
   densities become the patch's, and the new edit goes on top.
 - **A patch at its `maxSide`:** a dig past it starts a neighbouring patch;
@@ -182,8 +210,8 @@ fine or coarse.
 3. DIG's ore and dirt are exactly as before (the 80-seed test unchanged).
 4. 15 s after the last dig, with nobody on it, the patch slumps over 1.5 s
    into the 8 m ground, with a rumble and dust, and is gone.
-5. Standing in the hole delays the settle, and the ground never moves under
-   a planted foot.
+5. Standing in the hole delays the settle, and a settle never drops ground
+   from under a mech (it can only lift one out of a bite).
 6. No seam shows between a patch and the ground round it.
 7. `npm run perf` holds its budgets with a patch being dug and one settling.
 8. Online, both clients see the same fine hole. No protocol change.
@@ -203,7 +231,9 @@ fine or coarse.
   - growth, `maxSide` and `maxPatches`;
   - the settle: after `settleAfter`, `settleTime` later the patch is gone and
     the ground is the coarse ground;
-  - stood on: it waits; past `settleWait`, the foot's column doesn't move;
+  - stood on: it waits; past `settleWait` it settles, lifting the mech;
+  - the fine ground is never rock where the 8 m ground is air;
+  - a mech walks out of a bite deeper than its step;
   - a coarse fall in a patch settles it first.
 - `test/tools.test.js`: the 80-seed ore test unchanged.
 - `test/mesher.test.js`: a patch's mesh agrees with its `height` within
