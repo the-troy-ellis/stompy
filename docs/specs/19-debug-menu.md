@@ -57,7 +57,8 @@ The new text, in full:
 | foes names | NONE · STANDING STILL · AWAKE |
 | cheats | INVINCIBLE · NO HEAT · ENDLESS AMMO · NO WEIGHT LIMIT · BIG DIGS · FOES FROZEN |
 | cheats blurb | Single player only. The arena does not care. |
-| jump to | MISSION ◀ n ▶ · EDITOR · BENCH · WALK · TUTORIAL AGAIN |
+| jump to | MISSION ◀ n ▶ · EDITOR · BENCH · WALK · TUTORIAL AGAIN · FIRST FACTORY · THE YARD (placeholder) |
+| yard brief | Nobody comes. Dig the rock. Build things. |
 | tuning | FEEL · GAIT · LOOK · COPY |
 | overlays | FRAME TIME · AI LABELS · NAV · DIGS AND FALLS |
 | HUD | CHEATS: … · CHEATS (OFF HERE) |
@@ -262,6 +263,24 @@ it from outside.
   rides the legs, saved, and in force for the whole debug session, play
   included. PENDULUM is the game's default; OLD is kept to compare. The
   chart adds the torso (orange) to see its lag.
+
+### The yard
+
+The owner (2026-10-30): "I need a test area without combat for testing the
+construction and mining mechanics". JUMP TO gets a button for it (THE YARD,
+a placeholder name in `names.js` as `y01`), beside FIRST FACTORY.
+
+- `YARD_MISSION` in `data/missions.js`: FIRST FACTORY's ground (the rocky
+  mesa ahead), silo and flat room round it, and you in a digger.
+- The crew: a second digger and a hauler, parked by you, so parked diggers
+  digging and building, and a hauler fetching ore to a site, can all be
+  watched (specs 21 and 23).
+- No foes, no raids, no objectives: nothing ends it, as on the range.
+- The silo starts with `CONSTRUCT.startOre` as in FIRST FACTORY; balance
+  numbers are untouched.
+- The debrief's AGAIN plays it again (`startBase(G.def)`).
+- Test: `test/yard.test.js` (the crew, nobody in ten minutes, it checks
+  clean); its brief is in the tone test.
 
 ## Code touchpoints
 

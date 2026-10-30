@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MISSIONS, BASE_MISSION, missionDef } from '../src/data/missions.js';
+import { MISSIONS, BASE_MISSION, YARD_MISSION, missionDef } from '../src/data/missions.js';
 import { NAMES } from '../src/data/names.js';
 
 // The board-book voice (docs/vision.md § Tone guide): short, plain sentences
@@ -20,7 +20,7 @@ function boardBook(text, where) {
 }
 
 test('every brief is board-book short: a few plain sentences, eight words or fewer each', () => {
-  for (const m of [...MISSIONS, BASE_MISSION]) boardBook(m.intel, m.key);
+  for (const m of [...MISSIONS, BASE_MISSION, YARD_MISSION]) boardBook(m.intel, m.key);
   for (let n = MISSIONS.length; n < 40; n++) boardBook(missionDef(n).intel, `contract ${n + 1}`);
 });
 
