@@ -53,9 +53,11 @@ test('feet, shots and the ring read the fine ground inside a patch, the 8 m grou
   assert.equal(T.sample(-60, h - 2, -60), T.csample(-60, h - 2, -60), 'far off: the 8 m ground');
 });
 
-test('digs give the same patches in any order', () => {
+// Within a patch, in any order. (A patch growing reads the ground as it is
+// then: a dig it didn't hold yet is there only as the 8 m ground has it.)
+test('digs give the same patch in any order', () => {
   const a = game(), b = game(), h = a.ter.height(...SPOT);
-  const holes = [[[60, h, 60], 4], [[63, h - 2, 61], 6], [[57, h, 58], 3], [[62, h - 4, 62], 5]];
+  const holes = [[[60, h, 60], 6], [[61, h - 1, 61], 4], [[59, h, 60], 3], [[60, h - 2, 59], 5]];
   holes.forEach(([p, r]) => a.ter.carve(p, r));
   [...holes].reverse().forEach(([p, r]) => b.ter.carve(p, r));
   assert.equal(a.ter.hash(), b.ter.hash());
@@ -72,7 +74,7 @@ test('a patch grows to hold nearby digs, up to its widest; past that a new one; 
   assert.equal(T.patches.length, 1, 'grown');
   T.carve([60 + PATCH.maxSide * VS, h, 60], 3);
   assert.equal(T.patches.length, 2, 'too wide: a second');
-  for (let n = 0; n < 5; n++) T.carve([-200 + n * 90, T.height(-200 + n * 90, -200), -200], 3);
+  for (let n = 0; n < 5; n++) T.carve([-120 + n * 60, T.height(-120 + n * 60, -60), -60], 3);   // all within FINE_DIG.far of you
   assert.equal(T.patches.length, 7);
   assert.ok(T.patches[0].force && !T.patches[1].force, 'the oldest is pushed out');
   stepFor(G, FINE_DIG.settleTime + 0.1);

@@ -246,32 +246,40 @@ function land(G, f, seen) {
 // mech standing in one is lifted as it fills, never dropped. One pushed out
 // by too many patches (`force`) doesn't wait.
 export function stepFinePatches(G, dt) {
-  const P = G.ter?.patches;
-  if (!P || !P.length) return;
-  const F = FINE_DIG;
-  for (const p of [...P]) {
+  const P = G.ter?.patches, F = FINE_DIG, me = G.player;
+  if (!P) return;
+  if (me) { const n = (G.ter.fineNear ||= [0, 0, F.far]); n[0] = me.x; n[1] = me.z; }   // where new patches may be born (world/voxels.js)
+  if (!P.length) return;
+  for (let n = P.length - 1; n >= 0; n--) {   // backwards: a patch that goes leaves the rest in place
+    const p = P[n], cx = (p.x0 + p.x1) / 2, cz = (p.z0 + p.z1) / 2;
+    if (me && hypot(me.x - cx, me.z - cz) > F.far + (p.x1 - p.x0) / 2) { gone(G, p); continue; }   // far off: unseen, at once
     if (p.seen !== p.edits) { p.seen = p.edits; p.at = G.time; p.settling = false; }
     if (!p.settling) {
-      const idle = G.time - p.at, on = standing(G, p);
-      if (!p.force && (idle < F.settleAfter || (on.length && idle < F.settleAfter + F.settleWait))) continue;
+      const idle = G.time - p.at;
+      if (!p.force && (idle < F.settleAfter || (idle < F.settleAfter + F.settleWait && standing(G, p)))) continue;
       p.settling = true; p.blend = 0;
       settleFx(G, p);
     }
     p.blend = min(1, p.blend + dt / F.settleTime);
     p.rev++;
     if (!(G.time - (p.topsAt ?? -1) < 0.1) || p.blend >= 1) { G.ter.topsOf(p); p.topsAt = G.time; }
-    if (p.blend >= 1) {
-      G.ter.dropPatch(p);
-      settle(G, (p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2, hypot(p.x1 - p.x0, p.z1 - p.z0) / 2);
-    }
+    if (p.blend >= 1) gone(G, p);
   }
 }
-// The mechs on the ground over a patch.
-const standing = (G, p) => G.mechs.filter(m => {
-  if (!m.alive || m.air) return false;
-  const r = geoOf(m).radius * m.ch.scale;
-  return m.x > p.x0 - r && m.x < p.x1 + r && m.z > p.z0 - r && m.z < p.z1 + r && m.y < p.y1 + 2 && m.y > p.y0 - 2;
-});
+// A patch goes: the 8 m ground there again, and what stood on it settles onto it.
+function gone(G, p) {
+  G.ter.dropPatch(p);
+  settle(G, (p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2, hypot(p.x1 - p.x0, p.z1 - p.z0) / 2);
+}
+// Whether a mech is on the ground over a patch.
+function standing(G, p) {
+  for (const m of G.mechs) {
+    if (!m.alive || m.air) continue;
+    const r = geoOf(m).radius * m.ch.scale;
+    if (m.x > p.x0 - r && m.x < p.x1 + r && m.z > p.z0 - r && m.z < p.z1 + r && m.y < p.y1 + 2 && m.y > p.y0 - 2) return true;
+  }
+  return false;
+}
 // The slump starting: a low rumble and a soft thump, felt by how near, and dust along the patch's ground.
 function settleFx(G, p) {
   const r = G.rng, cx = (p.x0 + p.x1) / 2, cz = (p.z0 + p.z1) / 2, at = [cx, G.ter.height(cx, cz), cz];
