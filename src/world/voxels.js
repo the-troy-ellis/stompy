@@ -10,7 +10,7 @@ const { floor, ceil, hypot, max, min } = Math;
 // hills are its base (makeTerrain's heights, so every mission keeps its shape);
 // a mission's landmarks and the editor's strokes are laid on top, in order.
 // Bedrock (the bottom two layers) never changes; outside the map is air.
-export const VS = 8, Y0 = -44, NX = (2 * HALF) / VS, NY = 38, NZ = NX;
+export const VS = 4, Y0 = -44, NX = (2 * HALF) / VS, NY = 76, NZ = NX;   // EXPERIMENT: a 4 m grid (was 8, NY 38); not for merging
 export const CS = 16, CX = ceil(NX / CS), CY = ceil(NY / CS), CZ = ceil(NZ / CS);
 export const PX = NX + 1, PY = NY + 1, PZ = NZ + 1;
 const STEPS = new Int32Array([1, -1, PX * PY, -PX * PY, PX, -PX]);   // the six face neighbours; down last, so it is tried first
@@ -22,8 +22,8 @@ export const SOFT = 6;
 const Q = d => (d <= -1 ? 1 : d >= 1 ? 255 : Math.round(d * 127) + 128);   // never 0, so 128 is the one boundary byte
 const BEDROCK = 1;   // corners j <= 1 stay solid
 // A fill past this many corners is part of the land (held up); an island under SHATTER corners breaks up as it lands.
-export const ISLAND_MAX = 4096, SHATTER = 8, TORQUE_GROW = 6;   // TORQUE_GROW: the torque rule's check box, cells around a dig
-const LIST_MAX = 1 << 19;
+export const ISLAND_MAX = 32768, SHATTER = 64, TORQUE_GROW = 12;   // EXPERIMENT: x8 corners, x2 cells (was 4096, 8, 6)   // TORQUE_GROW: the torque rule's check box, cells around a dig
+const LIST_MAX = 1 << 22;   // EXPERIMENT (was 1 << 19)
 let MARK = null, LIST = null, STACK = null;   // the support check's scratch (groundApi islands)
 
 // Builds the ground for a seed and a mission definition. `def.ground` (all
