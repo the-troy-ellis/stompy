@@ -53,10 +53,10 @@ export function createUi(app) {
     app.scene.uploadWorld();
   }
 
-  // Build and fight's mission (spec 20): you start in its digger, whatever is in the selector.
-  function startBase() {
+  // Build and fight's mission (spec 20), or the DEBUG tab's yard: you start in its digger, whatever is in the selector.
+  function startBase(def = BASE_MISSION) {
     G.diff = prefs.diff;
-    startMatch(G, BASE_MISSION, BASE_MISSION.seed, false, BASE_MISSION.pilot);
+    startMatch(G, def, def.seed, false, def.pilot);
     G.kind = 'base';
     app.scene.uploadWorld();
   }
@@ -442,7 +442,7 @@ export function createUi(app) {
     else if (a === 'retry') { startMission(prefs.mission); launch(); }
     else if (a === 'again' && G.kind === 'edit') app.editor.play();   // the editor's mission again, as it is now
     else if (a === 'again' && G.kind === 'range') dbg.again();   // the DEBUG tab's range (ui/debugMenu.js)
-    else if (a === 'again' && G.kind === 'base') { startBase(); launch(); }   // the base mission again (spec 20)
+    else if (a === 'again' && G.kind === 'base') { startBase(G.def); launch(); }   // the base mission (spec 20) or the yard again
     else if (a === 'again') { startSkirmish(); launch(); }
     else if (G.state === 'play' && G.paused) pause(false);
   });

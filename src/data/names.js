@@ -21,7 +21,7 @@ export const NAMES = {
   buildings: { silo: 'SILO', factory: 'FACTORY', bay: 'BAY', wall: 'WALL' },
   // The construction mechs' tools, on their primary button (docs/specs/25-hold-to-dig.md).
   tools: { dig: 'DIG' },
-  missions: { m01: 'LIL SNOOZERS', m02: 'TOWER TOPPLER', m03: 'HELPLESS LIL BUDDIES', m04: 'FOUR LEGS BAD', b01: 'FIRST FACTORY' },   // b01: spec 20's base mission, a placeholder
+  missions: { m01: 'LIL SNOOZERS', m02: 'TOWER TOPPLER', m03: 'HELPLESS LIL BUDDIES', m04: 'FOUR LEGS BAD', b01: 'FIRST FACTORY', y01: 'THE YARD' },   // b01: spec 20's base mission; y01: the DEBUG tab's yard, a placeholder
   // The debrief's one word (docs/specs/04-campaign.md § Debrief verdicts): spec drafts until the owner picks.
   verdicts: { won: 'STOMPED.', untouched: 'UNTOUCHED.', punched: 'PUNCHED.', lost: 'SQUASHED.', awkward: 'AWKWARD.', flattened: 'FLATTENED.' },
   locked: n => `LOCKED · CLEAR MISSION ${n}`,

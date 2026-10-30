@@ -1,6 +1,6 @@
 import { esc } from '../util/dom.js';
 import { store } from '../util/store.js';
-import { missionDef, BASE_MISSION, FP_MIXES, FP_WEATHER, FP_TIMES, fpWeather, pickFoes } from '../data/missions.js';
+import { missionDef, BASE_MISSION, YARD_MISSION, FP_MIXES, FP_WEATHER, FP_TIMES, fpWeather, pickFoes } from '../data/missions.js';
 import { CHASSIS, MECH_ORDER } from '../data/chassis.js';
 import { RANGE_GROUNDS, RANGE_FOES, RANGE_MAX, RANGE_CREW, RANGE_BASE, rangeDef } from '../data/range.js';
 import { startMatch } from '../sim/state.js';
@@ -56,7 +56,7 @@ export function createDebugMenu(app, ui) {
     tuning: () => tune.html(),
     // Any mission (all open under ?debug=1); GO plays it. The rest go on a tap.
     jump: () => `<div class="mm-pick"><span>MISSION</span><button data-dmis="-1">◀</button><b>${esc(missionTitle(prefs.mission + 1, missionDef(prefs.mission).name))}</b><button data-dmis="1">▶</button></div>
-      <div class="opts"><button class="opt" data-dj="editor">EDITOR</button><button class="opt" data-dj="bench">BENCH</button><button class="opt" data-dj="walk">WALK</button><button class="opt" data-dj="tut">TUTORIAL AGAIN</button><button class="opt" data-dj="base">${esc(BASE_MISSION.name)}</button></div>`,
+      <div class="opts"><button class="opt" data-dj="editor">EDITOR</button><button class="opt" data-dj="bench">BENCH</button><button class="opt" data-dj="walk">WALK</button><button class="opt" data-dj="tut">TUTORIAL AGAIN</button><button class="opt" data-dj="base">${esc(BASE_MISSION.name)}</button><button class="opt" data-dj="yard">${esc(YARD_MISSION.name)}</button></div>`,
   };
 
   return {
@@ -94,6 +94,7 @@ export function createDebugMenu(app, ui) {
       if (j === 'bench') { app.bench?.start(); return true; }
       if (j === 'walk') { app.walk?.start(prefs.chassis); return true; }   // the walk viewer (ui/walkView.js), in the picked mech
       if (j === 'base') { ui.startBase(); ui.launch(); return true; }   // spec 20's mission
+      if (j === 'yard') { ui.startBase(YARD_MISSION); ui.launch(); return true; }   // no foes: mining and building
       if (j === 'tut') { store.set('tut.done', false); ui.startMission(0); ui.launch(); return true; }
       return false;
     },

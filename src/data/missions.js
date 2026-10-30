@@ -142,6 +142,21 @@ export const BASE_MISSION = {
   intel: 'Dig the rock. Fill the silo. Build a factory. Keep the silo safe.',
   name: NAMES.missions.b01,
 };
+// The yard (docs/specs/19-debug-menu.md § The yard): the DEBUG tab's place
+// to try mining and construction with nobody shooting. Build and fight's
+// ground and silo, a second digger and a hauler in the crew, no foes, no
+// raids, and nothing to win, so it stays open.
+export const YARD_MISSION = {
+  key: 'y01', pal: 'dusk', seed: 31, pilot: 'digger',
+  ground: BASE_MISSION.ground,
+  base: BASE_MISSION.base,
+  flat: BASE_MISSION.flat,
+  crew: [{ type: 'digger', at: [90, 30], face: 0 }, { type: 'hauler', at: [60, 45], face: 0 }],
+  foes: [],
+  objectives: [],
+  intel: 'Nobody comes. Dig the rock. Build things.',
+  name: NAMES.missions.y01,
+};
 // Every hostile a mission brings: placed, in its waves, and on a SURVIVE's clock.
 export const missionFoes = d => [...d.foes, ...(d.waves || []).flatMap(w => w.foes), ...(d.objectives || []).flatMap(o => (o.waves || []).flatMap(w => w.foes))];
 // Board-book numbers (docs/vision.md § Tone guide): words, not digits.
