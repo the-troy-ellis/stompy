@@ -17,7 +17,7 @@ const SPOT = [60, 60];
 
 test('a dig in play makes a patch; at a mission\'s load none are made', () => {
   const plain = makeGround(1, { flat: true }, { ground: { strokes: [[0, 0, 0, 0, 6]] } });
-  assert.equal(plain.patches, undefined, 'a mission\'s own strokes');
+  assert.ok(!plain.patches, 'a mission\'s own strokes');
   const G = game(), h = G.ter.height(...SPOT);
   G.ter.carve([SPOT[0], h, SPOT[1]], 4);
   assert.equal(G.ter.patches.length, 1);
