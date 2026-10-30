@@ -456,9 +456,8 @@ try {
     // The left side flies the mech, the right side only shoots (input.js).
     // Real touches through CDP, on 1024 x 640 (the zones meet 200 px up):
     // the lower stick turns the legs for as long as it's held out and tilts;
-    // the upper stick is the throttle (sideways twists the torso); a double
-    // tap on the lower one centres the torso; a drag off the buttons on the
-    // right does nothing.
+    // the upper stick is the throttle (sideways twists the torso); a drag off
+    // the buttons on the right does nothing.
     const cdp = await page.context().newCDPSession(page);
     const touch = async (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
     const drag = async (x0, y0, x1, y1, hold = 0) => {
@@ -488,14 +487,14 @@ try {
     // A double tap as one burst: the four events queued at once. Awaited one
     // by one, each dispatch waits for a software-rendered frame, and the two
     // taps landed 220-335 ms apart, past the 300 ms window about one run in ten.
-    // On the lower stick it punches.
+    // On the upper stick it punches.
     await page.evaluate(() => { const p = window.__stompy.game.player; p.melee = null; p.meleeCd = 0; });
-    await Promise.all([touch('touchStart', 200, 560), touch('touchEnd'), touch('touchStart', 200, 560), touch('touchEnd')]);
+    await Promise.all([touch('touchStart', 200, 300), touch('touchEnd'), touch('touchStart', 200, 300), touch('touchEnd')]);
     await page.waitForTimeout(150);
     const punched = await page.evaluate(() => !!window.__stompy.game.player.melee);
-    // Tap, then tap and hold, on the upper stick: the jets charge while it's held, and letting go blasts off (spec 26).
+    // Tap, then tap and hold, on the lower stick: the jets charge while it's held, and letting go blasts off (spec 26).
     await page.waitForTimeout(800);
-    await Promise.all([touch('touchStart', 200, 300), touch('touchEnd'), touch('touchStart', 200, 300)]);
+    await Promise.all([touch('touchStart', 200, 560), touch('touchEnd'), touch('touchStart', 200, 560)]);
     await page.waitForTimeout(700);
     const charged = await page.evaluate(() => { const p = window.__stompy.game.player; return !p.air && p.jet?.charge > 0.3; });
     await touch('touchEnd');
@@ -507,7 +506,7 @@ try {
     await page.waitForTimeout(800);
     const centred = Math.abs((await P()).twist) < 0.1;
     const gone = await page.evaluate(() => !document.querySelector('[data-t="jump"]') && !document.querySelector('[data-t="punch"]'));
-    console.log(`touch: the lower stick keeps turning the legs while held ${aimOk}, the upper stick sets throttle and twists ${stickOk}, right side only buttons ${rightOk}, double tap lower punches ${punched}, tap then hold upper charges and letting go blasts off ${jumped}, compass tap centres ${centred}, no JUMP or PUNCH buttons ${gone}`);
+    console.log(`touch: the lower stick keeps turning the legs while held ${aimOk}, the upper stick sets throttle and twists ${stickOk}, right side only buttons ${rightOk}, double tap upper punches ${punched}, tap then hold lower charges and letting go blasts off ${jumped}, compass tap centres ${centred}, no JUMP or PUNCH buttons ${gone}`);
     if (!(aimOk && stickOk && rightOk && punched && jumped && centred && gone)) { failed = true; console.error('FAIL: the touch layout did not behave'); }
   });
   // The mission editor (#246): ?edit=1 shows a mission from above; a tap on a

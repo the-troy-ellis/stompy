@@ -188,12 +188,12 @@ export function createInput(app) {
   // zones stacked in the bottom-left corner: on a phone each is half the
   // height, on a tablet each is ZONE px, so one thumb reaches both.
   //   Lower left: turn and aim. Sideways turns the legs (the whole mech) for
-  //     as long as it's held, faster the further out; up and down pitches. A
-  //     double tap punches.
+  //     as long as it's held, faster the further out; up and down pitches.
+  //     Tap, then tap and hold: the jump jets charge for as long as the
+  //     second touch stays down, and letting go blasts off.
   //   Upper left: throttle and torso. Up and down moves the throttle from
   //     where it was when the thumb went down, and it stays set on release,
-  //     like W/S; sideways twists the torso. Tap, then tap and hold: the jump
-  //     jets burn for as long as the second touch stays down.
+  //     like W/S; sideways twists the torso. A double tap punches.
   //   The compass tape: a tap swings the torso back over the legs.
   //   Right: the buttons. Dragging the FUSION button aims the scan, and while
   //     flying missiles the aim side or the MISSILE button steers them.
@@ -262,14 +262,14 @@ export function createInput(app) {
     const has = k => [...fingers.values()].some(f => f.kind === k);
     const now = performance.now();
     if (y < split(r.height) && !has('stick')) {
-      // Tap, then tap and hold: the jets burn while this touch stays down (JUMP JETS NONE: nothing).
-      const jets = now - lastStickTap < DOUBLE_TAP && G.player.jets > 0;
-      if (jets) { keys.KeyJ = true; lastStickTap = -1e9; }
-      fingers.set(e.pointerId, { kind: 'stick', x0: x, y0: y, thr0: G.player.throttle, jets });
+      if (now - lastStickTap < DOUBLE_TAP) { punchTap = true; lastStickTap = -1e9; }   // double tap: a punch
+      fingers.set(e.pointerId, { kind: 'stick', x0: x, y0: y, thr0: G.player.throttle });
       showStick(ring.stick, x, y);
     } else if (y >= split(r.height) && !has('aim')) {
-      if (now - lastAimTap < DOUBLE_TAP) { punchTap = true; lastAimTap = -1e9; }   // double tap: a punch
-      fingers.set(e.pointerId, { kind: 'aim', x0: x, y0: y, lx: e.clientX, ly: e.clientY, cx: e.clientX, cy: e.clientY });
+      // Tap, then tap and hold: the jets charge while this touch stays down (JUMP JETS NONE: nothing).
+      const jets = now - lastAimTap < DOUBLE_TAP && G.player.jets > 0;
+      if (jets) { keys.KeyJ = true; lastAimTap = -1e9; }
+      fingers.set(e.pointerId, { kind: 'aim', x0: x, y0: y, lx: e.clientX, ly: e.clientY, cx: e.clientX, cy: e.clientY, jets });
       showStick(ring.aim, x, y);
     }
   });
@@ -319,12 +319,12 @@ export function createInput(app) {
     const tapped = (() => { const r = tui.getBoundingClientRect(); return abs(e.clientX - r.left - (f.x0 ?? 0)) + abs(e.clientY - r.top - (f.y0 ?? 0)) < 12; })();
     if (f.kind === 'stick') {
       G.touchTwist = 0; ring.stick.hidden = true;
-      if (f.jets) keys.KeyJ = false;
-      lastStickTap = tapped && !f.jets ? performance.now() : -1e9;
+      lastStickTap = tapped ? performance.now() : -1e9;
     }
     if (f.kind === 'aim') {
       G.touchTurn = 0; G.touchPitch = 0; ring.aim.hidden = true;
-      lastAimTap = tapped ? performance.now() : -1e9;
+      if (f.jets) keys.KeyJ = false;
+      lastAimTap = tapped && !f.jets ? performance.now() : -1e9;
     }
   };
   addEventListener('resize', () => { if (G.touchUI) syncTouchUI(); });   // the zones follow the screen
