@@ -31,7 +31,7 @@ export function createTuning(app) {
   const copy = '<div class="dbg-tune-row"><button data-tune-a="copy">COPY</button> <span class="dim">FEEL and GAIT, as JSON</span></div><textarea class="dbg-tune-out" hidden></textarea>';
   const feel = () => {
     const rows = FEEL_EVENTS.map(ev => `<tr><th>${ev}</th>${FEEL_COLS.map(c => `<td>${num(`data-ev="${ev}" data-col="${c}"`, FEEL[ev][c])}</td>`).join('')}</tr>`).join('');
-    const extra = ['view', 'spring', 'knock', 'inertia', 'sound'].map(g => `<tr><th>${g}</th><td colspan="${FEEL_COLS.length}">${Object.keys(FEEL[g]).map(k => `${k} ${num(`data-ev="${g}" data-col="${k}"`, FEEL[g][k])}`).join(' ')}</td></tr>`).join('');
+    const extra = ['view', 'spring', 'knock', 'inertia', 'dig', 'sound'].map(g => `<tr><th>${g}</th><td colspan="${FEEL_COLS.length}">${Object.keys(FEEL[g]).map(k => `${k} ${num(`data-ev="${g}" data-col="${k}"`, FEEL[g][k])}`).join(' ')}</td></tr>`).join('');
     return `<div class="dbg-tune-scroll"><table><tr><th></th>${FEEL_COLS.map(c => `<th>${c}</th>`).join('')}</tr>${rows}${extra}</table></div>${copy}`;
   };
   // A row per leg type; `lift` is two numbers.

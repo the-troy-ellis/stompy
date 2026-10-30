@@ -5,9 +5,10 @@ import { STEP } from './mech.js';
 import { bite } from './dig.js';
 import { buildSwing } from './base.js';
 import { feel } from './feel.js';
+import { FEEL, HIT_STOP } from '../data/feel.js';
 import { particle, msg, spawnClods } from './effects.js';
 
-const { atan2, hypot, sin, cos, min, abs, PI } = Math;
+const { atan2, hypot, sin, cos, min, abs, exp, PI } = Math;
 const TAU = 2 * PI;
 
 // The construction mechs' tools (docs/specs/25-hold-to-dig.md). A chassis
@@ -33,12 +34,13 @@ const crosses = (a0, a1, at) => (a0 < at && a1 >= at) || (a0 < at + TAU && a1 >=
 function spinArms(G, m, dt) {
   const T = TOOL.dig, s = (m.spin ||= { L: 0, R: 0, w: 0 }), full = TAU / T.turn;
   const held = !!m.toolHold && m.alive && !m.shutdown, arms = { L: m.hp.LA > 0, R: m.hp.RA > 0 };
+  if (s.hL || s.hR) { const f = exp(-FEEL.dig.hitchBack * dt); s.hL = (s.hL || 0) * f; s.hR = (s.hR || 0) * f; }   // a bit arm catching up
   if (!held && s.L === 0 && s.R === 0) { s.w = 0; return; }
   s.w = min(full, s.w + full * dt / T.spinUp);   // up to speed, held or finishing a turn (a tap is one bucket's pass)
   const step = s.w * dt;
   const turn = (k, a0, a1) => {   // a1 unwrapped; returns the new angle
     if (!held) a1 = min(a1, TAU);   // finishing its turn
-    if (arms[k] && crosses(a0, a1, T.bite)) scoop(G, m);
+    if (arms[k] && crosses(a0, a1, T.bite)) scoop(G, m, k);
     return a1 >= TAU ? (held ? a1 - TAU : 0) : a1;
   };
   const L0 = s.L, L1 = held || L0 > 0 ? L0 + step : L0;
@@ -49,12 +51,14 @@ function spinArms(G, m, dt) {
 
 // The shoulder angle the renderer gives each arm, forward of hanging down
 // (render/scene.js): null when the arms aren't spinning a tool.
-export const spinPose = m => (m.spin && m.ch.tool === 'dig' ? { LA: m.spin.L, RA: m.spin.R } : null);
+// An arm that bit rock lags a little behind its spin (`hL`, `hR`), drawn only.
+export const spinPose = m => (m.spin && m.ch.tool === 'dig' ? { LA: m.spin.L - (m.spin.hL || 0), RA: m.spin.R - (m.spin.hR || 0) } : null);
 
-// One bucket's scoop: one of your own sites in reach gets its work, else the
-// ground the aim finds is bitten. Felt either way; `m.scoops` counts them and
-// `m.biteCorners` says what the last one turned to air (sim/miner.js reads both).
-export function scoop(G, m) {
+// One bucket's scoop (`arm`, 'L' or 'R'): one of your own sites in reach gets
+// its work, else the ground the aim finds is bitten. Felt either way, by what
+// the bucket met (scoopFeel); `m.scoops` counts them and `m.biteCorners` says
+// what the last one turned to air (sim/miner.js reads both).
+export function scoop(G, m, arm = 'L') {
   const T = TOOL.dig;
   m.scoops = (m.scoops || 0) + 1;
   m.heat += T.heat;
@@ -74,8 +78,7 @@ export function scoop(G, m) {
   // Where it stood to dig: a parked digger comes back here (sim/miner.js), and
   // keeps its own heading there, only noting that the scoop dug.
   if (m.biteCorners) { if (m.parked && m.site) m.site.t = G.time; else m.site = { x: m.x, y: m.y, z: m.z, yaw: viewYaw(m), pitch: m.pitch || 0, t: G.time }; }
-  feel(G, 'scoop', { mech: m, k: 1, at: m === G.player ? null : p });
-  G.fx.sfx.scoop(m === G.player ? null : p, m.seamBite);
+  scoopFeel(G, m, p, arm);
   // Clods out of the face toward the digger, in what it cut: a seam's colour,
   // rock, or soil. A scoop that turned no corner throws what the run last cut.
   const run = m.digRun;
@@ -86,6 +89,28 @@ export function scoop(G, m) {
     if (m === G.player && !full) msg(G, 'ORE SEAM', '#7fd');
   }
   if (m === G.player && full) msg(G, 'HOPPER FULL', '#fc3');
+}
+
+// How a scoop feels (docs/specs/28-dig-feel.md), by what the bucket met:
+// soil or air, a swish (scoopSoft); rock, a clunk (scoop), the arm hitching;
+// rock breaking loose, the scoop that takes ore, a crack (scoopCrack): the
+// arm hitches further, the crosshair holds a beat, and chips fly. Each scoop
+// in a run hits a little harder and sounds a little lower, building to it.
+// What the scoop took, and how fast, are the same as ever.
+export function scoopTier(G, m, p) {
+  if (m.biteRock) return 2;
+  return G.ter && G.ter.inRock(p[0], p[1], p[2]) ? 1 : 0;
+}
+function scoopFeel(G, m, p, arm) {
+  const D = FEEL.dig, tier = scoopTier(G, m, p), run = m.digRun, T = TOOL.dig;
+  const into = run ? min(1, (run.k - 1) / (T.steps - 1)) : 0, at = m === G.player ? null : p;
+  feel(G, ['scoopSoft', 'scoop', 'scoopCrack'][tier], { mech: m, k: tier === 2 ? 1 : 1 - D.ramp + D.ramp * into, at });
+  G.fx.sfx.scoop(at, m.seamBite, tier, into);
+  if (tier && m.spin) m.spin[arm === 'R' ? 'hR' : 'hL'] = tier === 2 ? D.hitchCrack : D.hitchRock;
+  if (tier === 2) {
+    if (m === G.player) G.hitStop = Math.max(G.hitStop || 0, HIT_STOP);
+    for (let i = 0; i < 6; i++) particle(G, [p[0] + G.rng.range(-1, 1), p[1] + G.rng.range(-1, 1), p[2] + G.rng.range(-1, 1)], [G.rng.range(-5, 5), G.rng.range(3, 8), G.rng.range(-5, 5)], G.rng.range(0.4, 0.7), G.rng.range(0.3, 0.6), G.pal.high, 'spark', 26);
+  }
 }
 
 // The run of scoops into one face: the first is centred TOOL.dig.into past

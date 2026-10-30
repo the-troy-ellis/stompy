@@ -4,7 +4,7 @@
 //
 // @typedef {object} Fx
 // @property {(text: string, force?: boolean) => void} say        cockpit voice
-// @property {object} sfx                                           one-shot sounds: laser(at, small), cannon(at), thunderclap / bonker / peashooter / toaster(at) (a weapon's `sfx`), missile(at), boom(at, big), clang(), step(m, vol), land(force), fusionCrack(), fusion(at), beep(), powerdown(), powerup(), thunder(dist 0..1), lock() (a missile lock, as it comes on), scoop(at, seam) (a digger's bucket in the ground), blastoff(at, charge) (blast-off jets), settle(at) (a fine patch slumping back)
+// @property {object} sfx                                           one-shot sounds: laser(at, small), cannon(at), thunderclap / bonker / peashooter / toaster(at) (a weapon's `sfx`), missile(at), boom(at, big), clang(), step(m, vol), land(force), fusionCrack(), fusion(at), beep(), powerdown(), powerup(), thunder(dist 0..1), lock() (a missile lock, as it comes on), scoop(at, seam, tier, into) (a digger's bucket in the ground: tier 0 soil, 1 rock, 2 breaking loose; into 0..1 through its run), blastoff(at, charge) (blast-off jets), settle(at) (a fine patch slumping back)
 // @property {(on: boolean, p: number) => void} fusionSound        scan whine
 // @property {(obj: object) => void} netSend                        arena message (ignored outside the arena)
 // @property {(bass: number, duck: number, haptic: number, at?: number[]) => void} thump   the feel table's sound and haptic columns
