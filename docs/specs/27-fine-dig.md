@@ -44,8 +44,9 @@ dig"), now picked by the owner.
     shape. Sharp edges round off and the hole relaxes into its chunky,
     low-poly self.
 - Then it's plain ground again, the same as anywhere else on the map.
-- A patch someone is standing on waits for them to step off, up to 45 s.
-  Then it settles anyway. Settling only fills the bites in, so it can lift a
+- A patch with a mech standing down in a bite (more than a step deep)
+  waits for it to step out, up to 45 s. Then it settles anyway. A mech
+  beside the bite, or in a scrape less than a step deep, doesn't hold it. Settling only fills the bites in, so it can lift a
   mech standing in one, never drop it.
 
 ### Text
@@ -138,7 +139,8 @@ gave up, or walked into rock the 8 m ground said was open. With it:
 
 `stepFinePatches(G, dt)` (in `sim/dig.js`'s step):
 1. A patch whose last edit is `settleAfter` old, with no live mech standing
-   in its box, starts settling. Stood on, it waits up to `settleWait` more,
+   in a bite in it (the 8 m ground more than a step above the fine ground
+   under its middle or a foot's width to a side), starts settling. Stood on, it waits up to `settleWait` more,
    then settles anyway: a settle only fills bites in, so a mech standing in
    one is lifted out as it fills. Wrecks and buildings don't hold it up;
    `settle()` puts them back on the ground after.
@@ -320,6 +322,10 @@ frames to 90 ms and blew the garbage budgets.
 - **The settle** (`stepFinePatches`): no held columns. A slump only fills
   bites in, so a mech standing in one is lifted out. Re-meshed 5 times a
   second while it slumps (10 while dug).
+- **Stood on, after part 1:** at first any mech in a patch's box held it,
+  and the box runs 8 m past the dig, so a digger at its own face held its
+  patch the full 45 s (60 s, not 15). Now only a mech down in a bite more
+  than a step deep holds it; a shallower scrape lifts it less than a step.
 - **Drawing** (`render/ground.js`): patches mesh in the ground worker, their
   byte and top arrays passed there and back and reused. They're drawn 0.15 m
   low, so where a patch's outer ring overlaps the coarse ground, the coarse

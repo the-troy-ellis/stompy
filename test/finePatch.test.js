@@ -114,6 +114,19 @@ test('stood on, it waits; then it slumps anyway, lifting the mech out of the bit
   assert.ok(P.y > low + 1, `lifted: ${low.toFixed(1)} -> ${P.y.toFixed(1)}`);
 });
 
+test('a mech beside the bite, or in a scrape less than a step deep, doesn\'t hold the settle', () => {
+  const G = game(), T = G.ter, P = G.player, [cx, cz] = SPOT;
+  shiftMech(P, cx - P.x, cz - P.z);
+  stepFor(G, 0.5);
+  const h = P.y;
+  T.carve([cx + 9, h, cz], 4);   // the bite, at the face in front
+  T.carve([cx, h + 3, cz], 4);   // a scrape underfoot, 1 m deep
+  stepFor(G, 1);
+  assert.equal(T.patches.length, 1);
+  stepFor(G, FINE_DIG.settleAfter + FINE_DIG.settleTime);
+  assert.equal(T.patches.length, 0, 'settled on time');
+});
+
 test('ground falling in a patch drops the patch first: the 8 m ground says what falls', () => {
   const G = game(), T = G.ter, h = T.height(...SPOT);
   T.carve([60, h, 60], 4);
