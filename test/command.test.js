@@ -58,11 +58,11 @@ test('the mech you left does its job while you are up: a digger digs', () => {
   shiftMech(D, -D.x, z - 9 - D.z);
   D.pitch = 0;
   for (let i = 0; i < 240; i++) frame(G, { held: { ...noInput().held, energy: true } });
-  const ore = D.ore;
+  const h = G.ter.hash(), n = D.scoops;
   commandUp(G);
   run(G, 30);
   assert.equal(D.job, 'DIGGING');
-  assert.ok(D.ore > ore, `it dug: ${ore} -> ${D.ore}`);
+  assert.ok(D.scoops > n && G.ter.hash() !== h, `it dug: ${D.scoops - n} scoops`);   // the ground: at the mesa's foot on the 4 m grid its first scoops are soil, no ore yet
 });
 
 test('DRIVE: down into another crew mech', () => {

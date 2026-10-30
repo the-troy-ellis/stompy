@@ -35,7 +35,7 @@ import { NAMES } from './names.js';
 //   bayRate       armour a second a repair bay gives a crew mech on its pad
 //                 (bayPad m from it), most damaged section first (docs/specs/21-mining.md)
 export const CONSTRUCT = {
-  bucket: 6, hopper: 40, haul: 160, handover: 16, orePerCorner: 0.157, orePerSeam: 1.26, seamDeep: 40, seamMax: 2.5,
+  bucket: 6, hopper: 40, haul: 160, handover: 16, orePerCorner: 0.127, orePerSeam: 1.02, seamDeep: 40, seamMax: 2.5,
   dirtPerCorner: 3 / 8, dirtMax: 24, dumpCost: 4, dumpH: 6, dumpR: 9, dumpAt: 13,
   startOre: 20, factory: 60, buildTime: 6, mechCost: { ore: 50, salvage: 30 }, mechTime: 30,
   salvage: { jackal: 10, light1: 10, kestrel: 20, sniper1: 20, warden: 35, puncher: 50 },

@@ -11,7 +11,7 @@ const { abs, floor, hypot, max, min } = Math;
 // moves past the feelers' reach. Digs and falls mark squares to look at again
 // (sim/dig.js). Built per ground, at first use, in a few ms.
 export const SQ = 32, N = (2 * HALF) / SQ, CLIFF = 1.6, HEADROOM = 9, MAX_FLOORS = 4;
-const PER = SQ / VS, STEP_M = 2;   // corner columns a square spans; the walk between squares, in metres: half a 4 m cell, so a wall that rises inside one cell is seen (docs/specs/29-ground-4m.md)
+const PER = SQ / VS, STEP_M = 2, SLACK = STEP_M / 4;   // corner columns a square spans; the walk between squares, in metres: half a 4 m cell, so a wall that rises inside one cell is seen (docs/specs/29-ground-4m.md)
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
 export function makeNav(ter) {
@@ -53,7 +53,7 @@ export function makeNav(ter) {
     const A = fl(a)[fa], B = fl(b)[fb], ax = A.x, az = A.z, bx = B.x, bz = B.z, n = Math.ceil(hypot(bx - ax, bz - az) / STEP_M);
     let y = A.y, ok = true;
     for (let i = 1; ok && i <= n; i++) {
-      const x = ax + (bx - ax) * i / n, z = az + (bz - az) * i / n, lid = y + CLIFF * STEP_M + 1, g = ter.groundBelow(x, lid, z);
+      const x = ax + (bx - ax) * i / n, z = az + (bz - az) * i / n, lid = y + CLIFF * STEP_M + SLACK, g = ter.groundBelow(x, lid, z);
       ok = g < lid - 0.01 && !ter.solid(x, g + HEADROOM, z);   // rock right up at the lid: a wall
       y = g;
     }
@@ -115,15 +115,16 @@ export function makeNav(ter) {
 // The nav for this match's ground, made at first use.
 // The AI walks by the 8 m ground (world/voxels.js `coarse`): a fine patch's
 // round pits (docs/specs/27-fine-dig.md) aren't drops or walls to it.
-const walkGround = ter => ter.coarse || ter;
+export const walkGround = ter => ter.coarse || ter;
 export const navOf = G => (G.nav && G.nav.of === G.ter ? G.nav : (G.nav = { ...makeNav(walkGround(G.ter)), of: G.ter }));
 
 // Whether a mech at (x, y, z) can walk the straight line to (x1, z1), the
-// first `reach` metres of it: stepped as the nav's links are.
-export function walkable(ter, x, y, z, x1, z1, reach = Infinity) {
+// first `reach` metres of it: stepped as the nav's links are, climbing no
+// steeper than `climb` (rise over run).
+export function walkable(ter, x, y, z, x1, z1, reach = Infinity, climb = CLIFF) {
   const d = Math.min(hypot(x1 - x, z1 - z), reach), n = Math.ceil(d / STEP_M), ux = (x1 - x) / (hypot(x1 - x, z1 - z) || 1), uz = (z1 - z) / (hypot(x1 - x, z1 - z) || 1);
   for (let i = 1; i <= n; i++) {
-    const px = x + ux * i * STEP_M, pz = z + uz * i * STEP_M, lid = y + CLIFF * STEP_M + 1, g = ter.groundBelow(px, lid, pz);
+    const px = x + ux * i * STEP_M, pz = z + uz * i * STEP_M, lid = y + climb * STEP_M + SLACK, g = ter.groundBelow(px, lid, pz);
     if (g >= lid - 0.01 || ter.solid(px, g + HEADROOM, pz)) return false;
     y = g;
   }
@@ -151,13 +152,16 @@ export function routeYaw(G, e, x, y, z) {
 // a canyon wall instead of grinding into it.
 export const FEEL_M = 12;
 const TRY = [0.45, 0.9, 1.35, 1.8, 2.4];
-export function feelers(G, e, yaw) {
-  if (feelOpen(G, e, yaw)) return yaw;   // plain calls, no closures: this runs every frame for every foe on the move
+// `reach`: how far to look, if the goal is nearer than FEEL_M (a digger a few
+// metres from its spot, the face it digs just past it).
+// `climb`: the steepest it walks up, if less than CLIFF (sim/miner.js: a crew mech's own).
+export function feelers(G, e, yaw, reach = FEEL_M, climb = CLIFF) {
+  if (feelOpen(G, e, yaw, reach, climb)) return yaw;   // plain calls, no closures: this runs every frame for every foe on the move
   const side = e.ai.feelSide || 1;
   for (let i = 0; i < TRY.length; i++) {
-    if (feelOpen(G, e, yaw + side * TRY[i])) return yaw + side * TRY[i];
-    if (feelOpen(G, e, yaw - side * TRY[i])) { e.ai.feelSide = -side; return yaw - side * TRY[i]; }
+    if (feelOpen(G, e, yaw + side * TRY[i], reach, climb)) return yaw + side * TRY[i];
+    if (feelOpen(G, e, yaw - side * TRY[i], reach, climb)) { e.ai.feelSide = -side; return yaw - side * TRY[i]; }
   }
   return yaw;
 }
-function feelOpen(G, e, t) { return walkable(walkGround(G.ter), e.x, e.y, e.z, e.x + Math.sin(t) * FEEL_M, e.z + Math.cos(t) * FEEL_M); }
+function feelOpen(G, e, t, reach, climb) { return walkable(walkGround(G.ter), e.x, e.y, e.z, e.x + Math.sin(t) * reach, e.z + Math.cos(t) * reach, Infinity, climb); }

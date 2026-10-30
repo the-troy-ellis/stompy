@@ -65,7 +65,10 @@ test('a foe hunting you from the far side of a mesa walks round it to you', () =
 test('a foe up on a mesa can\'t see a mech under its lip', () => {
   const G = createTestGame({ foes: ['jackal'] }), P = G.player, e = foes(G)[0];
   G.ter = makeGround(1, { flat: true }, { ground: { landmarks: [{ kind: 'mesa', at: [0, 400], r: 50, top: 60, lip: 24 }] } });
-  Object.assign(e, { x: c.x, z: c.z - 60 }); e.y = G.ter.groundBelow(e.x, 80, e.z); initFeet(G, e);
+  // At the lip's edge: its top 2 m in from where it drops away (the 4 m ground's edge is sharp, docs/specs/29-ground-4m.md).
+  let ez = c.z - 60;
+  while (G.ter.groundBelow(c.x, 80, ez - 1) > 55) ez--;
+  Object.assign(e, { x: c.x, z: ez + 2 }); e.y = G.ter.groundBelow(e.x, 80, e.z); initFeet(G, e);
   assert.ok(e.y > 55, 'up on top, at the edge');
   Object.assign(P, { x: c.x, z: c.z - 62 }); P.y = G.ter.groundBelow(P.x, 20, P.z); initFeet(G, P);
   assert.ok(P.y < 3, 'and you under the lip below it');

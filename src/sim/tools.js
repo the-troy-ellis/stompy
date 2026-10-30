@@ -73,7 +73,7 @@ export function scoop(G, m, arm = 'L') {
     return;
   }
   const full = (m.ore || 0) >= m.ch.hopper;
-  bite(G, m, floored(m, p), m.digRun.r);
+  bite(G, m, p, m.digRun.r, floorOf(m));
   m.dryScoops = m.biteCorners ? 0 : (m.dryScoops || 0) + 1;
   // Where it stood to dig: a parked digger comes back here (sim/miner.js), and
   // keeps its own heading there, only noting that the scoop dug.
@@ -97,9 +97,12 @@ export function scoop(G, m, arm = 'L') {
 // arm hitches further, the crosshair holds a beat, and chips fly. Each scoop
 // in a run hits a little harder and sounds a little lower, building to it.
 // What the scoop took, and how fast, are the same as ever.
+// On the 4 m grid nearly every rock scoop turns a corner, and a corner is a
+// fraction of an ore (docs/specs/29-ground-4m.md): the crack is the scoop
+// that tips a whole one into the hopper, or that broke rock with it full.
 export function scoopTier(G, m, p) {
-  if (m.biteRock) return 2;
-  return G.ter && G.ter.inRock(p[0], p[1], p[2]) ? 1 : 0;
+  if (m.biteRock && (m.biteOre > 0 || (m.ore || 0) >= m.ch.hopper)) return 2;
+  return m.biteRock || (G.ter && G.ter.inRock(p[0], p[1], p[2])) ? 1 : 0;
 }
 function scoopFeel(G, m, p, arm) {
   const D = FEEL.dig, tier = scoopTier(G, m, p), run = m.digRun, T = TOOL.dig;
@@ -127,19 +130,21 @@ function runPoint(G, m) {
     return run.c;
   }
   if (!a) { m.digRun = null; return null; }
-  m.digRun = { c: a, r: T.r0, k: 1, at: [m.x, m.z], tilt: AIM.hit };
+  // fl: a face's run (aimed within LEVEL of level) is flat-bottomed at the
+  // feet; a parked digger's tunnel stays at its mouth's level (sim/miner.js),
+  // so no dip deepens into a pit. Aimed down at the floor, it's round (-Infinity).
+  const level = AIM.d[AIM.hit][1] > -LEVEL;
+  m.digRun = { c: a, r: T.r0, k: 1, at: [m.x, m.z], tilt: AIM.hit, fl: !level ? -Infinity : m.parked && m.site?.mouth ? m.site.mouth[1] : m.y };
   return a;
 }
-// A face's scoop (the level aim) keeps the floor: its sphere's bottom comes
-// down to the digger's feet and no further, so it tunnels on level, with no
-// toe of rock left at the face and no pit under it (on the 4 m grid a corner
-// under the floor is in reach, docs/specs/29-ground-4m.md). Aimed at the
-// floor in front, it digs down, as it always did.
-const FLOOR = 0.5;
-function floored(m, p) {
-  const r = m.digRun.r, low = m.y - FLOOR + r;
-  return m.digRun.tilt === 0 ? [p[0], low, p[2]] : p;
-}
+// A face's scoop (the level aim) keeps the floor: a flat-bottomed bite down
+// to the digger's feet, so it tunnels on level, with no toe of rock left at
+// the face and no pit under it (docs/specs/29-ground-4m.md). Aimed at the
+// floor in front, it's round and digs down, as it always did.
+// The floor is the feet's height where the run began, so scoops that reach
+// back under the digger never lower what it stands on.
+const LEVEL = sin(15 * PI / 180);
+const floorOf = m => m.digRun.fl;
 // How far a point is off a ray (o, unit d), ahead of its start; behind it is far.
 function offLine(c, o, d) {
   const vx = c[0] - o[0], vy = c[1] - o[1], vz = c[2] - o[2], t = vx * d[0] + vy * d[1] + vz * d[2];
