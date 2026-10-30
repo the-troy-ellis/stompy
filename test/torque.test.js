@@ -61,10 +61,10 @@ test('a slab on a pillar stands; thin the pillar and it snaps off', () => {
 });
 
 test('the check weighs load against section: the numbers K was set from', () => {
-  const both = game(ARCH), one = game(ARCH), box = [140, 150, 8, 12, 180, 190], r1 = [], r2 = [];
+  const both = game(ARCH), one = game(ARCH), box = [280, 300, 16, 24, 360, 380], r1 = [], r2 = [];   // boxes in 4 m corners
   both.ter.overhangs(box, Infinity, r1);
   for (const y of [0, 6, 12, 18]) for (const dz of [-8, 0, 8]) for (const dx of [-6, 0, 6]) one.ter.carve([a.x + 46 + dx, y, a.z + dz], 7);
-  one.ter.overhangs([148, 152, 5, 9, 186, 190], Infinity, r2);
+  one.ter.overhangs([296, 304, 10, 18, 372, 380], Infinity, r2);   // corners: the same metres as on the 8 m grid ([148, 152, 5, 9, 186, 190] there)
   assert.ok(Math.max(...r1) < TORQUE.rock, `on both legs: ${Math.max(...r1).toFixed(0)} < ${TORQUE.rock}`);
   assert.ok(Math.max(...r2) > TORQUE.rock, `on one: ${Math.max(...r2).toFixed(0)} > ${TORQUE.rock}`);
 });

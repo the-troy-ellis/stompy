@@ -105,21 +105,28 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   garbage is the patches' own arrays and the chunks round them meshed
 //   again when one is born, grows and goes; the per-frame paths box nothing
 //   (world/voxels.js keeps the hot loops free of calls through variables).
+// The ground on a 4 m grid (spec 29): the near ground's triangles about
+//   double, everything else as it was: menu 74.9k (32.9k) · free-start 94.6k
+//   (42.8k) · walk 88.8k (44.8k) · run 78.7k (42.2k) · fight 79.6k (43.0k) ·
+//   deaths 76.1k (41.1k) · wrecks 78.5k (44.1k) · away 95.5k (48.5k) · dig
+//   86.4k (46.7k) · scoop 65.0k (32.0k) · rain 83.4k (31.6k) · snow 75.4k
+//   (23.5k) · dust 70.1k (18.3k). Draws and garbage unchanged (spec 14: the
+//   cost is draw calls, not polygons); to be checked on a mid phone.
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
-  menu:           { meanDraws: 14, peakDraws: 14, tris: 38000, allocKB: 38 },   // the menu's 60 frames are too few for drawWorld to be optimized, so its sums box a little
-  'free-start':   { meanDraws: 22, peakDraws: 22, tris: 49000, allocKB: 125 },
-  'bench-walk':   { meanDraws: 27, peakDraws: 29, tris: 50000, allocKB: 150 },
-  'bench-run':    { meanDraws: 27, peakDraws: 43, tris: 47000, allocKB: 120 },
-  'bench-fight':  { meanDraws: 68, peakDraws: 92, tris: 47500, allocKB: 270 },   // craters make fine patches (spec 27)
-  'bench-deaths': { meanDraws: 91, peakDraws: 98, tris: 45500, allocKB: 340 },
-  'bench-wrecks': { meanDraws: 91, peakDraws: 113, tris: 51000, allocKB: 285 },
-  'bench-away':   { meanDraws: 43, peakDraws: 102, tris: 55500, allocKB: 200 },
-  'bench-dig':    { meanDraws: 23, peakDraws: 24, tris: 53500, allocKB: 140 },   // three digs: the main thread only copies corners out and uploads what comes back; each makes a fine patch (spec 27)
-  scoop:          { meanDraws: 18, peakDraws: 19, tris: 37000, allocKB: 80 },   // DIG held 10 s at the range's mesa (spec 25): clods are particles, so no draws of their own; a fine patch round the face (spec 27)
-  rain:           { meanDraws: 21, peakDraws: 21, tris: 36000, allocKB: 110 },   // free-start in a downpour: one more draw (the rain), no more garbage
-  snow:           { meanDraws: 19, peakDraws: 19, tris: 27000, allocKB: 95 },   // and in snow
-  dust:           { meanDraws: 14, peakDraws: 14, tris: 21000, allocKB: 90 },   // and in a dust storm (2,500 grains)
+  menu:           { meanDraws: 14, peakDraws: 14, tris: 86000, allocKB: 38 },   // the menu's 60 frames are too few for drawWorld to be optimized, so its sums box a little
+  'free-start':   { meanDraws: 22, peakDraws: 22, tris: 109000, allocKB: 125 },
+  'bench-walk':   { meanDraws: 27, peakDraws: 29, tris: 102000, allocKB: 150 },
+  'bench-run':    { meanDraws: 27, peakDraws: 43, tris: 90500, allocKB: 120 },
+  'bench-fight':  { meanDraws: 68, peakDraws: 92, tris: 91500, allocKB: 270 },   // craters make fine patches (spec 27)
+  'bench-deaths': { meanDraws: 91, peakDraws: 98, tris: 87500, allocKB: 340 },
+  'bench-wrecks': { meanDraws: 91, peakDraws: 113, tris: 90500, allocKB: 285 },
+  'bench-away':   { meanDraws: 43, peakDraws: 102, tris: 110000, allocKB: 200 },
+  'bench-dig':    { meanDraws: 23, peakDraws: 24, tris: 99500, allocKB: 140 },   // three digs: the main thread only copies corners out and uploads what comes back; each makes a fine patch (spec 27)
+  scoop:          { meanDraws: 18, peakDraws: 19, tris: 75000, allocKB: 80 },   // DIG held 10 s at the range's mesa (spec 25): clods are particles, so no draws of their own; a fine patch round the face (spec 27)
+  rain:           { meanDraws: 21, peakDraws: 21, tris: 96000, allocKB: 110 },   // free-start in a downpour: one more draw (the rain), no more garbage
+  snow:           { meanDraws: 19, peakDraws: 19, tris: 87000, allocKB: 95 },   // and in snow
+  dust:           { meanDraws: 14, peakDraws: 14, tris: 81000, allocKB: 90 },   // and in a dust storm (2,500 grains)
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;

@@ -13,7 +13,7 @@ import { FS } from '../world/finePatch.js';
 // right around you when a world loads is meshed at once, and without a worker
 // the queue is meshed here, a couple of ms a frame. A dig marks chunks dirty
 // (world/voxels.js), and they and the far meshes over them are meshed again.
-const LOD_AT = 300, NEAR_NOW = 200, BUDGET_MS = 2, SEND_MAX = 32, G2 = 2, GX = Math.ceil(CX / G2), GZ = Math.ceil(CZ / G2), SIZE = CS * VS * G2;
+const LOD_AT = 300, NEAR_NOW = 200, BUDGET_MS = 2, SEND_MAX = 32, G2 = 4, GX = Math.ceil(CX / G2), GZ = Math.ceil(CZ / G2), SIZE = CS * VS * G2;
 const FAR = 1 << 16;   // a job id at or past this is a group's far mesh
 const plain = (p, seed) => ({ low: p.low, mid: p.mid, high: p.high, rock: p.rock, ore: p.ore, seed });   // seed: where the seams run (world/seams.js)
 const groupDist = (g, eye) => {   // from eye to the group's square, flat

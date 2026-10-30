@@ -10,6 +10,7 @@ export const CHEATS = [
   ['freeze', 'FOES FROZEN'],
 ];
 // BIG DIGS: every dig at `scale` times its radius, through the rock band as if
-// it were soft. 3, so an AUTOCANNON shell (2.5 m, 7.5 m here) digs further than
-// a cell (8 m) reaches and keeps going: at 2 its holes stalled on rock.
-export const BIG_DIG = { scale: 3 };
+// it were soft. 4, so a few AUTOCANNON shells (2.5 m, 10 m here) cut an arch's
+// leg through: at 3 they did on the 8 m grid, but on the 4 m one only chipped
+// it (docs/specs/29-ground-4m.md); at 2 its holes stalled on rock.
+export const BIG_DIG = { scale: 4 };

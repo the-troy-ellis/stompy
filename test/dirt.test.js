@@ -14,7 +14,7 @@ test('a bite into soft ground fills the bucket with dirt, and no ore', () => {
   const G = digger(), P = G.player, h = G.ter.height(40, 40);
   const y = Y0 + Math.ceil((h - SOFT + 0.5 - Y0) / VS) * VS;   // a corner in the soft band
   assert.ok(y < h && y >= h - SOFT, `corner at ${y}, ground ${h}`);
-  const ore = bite(G, P, [40, y, 40]);
+  const ore = bite(G, P, [40, y, 40], 3);   // small enough to stay in the band: rock corners are 4 m down
   assert.equal(ore, 0);
   assert.ok(P.dirt >= CONSTRUCT.dirtPerCorner, `dirt ${P.dirt}`);
   for (let i = 0; i < 40; i++) bite(G, P, [40 + i * 8, y, 80]);
@@ -53,7 +53,7 @@ test('the FUSION button is DUMP for a digger: one mound a press, however long it
 });
 
 test('a pile is about one bite\'s hole of ground, and rock bites give dirt too', async () => {
-  // On the 8 m ground: the dirt is counted on it, and a fine patch's round
+  // On the 4 m ground: the dirt is counted on it, and a fine patch's round
   // bites (docs/specs/27-fine-dig.md) settle back into it.
   const G = digger(), P = G.player, ter = G.ter.coarse;
   const vol = (cx, cz, half, y0, y1) => { let v = 0; for (let x = cx - half; x <= cx + half; x += 1) for (let z = cz - half; z <= cz + half; z += 1) for (let y = y0; y <= y1; y += 1) if (ter.solid(x, y, z)) v++; return v; };

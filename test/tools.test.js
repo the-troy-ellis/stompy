@@ -70,7 +70,7 @@ test('with an arm shot off, the other still digs, half as often', () => {
 test('a run of scoops into the foot of a slope takes ground, and ore', () => {
   const G = game('mesa', 4), D = atMesa(G, 9);
   frames(G, 240, DIG);
-  assert.ok(D.ore > 0 && D.site, `dug: ${D.ore} ore`);
+  assert.ok(D.ore + (D.oreCarry || 0) > 0 && D.site, `dug: ${D.ore} ore and ${D.oreCarry} on its way`);   // whole ore, or the fraction toward the next (sim/dig.js bite)
 });
 
 test('nothing in reach: the arms spin in the air, and it says so', () => {

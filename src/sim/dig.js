@@ -82,17 +82,25 @@ export function dig(G, p, r, owned = true) {
 // A full hopper still digs. Single player: online a bite is a plain dig that
 // syncs and gives no ore (spec 20 § Edge cases). Returns the ore it got, and
 // sets `m.seamBite` when a seam paid for it (the sparkle, melee.js) and
-// `m.biteCorners` to how many corners it turned to air.
+// `m.biteCorners` to how many corners it turned to air. `fl`: a flat-bottomed
+// bite down to that floor (world/voxels.js dig; single player, as its ore is:
+// online a bite is a plain dig).
 export const seamOre = depth => CONSTRUCT.orePerSeam * Math.min(CONSTRUCT.seamMax, 1 + Math.max(0, depth) / CONSTRUCT.seamDeep);
-export function bite(G, m, p, r = CONSTRUCT.bucket) {
-  m.seamBite = false; m.biteCorners = 0;
+export function bite(G, m, p, r = CONSTRUCT.bucket, fl = -Infinity) {
+  m.seamBite = false; m.biteCorners = 0; m.biteOre = 0;
   if (!G.ter || online(G)) { dig(G, p, r, ownsDigs(G, m)); return 0; }
   const x = q(p[0], 0.25), y = q(p[1], 0.25), z = q(p[2], 0.25), seed = G.ter.seed;
   let got = 0, seams = 0;
   const tally = { rock: 0, soft: 0, corner: (cx, cy, cz, depth) => { if (seamAt(seed, cx, cy, cz)) { got += seamOre(depth); seams++; } else got += CONSTRUCT.orePerCorner; } };
-  confirmDig(G, [0, x, y, z, r], true, 1, tally);
-  const ore = Math.max(0, Math.min(m.ch.hopper - (m.ore || 0), Math.round(got)));
+  confirmDig(G, [0, x, y, z, r], true, 1, tally, fl);
+  // Whole ore into the hopper; the fraction rides on to the next bite (a 4 m
+  // corner is an eighth of an 8 m one, docs/specs/29-ground-4m.md), so the
+  // sum is the same in any order.
+  const want = got + (m.oreCarry || 0), whole = Math.floor(want + 1e-9);
+  m.oreCarry = want - whole;
+  const ore = Math.max(0, Math.min(m.ch.hopper - (m.ore || 0), whole));
   m.ore = (m.ore || 0) + ore;
+  m.biteOre = ore;   // whole ore this bite put in the hopper: the crack (sim/tools.js scoopTier)
   m.seamBite = seams > 0;
   m.biteCorners = tally.soft + tally.rock;   // none: the bucket scraped the hole's side (sim/miner.js moves on)
   m.biteRock = tally.rock > 0;   // what its clods look like (sim/tools.js)
@@ -148,8 +156,8 @@ function logDig(G, e) {
 
 // One dig in the confirmed order: carved, the ground it leaves unheld falls,
 // and what stood there settles. `seen`: the falls are shown coming down.
-function confirmDig(G, e, seen, rock = DIG.rock, tally = null) {
-  const [, x, y, z, r] = e, C = confirmed(G), b = C.dig([x, y, z], r, rock, tally);
+function confirmDig(G, e, seen, rock = DIG.rock, tally = null, fl = -Infinity) {
+  const [, x, y, z, r] = e, C = confirmed(G), b = C.dig([x, y, z], r, rock, tally, fl);
   const falls = b ? C.islands(b).map(cells => C.fall(cells)) : [];
   // Then what still holds on but hangs too far off what holds it (the torque rule); a break can leave another.
   const weighed = G.digLog ? [] : null;

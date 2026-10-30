@@ -1,8 +1,9 @@
+import { geoOf } from '../data/geo.js';
 import { clampN, wrapA } from '../util/math.js';
 import { CONSTRUCT } from '../data/construct.js';
 import { siteInReach, siteReach } from './tools.js';
 import { TOOL } from '../data/tools.js';
-import { routeYaw, feelers } from './ai/nav.js';
+import { routeYaw, feelers, walkable, walkGround, FEEL_M } from './ai/nav.js';
 import { padOf, siteWork } from './base.js';
 
 const { atan2, hypot, sin, cos, abs, min } = Math;
@@ -23,8 +24,10 @@ const { atan2, hypot, sin, cos, abs, min } = Math;
 // 'HAULING', 'LOADING', 'BUILDING', 'FETCHING', 'DELIVERING' or null.
 export const MINER = {
   arrive: 3,      // m: this near its site it stops and digs
+  mouth: 6,       // m: this near its tunnel's mouth, it walks on straight (walkTo)
   face: 0.12,     // rad: this square to the site's heading before it holds DIG
-  follow: 4,      // m: when no aim digs, the site moves this far ahead, after the face
+  follow: 4,      // m: when no aim digs, the site moves this far ahead, after the face; or, if the face is in sight further on,
+  stand: 8,       // m: to this far short of it (the face a run digs back runs well past the bucket's reach on the 4 m grid, docs/specs/29-ground-4m.md)
   moves: 3,       // moves ahead in a row that dig nothing, and it gives the site up
   level: 0.12,    // rad: it aims this far up, so the aim's own tilt (sim/tools.js) digs level and it tunnels on, not down
   deep: 16,       // m: and never moves ahead onto ground this far under where you left it digging
@@ -38,6 +41,7 @@ const AIMS = [[0, 0], [0.4, 0], [-0.4, 0], [0, 0.25]];
 
 export function mine(G, m, dt) {
   const a = (m.ai ||= {});   // the nav's route and the feelers' side live here, as a foe's do
+  if (m.site && !m.site.mouth) m.site.mouth = [m.site.x, m.site.y, m.site.z];   // where its dig began: the way in and out of the tunnel it makes
   m.jetting = false; m.beamOn = false;
   const silo = G.base?.silo?.alive ? G.base.silo : null, full = (m.ore || 0) >= m.ch.hopper;
   const e = siteFor(G, m, a, full);
@@ -62,7 +66,8 @@ export function mine(G, m, dt) {
     a.seen = m.scoops || 0;
     if (!m.dryScoops) a.aim = a.dry = 0;   // it dug
     else if (m.dryScoops % TOOL.dig.dry === 0 && (a.aim = (a.aim || 0) + 1) >= AIMS.length) {   // dry, and every way round the hole tried: the face has moved back, so after it, unless that is down a hole
-      const x = s.x + sin(s.yaw) * MINER.follow, z = s.z + cos(s.yaw) * MINER.follow;
+      const t = G.ter.coarse.ray([m.x, m.y + 4 * m.ch.scale, m.z], [sin(s.yaw), 0, cos(s.yaw)], 60), ahead = t != null && t - MINER.stand > MINER.follow ? t - MINER.stand : MINER.follow;   // from where it stands, at its bucket's height
+      const x = m.x + sin(s.yaw) * ahead, z = m.z + cos(s.yaw) * ahead;
       if ((a.dry = (a.dry || 0) + 1) > MINER.moves || G.ter.coarse.groundBelow(x, s.y + 4, z) < s.y - MINER.deep) { m.site = null; m.job = null; return halt(m, dt); }   // dug out, or nothing in reach: it stops (the 8 m ground: a fine scoop's pit isn't a hole, docs/specs/27-fine-dig.md)
       a.aim = 0; s.x = x; s.z = z;
     }
@@ -186,13 +191,21 @@ export function halt(m, dt) { m.throttle = 0; m.twist -= clampN(m.twist, -2 * dt
 
 // Toward (x, y, z) by the nav's way round, the feelers along walls; `giveUp`
 // when it hasn't got a metre nearer in MINER.stuck seconds of walking.
+// The steepest a mech walks up, rise over run, with a margin: its torso
+// meets a slope steeper than its height over its radius (sim/mech.js rockAt).
+const climbOf = m => { const g = geoOf(m); return 0.85 * g.torsoY / g.radius; };
 export function walkTo(G, m, a, x, y, z, dt, giveUp) {
+  // In or out of its own tunnel (docs/specs/29-ground-4m.md: on the 4 m grid
+  // its walls are walls): when the straight way isn't one it can walk, by the
+  // tunnel's mouth first, the way it came.
+  const mo = m.site?.mouth;
+  if (mo && hypot(mo[0] - m.x, mo[2] - m.z) > MINER.mouth && hypot(x - m.x, z - m.z) > MINER.mouth && !walkable(walkGround(G.ter), m.x, m.y, m.z, x, z, 40, climbOf(m))) { x = mo[0]; y = mo[1]; z = mo[2]; }
   const d = hypot(x - m.x, z - m.z), g = a.goal;
   if (!g || g.x !== x || g.z !== z || d < g.best - 1 || G.time - g.seen > 1) a.goal = { x, z, best: d, t: G.time, seen: G.time };   // a new trip, nearer, or back after a break
   else if (G.time - g.t > MINER.stuck) { a.goal = null; giveUp(); return halt(m, dt); }
   else g.seen = G.time;
   let yaw = routeYaw(G, m, x, y, z) ?? atan2(x - m.x, z - m.z);
-  yaw = feelers(G, m, yaw);
+  yaw = feelers(G, m, yaw, min(FEEL_M, d + 2), climbOf(m));
   const off = abs(wrapA(yaw - m.yaw));
   m.yaw += clampN(wrapA(yaw - m.yaw), -m.ch.turn * dt, m.ch.turn * dt);
   m.twist -= clampN(m.twist, -2 * dt, 2 * dt);
