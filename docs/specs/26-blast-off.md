@@ -6,7 +6,7 @@
 | Milestone | M13 (proposed) |
 | Size | L, split in four: charge and blast-off; the flight, the view and the landing spot; targeting and the insta-stomp; the AI and online |
 | Depends on | [12-melee.md](12-melee.md) (the stomp); [13-thunk.md](13-thunk.md) (the feel table) |
-| Touch parity | The same gesture as now: a tap then a hold on the upper stick charges, and letting go blasts off |
+| Touch parity | A tap then a hold on the lower stick charges, and letting go blasts off (the upper stick until the owner swapped them, 2026-10-30; As built) |
 
 ## Summary
 
@@ -24,7 +24,7 @@ them. In the air you still steer; the jets only nudge you back on.
 
 ### Charging
 
-- **Hold JUMP** (`J`; on touch, tap then hold the upper stick, as now; `A`
+- **Hold JUMP** (`J`; on touch, tap then hold the lower stick; `A`
   on a gamepad). The charge fills in 0.9 s.
 - While it fills:
   - the mech crouches lower and lower;
@@ -115,7 +115,7 @@ sums.
 
 New text, in full:
 - tutorial, keyboard: `HOLD J. LET GO: UP.`
-- tutorial, touch: `UPPER STICK: TAP, HOLD, LET GO` (the 30-letter limit)
+- tutorial, touch: `LOWER STICK: TAP, HOLD, LET GO` (the 30-letter limit)
 - tutorial, gamepad: `HOLD A. LET GO: UP.`
 - voice, when a blast-off locks on to you: `ABOVE YOU.` (flat; part 4, the
   arena)
@@ -305,7 +305,7 @@ is a balance issue.
 8. No blast again until the ring refills (3 s).
 9. In the arena, an insta-stomp kills the other pilot; both see the blast.
 10. Foes still hop obstacles, and never insta-stomp you.
-11. On a phone: tap and hold the upper stick, let go, steer with the same
+11. On a phone: tap and hold the lower stick, let go, steer with the same
    thumb. Locking needs no extra button: you look at it.
 
 ## Tests
@@ -530,6 +530,17 @@ frame, about 40 ground samples. Nothing else measurable.
     the red ring stay mid-windscreen;
   - in the last fraction of a second, about 5 m out, the cap is reached and
     it sits at the bottom edge as you hit.
+
+### After part 3: jump on the lower stick
+
+- The owner, 2026-10-30: "Lets swap the jump and punch. The lower stick
+  should be the one to double tap to jump".
+- On touch, tap then tap and hold the **lower** stick (turn and aim) to
+  charge, and let go to blast off. A double tap on the **upper** stick
+  (throttle and torso) punches. `input/input.js`, the tutorial lines, the
+  controls screen, the workflow checklist and the touch smoke run follow.
+- So the thumb that charges is the one that turns: you can swing round
+  onto a lock while the jets build. The throttle stays where it was set.
 
 ## Open questions
 

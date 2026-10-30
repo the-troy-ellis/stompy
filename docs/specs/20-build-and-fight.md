@@ -6,7 +6,7 @@
 | Milestone | M9 (proposed; after M8) |
 | Size | L (split into five issues; see the end) |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md) (digging, building, falling, the torque rule); [03-objectives.md](03-objectives.md) (structures, waves, protect); [05-ai.md](05-ai.md) (foes that go for a target); [12-melee.md](12-melee.md) (the punch the bucket rides on); [16-body-plans.md](16-body-plans.md) (a new body); [19-debug-menu.md](19-debug-menu.md) (where it is tried first) |
-| Touch parity | Full. Digging is the punch (double tap the lower stick), unloading and building are automatic or one button, and swapping mechs is one button. Nothing needs a new control on the phone |
+| Touch parity | Full. Digging is the punch (double tap the upper stick, since spec 26's swap), unloading and building are automatic or one button, and swapping mechs is one button. Nothing needs a new control on the phone |
 
 ## Summary
 
@@ -47,7 +47,7 @@ A slow, wide construction mech with a bucket arm where a fist would be, a
 hopper on its back, hazard stripes, and fat feet. It has no guns. Its HUD
 shows the hopper in place of the weapon list.
 
-- **Dig:** the punch (double tap the lower stick; E or Mouse 4). The bucket
+- **Dig:** the punch (double tap the upper stick, since spec 26's swap; E or Mouse 4). The bucket
   winds up, bites the ground in front of it with the punch's thunk, and
   digs a big hole (radius `CONSTRUCT.bucket`, larger than any gun's, as
   spec 18 promised construction mechs). Dirt flies.
