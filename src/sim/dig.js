@@ -12,6 +12,7 @@ import { HALF } from '../world/terrain.js';
 import { feel } from './feel.js';
 import { damage } from './combat.js';
 import { geoOf } from '../data/geo.js';
+import { STEP } from './mech.js';
 
 const { hypot, min, max, round } = Math;
 
@@ -271,12 +272,21 @@ function gone(G, p) {
   G.ter.dropPatch(p);
   settle(G, (p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2, hypot(p.x1 - p.x0, p.z1 - p.z0) / 2);
 }
-// Whether a mech is on the ground over a patch.
+// Whether a mech stands down in a bite: under it (its middle, or a foot's
+// width to any side) the fine ground is more than a step below the 8 m
+// ground, so a settle would heave it up. A shallow scrape under a digger at
+// its face, or a bite beside it, doesn't hold the settle: that lift is a step.
 function standing(G, p) {
+  const C = G.ter.coarse;
   for (const m of G.mechs) {
     if (!m.alive || m.air) continue;
-    const r = geoOf(m).radius * m.ch.scale;
-    if (m.x > p.x0 - r && m.x < p.x1 + r && m.z > p.z0 - r && m.z < p.z1 + r && m.y < p.y1 + 2 && m.y > p.y0 - 2) return true;
+    const r = geoOf(m).radius * m.ch.scale * 0.5, up = STEP * m.ch.scale;
+    for (let n = 0; n < 5; n++) {
+      const x = m.x + (n === 1 ? r : n === 2 ? -r : 0), z = m.z + (n === 3 ? r : n === 4 ? -r : 0);
+      if (x < p.x0 || x >= p.x1 || z < p.z0 || z >= p.z1) continue;
+      const y = G.ter.groundBelow(x, m.y + up, z);
+      if (C.sample(x, y + up, z) > 0) return true;   // the 8 m ground is rock a step up
+    }
   }
   return false;
 }
