@@ -40,7 +40,7 @@ export function makeGround(seed, opts = {}, def = {}) {
     let o = cornerIndex(i, 0, k);
     for (let j = 0; j < PY; j++, o += PX) D[o] = j <= jr ? 255 : j >= ja || j === NY ? 1 : Q((h - (Y0 + j * VS)) / DS);
   }
-  const G = { D, top, seed, flat: !!opts.flat, dirty: new Set(), rev: 0 };
+  const G = { D, top, seed, flat: !!opts.flat, dirty: new Set(), rev: 0, patches: null, fineNear: null };   // patches, fineNear: fine digging (fineOn), there from the start so the object keeps its shape
   const ground = Object.assign(G, groundApi(G));
   ground.retop(0, NX, 0, NZ);
   for (const l of g.landmarks || []) landmark(ground, l);
@@ -57,17 +57,12 @@ function groundApi(G) {
   // The ground anywhere: the newest fine patch the point is in (world/finePatch.js,
   // docs/specs/27-fine-dig.md), else the 8 m grid. Every query reads it.
   function sample(x, y, z) {
-    const P = G.patches;
-    if (P && P.length) for (let n = P.length - 1; n >= 0; n--) { const p = P[n]; if (x >= p.x0 && x < p.x1 && y >= p.y0 && y < p.y1 && z >= p.z0 && z < p.z1) return patchSample(p, x, y, z, csample(x, y, z)); }
-    // csample's body, not a call to it: this is the hottest path in the game, and a call it doesn't inline boxes the number it returns.
-    const fx = (x + HALF) / VS, fy = (y - Y0) / VS, fz = (z + HALF) / VS;
-    if (fy <= 0) return 1;
-    if (fx < 0 || fz < 0 || fx >= NX || fz >= NZ || fy >= NY) return -1;
-    const i = fx | 0, j = fy | 0, k = fz | 0, u = fx - i, v = fy - j, w = fz - k;
-    const o = cornerIndex(i, j, k), oy = o + PX, oz = o + PX * PY, oyz = oz + PX;
-    const a = (D[o] * (1 - u) + D[o + 1] * u) * (1 - v) + (D[oy] * (1 - u) + D[oy + 1] * u) * v;
-    const b = (D[oz] * (1 - u) + D[oz + 1] * u) * (1 - v) + (D[oyz] * (1 - u) + D[oyz + 1] * u) * v;
-    return ((a * (1 - w) + b * w) - 128) / 127;
+    const P = G.patches;   // small on purpose: inlined into every query, so nothing boxes; with patches, finer()
+    return P && P.length ? finer(P, x, y, z) : csample(x, y, z);
+  }
+  function finer(P, x, y, z) {
+    for (let n = P.length - 1; n >= 0; n--) { const p = P[n]; if (x >= p.x0 && x < p.x1 && y >= p.y0 && y < p.y1 && z >= p.z0 && z < p.z1) return patchSample(p, x, y, z, csample(x, y, z)); }
+    return csample(x, y, z);
   }
   // Density on the 8 m grid by trilinear blend: below the grid is rock, beside or above it air.
   function csample(x, y, z) {
@@ -82,12 +77,12 @@ function groundApi(G) {
   }
   // The top surface under the sky: a fine patch's over it, else the 8 m grid's.
   function height(x, z) {
-    const P = G.patches;
-    if (P && P.length) for (let n = P.length - 1; n >= 0; n--) if (overXZ(P[n], x, z)) return patchHeight(P[n], x, z);
-    // cheight's body, not a call (as in sample): a hot path.
-    const gx = clampN((x + HALF) / VS, 0, NX - 1e-4), gz = clampN((z + HALF) / VS, 0, NZ - 1e-4);
-    const i = gx | 0, k = gz | 0, u = gx - i, w = gz - k, o = i + PX * k;
-    return (top[o] * (1 - u) + top[o + 1] * u) * (1 - w) + (top[o + PX] * (1 - u) + top[o + PX + 1] * u) * w;
+    const P = G.patches;   // as sample: small, so it inlines
+    return P && P.length ? finerTop(P, x, z) : cheight(x, z);
+  }
+  function finerTop(P, x, z) {
+    for (let n = P.length - 1; n >= 0; n--) if (overXZ(P[n], x, z)) return patchHeight(P[n], x, z);
+    return cheight(x, z);
   }
   // The 8 m grid's top surface, blended between the four corner columns.
   // The mesh (mesher.js) is the same surface, smoothed: the two agree within
@@ -636,7 +631,7 @@ function pockets(ground, seed) {
 
 // A second ground with the same bytes (the net's confirmed ground, sim/dig.js).
 export function cloneGround(g) {
-  const c = { D: g.D.slice(), top: g.top.slice(), base: g.base, seed: g.seed, flat: g.flat, dirty: new Set(), rev: 0 };
+  const c = { D: g.D.slice(), top: g.top.slice(), base: g.base, seed: g.seed, flat: g.flat, dirty: new Set(), rev: 0, patches: null, fineNear: null };
   return Object.assign(c, groundApi(c));
 }
 
