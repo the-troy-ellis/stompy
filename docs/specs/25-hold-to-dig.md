@@ -401,7 +401,8 @@ brings its own. Some candidates, each its own spec, with names the owner's:
 
 ## Open questions
 
-- **A finer ground near the dig.** The literal version of "higher poly that
+- **A finer ground near the dig.** Picked by the owner (2026-10-29): it's
+  [27-fine-dig.md](27-fine-dig.md). The literal version of "higher poly that
   settles": a finer grid in a patch round the face that later merges back to
   8 m cells. Default: not now. It touches the feet rule, falls and the
   network, and the settle would move ground under anything standing on it.

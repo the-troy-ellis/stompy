@@ -323,6 +323,11 @@ the pour.
 
 - **Part 1, the tool button, the spin and the scoop:** built.
 - **Part 2, the sliding face and the clods:** built.
+- **Fine digging that settles** ([specs/27-fine-dig.md](specs/27-fine-dig.md),
+  proposed): where you dig, the ground goes four times finer, so scoops and
+  craters leave round bites. Left alone for 15 s it slumps back into the
+  usual low-poly ground. In three parts: fine patches in the sim; drawing
+  them and the settle; online.
 
 ## M13 — Blast-off jets (proposed)
 
