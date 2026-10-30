@@ -11,8 +11,10 @@
 // each axis, from world position `o` (local corner 0) at `s` metres apart.
 // `top` holds the nx × nz column tops (metres) of the same corners. A block
 // owns the edges that start at its corners 1..n-2, so neighbours never draw
-// the same quad. Returns 9 floats per vertex (position, normal, colour), as
-// mesh/builder.js does.
+// the same quad. `skip` (optional): boxes of the block's own corners,
+// [i0, i1, j0, j1, k0, k1], whose edges it doesn't draw (a fine patch draws
+// that ground, world/finePatch.js). Returns 9 floats per vertex (position,
+// normal, colour), as mesh/builder.js does.
 // The cube's 12 edges as corner pairs (corner c is x = c & 1, y = c >> 1 & 1, z = c >> 2).
 const EA = [0, 2, 4, 6, 0, 1, 4, 5, 0, 1, 2, 3], EB = [1, 3, 5, 7, 2, 3, 6, 7, 4, 5, 6, 7];
 import { seamAt } from './seams.js';
@@ -21,7 +23,7 @@ const { sin, floor, hypot, round } = Math;
 const SOFT = 6;   // world/voxels.js SOFT (not imported: the worker's bundle stays the mesher alone)
 const hash = (x, z) => { const v = sin(x * 12.9898 + z * 78.233) * 43758.5453; return v - floor(v); };
 
-export function meshChunk(D, top, dims, o, s, pal) {
+export function meshChunk(D, top, dims, o, s, pal, skip = null) {
   const [nx, ny, nz] = dims;
   // All rock or all air (most chunks): nothing to draw.
   let lo = 255, hi = 0;
@@ -87,11 +89,17 @@ export function meshChunk(D, top, dims, o, s, pal) {
       out[no + 6] = col0; out[no + 7] = col1; out[no + 8] = col2; no += 9;
     }
   }
+  const sk = skip && skip.length ? skip : null;
+  // An edge from corner (i, j, k) one step along axis a, wholly in a skipped box.
+  const skipped = (i, j, k, a) => {
+    for (const b of sk) if (i >= b[0] && j >= b[2] && k >= b[4] && i + (a === 0) <= b[1] && j + (a === 1) <= b[3] && k + (a === 2) <= b[5]) return true;
+    return false;
+  };
   for (let k = 1; k < mz; k++) for (let j = 1; j < my; j++) for (let i = 1; i < mx; i++) {
     const here = D[ci(i, j, k)] > 128;
-    if (here !== D[ci(i + 1, j, k)] > 128) { const d = here ? 1 : -1; quad(cell(i, j - 1, k - 1), cell(i, j, k - 1), cell(i, j, k), cell(i, j - 1, k), d, 0, 0); }
-    if (here !== D[ci(i, j + 1, k)] > 128) { const d = here ? 1 : -1; quad(cell(i - 1, j, k - 1), cell(i, j, k - 1), cell(i, j, k), cell(i - 1, j, k), 0, d, 0); }
-    if (here !== D[ci(i, j, k + 1)] > 128) { const d = here ? 1 : -1; quad(cell(i - 1, j - 1, k), cell(i, j - 1, k), cell(i, j, k), cell(i - 1, j, k), 0, 0, d); }
+    if (here !== D[ci(i + 1, j, k)] > 128 && !(sk && skipped(i, j, k, 0))) { const d = here ? 1 : -1; quad(cell(i, j - 1, k - 1), cell(i, j, k - 1), cell(i, j, k), cell(i, j - 1, k), d, 0, 0); }
+    if (here !== D[ci(i, j + 1, k)] > 128 && !(sk && skipped(i, j, k, 1))) { const d = here ? 1 : -1; quad(cell(i - 1, j, k - 1), cell(i, j, k - 1), cell(i, j, k), cell(i - 1, j, k), 0, d, 0); }
+    if (here !== D[ci(i, j, k + 1)] > 128 && !(sk && skipped(i, j, k, 2))) { const d = here ? 1 : -1; quad(cell(i - 1, j - 1, k), cell(i, j - 1, k), cell(i, j, k), cell(i - 1, j, k), 0, 0, d); }
   }
   return out.slice(0, no);
 }

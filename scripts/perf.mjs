@@ -95,18 +95,28 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 // Hold to dig (spec 25 part 2), first measured: scoop 15/16 31.9k, particles
 //   28 (53 at most: dirt, sparks and the clods), 45 KB a frame, with the
 //   chunks rebuilding two and a half times a second in the worker.
+// Fine digging that settles (spec 27 part 1): a dig or a crater near you
+//   makes a patch of 2 m ground, meshed in the worker, that the 8 m chunks
+//   round it skip; it settles back 15 s after its last dig. The scenes that
+//   dig pay for it, the rest don't (with no patch the numbers are main's):
+//   dig 20/21 46.7k 122 KB (main 15/16 38.7k 61 KB: three patches' draws and
+//   their 2 m ground) · deaths 295 KB (165) · wrecks 248 KB (123) · away
+//   48.5k 175 KB (41.1k 86) · fight 234 KB (191) · scoop 70 KB (54). The
+//   garbage is the patches' own arrays and the chunks round them meshed
+//   again when one is born, grows and goes; the per-frame paths box nothing
+//   (world/voxels.js keeps the hot loops free of calls through variables).
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
   menu:           { meanDraws: 14, peakDraws: 14, tris: 38000, allocKB: 38 },   // the menu's 60 frames are too few for drawWorld to be optimized, so its sums box a little
   'free-start':   { meanDraws: 22, peakDraws: 22, tris: 49000, allocKB: 125 },
   'bench-walk':   { meanDraws: 27, peakDraws: 29, tris: 50000, allocKB: 150 },
   'bench-run':    { meanDraws: 27, peakDraws: 43, tris: 47000, allocKB: 120 },
-  'bench-fight':  { meanDraws: 68, peakDraws: 92, tris: 47500, allocKB: 220 },
-  'bench-deaths': { meanDraws: 91, peakDraws: 98, tris: 45500, allocKB: 195 },
-  'bench-wrecks': { meanDraws: 91, peakDraws: 113, tris: 45500, allocKB: 145 },
-  'bench-away':   { meanDraws: 43, peakDraws: 102, tris: 47500, allocKB: 100 },
-  'bench-dig':    { meanDraws: 18, peakDraws: 19, tris: 44500, allocKB: 80 },   // three digs: the main thread only copies corners out and uploads what comes back
-  scoop:          { meanDraws: 18, peakDraws: 19, tris: 37000, allocKB: 55 },   // DIG held 10 s at the range's mesa (spec 25): clods are particles, so no draws of their own
+  'bench-fight':  { meanDraws: 68, peakDraws: 92, tris: 47500, allocKB: 270 },   // craters make fine patches (spec 27)
+  'bench-deaths': { meanDraws: 91, peakDraws: 98, tris: 45500, allocKB: 340 },
+  'bench-wrecks': { meanDraws: 91, peakDraws: 113, tris: 51000, allocKB: 285 },
+  'bench-away':   { meanDraws: 43, peakDraws: 102, tris: 55500, allocKB: 200 },
+  'bench-dig':    { meanDraws: 23, peakDraws: 24, tris: 53500, allocKB: 140 },   // three digs: the main thread only copies corners out and uploads what comes back; each makes a fine patch (spec 27)
+  scoop:          { meanDraws: 18, peakDraws: 19, tris: 37000, allocKB: 80 },   // DIG held 10 s at the range's mesa (spec 25): clods are particles, so no draws of their own; a fine patch round the face (spec 27)
   rain:           { meanDraws: 21, peakDraws: 21, tris: 36000, allocKB: 110 },   // free-start in a downpour: one more draw (the rain), no more garbage
   snow:           { meanDraws: 19, peakDraws: 19, tris: 27000, allocKB: 95 },   // and in snow
   dust:           { meanDraws: 14, peakDraws: 14, tris: 21000, allocKB: 90 },   // and in a dust storm (2,500 grains)

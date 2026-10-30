@@ -1,6 +1,7 @@
 import { makeTerrain, HALF } from './terrain.js';
 import { clampN } from '../util/math.js';
 import { polar } from '../sim/placement.js';
+import { FS, PATCH, makePatch, inPatch, overXZ, contains, overlaps, union, fits, patchSample, patchHeight } from './finePatch.js';
 
 const { floor, ceil, hypot, max, min } = Math;
 
@@ -39,7 +40,7 @@ export function makeGround(seed, opts = {}, def = {}) {
     let o = cornerIndex(i, 0, k);
     for (let j = 0; j < PY; j++, o += PX) D[o] = j <= jr ? 255 : j >= ja || j === NY ? 1 : Q((h - (Y0 + j * VS)) / DS);
   }
-  const G = { D, top, seed, flat: !!opts.flat, dirty: new Set(), rev: 0 };
+  const G = { D, top, seed, flat: !!opts.flat, dirty: new Set(), rev: 0, patches: null, fineNear: null };   // patches, fineNear: fine digging (fineOn), there from the start so the object keeps its shape
   const ground = Object.assign(G, groundApi(G));
   ground.retop(0, NX, 0, NZ);
   for (const l of g.landmarks || []) landmark(ground, l);
@@ -53,8 +54,18 @@ export function makeGround(seed, opts = {}, def = {}) {
 function groundApi(G) {
   const { D, top } = G;
   const val = (i, j, k) => (D[cornerIndex(i, j, k)] - 128) / 127;
-  // Density anywhere by trilinear blend: below the grid is rock, beside or above it air.
+  // The ground anywhere: the newest fine patch the point is in (world/finePatch.js,
+  // docs/specs/27-fine-dig.md), else the 8 m grid. Every query reads it.
   function sample(x, y, z) {
+    const P = G.patches;   // small on purpose: inlined into every query, so nothing boxes; with patches, finer()
+    return P && P.length ? finer(P, x, y, z) : csample(x, y, z);
+  }
+  function finer(P, x, y, z) {
+    for (let n = P.length - 1; n >= 0; n--) { const p = P[n]; if (x >= p.x0 && x < p.x1 && y >= p.y0 && y < p.y1 && z >= p.z0 && z < p.z1) return patchSample(p, x, y, z, csample(x, y, z)); }
+    return csample(x, y, z);
+  }
+  // Density on the 8 m grid by trilinear blend: below the grid is rock, beside or above it air.
+  function csample(x, y, z) {
     const fx = (x + HALF) / VS, fy = (y - Y0) / VS, fz = (z + HALF) / VS;
     if (fy <= 0) return 1;
     if (fx < 0 || fz < 0 || fx >= NX || fz >= NZ || fy >= NY) return -1;
@@ -64,10 +75,19 @@ function groundApi(G) {
     const b = (D[oz] * (1 - u) + D[oz + 1] * u) * (1 - v) + (D[oyz] * (1 - u) + D[oyz + 1] * u) * v;
     return ((a * (1 - w) + b * w) - 128) / 127;
   }
-  // The top surface under the sky, blended between the four corner columns.
+  // The top surface under the sky: a fine patch's over it, else the 8 m grid's.
+  function height(x, z) {
+    const P = G.patches;   // as sample: small, so it inlines
+    return P && P.length ? finerTop(P, x, z) : cheight(x, z);
+  }
+  function finerTop(P, x, z) {
+    for (let n = P.length - 1; n >= 0; n--) if (overXZ(P[n], x, z)) return patchHeight(P[n], x, z);
+    return cheight(x, z);
+  }
+  // The 8 m grid's top surface, blended between the four corner columns.
   // The mesh (mesher.js) is the same surface, smoothed: the two agree within
   // 0.6 m over nearly all of a map (test/mesher.test.js).
-  function height(x, z) {
+  function cheight(x, z) {
     const gx = clampN((x + HALF) / VS, 0, NX - 1e-4), gz = clampN((z + HALF) / VS, 0, NZ - 1e-4);
     const i = gx | 0, k = gz | 0, u = gx - i, w = gz - k, o = i + PX * k;
     return (top[o] * (1 - u) + top[o + 1] * u) * (1 - w) + (top[o + PX] * (1 - u) + top[o + PX + 1] * u) * w;
@@ -90,6 +110,23 @@ function groundApi(G) {
     }
     return lo;
   }
+  // The same on the 8 m grid alone, under any fine patch (docs/specs/27-fine-dig.md;
+  // `coarse.groundBelow`): its own copy, so neither one grows a branch or
+  // calls through a variable (either can box every number it returns).
+  function cgroundBelow(x, y, z, lo = Y0) {
+    if (csample(x, y, z) > 0) return y;
+    const step = VS / 4, h = cheight(x, z);
+    let yy = y - step;
+    if (y > h + 2 * step && csample(x, h + step, z) <= 0) yy = h + step;
+    for (; yy > lo; yy -= step) {
+      if (csample(x, yy, z) > 0) {
+        let a = yy, b = yy + step;
+        for (let n = 0; n < 7; n++) { const m = (a + b) / 2; if (csample(x, m, z) > 0) a = m; else b = m; }
+        return (a + b) / 2;
+      }
+    }
+    return lo;
+  }
   // Where a ray first meets rock (distance along d), or null. The arrays are
   // read once into plain numbers: shots and sight lines run this all frame.
   function ray(o, d, maxT) {
@@ -99,6 +136,20 @@ function groundApi(G) {
       if (sample(ox + dx * t, oy + dy * t, oz + dz * t) > 0) {
         let a = (k - 1) * step, b = t;
         for (let q = 0; q < 8; q++) { const m = (a + b) / 2; if (sample(ox + dx * m, oy + dy * m, oz + dz * m) > 0) b = m; else a = m; }
+        return b;
+      }
+    }
+    return null;
+  }
+  // The same on the 8 m grid alone (`coarse.ray`: the digger's aim, what a
+  // scoop's ore counts, docs/specs/27-fine-dig.md).
+  function cray(o, d, maxT) {
+    const ox = +o[0], oy = +o[1], oz = +o[2], dx = +d[0], dy = +d[1], dz = +d[2], step = VS / 2, n = ceil(maxT / step);
+    for (let k = 1; k <= n; k++) {
+      const t = k === n ? maxT : k * step;
+      if (csample(ox + dx * t, oy + dy * t, oz + dz * t) > 0) {
+        let a = (k - 1) * step, b = t;
+        for (let q = 0; q < 8; q++) { const m = (a + b) / 2; if (csample(ox + dx * m, oy + dy * m, oz + dz * m) > 0) b = m; else a = m; }
         return b;
       }
     }
@@ -120,6 +171,12 @@ function groundApi(G) {
     clampN(floor((p[2] + HALF - r) / VS) - 1, 1, NZ - 1), clampN(ceil((p[2] + HALF + r) / VS) + 1, 1, NZ - 1)];
   function touched(i0, i1, j0, j1, k0, k1) {
     retop(i0, i1, k0, k1);
+    chunks(i0, i1, j0, j1, k0, k1);
+    // A patch reads the 8 m ground too (never rock where it's air): its tops again.
+    const P = G.patches;
+    if (P && P.length) for (const p of P) if (overlaps(p, [i0 - 1, i1 + 1, j0 - 1, j1 + 1, k0 - 1, k1 + 1])) topsOf(p);
+  }
+  function chunks(i0, i1, j0, j1, k0, k1) {
     // A corner is read by the cells on both sides of it: the chunks one corner out rebuild too.
     const c = (v, n) => clampN(floor(v / CS), 0, n - 1);
     for (let cz = c(k0 - 1, CZ); cz <= c(k1 + 1, CZ); cz++) for (let cy = c(j0 - 1, CY); cy <= c(j1 + 1, CY); cy++)
@@ -137,7 +194,7 @@ function groundApi(G) {
     }
     touched(i0, i1, j0, j1, k0, k1);
   }
-  const carve = (p, r) => shape(p, r, (d, dist) => min(d, (dist - r) / DS));
+  const carve = (p, r) => { fine(p, r, CARVE); shape(p, r, (d, dist) => min(d, (dist - r) / DS)); };
   // A blast's dig (spec 18 § Digging in play): soft ground, the top SOFT
   // metres of the ground as built, goes to radius r; the rock band under it
   // only to r × `rock` (battle weapons: half); bedrock not at all. Each corner's
@@ -151,6 +208,7 @@ function groundApi(G) {
     const [i0, i1, j0, j1, k0, k1] = box(p, r);
     if (i0 > i1 || j0 > j1 || k0 > k1) return;
     const base = G.base;
+    fine(p, r, DIG, rock);
     for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
       const soft = base[i + PX * k] - SOFT;
       for (let j = j0; j <= j1; j++) {
@@ -278,6 +336,7 @@ function groundApi(G) {
       if (!low.has(col) || j < low.get(col)) low.set(col, j);
       i0 = min(i0, i); i1 = max(i1, i); j0 = min(j0, j); j1 = max(j1, j); k0 = min(k0, k); k1 = max(k1, k);
     });
+    dropIn([i0 - 1, i1 + 1, 0, j1 + 1, k0 - 1, k1 + 1]);   // a fine patch there settles at once: the 8 m grid says what falls
     for (const o of cells) D[o] = 1;
     let drop = NY;
     for (const [col, j] of low) {
@@ -295,6 +354,7 @@ function groundApi(G) {
   // the confirmed ground's bytes after a fall).
   function copyBox(from, b) {
     const [i0, i1, j0, j1, k0, k1] = b;
+    dropIn(b);
     for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) { const o = cornerIndex(i0, j, k); D.set(from.D.subarray(o, o + i1 - i0 + 1), o); }
     touched(i0, i1, j0, j1, k0, k1);
   }
@@ -305,12 +365,14 @@ function groundApi(G) {
     for (let n = 0; n < D.length; n++) { h ^= D[n]; h = Math.imul(h, 0x01000193); }
     return (h >>> 0).toString(16).padStart(8, '0');
   }
-  const build = (p, r) => shape(p, r, (d, dist) => max(d, (r - dist) / DS));
+  const build = (p, r) => { fine(p, r, BUILD); shape(p, r, (d, dist) => max(d, (r - dist) / DS)); };
   // A pile (the digger's DUMP, docs/specs/21-mining.md § Dirt): a cone of
   // ground `h` high and `r` across its foot, raised column by column off
   // whatever each column's top is, so its height comes out exact on the 8 m
   // grid (a sphere built there spreads wide and low) and piles stack.
   function pile(x, z, h, r) {
+    const t0 = height(x, z);
+    fine([x, t0 + h / 2, z], max(r, h), PILE, h, r);
     const i0 = clampN(floor((x + HALF - r) / VS), 1, NX - 1), i1 = clampN(ceil((x + HALF + r) / VS), 1, NX - 1);
     const k0 = clampN(floor((z + HALF - r) / VS), 1, NZ - 1), k1 = clampN(ceil((z + HALF + r) / VS), 1, NZ - 1);
     let j0 = NY, j1 = 0;
@@ -329,6 +391,7 @@ function groundApi(G) {
   function smooth(p, r) {
     const [i0, i1, j0, j1, k0, k1] = box(p, r);
     if (i0 > i1 || j0 > j1 || k0 > k1) return;
+    dropIn([i0, i1, j0, j1, k0, k1]);
     const w = i1 - i0 + 3, h = j1 - j0 + 3, copy = new Float32Array(w * h * (k1 - k0 + 3));
     const at = (i, j, k) => copy[(i - i0 + 1) + w * ((j - j0 + 1) + h * (k - k0 + 1))];
     for (let k = k0 - 1; k <= k1 + 1; k++) for (let j = j0 - 1; j <= j1 + 1; j++) for (let i = i0 - 1; i <= i1 + 1; i++)
@@ -349,6 +412,7 @@ function groundApi(G) {
     const i0 = clampN(floor((x0 + HALF) / VS) - 1, 1, NX - 1), i1 = clampN(ceil((x1 + HALF) / VS) + 1, 1, NX - 1);
     const k0 = clampN(floor((z0 + HALF) / VS) - 1, 1, NZ - 1), k1 = clampN(ceil((z1 + HALF) / VS) + 1, 1, NZ - 1);
     const j1 = clampN(ceil((top - Y0) / VS) + 2, BEDROCK + 1, NY - 1);
+    dropIn([i0, i1, 0, j1, k0, k1]);
     for (let k = k0; k <= k1; k++) for (let j = BEDROCK + 1; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const x = -HALF + i * VS, y = Y0 + j * VS, z = -HALF + k * VS, o = cornerIndex(i, j, k);
       const side = min(x - x0, x1 - x, z - z0, z1 - z), d = grade === Infinity ? min(top - y, side) : min(top - y, side * grade - y) / Math.hypot(1, grade);
@@ -359,7 +423,150 @@ function groundApi(G) {
   // An editor stroke: [op, x, y, z, r], op 0 carve, 1 build, 2 smooth.
   const stroke = ([op, x, y, z, r]) => (op === 0 ? carve : op === 1 ? build : smooth)([x, y, z], r);
   const mark = b => touched(...b);   // mesh a box of corners again (a heap that has landed)
-  return { sample, height, solid, groundBelow, ray, carve, dig, islands, overhangs, fall, copyBox, mark, build, pile, smooth, block, stroke, retop, hash };
+
+  const CARVE = 0, DIG = 1, BUILD = 2, PILE = 3;   // fine()'s edits
+  // Fine patches (world/finePatch.js, docs/specs/27-fine-dig.md): off until
+  // play starts (a mission's own strokes never make them). `G.patches` holds
+  // them oldest first; sample and height read the newest a point is in.
+  const GRID = { VS, Y0 };
+  const baseAt = (x, z) => {   // the ground as built, between its corner columns (where the soft band ends)
+    const B = G.base || top, gx = clampN((x + HALF) / VS, 0, NX - 1e-4), gz = clampN((z + HALF) / VS, 0, NZ - 1e-4), i = gx | 0, k = gz | 0, u = gx - i, w = gz - k, o = i + PX * k;
+    return (B[o] * (1 - u) + B[o + 1] * u) * (1 - w) + (B[o + PX] * (1 - u) + B[o + PX + 1] * u) * w;
+  };
+  // The coarse corners a patch needs to hold an edit reaching `reach` m from c: its box, the margin round it.
+  const fineBox = (c, reach) => {
+    const m = PATCH.margin;
+    return [clampN(floor((c[0] + HALF - reach) / VS) - m, 0, NX), clampN(ceil((c[0] + HALF + reach) / VS) + m, 0, NX),
+      clampN(floor((c[1] - Y0 - reach) / VS) - m, 0, NY), clampN(ceil((c[1] - Y0 + reach) / VS) + m, 0, NY),
+      clampN(floor((c[2] + HALF - reach) / VS) - m, 0, NZ), clampN(ceil((c[2] + HALF + reach) / VS) + m, 0, NZ)];
+  };
+  // An edit, before the 8 m grid takes it: a patch to hold it (one that does,
+  // one grown to, or a new one read from the ground as it is now), then the
+  // edit into every patch it reaches (editFine) at each fine corner within
+  // reach + 2 fine cells, so the surface between them is the sphere's. `op`
+  // and `a`, `b` say which edit: CARVE (r), DIG (r, rock: a), BUILD (r), PILE
+  // (h: a, foot radius: b). No closures: these loops run over tens of
+  // thousands of corners, and a call through one boxes every number it returns.
+  function fine(c, r, op, a = 0, b2 = 0) {
+    const P = G.patches;
+    if (!P) return;
+    const reach = r + 2 * FS, b = fineBox(c, reach), near = !G.fineNear || hypot(c[0] - G.fineNear[0], c[2] - G.fineNear[1]) < G.fineNear[2];
+    if (near && !P.some(p => contains(p, b))) {
+      const n = P.findIndex(p => overlaps(p, b) && fits(union(p, b)));
+      if (n >= 0) { P[n] = fillPatch(makePatch(GRID, union(P[n], b), P[n])); topsOf(P[n]); chunksOf(P[n]); }
+      else {
+        const p = fillPatch(makePatch(GRID, b));
+        topsOf(p); P.push(p); chunksOf(p);
+        if (P.length > PATCH.max) P.find(q => !q.force).force = true;   // the oldest settles at once (sim/dig.js)
+      }
+    }
+    for (const p of P) if (overlaps(p, b)) editFine(p, c, reach, r, op, a, b2);   // their tops come when the 8 m grid has taken it too (touched)
+    G.rev++;
+  }
+  // A new patch's bytes that `makePatch` didn't keep from the one it grew from: the ground as it reads now.
+  function fillPatch(p) {
+    const K = p.keep, nx = p.nx, ny = p.ny, D2 = p.D;
+    for (let k = 0; k < p.nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      if (K) { const a = i - K[0], b = j - K[1], c = k - K[2], q = K[3]; if (a >= 0 && b >= 0 && c >= 0 && a < q.nx && b < q.ny && c < q.nz) continue; }
+      D2[i + nx * (j + ny * k)] = Q(sample(p.x0 + i * FS, p.y0 + j * FS, p.z0 + k * FS));
+    }
+    p.keep = null;
+    return p;
+  }
+  // One edit into a patch, at each fine corner within `reach` of c, only where
+  // the 8 m grid may change too (not bedrock, not the map's edge). A patch
+  // caught settling keeps the slump so far as its own ground and stops.
+  function editFine(p, c, reach, r, op, a, b2) {
+    if (p.blend > 0) bake(p);
+    const i0 = max(0, floor((c[0] - reach - p.x0) / FS)), i1 = min(p.nx - 1, ceil((c[0] + reach - p.x0) / FS));
+    const j0 = max(0, floor((c[1] - reach - p.y0) / FS)), j1 = min(p.ny - 1, ceil((c[1] + reach - p.y0) / FS));
+    const k0 = max(0, floor((c[2] - reach - p.z0) / FS)), k1 = min(p.nz - 1, ceil((c[2] + reach - p.z0) / FS));
+    const lo = Y0 + BEDROCK * VS, ys = Y0 + (NY - 1) * VS, xs = -HALF + VS, xe = HALF - VS, F = p.D, nx = p.nx, nxy = nx * p.ny;
+    for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
+      const x = p.x0 + i * FS, z = p.z0 + k * FS;
+      if (x < xs || x > xe || z < xs || z > xe) continue;
+      const soft = op === DIG ? baseAt(x, z) - SOFT : 0, dd = hypot(x - c[0], z - c[2]), want = op === PILE && dd < b2 ? height(x, z) + a * (1 - dd / b2) : 0;
+      for (let j = j0; j <= j1; j++) {
+        const y = p.y0 + j * FS;
+        if (y <= lo || y > ys) continue;
+        const o = i + nx * j + nxy * k, d = (F[o] - 128) / 127, dist = hypot(dd, y - c[1]);
+        F[o] = Q(op === CARVE ? min(d, (dist - r) / DS) : op === DIG ? min(d, (dist - (y >= soft ? r : r * a)) / DS)
+          : op === BUILD ? max(d, (r - dist) / DS) : dd < b2 ? max(d, (want - y) / DS) : d);
+      }
+    }
+    p.edits++; p.rev++;
+  }
+  // The slump so far becomes the patch's own bytes; the settle stops.
+  function bake(p) {
+    const F = p.D, nx = p.nx, nxy = nx * p.ny, t = p.blend;
+    for (let k = 0; k < p.nz; k++) for (let j = 0; j < p.ny; j++) for (let i = 0; i < nx; i++) {
+      const x = p.x0 + i * FS, y = p.y0 + j * FS, z = p.z0 + k * FS, o = i + nx * j + nxy * k, c = csample(x, y, z), d = min((F[o] - 128) / 127, c);
+      F[o] = Q(d + (c - d) * t);
+    }
+    p.blend = 0; p.settling = false; p.rev++;
+  }
+  // The bytes the mesher sees (render/ground.js): the ground at each corner as
+  // sample reads it, into `out` if it's the right size (the renderer passes
+  // the last one back to fill again), else a new array.
+  function bytesOf(p, out = null) {
+    if (!out || out.length !== p.D.length) out = new Uint8Array(p.D.length);
+    const F = p.D, nx = p.nx, nxy = nx * p.ny, t = p.blend;
+    for (let k = 0; k < p.nz; k++) for (let j = 0; j < p.ny; j++) for (let i = 0; i < nx; i++) {
+      const o = i + nx * j + nxy * k, c = csample(p.x0 + i * FS, p.y0 + j * FS, p.z0 + k * FS), d = min((F[o] - 128) / 127, c);
+      out[o] = Q(t > 0 ? d + (c - d) * t : d);
+    }
+    return out;
+  }
+  const chunksOf = p => chunks(p.i0, p.i1, p.j0, p.j1, p.k0, p.k1);
+  // A patch's fine column tops again (after an edit, or as it slumps).
+  // Each fine column's top (metres): the highest crossing from rock to air in
+  // the patch as it reads (so a slump shows). Rock at the patch's top: the
+  // ground is higher, and the 8 m tops say where; no rock in it: the same,
+  // lower down.
+  function topsOf(p) {
+    const T = p.top;
+    for (let k = 0; k < p.nz; k++) for (let i = 0; i < p.nx; i++) {
+      const x = p.x0 + i * FS, z = p.z0 + k * FS, ytop = p.y0 + (p.ny - 1) * FS;
+      let t = NaN, above = patchSample(p, x, ytop, z, csample(x, ytop, z));
+      if (above > 0) t = cheight(x, z);
+      else for (let j = p.ny - 2; j >= 0; j--) {
+        const y = p.y0 + j * FS, d = patchSample(p, x, y, z, csample(x, y, z));
+        if (d > 0) { t = y + FS * d / (d - above); break; }
+        above = d;
+      }
+      T[i + p.nx * k] = t === t ? t : min(p.y0, cheight(x, z));
+    }
+  }
+  // Patches in a box of corners go at once (a fall, a copy, the editor's tools): the 8 m grid holds there.
+  function dropIn(b) {
+    const P = G.patches;
+    if (!P || !P.length) return;
+    for (let n = P.length - 1; n >= 0; n--) if (overlaps(P[n], b)) dropPatch(P[n]);
+  }
+  function dropPatch(p) {
+    const P = G.patches, n = P ? P.indexOf(p) : -1;
+    if (n < 0) return;
+    P.splice(n, 1); chunksOf(p); G.rev++;
+  }
+  // Play starts: fine patches from now on. `fineNear` [x, z, r] (sim/dig.js
+  // keeps it at you): edits further off make no new patch, as nobody would see it.
+  const fineOn = () => { G.patches ||= []; };
+  // What the coarse mesher skips in a block of corners from (i0, j0, k0): each
+  // patch's inside (all but its outer ring), in the block's own corners, as
+  // [i0, i1, j0, j1, k0, k1]. The patch's own mesh draws it (render/ground.js).
+  function skipIn(i0, j0, k0, dims) {
+    const P = G.patches, out = [];
+    if (!P) return out;
+    for (const p of P) {
+      const s = [p.i0 + 1 - i0, p.i1 - 1 - i0, p.j0 + 1 - j0, p.j1 - 1 - j0, p.k0 + 1 - k0, p.k1 - 1 - k0];
+      if (s[1] >= 0 && s[3] >= 0 && s[5] >= 0 && s[0] < dims[0] && s[2] < dims[1] && s[4] < dims[2]) out.push(s);
+    }
+    return out;
+  }
+  // The 8 m grid's ground alone, under any fine patch: what the AI walks by
+  // (sim/ai/nav.js), so a scoop's round pits never read as drops or walls.
+  const coarse = { D, top, sample: csample, height: cheight, solid: (x, y, z) => csample(x, y, z) > 0, groundBelow: cgroundBelow, ray: cray };
+  return { coarse, sample, csample, height, cheight, solid, groundBelow, ray, carve, dig, islands, overhangs, fall, copyBox, mark, build, pile, smooth, block, stroke, retop, hash, fineOn, dropPatch, topsOf, skipIn, bytesOf, inPatch };
 }
 
 // A landmark, as a distance shape laid onto the ground: positive inside rock.
@@ -424,7 +631,7 @@ function pockets(ground, seed) {
 
 // A second ground with the same bytes (the net's confirmed ground, sim/dig.js).
 export function cloneGround(g) {
-  const c = { D: g.D.slice(), top: g.top.slice(), base: g.base, seed: g.seed, flat: g.flat, dirty: new Set(), rev: 0 };
+  const c = { D: g.D.slice(), top: g.top.slice(), base: g.base, seed: g.seed, flat: g.flat, dirty: new Set(), rev: 0, patches: null, fineNear: null };
   return Object.assign(c, groundApi(c));
 }
 

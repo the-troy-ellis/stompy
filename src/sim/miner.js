@@ -63,7 +63,7 @@ export function mine(G, m, dt) {
     if (!m.dryScoops) a.aim = a.dry = 0;   // it dug
     else if (m.dryScoops % TOOL.dig.dry === 0 && (a.aim = (a.aim || 0) + 1) >= AIMS.length) {   // dry, and every way round the hole tried: the face has moved back, so after it, unless that is down a hole
       const x = s.x + sin(s.yaw) * MINER.follow, z = s.z + cos(s.yaw) * MINER.follow;
-      if ((a.dry = (a.dry || 0) + 1) > MINER.moves || G.ter.groundBelow(x, s.y + 4, z) < s.y - MINER.deep) { m.site = null; m.job = null; return halt(m, dt); }   // dug out, or nothing in reach: it stops
+      if ((a.dry = (a.dry || 0) + 1) > MINER.moves || G.ter.coarse.groundBelow(x, s.y + 4, z) < s.y - MINER.deep) { m.site = null; m.job = null; return halt(m, dt); }   // dug out, or nothing in reach: it stops (the 8 m ground: a fine scoop's pit isn't a hole, docs/specs/27-fine-dig.md)
       a.aim = 0; s.x = x; s.z = z;
     }
   }

@@ -113,7 +113,10 @@ export function makeNav(ter) {
 }
 
 // The nav for this match's ground, made at first use.
-export const navOf = G => (G.nav && G.nav.ter === G.ter ? G.nav : (G.nav = makeNav(G.ter)));
+// The AI walks by the 8 m ground (world/voxels.js `coarse`): a fine patch's
+// round pits (docs/specs/27-fine-dig.md) aren't drops or walls to it.
+const walkGround = ter => ter.coarse || ter;
+export const navOf = G => (G.nav && G.nav.of === G.ter ? G.nav : (G.nav = { ...makeNav(walkGround(G.ter)), of: G.ter }));
 
 // Whether a mech at (x, y, z) can walk the straight line to (x1, z1), the
 // first `reach` metres of it: stepped as the nav's links are.
@@ -135,7 +138,7 @@ export const ROUTE_EVERY = 3, ROUTE_NEAR = 14;
 export function routeYaw(G, e, x, y, z) {
   const a = e.ai, r = a.route;
   if (!r || G.time - r.t > ROUTE_EVERY || hypot(r.x - x, r.z - z) > 40) {
-    const open = walkable(G.ter, e.x, e.y, e.z, x, z, 160);
+    const open = walkable(walkGround(G.ter), e.x, e.y, e.z, x, z, 160);
     a.route = { t: G.time, x, z, pts: open ? null : navOf(G).path(e.x, e.y, e.z, x, y, z) };
   }
   const pts = a.route.pts;
@@ -157,4 +160,4 @@ export function feelers(G, e, yaw) {
   }
   return yaw;
 }
-function feelOpen(G, e, t) { return walkable(G.ter, e.x, e.y, e.z, e.x + Math.sin(t) * FEEL_M, e.z + Math.cos(t) * FEEL_M); }
+function feelOpen(G, e, t) { return walkable(walkGround(G.ter), e.x, e.y, e.z, e.x + Math.sin(t) * FEEL_M, e.z + Math.cos(t) * FEEL_M); }

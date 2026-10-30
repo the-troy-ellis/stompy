@@ -32,7 +32,11 @@ export const groundUnder = (G, m, x = m.x, z = m.z) => G.ter.groundBelow(x, m.y 
 // returns a boxed number (scripts/perf.mjs counts the garbage).
 export const CAB_CLEAR = 0.8;   // m in front of the eye that stay clear: the near plane (0.5 m) and its corners
 export function rockAt(G, m, x, z, dx, dz) {
-  const g = geoOf(m), s = m.ch.scale, ter = G.ter, y = m.y, R = g.radius * s;
+  const g = geoOf(m), s = m.ch.scale, ter = G.ter, R = g.radius * s;
+  // In a fine patch's pit (docs/specs/27-fine-dig.md) the body is weighed from
+  // the 8 m ground over it, not the pit's floor: a pit is never a wall, and a
+  // mech climbs out of one step by step wherever the 8 m ground lets it walk.
+  const y = ter.patches?.length ? max(m.y, ter.coarse.groundBelow(x, m.y + g.height * s * 0.9, z, m.y)) : m.y;
   const body = max(ter.sample(x, y + STEP * s, z), ter.sample(x + dx * R, y + g.torsoY * s, z + dz * R), ter.sample(x, y + g.height * s * 0.95, z));
   if (m !== G.player) return body;
   const a = m.yaw + (m.twist || 0), f = g.eye[2] * s + CAB_CLEAR;

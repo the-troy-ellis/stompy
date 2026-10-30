@@ -53,7 +53,9 @@ test('the FUSION button is DUMP for a digger: one mound a press, however long it
 });
 
 test('a pile is about one bite\'s hole of ground, and rock bites give dirt too', async () => {
-  const G = digger(), P = G.player, ter = G.ter;
+  // On the 8 m ground: the dirt is counted on it, and a fine patch's round
+  // bites (docs/specs/27-fine-dig.md) settle back into it.
+  const G = digger(), P = G.player, ter = G.ter.coarse;
   const vol = (cx, cz, half, y0, y1) => { let v = 0; for (let x = cx - half; x <= cx + half; x += 1) for (let z = cz - half; z <= cz + half; z += 1) for (let y = y0; y <= y1; y += 1) if (ter.solid(x, y, z)) v++; return v; };
   const h = ter.height(60, 60), b0 = vol(60, 60, 12, h - 16, h + 6);
   bite(G, P, [60, h - CONSTRUCT.bucket * 0.5, 60]);
