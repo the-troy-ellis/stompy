@@ -275,3 +275,63 @@ The owner, 2026-10-29: "Lets do 2m, 15s, include craters, and a slow slump".
 - **Craters:** yes. Missile, shell and fusion craters get fine patches, as
   scoops do.
 - **The settle's look:** the slow slump: 1.5 s, with dust and a low rumble.
+
+## As built
+
+### Part 1: fine patches, the settle, and the worker
+
+Part 1 took in most of part 2 (the worker, re-mesh pacing, the perf bench):
+`npm run perf` runs in CI, and drawing patches on the main thread spiked
+frames to 90 ms and blew the garbage budgets.
+
+- **`world/finePatch.js`** holds a patch's layout and its two hot reads:
+  `patchSample` and `patchHeight`. The loops over a patch's corners (filling a
+  new one, edits, baking a slump, the mesher's bytes) live in
+  `world/voxels.js`, which calls the ground directly. A call through a
+  variable can't be inlined, so every number it returned was boxed; on these
+  loops (tens of thousands of corners) and on `sample` that was most of the
+  garbage. For the same reason the 8 m ground's `groundBelow` and `ray` are
+  their own copies (`ground.coarse`), and `sample` and `height` stay small
+  enough to inline, handing patches to `finer` and `finerTop`.
+- **The fine ground is the 8 m ground with round bites out of it**
+  (§ Reading the ground): `patchSample` takes the smaller of its own corners
+  and the 8 m ground, live. Digs give the same patch in any order. A patch
+  that *grows* reads the new part from the ground as it is then, so a dig it
+  didn't yet hold is only there as the 8 m ground has it.
+- **Edits** go into the patches first (a patch must be read before the 8 m
+  grid is carved), then the 8 m grid. Falls, copies (the net's confirmed
+  ground), the editor's smooth and the tests' blocks drop the patches they
+  touch.
+- **No patch is born more than `FINE_DIG.far` (160 m) from you**, and one that
+  far off goes at once: nobody would see it, and crater-heavy fights were
+  making patches everywhere (sim/dig.js keeps `ground.fineNear` at you).
+- **The margin** is one coarse cell round an edit's reach, as specced (the
+  first cut had two, so patches were half as big again).
+- **The digger, the miner and the AI** read the 8 m ground: the digger aims
+  from the bucket's height over where it would stand on it (`STEP`, as it
+  walks); a parked digger's "is the next spot down a hole?" check; routes,
+  feelers and `walkable`. Tuned against the old tests: the 80-seed ore pace
+  (its 8 m standoff now measured to the 8 m face the bucket aims at) and the
+  parked digger filling up on seeds 4 to 7 (241, 154, 91, 91 s against 232,
+  234, 91, 91 on main).
+- **Climbing out:** `rockAt` weighs a mech's body from the higher of its feet
+  and the 8 m ground under it. A bite deeper than a step was a trap: the
+  parked digger couldn't walk its ore to the silo.
+- **The settle** (`stepFinePatches`): no held columns. A slump only fills
+  bites in, so a mech standing in one is lifted out. Re-meshed 5 times a
+  second while it slumps (10 while dug).
+- **Drawing** (`render/ground.js`): patches mesh in the ground worker, their
+  byte and top arrays passed there and back and reused. They're drawn 0.15 m
+  low, so where a patch's outer ring overlaps the coarse ground, the coarse
+  one shows and nothing flickers. A patch past `LOD_AT` isn't re-meshed. One
+  that goes stays drawn until the chunks round it have been meshed again.
+- **Perf** (`scripts/perf.mjs`): with no patch, the numbers are main's. The
+  scenes that dig pay for it, and their budgets moved with the numbers
+  recorded beside main's (dig 20/21 draws 46.7k tris 122 KB against main's
+  15/16 38.7k 61 KB; deaths 295 KB against 165). The garbage is the patches'
+  own arrays and the chunks round a patch meshed again as it's born, grows
+  and goes.
+- **Not yet:**
+  - online (part 3): each client builds its own patches already, but no
+    two-client test;
+  - a smoke run that digs and settles in the browser.
