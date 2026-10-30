@@ -510,6 +510,27 @@ frame, about 40 ground samples. Nothing else measurable.
   for the last second or so. It still lands (the auto-steer has it), but you
   watch it on faith. Open questions: tip the view further with a lock.
 
+### After part 3: the view follows the lock
+
+- On the range, the target dropped out of sight under you for the last
+  second of a locked flight. The owner: "Go ahead and implement the camera
+  change".
+- `render/scene.js` `flightTilt`: with a lock in flight, the view's tilt is
+  the larger of part 2's height tilt and what it takes to put the target in
+  the middle of the windscreen:
+  - that's the angle down to the target's centre, plus the torso's own
+    pitch, plus `WINDOW_MID` (0.12 rad: the dash covers the bottom of the
+    screen, so the windscreen's middle sits that far above the screen's);
+  - it's capped at `JETS_FLIGHT.lockTilt`, 1.1 rad (about 63°), and eased as
+    before.
+- Only the view moves: the guns still aim where the torso points, and
+  without a lock it's part 2's tilt.
+- **Seen on the range** (a JACKAL standing 55 m off, a full charge):
+  - on the climb and most of the way down, the target, its red diamond and
+    the red ring stay mid-windscreen;
+  - in the last fraction of a second, about 5 m out, the cap is reached and
+    it sits at the bottom edge as you hit.
+
 ## Open questions
 
 - **The AI and the insta-stomp.** Default: foes never aim blast-offs at you,
@@ -524,10 +545,9 @@ frame, about 40 ground samples. Nothing else measurable.
   tuned headless: enough to stick a slow foe, not a quick one that dodges
   late (see As built, part 3). Hands-on play may move them, as a balance
   issue.
-- **Seeing the target on the way down.** Default: the view tips 17°, as
-  now, and the target drops out of sight under you near the end. Option:
-  with a lock, tip further as you come down (to about 45°), or pull the view
-  toward the target. Only the view would move, never the guns.
+- ~~**Seeing the target on the way down.**~~ Decided by the owner,
+  2026-10-29: "Go ahead and implement the camera change". With a lock, the
+  view tips down to keep the target in sight (As built, after part 3).
 - **A dive.** An option for later: at the top, tap JUMP again to cut the
   flight short and slam straight down on the lock. It's quicker, so harder
   to dodge, but a smaller stomp. Not in this spec.
