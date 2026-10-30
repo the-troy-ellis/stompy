@@ -84,7 +84,10 @@ function groundApi(G) {
   function height(x, z) {
     const P = G.patches;
     if (P && P.length) for (let n = P.length - 1; n >= 0; n--) if (overXZ(P[n], x, z)) return patchHeight(P[n], x, z);
-    return cheight(x, z);
+    // cheight's body, not a call (as in sample): a hot path.
+    const gx = clampN((x + HALF) / VS, 0, NX - 1e-4), gz = clampN((z + HALF) / VS, 0, NZ - 1e-4);
+    const i = gx | 0, k = gz | 0, u = gx - i, w = gz - k, o = i + PX * k;
+    return (top[o] * (1 - u) + top[o + 1] * u) * (1 - w) + (top[o + PX] * (1 - u) + top[o + PX + 1] * u) * w;
   }
   // The 8 m grid's top surface, blended between the four corner columns.
   // The mesh (mesher.js) is the same surface, smoothed: the two agree within
@@ -98,9 +101,7 @@ function groundApi(G) {
   // The first surface going down from y (what a foot under an overhang
   // stands on), or `lo` if there is none above it. Above the top surface the
   // march starts just over it, so the open ground costs a few samples.
-  // `coarse`: the 8 m grid's, under any fine patch (docs/specs/27-fine-dig.md).
-  function groundBelow(x, y, z, lo = Y0, coarse = false) {
-    if (coarse) return cgroundBelow(x, y, z, lo);
+  function groundBelow(x, y, z, lo = Y0) {
     if (sample(x, y, z) > 0) return y;
     const step = VS / 4, h = height(x, z);
     let yy = y - step;
@@ -114,8 +115,9 @@ function groundApi(G) {
     }
     return lo;
   }
-  // The same on the 8 m grid alone: its own copy, so neither one's calls go
-  // through a variable (that would box every number they return).
+  // The same on the 8 m grid alone, under any fine patch (docs/specs/27-fine-dig.md;
+  // `coarse.groundBelow`): its own copy, so neither one grows a branch or
+  // calls through a variable (either can box every number it returns).
   function cgroundBelow(x, y, z, lo = Y0) {
     if (csample(x, y, z) > 0) return y;
     const step = VS / 4, h = cheight(x, z);
@@ -132,10 +134,7 @@ function groundApi(G) {
   }
   // Where a ray first meets rock (distance along d), or null. The arrays are
   // read once into plain numbers: shots and sight lines run this all frame.
-  // `coarse`: the 8 m grid's rock, under any fine patch (the digger's aim:
-  // what a scoop's ore counts, docs/specs/27-fine-dig.md).
-  function ray(o, d, maxT, coarse = false) {
-    if (coarse) return cray(o, d, maxT);
+  function ray(o, d, maxT) {
     const ox = +o[0], oy = +o[1], oz = +o[2], dx = +d[0], dy = +d[1], dz = +d[2], step = VS / 2, n = ceil(maxT / step);
     for (let k = 1; k <= n; k++) {
       const t = k === n ? maxT : k * step;
@@ -147,6 +146,8 @@ function groundApi(G) {
     }
     return null;
   }
+  // The same on the 8 m grid alone (`coarse.ray`: the digger's aim, what a
+  // scoop's ore counts, docs/specs/27-fine-dig.md).
   function cray(o, d, maxT) {
     const ox = +o[0], oy = +o[1], oz = +o[2], dx = +d[0], dy = +d[1], dz = +d[2], step = VS / 2, n = ceil(maxT / step);
     for (let k = 1; k <= n; k++) {

@@ -36,7 +36,7 @@ export function rockAt(G, m, x, z, dx, dz) {
   // In a fine patch's pit (docs/specs/27-fine-dig.md) the body is weighed from
   // the 8 m ground over it, not the pit's floor: a pit is never a wall, and a
   // mech climbs out of one step by step wherever the 8 m ground lets it walk.
-  const y = ter.patches?.length ? max(m.y, ter.groundBelow(x, m.y + g.height * s * 0.9, z, m.y, true)) : m.y;
+  const y = ter.patches?.length ? max(m.y, ter.coarse.groundBelow(x, m.y + g.height * s * 0.9, z, m.y)) : m.y;
   const body = max(ter.sample(x, y + STEP * s, z), ter.sample(x + dx * R, y + g.torsoY * s, z + dz * R), ter.sample(x, y + g.height * s * 0.95, z));
   if (m !== G.player) return body;
   const a = m.yaw + (m.twist || 0), f = g.eye[2] * s + CAB_CLEAR;

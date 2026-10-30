@@ -125,13 +125,13 @@ export function aimGround(G, m) {
   // is the punch's as before. The fine ground is that ground with the scoops' round bites out
   // of it (world/finePatch.js patchSample), so the bites land on the face you see.
   const T = TOOL.dig, s = m.ch.scale, yaw = viewYaw(m), reach = T.reach * s;
-  const o = [m.x, Math.max(m.y, G.ter.groundBelow(m.x, m.y + STEP * s, m.z, m.y - 4 * s, true)) + 4 * s, m.z];
+  const o = [m.x, Math.max(m.y, G.ter.coarse.groundBelow(m.x, m.y + STEP * s, m.z, m.y - 4 * s)) + 4 * s, m.z];
   let t = null;
   AIM.o = o;
   for (let i = 0; i < TILT.length; i++) { const down = (m.pitch || 0) + TILT[i]; AIM.d[i] = [sin(yaw) * cos(down), sin(down), cos(yaw) * cos(down)]; }
   for (let i = 0; i < (m.parked ? 1 : TILT.length) && t == null; i++) {
     DIR[0] = AIM.d[i][0]; DIR[1] = AIM.d[i][1]; DIR[2] = AIM.d[i][2];
-    t = G.ter.ray(o, DIR, reach, true);
+    t = G.ter.coarse.ray(o, DIR, reach);
     AIM.hit = i;
   }
   if (t == null) return null;

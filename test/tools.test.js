@@ -109,7 +109,7 @@ test('held DIG at a face brings ore in at the old punch\'s pace (80 seeds)', () 
     const G = game('mesa', seed), D = atMesa(G);
     D.ch = { ...D.ch, hopper: 1e9 };
     for (let i = 0; i < 30 / DT; i++) {
-      if (i % 30 === 0) { const t = G.ter.ray([D.x, D.y + 4 * D.ch.scale, D.z], [0, 0, 1], 60, true); if (t != null && Math.abs(t - 8) > 1) shiftMech(D, 0, t - 8); }
+      if (i % 30 === 0) { const t = G.ter.coarse.ray([D.x, D.y + 4 * D.ch.scale, D.z], [0, 0, 1], 60); if (t != null && Math.abs(t - 8) > 1) shiftMech(D, 0, t - 8); }
       update(G, { ...noInput(), ...DIG }, DT);
       ore += D.ore || 0; D.ore = 0; D.dirt = 0; D.heat = 0;
     }
