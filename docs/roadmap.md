@@ -332,6 +332,10 @@ the pour.
   ready): the voxel ground goes from 8 m cells to 4 m, so craters and bites
   stay round and a fine patch settles into ground only twice as coarse.
   Ore, dirt, falls and the dig's pace rescaled to stay as today.
+- **The builder** ([specs/31-builder.md](specs/31-builder.md)): sites are
+  placed only from the command view, and a new crane mech builds them,
+  slamming pieces in one by one; diggers only dig. In two parts: the
+  builder and its loop; its look and feel.
 - **Digging up, and arms you can see** ([specs/30-dig-up.md](specs/30-dig-up.md)):
   a scoop aimed up cuts a ramp to climb out of a pit, a parked digger does
   the same when stuck, and from the cockpit you see the digger's arms.
