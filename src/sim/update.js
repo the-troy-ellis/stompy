@@ -1,6 +1,6 @@
 import { cheat } from './cheats.js';
 import { swap } from './crew.js';
-import { buildTrigger, stepBase, pickNext } from './base.js';
+import { stepBase } from './base.js';
 import { stepSalvage } from './raid.js';
 import { blendPal } from '../data/palettes.js';
 import { tickWeather } from './weather.js';
@@ -107,21 +107,18 @@ export function update(G, input, dt) {
   const live = P.alive && !G.paused && !G.roundOver;
   if (live && input.punch) meleePress(G, P);
   G.punchReady = live && !P.melee && !P.ch.tool && !!meleeTarget(G, P);   // the HUD's fist by the crosshair lights up
-  G.digReady = live && P.ch.tool === 'dig' && !!(siteInReach(G, P) || aimGround(G, P));   // a digger's DIG there instead (sim/tools.js)
+  G.digReady = live && (P.ch.tool === 'dig' ? !!aimGround(G, P) : P.ch.tool === 'build' && !!siteInReach(G, P));   // a digger's DIG or a builder's BUILD there (sim/tools.js)
   const armed = live && !P.melee;   // no guns during a swing or its recovery
   P.beamOn = armed && input.held.energy && !G.guide;
   fusionTick(G, P, dt, armed && input.held.fusion && !G.guide);
   if (armed && input.held.energy && !G.guide) fireCat(G, 'energy');   // energy weapons that are not beams (bolts); beams skip themselves
   if (armed && input.held.ballistic) fireCat(G, 'ballistic');
   if (P.ch.tool) {
-    P.toolHold = armed && input.held.energy;   // its energy button is its tool: DIG, held (sim/tools.js, docs/specs/25-hold-to-dig.md)
-    buildTrigger(G, P, armed && input.held.missile);   // a digger's missile button is BUILD (sim/base.js)
-    const tip = armed && input.held.fusion;   // its fusion button is DUMP, once a press (sim/dig.js)
+    P.toolHold = armed && input.held.energy;   // its energy button is its tool, held: DIG or BUILD (sim/tools.js, docs/specs/25-hold-to-dig.md, 31-builder.md)
+    const tip = armed && input.held.fusion && P.ch.tool === 'dig';   // a digger's fusion button is DUMP, once a press (sim/dig.js)
     if (tip && !G.dumpHeld) dump(G, P);
     G.dumpHeld = tip;
-    const pick = armed && input.held.ballistic;   // its ballistic button picks what BUILD puts down (sim/base.js)
-    if (pick && !G.pickHeld) pickNext(G);
-    G.pickHeld = pick;
+    // No cockpit places a site: the command view does (docs/specs/31-builder.md).
   }
   else missileTrigger(G, armed && (input.held.missile || input.missileTap));
   if (G.guide) steerVolley(G, dt);

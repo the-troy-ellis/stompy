@@ -13,12 +13,13 @@ import { shiftMech } from '../src/sim/walkView.js';
 
 const DT = 1 / 60;
 // You in a KESTREL, up in the command view; a digger and a hauler parked. On the mesa range unless `flat`.
-const game = (flat = false) => {
+const game = (flat = false, builder = false) => {
   const G = createGame({ fx: recordFx(), seed: 4 }), def = rangeDef({ ground: flat ? 'flat' : 'mesa', crew: 'digger', base: 'silo' });
   def.crew.push({ type: 'hauler', at: [-90, 30], face: 0 });
+  if (builder) def.crew.push({ type: 'builder', at: [180, 40], face: 0 });
   startMatch(G, def, 4, false, 'kestrel', flat ? { terrainOpts: { flat: true } } : {});
   commandUp(G);
-  return { G, you: G.player, d: G.crew.find(m => m.type === 'digger'), h: G.crew.find(m => m.type === 'hauler') };
+  return { G, you: G.player, d: G.crew.find(m => m.type === 'digger'), h: G.crew.find(m => m.type === 'hauler'), b: G.crew.find(m => m.type === 'builder') };
 };
 const run = (G, s, until = () => false) => { for (let i = 0; i < s / DT && !until(); i++) update(G, noInput(), DT); };
 const said = G => G.fx.calls('say').map(c => c.args[0]);
@@ -101,18 +102,17 @@ test('the mech you drive ignores its order until you leave it', () => {
   assert.ok(Math.abs(d.x - x) < 0.5 && d.order.kind === 'go', 'kept, not obeyed');
 });
 
-test('BUILD: a digger told to build a site goes and builds it, even off its dig; not a non-site', async () => {
+test('BUILD: a builder told to build a site goes and builds it; not a non-site; not a digger (docs/specs/31-builder.md)', async () => {
   const { footprintAt, placeSite } = await import('../src/sim/base.js');
-  const { G, d, h, you } = game(true);
-  d.site = { x: d.x, y: d.y, z: d.z + 40, yaw: 0, pitch: 0, t: 0 };
+  const { G, d, h, you, b } = game(true, true);
   Object.assign(h, { x: 900, z: 900 });   // out of it: no fetching
-  const s = placeSite(G, footprintAt(G, d.x - 70, d.z - 50, 0, 'bay'));
-  assert.equal(give(G, [d], { kind: 'build', target: G.base.silo }), 0, 'the silo is not a site');
-  assert.equal(give(G, [you, d], { kind: 'build', target: s.parts[0] }), 1, 'diggers only');
+  const s = placeSite(G, footprintAt(G, b.x - 70, b.z - 50, 0, 'bay'));
+  assert.equal(give(G, [b], { kind: 'build', target: G.base.silo }), 0, 'the silo is not a site');
+  assert.equal(give(G, [you, d, b], { kind: 'build', target: s.parts[0] }), 1, 'builders only');
   assert.ok(said(G).includes(SAY.build));
   s.ore = s.need;
-  run(G, 90, () => !d.order);
-  assert.equal(d.order, null, 'done: the order ends');
+  run(G, 90, () => !b.order);
+  assert.equal(b.order, null, 'done: the order ends');
   assert.equal(s.parts[0].prog, 1);
 });
 

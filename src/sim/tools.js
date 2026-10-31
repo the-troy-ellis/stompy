@@ -3,7 +3,7 @@ import { wrapA } from '../util/math.js';
 import { viewYaw } from './geom.js';
 import { STEP } from './mech.js';
 import { bite } from './dig.js';
-import { buildSwing } from './base.js';
+import { buildSwing, siteDone } from './base.js';
 import { feel } from './feel.js';
 import { FEEL, HIT_STOP } from '../data/feel.js';
 import { particle, msg, spawnClods } from './effects.js';
@@ -23,7 +23,45 @@ const TAU = 2 * PI;
 
 export function stepTool(G, m, dt) {
   if (m.ch.tool === 'dig') spinArms(G, m, dt);
+  else if (m.ch.tool === 'build') swingCrane(G, m, dt);
 }
+
+// BUILD (docs/specs/31-builder.md): held, the crane swings, one swing every
+// TOOL.build.swing s (`m.crane.t`, through it); each swing's end slams a piece
+// into a construction site in reach and in front (base.js buildSwing). Let go
+// and the swing in hand finishes, the hook back down.
+function swingCrane(G, m, dt) {
+  const T = TOOL.build, s = (m.crane ||= { t: 0 }), held = !!m.toolHold && m.alive && !m.shutdown;
+  if (!held && s.t === 0) return;
+  s.t += dt;
+  if (s.t < T.swing) return;
+  s.t = held ? s.t - T.swing : 0;
+  if (held) slam(G, m);
+}
+// One piece: the site in reach gets a swing of work if its ore pays for it
+// (else NEEDS ORE, base.js). Pieces in a row at one site build up, as a dig
+// run does (spec 28): each a little harder and lower; the last a landing's thump.
+function slam(G, m) {
+  m.heat += TOOL.build.heat;
+  const e = siteInReach(G, m), at = m === G.player ? null : e ? [e.x, e.y, e.z] : null;
+  if (!e) {
+    if (m === G.player) msg(G, 'NOTHING TO BUILD', '#fc3');
+    feel(G, 'whiff', { mech: m });
+    return;
+  }
+  const site = e.site;
+  if (!buildSwing(G, m, e, true)) { feel(G, 'whiff', { mech: m }); m.buildRun = null; return; }
+  const run = m.buildRun && m.buildRun.site === site ? m.buildRun : (m.buildRun = { site, k: 0 });
+  run.k++;
+  const done = siteDone(site), into = min(1, (run.k - 1) / 5);
+  feel(G, done ? 'built' : 'slam', { mech: m, k: done ? 1 : 0.6 + 0.4 * into, at });
+  if (done) G.fx.sfx.built(at); else G.fx.sfx.slam(at, into);
+  const p = [e.x, e.y + (e.height || 2), e.z], n = done ? 18 : 6;
+  for (let i = 0; i < n; i++) particle(G, [p[0] + G.rng.range(-3, 3), p[1], p[2] + G.rng.range(-3, 3)], [G.rng.range(-3, 3), G.rng.range(1, 4), G.rng.range(-3, 3)], G.rng.range(0.8, 1.6), G.rng.range(0.8, 1.6), G.pal.low, 'dust');
+}
+// The crane's swing as the arms' angle forward of hanging down (render/scene.js):
+// up and over through the swing, and down hard at its end (the slam).
+const craneAngle = m => { const u = (m.crane?.t || 0) / TOOL.build.swing; return u < 0.75 ? 1.9 * u / 0.75 : 1.9 * (1 - (u - 0.75) / 0.25); };
 
 // The arms' spin, each arm's angle kept in [0, a turn), 0 hanging down at
 // rest. The left arm leads; the right starts as the left passes half a turn,
@@ -52,7 +90,8 @@ function spinArms(G, m, dt) {
 // The shoulder angle the renderer gives each arm, forward of hanging down
 // (render/scene.js): null when the arms aren't spinning a tool.
 // An arm that bit rock lags a little behind its spin (`hL`, `hR`), drawn only.
-export const spinPose = m => (m.spin && m.ch.tool === 'dig' ? { LA: m.spin.L - (m.spin.hL || 0), RA: m.spin.R - (m.spin.hR || 0) } : null);
+export const spinPose = m => (m.spin && m.ch.tool === 'dig' ? { LA: m.spin.L - (m.spin.hL || 0), RA: m.spin.R - (m.spin.hR || 0) }
+  : m.ch.tool === 'build' ? { LA: craneAngle(m), RA: craneAngle(m) } : null);   // the builder's crane: both arms through a swing
 
 // One bucket's scoop (`arm`, 'L' or 'R'): one of your own sites in reach gets
 // its work, else the ground the aim finds is bitten. Felt either way, by what
@@ -62,9 +101,7 @@ export function scoop(G, m, arm = 'L') {
   const T = TOOL.dig;
   m.scoops = (m.scoops || 0) + 1;
   m.heat += T.heat;
-  const e = siteInReach(G, m);
-  if (e) return scoopSite(G, m, e);
-  const p = runPoint(G, m);
+  const p = runPoint(G, m);   // a digger digs; it doesn't build (builders do, docs/specs/31-builder.md)
   m.biteCorners = 0;
   if (!p) {
     m.dryScoops = (m.dryScoops || 0) + 1;
@@ -220,14 +257,3 @@ export function siteInReach(G, m) {
 }
 export const siteReach = m => REACH * m.ch.scale;   // how near a digger stands to build (sim/miner.js)
 
-// A scoop at a site: TOOL.dig.perSwing of them make one swing of work, the
-// punch's pace (base.js buildSwing says BUILDING or NEEDS ORE).
-function scoopSite(G, m, e) {
-  const s = e.site, dx = e.x - m.x, dz = e.z - m.z, hd = hypot(dx, dz) || 1, p = [e.x - dx / hd * e.radius, e.y + 1, e.z - dz / hd * e.radius];
-  s.scoops = (s.scoops || 0) + 1;
-  const built = buildSwing(G, m, e, s.scoops >= TOOL.dig.perSwing);
-  if (s.scoops >= TOOL.dig.perSwing && built) s.scoops = 0;
-  feel(G, built ? 'scoop' : 'whiff', { mech: m, k: 0.8, at: m === G.player ? null : p });
-  G.fx.sfx.scoop(m === G.player ? null : p, false);
-  if (built) for (let i = 0; i < 4; i++) particle(G, [p[0] + G.rng.range(-2, 2), p[1], p[2] + G.rng.range(-2, 2)], [G.rng.range(-3, 3), G.rng.range(2, 5), G.rng.range(-3, 3)], G.rng.range(0.8, 1.4), G.rng.range(0.6, 1.2), G.pal.low, 'dust');
-}

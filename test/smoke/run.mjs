@@ -235,7 +235,7 @@ try {
     console.log(`crew: ${first[1]} in the crew; in ${first[0]}, Q -> the other ${second[0]} (the first parked ${second[1]}), Q -> back ${third}`);
     if (first[1] !== 2 || !second[0] || !second[1] || !third) { failed = true; console.error(`FAIL: SWAP (${first}, ${second}, ${third})`); }
   });
-  // The base (spec 20, #309): the digger, a silo; BUILD held then let go puts the factory up.
+  // The base (spec 20, #309): the digger, a silo; its MISSILE button (BUILD once) places nothing: sites come from the map (spec 31).
   await run('base', URL_, async page => {
     for (let i = 0; i < 8 && (await page.evaluate(() => window.__stompy.app.prefs.chassis)) !== 'digger'; i++) await page.click('[data-mech="1"]');
     await page.click('[data-sel="debug"]'); await page.click('[data-dsec="range"]');
@@ -245,13 +245,11 @@ try {
     await page.waitForFunction(() => window.__stompy.game.kind === 'range' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
     await page.evaluate(() => { const G = window.__stompy.game; G.base.ore = 100; G.player.yaw = Math.PI; G.player.twist = 0; });
     await page.keyboard.down('Space'); await page.waitForTimeout(400);
-    const preview = await page.evaluate(() => window.__stompy.game.buildAt && window.__stompy.game.buildAt.why);
     await page.keyboard.up('Space'); await page.waitForTimeout(500);
-    // What goes down is a site (spec 23): nothing paid, nothing rising on its own.
-    const r = await page.evaluate(() => { const b = window.__stompy.game.base; return { silo: b.silo.alive, ore: b.ore, sites: b.sites.length, site: !!b.factory?.site, prog: b.factory?.prog }; });
+    const r = await page.evaluate(() => { const b = window.__stompy.game.base; return { silo: b.silo.alive, ore: b.ore, sites: b.sites.length }; });
     await page.screenshot({ path: 'test-results/smoke-base.png' });
-    console.log(`base: silo up ${r.silo}; BUILD showed the footprint (why ${preview}); a factory site ${r.site} (${r.sites}), prog ${r.prog}, ore left ${r.ore}`);
-    if (!r.silo || preview !== null || !r.site || r.sites !== 1 || r.prog !== 0 || r.ore !== 100) { failed = true; console.error(`FAIL: the base (${preview}, ${JSON.stringify(r)})`); }
+    console.log(`base: silo up ${r.silo}; Space in the digger placed ${r.sites} sites; ore ${r.ore}`);
+    if (!r.silo || r.sites !== 0 || r.ore !== 100) { failed = true; console.error(`FAIL: the base (${JSON.stringify(r)})`); }
   });
   // Raids (spec 20, #311): the range's SILO AND A RAID, the raid brought forward; it is called and walks on going for the base.
   await run('raid', URL_, async page => {
@@ -267,7 +265,8 @@ try {
     console.log(`raid: ${r.n} raiders, all raiding ${r.raid}, silo up ${r.silo}`);
     if (r.n !== 2 || !r.raid || !r.silo) { failed = true; console.error(`FAIL: the raid (${JSON.stringify(r)})`); }
   });
-  // The base mission (spec 20, #312) from JUMP TO: dig the mesa, unload at the silo, put the factory up, swap.
+  // The base mission (spec 20, #312) from JUMP TO: dig the mesa, unload at the silo, a factory site placed (as the map's BUILD
+  // does, spec 31) with its ore in, the parked builder builds it, swap.
   await run('first-factory', URL_, async page => {
     await page.click('[data-sel="debug"]'); await page.click('[data-dsec="jump"]');
     await page.click('[data-dj="base"]');
@@ -280,19 +279,21 @@ try {
     await page.evaluate(() => { const G = window.__stompy.game, P = G.player, s = G.base.silo; P.x = s.x + Math.sin(s.yaw) * s.radius * 0.9; P.z = s.z + Math.cos(s.yaw) * s.radius * 0.9; P.y = G.ter.groundBelow(P.x, 30, P.z); });
     await page.waitForTimeout(500);
     const unloaded = await page.evaluate(() => [window.__stompy.game.player.ore, window.__stompy.game.base.ore]);
-    await page.evaluate(() => { const G = window.__stompy.game, P = G.player; G.base.ore = Math.max(G.base.ore, 60); P.x = 0; P.z = 0; P.y = G.ter.groundBelow(0, 30, 0); P.yaw = Math.PI; P.twist = 0; });
-    await page.keyboard.down('Space'); await page.waitForTimeout(400); await page.keyboard.up('Space');
-    // Its site (spec 23): its ore in, then DIG held builds it, from just in front.
-    await page.evaluate(() => { const G = window.__stompy.game, P = G.player, f = G.base.factory; f.site.ore = f.site.need; const d = f.radius + 6; P.x = f.x - Math.sin(P.yaw) * d; P.z = f.z - Math.cos(P.yaw) * d; P.y = G.ter.groundBelow(P.x, 30, P.z); });
-    await page.keyboard.down('Digit1');
-    for (let i = 0; i < 60 && (await page.evaluate(() => window.__stompy.game.base.factory?.prog)) < 1; i++) await page.waitForTimeout(500);
-    await page.keyboard.up('Digit1');
+    await page.evaluate(async () => {
+      const { footprintAt, placeSite } = await import('/src/sim/base.js');
+      const G = window.__stompy.game, b = G.crew.find(m => m.type === 'builder');
+      for (let r = 30; r < 200; r += 10) for (let a = 0; a < 12; a++) {   // the nearest spot to the builder a factory fits (the flat round the silo)
+        const f = footprintAt(G, b.x + Math.sin(a * Math.PI / 6) * r, b.z + Math.cos(a * Math.PI / 6) * r, 0, 'factory');
+        if (!f.why) { placeSite(G, f).ore = 60; return; }
+      }
+    });
+    for (let i = 0; i < 240 && !((await page.evaluate(() => window.__stompy.game.base.factory?.prog)) >= 1); i++) await page.waitForTimeout(500);   // the builder walks over and builds it: 12 pieces
     const prog = await page.evaluate(() => window.__stompy.game.base.factory?.prog);
     await page.keyboard.press('q'); await page.waitForTimeout(500);
     const now = await page.evaluate(() => window.__stompy.game.player.type);
     await page.screenshot({ path: 'test-results/smoke-first-factory.png' });
     console.log(`first-factory: in the ${start[0]}, crew ${start[1]}, ${start[2]} ore; dug ${dug}; unloaded (hopper ${unloaded[0]}, silo ${unloaded[1]}); factory ${prog}; Q -> ${now}`);
-    if (start[0] !== 'digger' || start[1] !== 2 || !(dug > 0) || unloaded[0] !== 0 || !(unloaded[1] > start[2]) || prog !== 1 || now !== 'kestrel') { failed = true; console.error('FAIL: the base mission'); }
+    if (start[0] !== 'digger' || start[1] !== 3 || !(dug > 0) || unloaded[0] !== 0 || !(unloaded[1] > start[2]) || prog !== 1 || now !== 'kestrel') { failed = true; console.error('FAIL: the base mission'); }
   });
   // The command view (spec 22): from FIRST FACTORY, Tab goes up; a click on the KESTREL picks it, a click on the ground sends it (GO); DRIVE drops you into it.
   await run('command', URL_, async page => {
@@ -422,7 +423,7 @@ try {
     window.__pad = { set: (i, on) => { pad.buttons[i] = { pressed: on, value: on ? 1 : 0 }; }, axis: (i, v) => { pad.axes[i] = v; } };
     Object.defineProperty(window.navigator, 'getGamepads', { value: () => [pad] });
   });
-  // SWAP on touch (spec 20): the digger shows DIG, BUILD, NEXT and DUMP and no guns (spec 25), and DIG held
+  // SWAP on touch (spec 20): the digger shows DIG and DUMP and no guns (spec 25; no BUILD or NEXT, spec 31), and DIG held
   // with a finger spins its arms; TGT held swaps into the KESTREL, whose fire buttons appear.
   await run('touch-swap', URL_ + '&touch=1', async page => {
     await page.tap('[data-sel="debug"]'); await page.tap('[data-dsec="jump"]');
@@ -442,7 +443,7 @@ try {
     const kes = await btns(), now = await page.evaluate(() => window.__stompy.game.player.type);
     await page.screenshot({ path: 'test-results/smoke-touch-swap.png' });
     console.log(`touch-swap: digger ${JSON.stringify(dig)}, DIG held spins and scoops ${spun}; TGT held -> ${now} ${JSON.stringify(kes)}`);
-    if (dig.missile !== 'BUILD FACTORY' || dig.energy !== 'DIG' || dig.fusion !== 'DUMP' || dig.ballistic !== 'NEXT' || !spun || now !== 'kestrel' || kes.missile !== 'MISSILE' || kes.energy !== 'ENERGY') { failed = true; console.error('FAIL: touch buttons after SWAP'); }
+    if (dig.missile !== '-' || dig.energy !== 'DIG' || dig.fusion !== 'DUMP' || dig.ballistic !== '-' || !spun || now !== 'kestrel' || kes.missile !== 'MISSILE' || kes.energy !== 'ENERGY') { failed = true; console.error('FAIL: touch buttons after SWAP'); }
   });
   await run('touch', URL_ + '&touch=1', async page => {
     // Taps, not clicks: a mouse click would switch the game back to mouse mode.

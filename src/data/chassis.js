@@ -77,13 +77,24 @@ export const CHASSIS = {
     hopper: CONSTRUCT.haul,
     tons: 50, frame: 50, systems: { sinks: 0, armour: 0, jets: 0 }, sysMax: { jets: 0, sinks: 0, armour: 0, knuckles: 0 },
     hardpoints: [] },
+  // The builder (docs/specs/31-builder.md, placeholder name): a tall crane
+  // mech in the crew's yellow, a cab low on the front and a crane arm each
+  // side with a hook. Its tool is BUILD on the primary button, held: the
+  // crane slams a piece into a construction site a swing (sim/tools.js). No
+  // guns, no punch. Like the digger: ?debug=1 only, single player.
+  builder: { name: NAMES.chassis.builder, legs: 'forward', style: 'builder', speed: 8.5, turn: 0.6, sink: 10, scale: 1.2, pref: 30, acc0: 0.03, ai: { profile: 'brawler' },
+    hp: { T: 100, LA: 40, RA: 40, LL: 50, RL: 50 }, col: [0.93, 0.72, 0.12], acc: [0.13, 0.13, 0.14],
+    geo: { hip: 3.9, l1: 2.1, l2: 1.9, stride: [2.4, 3.0], girth: 1.5, radius: 3.0, height: 9.5, armX: 2.6, armY: 1.6, eye: [0, 2.4, 1.6], acY: 0.8, rackY: 2.6 },
+    tool: 'build',
+    tons: 45, frame: 45, systems: { sinks: 0, armour: 0, jets: 0 }, sysMax: { jets: 0, sinks: 0, armour: 0, knuckles: 0 },
+    hardpoints: [] },
 };
 
 // The selectable mechs, in selector order. Locked ones are in the list too:
 // the selector shows them as silhouettes, and they cannot launch.
 export const MECH_ORDER = ['kestrel', 'jackal', 'warden', 'light1', 'sniper1', 'puncher'];
 // What ?debug=1's selector also offers: the construction mechs, not yet in a mission of their own.
-export const PILOTABLE = [...MECH_ORDER, 'digger', 'hauler'];
+export const PILOTABLE = [...MECH_ORDER, 'digger', 'hauler', 'builder'];
 export const isUnlocked = (key, cleared) => (CHASSIS[key]?.unlock || 0) <= cleared;
 // A locked chassis on show: a near-black silhouette, except the one that
 // stays purple (on purpose: it is the game's set piece).

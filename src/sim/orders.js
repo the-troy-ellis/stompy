@@ -17,8 +17,8 @@ const { atan2, hypot, sin, cos, abs } = Math;
 //   dig     a digger: walk to a stand point short of the spot, face it, and
 //           take it as its site (spec 21); its own `mine` goes on from there
 //   follow  a hauler: wait behind `target`, that digger, and take its loads
-//   build   a digger: build `target`, a construction site's part, until it's
-//           up (docs/specs/23-construction-sites.md)
+//   build   a builder: build `target`, a construction site's part, until it's
+//           up (docs/specs/23-construction-sites.md, 31-builder.md)
 //   attack  a fighter: fight `target`, a foe, with the foes' own brain
 //           (ai.js think), until it's dead; then stay
 //   guard   a fighter: stay by `target`, one of your buildings, and fight any
@@ -35,14 +35,15 @@ export const ORDER = {
 export const ORDERS = ['go', 'dig', 'follow', 'build', 'attack', 'guard', 'stay', 'work'];
 export const SAY = { go: 'Going.', dig: 'Digging.', follow: 'Following.', build: 'Building.', attack: 'Attacking.', guard: 'Guarding.', stay: 'Staying.', work: 'Back to work.' };
 
-// Who can take an order: anyone GO and STAY; DIG and BUILD a digger; FOLLOW
-// a hauler; WORK whoever has a job of its own; ATTACK and GUARD a fighter
-// (no hopper: a mech with guns or fists).
+// Who can take an order: anyone GO and STAY; DIG a digger; BUILD a builder;
+// FOLLOW a hauler; WORK whoever has a job of its own; ATTACK and GUARD a
+// fighter (no hopper and no tool: a mech with guns or fists).
 export function can(m, kind) {
-  if (kind === 'attack' || kind === 'guard') return !m.ch.hopper;
-  if (kind === 'dig' || kind === 'build') return !!m.ch.tool;
+  if (kind === 'attack' || kind === 'guard') return !m.ch.hopper && !m.ch.tool;
+  if (kind === 'dig') return m.ch.tool === 'dig';
+  if (kind === 'build') return m.ch.tool === 'build';   // builders build (docs/specs/31-builder.md)
   if (kind === 'follow') return !!m.ch.hopper && !m.ch.tool;
-  if (kind === 'work') return !!m.ch.hopper;
+  if (kind === 'work') return !!m.ch.hopper || !!m.ch.tool;
   return kind === 'go' || kind === 'stay';
 }
 

@@ -47,8 +47,17 @@ export function mine(G, m, dt) {
   const a = (m.ai ||= {});   // the nav's route and the feelers' side live here, as a foe's do
   if (m.site && !m.site.mouth) m.site.mouth = [m.site.x, m.site.y, m.site.z];   // where its dig began: the way in and out of the tunnel it makes
   m.jetting = false; m.beamOn = false;
+  // A builder builds (docs/specs/31-builder.md): the nearest site with work its
+  // ore pays for; with none, it stands. A digger only digs, and brings a full
+  // hopper to a site that needs ore (base.js tipIn takes it).
+  if (m.ch.tool === 'build') {
+    const e = siteFor(G, m, a, false);
+    if (e) return build(G, m, a, e, dt);
+    m.job = null;
+    return halt(m, dt);
+  }
   const silo = G.base?.silo?.alive ? G.base.silo : null, full = (m.ore || 0) >= m.ch.hopper;
-  const e = siteFor(G, m, a, full);
+  const e = full && siteFor(G, m, a, true);
   if (e) return build(G, m, a, e, dt);
   const h = full && hauler(G, m);
   if (h) {   // a hauler with room: into its tub (base.js handover), a far shorter walk than the silo's
@@ -90,7 +99,7 @@ export function mine(G, m, dt) {
 function siteFor(G, m, a, full) {
   let best = null, bd = Infinity;
   for (const s of G.base?.sites || []) {
-    if (!siteWork(s) && !(full && s.ore < s.need)) continue;
+    if (full ? !(s.ore < s.need) : !siteWork(s)) continue;   // full: a digger bringing ore; else a builder's work
     for (const e of s.parts) {
       const d = hypot(e.x - m.x, e.z - m.z);
       if (e.alive && d < bd && !(a.skip?.e === e && G.time < a.skip.until)) { best = e; bd = d; }
@@ -98,10 +107,10 @@ function siteFor(G, m, a, full) {
   }
   return best;
 }
-// To a site's part, square on, and hold DIG (sim/tools.js builds it with the
-// buckets; base.js tipIn takes its ore on the way in).
+// To a site's part, square on: a builder holds BUILD (sim/tools.js slams the
+// pieces in); a digger bringing ore stands there while base.js tipIn takes it.
 export function build(G, m, a, e, dt) {
-  m.job = 'BUILDING';
+  m.job = m.ch.tool === 'build' ? 'BUILDING' : 'DELIVERING';
   const reach = siteReach(m), d = hypot(e.x - m.x, e.z - m.z) - e.radius;
   if (d > reach * 0.7) {
     const k = e.radius + reach * 0.5, x = e.x + (m.x - e.x) / (d + e.radius) * k, z = e.z + (m.z - e.z) / (d + e.radius) * k;
@@ -111,7 +120,7 @@ export function build(G, m, a, e, dt) {
   const yaw = atan2(e.x - m.x, e.z - m.z);
   m.yaw += clampN(wrapA(yaw - m.yaw), -m.ch.turn * dt, m.ch.turn * dt);
   m.pitch = 0;
-  m.toolHold = abs(wrapA(yaw - m.yaw)) < MINER.face * 2 && siteInReach(G, m) === e;
+  m.toolHold = m.ch.tool === 'build' && abs(wrapA(yaw - m.yaw)) < MINER.face * 2 && siteInReach(G, m) === e;
 }
 
 // The nearest live crew hauler with room in its tub, or null.

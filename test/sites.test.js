@@ -1,7 +1,7 @@
-// Construction sites (docs/specs/23-construction-sites.md): placing a
-// building puts down a site; ore is carried to it and diggers' buckets build
-// it, never past the ore delivered. Parked diggers build on their own and
-// parked haulers fetch silo ore for it.
+// Construction sites (docs/specs/23-construction-sites.md, 31-builder.md):
+// placing a building puts down a site; ore is carried to it and builders'
+// cranes build it, never past the ore delivered. Parked builders build on
+// their own, parked haulers fetch silo ore for it, and diggers only dig.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, startMatch } from '../src/sim/state.js';
@@ -37,12 +37,12 @@ test('BUILD puts down a site and pays nothing; it doesn\'t rise on its own', () 
   assert.equal(siteProg(s), 0);
 });
 
-test('the bucket builds a site, a swing at a time, never past the ore in it; then it says NEEDS ORE', () => {
-  const G = game(), P = G.player;
+test('a builder\'s BUILD builds a site, a piece a swing, never past the ore in it; then it says NEEDS ORE', () => {
+  const G = game('builder'), P = G.player;
   Object.assign(P, { yaw: 0, twist: 0, pitch: 0 });
   placeBuilding(G, P, 'factory');
   const s = G.base.sites[0], e = s.parts[0];
-  shiftMech(P, 0, e.z - e.radius - 6 - P.z);   // in the bucket's reach
+  shiftMech(P, 0, e.z - e.radius - 6 - P.z);   // in the crane's reach
   s.ore = s.need / 2;
   run(G, 40, () => false, () => ({ ...noInput(), held: { ...noInput().held, energy: true } }));
   assert.equal(s.work, s.swings / 2, 'half the ore: half built');
@@ -63,20 +63,29 @@ test('a crew mech with ore beside a site tips in what it needs', () => {
   assert.ok(G.msgs.some(m => m.text === 'ORE ACROSS'));
 });
 
-test('a parked digger leaves its dig to build a site with work, then goes back to digging', () => {
-  const G = game('kestrel', ['digger']), d = G.crew.find(m => m.type === 'digger');
-  d.site = { x: d.x, y: d.y, z: d.z, yaw: 0, pitch: 0, t: 0 };
+test('a parked builder goes to a site with work and builds it, then stands', () => {
+  const G = game('kestrel', ['builder']), b = G.crew.find(m => m.type === 'builder');
   run(G, 1);
-  assert.equal(d.job, 'DIGGING');
-  const s = site(G, 'bay', d.x - 60, d.z - 40);
+  assert.equal(b.job, null, 'nothing to build: it stands');
+  const s = site(G, 'bay', b.x - 60, b.z - 40);
   s.ore = s.need;
   run(G, 2);
-  assert.equal(d.job, 'BUILDING');
+  assert.equal(b.job, 'BUILDING');
   run(G, 90, () => !G.base.sites.length);
   assert.equal(G.base.sites.length, 0, 'built');
   assert.equal(s.parts[0].prog, 1);
   run(G, 1);
-  assert.equal(d.job, 'DIGGING', 'and back to its dig');
+  assert.equal(b.job, null);
+});
+
+test('a parked digger leaves a site with work alone, and keeps digging', () => {
+  const G = game('kestrel', ['digger']), d = G.crew.find(m => m.type === 'digger');
+  d.site = { x: d.x, y: d.y, z: d.z, yaw: 0, pitch: 0, t: 0 };
+  const s = site(G, 'bay', d.x - 60, d.z - 40);
+  s.ore = s.need;
+  run(G, 10);
+  assert.equal(d.job, 'DIGGING');
+  assert.equal(s.work, 0, 'not a swing of it');
 });
 
 test('a parked hauler fetches silo ore for a site and delivers it', () => {
@@ -91,8 +100,8 @@ test('a parked hauler fetches silo ore for a site and delivers it', () => {
   assert.equal(h.ore, 0);
 });
 
-test('up in the command view the crew builds on: a digger and a hauler raise a factory from nothing', () => {
-  const G = game('kestrel', ['digger', 'hauler']);
+test('up in the command view the crew builds on: a builder and a hauler raise a factory from nothing', () => {
+  const G = game('kestrel', ['builder', 'hauler']);
   G.base.ore = 80;
   commandUp(G);
   const s = site(G, 'factory', 60, -80);

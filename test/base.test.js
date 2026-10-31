@@ -7,9 +7,10 @@ import assert from 'node:assert/strict';
 import { createGame, startMatch } from '../src/sim/state.js';
 import { recordFx } from '../src/sim/fx.js';
 import { CONSTRUCT } from '../src/data/construct.js';
-import { footprint, placeFactory, buildTrigger, padOf } from '../src/sim/base.js';
+import { footprint, placeFactory, placeBuilding, padOf } from '../src/sim/base.js';
 import { rangeDef } from '../src/data/range.js';
-import { stepFor } from './helpers.js';
+import { stepFor, input } from './helpers.js';
+import { update } from '../src/sim/update.js';
 
 const base = (opts = {}) => {
   const G = createGame({ fx: recordFx(), seed: 4 });
@@ -53,13 +54,12 @@ test('the footprint wants flat ground and nobody on it, not ore (it is carried t
   assert.equal(footprint(G, P).why, 'room', 'a mech on it: no room');
 });
 
-test('BUILD held shows the footprint; let go, the factory\'s site goes down, free, and goes up once filled and built', () => {
+test('a factory\'s site goes down where it fits, free, and goes up once filled and built', () => {
   const G = base(), P = G.player;
   G.base.ore = 100;
   Object.assign(P, { x: 200, z: -200, yaw: 0, twist: 0 });
-  buildTrigger(G, P, true);
-  assert.ok(G.buildAt && G.buildAt.why === null);
-  buildTrigger(G, P, false);
+  assert.equal(footprint(G, P, 'factory').why, null, 'it fits');
+  placeBuilding(G, P, 'factory');   // the command view's BUILD puts one down so (ui/command.js, docs/specs/31-builder.md)
   const f = G.base.factory;
   assert.ok(f && f.mesh === 'factory' && f.team === 0);
   assert.equal(G.base.ore, 100, 'nothing paid yet');
@@ -93,9 +93,9 @@ test('the factory turns ore and salvage into a KESTREL that joins the crew, park
   assert.ok(said(G).includes('New mech ready.'));
 });
 
-test('only a digger builds: a fighter\'s missile button still fires missiles', () => {
-  const G = base({ crew: 'none' });
-  startMatch(G, rangeDef({ ground: 'flat', base: 'silo' }), 4, false, 'kestrel', { terrainOpts: { flat: true } });
-  buildTrigger(G, G.player, true);
-  assert.equal(G.buildAt, null);
+test('no cockpit places a site: a digger\'s MISSILE and BALLISTIC buttons do nothing (docs/specs/31-builder.md)', () => {
+  const G = base();
+  for (let i = 0; i < 30; i++) update(G, input({ held: { missile: true, ballistic: true } }), 1 / 60);
+  for (let i = 0; i < 5; i++) update(G, input({}), 1 / 60);
+  assert.equal(G.base.sites.length, 0);
 });

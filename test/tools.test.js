@@ -81,21 +81,16 @@ test('nothing in reach: the arms spin in the air, and it says so', () => {
   assert.ok(G.msgs.some(m => m.text === 'NOTHING TO DIG'));
 });
 
-test('at your own site, DIG builds it: three scoops a swing of work, the punch\'s pace', () => {
+test('at your own site, DIG digs and doesn\'t build it: builders build (docs/specs/31-builder.md)', () => {
   const G = game('flat'), P = G.player;
   Object.assign(P, { yaw: 0, twist: 0, pitch: 0 });
   placeBuilding(G, P, 'factory');
   const s = G.base.sites[0], e = s.parts[0];
   shiftMech(P, 0, e.z - e.radius - 6 - P.z);
   s.ore = s.need;
-  const ore = G.base.ore, h = G.ter.hash();
-  frames(G, 60, DIG);
-  const w0 = s.work, n0 = P.scoops;
-  frames(G, 360, DIG);   // 6 s: 15 scoops
-  assert.equal(P.scoops - n0, 15);
-  assert.equal(s.work - w0, 5, 'a swing of work every 1.2 s, as the punch built');
-  assert.equal(G.ter.hash(), h, 'it built, it didn\'t dig');
-  assert.equal(G.base.ore, ore);
+  frames(G, 420, DIG);
+  assert.ok(P.scoops >= 15);
+  assert.equal(s.work, 0, 'not a piece of it');
 });
 
 // The old punch's pace (main at bc24e12): over these 80 seeds, 30 s of a bite
