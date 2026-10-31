@@ -1,6 +1,6 @@
 // The yard (docs/specs/19-debug-menu.md § The yard): the DEBUG tab's place to
 // try mining and construction. You in a digger, a second digger and a hauler
-// parked by you, the silo and a mesa to dig; nobody comes, and it never ends.
+// parked by you, a builder, the silo and a mesa to dig; nobody comes, and it never ends.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, startMatch } from '../src/sim/state.js';
@@ -16,10 +16,10 @@ const game = () => {
   return G;
 };
 
-test('you start in a digger, a digger and a hauler parked by you, the silo up', () => {
+test('you start in a digger, a digger, a hauler and a builder parked by you, the silo up', () => {
   const G = game();
   assert.equal(G.player.type, 'digger');
-  assert.deepEqual(G.crew.map(m => m.type), ['digger', 'digger', 'hauler']);
+  assert.deepEqual(G.crew.map(m => m.type), ['digger', 'digger', 'hauler', 'builder']);
   assert.ok(G.crew.slice(1).every(m => m.parked));
   assert.ok(G.base.silo.alive);
   assert.equal(G.base.ore, CONSTRUCT.startOre);

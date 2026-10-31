@@ -336,6 +336,19 @@ export function createAudio(app) {
       play('boom_low', { ...o, vol: 0.3 + 0.5 * c, rate: 0.7 });   // the deeper second layer: the ground answering
       this.osc('sine', 70, 20, 0.8, 0.4 * (0.5 + c), o);
     },
+    // A builder's piece slamming in (docs/specs/31-builder.md): a heavy clank and
+    // a deep thump, lower through a run (`into` 0 to 1); the last piece of a
+    // building, a bigger one with a ringing clang on top.
+    slam(at, into = 0) {
+      const o = { at, ref: 50 }, low = 1 - 0.25 * into;
+      play('punch', { ...o, vol: 0.8, rate: 0.55 * low }); play('crunch', { ...o, vol: 0.35, rate: 0.8 * low, vary: 0.06 });
+      this.osc('sine', 80 * low, 28, 0.3, 0.35, o);
+    },
+    built(at) {
+      const o = { at, ref: 70 };
+      play('boom_low', { ...o, vol: 0.9, rate: 0.6 }); play('punch', { ...o, vol: 1.0, rate: 0.5 });
+      this.osc('sine', 70, 22, 0.8, 0.5, o); this.osc('triangle', 660, 640, 0.6, 0.06, o);
+    },
     // A fine patch settling (docs/specs/27-fine-dig.md): a low rumble under a soft, deep thump.
     settle(at) {
       const o = { at, ref: 50 };

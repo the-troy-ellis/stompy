@@ -6,11 +6,10 @@ import assert from 'node:assert/strict';
 import { createGame, startMatch } from '../src/sim/state.js';
 import { recordFx } from '../src/sim/fx.js';
 import { CONSTRUCT, PLACE, PLACE_ORDER } from '../src/data/construct.js';
-import { footprint, placeBuilding, buildTrigger, padOf, pickOf, pickNext, mend } from '../src/sim/base.js';
+import { footprint, placeBuilding, padOf, mend } from '../src/sim/base.js';
 import { raidTarget } from '../src/sim/raid.js';
-import { update } from '../src/sim/update.js';
 import { rangeDef } from '../src/data/range.js';
-import { stepFor, input } from './helpers.js';
+import { stepFor } from './helpers.js';
 
 const base = () => {
   const G = createGame({ fx: recordFx(), seed: 4 });
@@ -23,27 +22,16 @@ const said = G => G.fx.calls('say').map(c => c.args[0]);
 // Every site down filled and built, as diggers and haulers would (docs/specs/23-construction-sites.md; test/sites.test.js does it for real).
 const finish = G => { for (const s of G.base.sites) { s.ore = s.need; s.work = s.swings; } stepFor(G, 0.05); };
 
-test('BALLISTIC picks FACTORY, BAY, WALL in turn, once a press, in a digger with a base', () => {
-  const G = base();
+test('the command view\'s BUILD offers FACTORY, BAY, WALL in turn (docs/specs/31-builder.md: no cockpit picks)', () => {
   assert.deepEqual(PLACE_ORDER, ['factory', 'bay', 'wall']);
-  assert.equal(pickOf(G), 'factory');
-  update(G, input({ held: { ballistic: true } }), 1 / 60);
-  update(G, input({ held: { ballistic: true } }), 1 / 60);
-  assert.equal(pickOf(G), 'bay', 'held: one step');
-  update(G, input({}), 1 / 60);
-  update(G, input({ held: { ballistic: true } }), 1 / 60);
-  assert.equal(pickOf(G), 'wall');
-  pickNext(G);
-  assert.equal(pickOf(G), 'factory', 'round again');
 });
 
 test('a bay goes down as a site; there can be more than one; the factory stays one, counting its site', () => {
   const G = base(), P = G.player;
-  G.base.pick = 1;
-  buildTrigger(G, P, true);
-  assert.equal(G.buildAt.kind, 'bay');
-  assert.equal(G.buildAt.w, PLACE.bay.w);
-  buildTrigger(G, P, false);
+  const f = footprint(G, P, 'bay');
+  assert.equal(f.kind, 'bay');
+  assert.equal(f.w, PLACE.bay.w);
+  placeBuilding(G, P, 'bay');
   assert.equal(G.base.bays.length, 1);
   assert.equal(G.base.ore, 500, 'nothing paid now');
   const bay = G.base.bays[0];

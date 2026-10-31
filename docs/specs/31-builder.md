@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ready. The owner, 2026-10-31: "I don't think the mech should be the ones placing buildings, that should be done from the command view. The mechs should be constructing the buildings on the sites placed from command view. I want there to be a building gameplay loop as well and we'll need to add additional mechs for that". Then picked: slam pieces in; only builders build; one new builder mech |
+| Status | part 1 built (see As built). The owner, 2026-10-31: "I don't think the mech should be the ones placing buildings, that should be done from the command view. The mechs should be constructing the buildings on the sites placed from command view. I want there to be a building gameplay loop as well and we'll need to add additional mechs for that". Then picked: slam pieces in; only builders build; one new builder mech |
 | Milestone | M10 (command and construction), a follow-on |
 | Size | L, in two parts: the builder and its loop (sim, data, inputs, AI); its look and feel (the crane's swing, the piece dropping in, the finish) |
 | Depends on | [22-command-view.md](22-command-view.md) (the map, BUILD); [23-construction-sites.md](23-construction-sites.md) (sites, ore carried in); [25-hold-to-dig.md](25-hold-to-dig.md) (a tool on the primary button); [28-dig-feel.md](28-dig-feel.md) (a run that builds to a finish) |
@@ -147,3 +147,33 @@ base mission's) move to builders.
 
 The builder ships as BIG STACKER (a placeholder in `names.js`); its PR
 carries screenshots and candidates.
+
+## As built (part 1)
+
+- **The builder** (`builder`, BIG STACKER for now): forward legs, speed 8.5
+  (just over the WARDEN's, which stays the slowest), scale 1.2, `tool:
+  'build'`, no hardpoints. Its look: a cab low on the front with hazard
+  stripes, a mast and a counterweight behind, and each arm a long boom with
+  a hook and a block on it. The crane swings both arms up through a swing
+  and down hard at its end (`spinPose`); part 2 makes this the crane's own.
+- **BUILD** (`sim/tools.js swingCrane`): held, a swing every 1.2 s; at its
+  end, a site part in reach and in front gets a piece (`buildSwing`), or the
+  cockpit says `NEEDS ORE` or `NOTHING TO BUILD`. Pieces in a row at one site
+  count up: `slam` (k 0.6 to 1) and `sfx.slam(at, into)`, the last one
+  `built` and `sfx.built`, with dust.
+- **Diggers no longer build:** DIG at a site digs. A parked digger with a
+  full hopper still walks to a site that needs ore and stands while it tips
+  in (`DELIVERING`); otherwise it digs.
+- **Parked builders** go to the nearest site with work, square on, and hold
+  BUILD; with none, they stand. BUILD from the map is a builder's order;
+  builders take WORK, not ATTACK or GUARD.
+- **No cockpit places a site:** `buildTrigger` is gone, and a digger's
+  MISSILE and BALLISTIC buttons are hidden and do nothing; the HUD's footprint
+  and `BUILDS …` line went with them. The map's BUILD is unchanged.
+- **Crews:** FIRST FACTORY's crew is the KESTREL and a builder; THE YARD's a
+  second digger, a hauler and a builder; the range's CREW offers it.
+- **Tests:** `test/builder.test.js` (5). The digger-building tests moved to
+  builders (sites, orders, the command view's factory), DIG at a site now
+  checks it doesn't build, and the cockpit-BUILD tests check that no button
+  places a site. Smoke: the base mission places its factory site as the map
+  does and the parked builder raises it.

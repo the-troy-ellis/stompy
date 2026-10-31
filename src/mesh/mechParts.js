@@ -237,6 +237,35 @@ const BODY = {
   // the quad's legs: the digger's safety yellow, a low cab up front with
   // hazard stripes under its window, an exhaust stack, and behind it a big
   // open tub for the ore, its rims in black. No guns: its arms are lamp boxes.
+  // The builder (docs/specs/31-builder.md, placeholder name): a cab low on
+  // the front with a wide window, a crane mast behind it, and each arm a long
+  // lattice boom ending in a hook with a block on it (the `fist` part, so it
+  // swings as the digger's buckets do). The block is what it slams in.
+  builder(ch) {
+    const { c, dark, acc, glass } = palette(ch);
+    return {
+      torso: part(b => {
+        b.cube(chain(M.T(0, 0.9, 0.5), M.S(3.4, 1.8, 2.2)), c, 0.92, 0.9);                        // the cab
+        b.cube(chain(M.T(0, 1.4, 1.62), M.S(2.4, 0.7, 0.08)), glass);                            // its window
+        for (let i = 0; i < 5; i++) b.cube(chain(M.T((i - 2) * 0.66, 0.4, 1.62), M.RZ(0.6), M.S(0.28, 0.8, 0.08)), acc);   // hazard stripes
+        b.cube(chain(M.T(0, 3.0, -0.6), M.S(0.7, 4.2, 0.7)), dark);                               // the mast...
+        b.cube(chain(M.T(0, 5.2, -0.6), M.S(1.4, 0.3, 1.4)), acc);                                // ...its cap
+        b.cube(chain(M.T(0, 1.2, -1.4), M.S(2.6, 1.6, 1.0)), dark);                               // the counterweight
+      }),
+      arm: part(b => {
+        b.cube(chain(M.T(0, -0.4, 0.1), M.S(1.0, 1.2, 1.1)), c);
+        b.cube(chain(M.T(0, -1.0 - BOOM, 0.1), M.S(0.5, 2 * BOOM + 0.6, 0.5)), dark);            // the boom
+        for (const sx of [1, -1]) b.cube(chain(M.T(sx * 0.32, -1.0 - BOOM, 0.1), M.S(0.1, 2 * BOOM, 0.4)), acc);   // its hazard rails
+        hinge(b, [0, 0.1, 0], 1.4, 1.3, dark);
+      }),
+      // The hook at the boom's end, and the block on it.
+      fist: part(b => {
+        b.cube(chain(M.T(0, -1.2 - 2 * BOOM, 0.1), M.S(0.2, 1.0, 0.2)), dark);                   // the cable
+        b.cube(chain(M.T(0, -1.9 - 2 * BOOM, 0.1), M.S(0.6, 0.3, 0.6)), acc);                    // the hook
+        b.cube(chain(M.T(0, -2.7 - 2 * BOOM, 0.1), M.S(1.6, 1.2, 1.6)), mul(c, 0.8), 0.95, 0.9); // the block
+      }),
+    };
+  },
   hauler(ch) {
     const { c, dark, acc, glass } = palette(ch);
     return {

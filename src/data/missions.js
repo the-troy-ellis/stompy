@@ -123,15 +123,15 @@ export const MISSIONS = [
 ].map(m => ({ ...m, name: NAMES.missions[m.key] }));
 // Build and fight (docs/specs/20-build-and-fight.md § The mission): outside
 // the campaign, on the DEBUG tab's JUMP TO and as BASE in Free Play's MAP.
-// You start in the digger (`pilot`), a KESTREL parked beside you, the silo
-// off to the left and a rocky mesa ahead; three raids, each bigger. Survive
-// the last with the silo up.
+// You start in the digger (`pilot`), a KESTREL and a builder parked beside
+// you, the silo off to the left and a rocky mesa ahead; three raids, each
+// bigger. Survive the last with the silo up.
 export const BASE_MISSION = {
   key: 'b01', pal: 'dusk', seed: 31, pilot: 'digger',
   ground: { landmarks: [{ kind: 'mesa', at: [10, 190], r: 60, top: 90 }] },
   base: { silo: [300, 55] },
   flat: [[300, 70, 70]],   // room round the silo for the factory
-  crew: [{ type: 'kestrel', at: [90, 30], face: 0 }],
+  crew: [{ type: 'kestrel', at: [90, 30], face: 0 }, { type: 'builder', at: [60, 45], face: 0 }],   // the builder raises what the command view places (docs/specs/31-builder.md)
   foes: [],
   objectives: [{ type: 'keep', targets: ['silo'], label: 'SILO' }, { type: 'eliminate' }],
   waves: [
@@ -144,14 +144,14 @@ export const BASE_MISSION = {
 };
 // The yard (docs/specs/19-debug-menu.md § The yard): the DEBUG tab's place
 // to try mining and construction with nobody shooting. Build and fight's
-// ground and silo, a second digger and a hauler in the crew, no foes, no
+// ground and silo, a second digger, a hauler and a builder in the crew, no foes, no
 // raids, and nothing to win, so it stays open.
 export const YARD_MISSION = {
   key: 'y01', pal: 'dusk', seed: 31, pilot: 'digger',
   ground: BASE_MISSION.ground,
   base: BASE_MISSION.base,
   flat: BASE_MISSION.flat,
-  crew: [{ type: 'digger', at: [90, 30], face: 0 }, { type: 'hauler', at: [60, 45], face: 0 }],
+  crew: [{ type: 'digger', at: [90, 30], face: 0 }, { type: 'hauler', at: [60, 45], face: 0 }, { type: 'builder', at: [120, 40], face: 0 }],
   foes: [],
   objectives: [],
   intel: 'Nobody comes. Dig the rock. Build things.',

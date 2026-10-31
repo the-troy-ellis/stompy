@@ -21,10 +21,10 @@ const game = () => {
 };
 const raiders = G => G.mechs.filter(m => m.team === 1);
 
-test('you start in the digger, a KESTREL parked by you, the silo up with some ore in it', () => {
+test('you start in the digger, a KESTREL and a builder parked by you, the silo up with some ore in it', () => {
   const G = game();
   assert.equal(G.player.type, 'digger');
-  assert.deepEqual(G.crew.map(m => m.type), ['digger', 'kestrel']);
+  assert.deepEqual(G.crew.map(m => m.type), ['digger', 'kestrel', 'builder']);
   assert.ok(G.crew[1].parked);
   assert.ok(G.base.silo.alive);
   assert.equal(G.base.ore, CONSTRUCT.startOre);

@@ -29,11 +29,14 @@
 //            A ramp's scoops are centred rampAt m ahead (× scale), rampLift m
 //            over where its floor will be
 //   heat     a scoop's heat
-//   perSwing scoops at a construction site that make one swing of work
-//            (docs/specs/23-construction-sites.md): today's pace
 //   clods    how many clods a scoop throws out of the face: [least, most]
 //   dry      scoops in a row that turn no ground to air before a parked
 //            digger tries its next aim (sim/miner.js): about one old bite
+//   build    the builder's BUILD (docs/specs/31-builder.md): swing, s a crane
+//            swing takes, held, and each one at a site in reach slams one
+//            piece in (base.js buildSwing): the pace a digger built at, three
+//            scoops a swing. heat: a swing's heat
 export const TOOL = {
-  dig: { turn: 0.8, spinUp: 0.15, bite: 1.0, lift: 4, ramp: 0.85, rampAt: 6, rampLift: 2, r0: 3, grow: 1, steps: 6, drift: 4, into: 2, reach: 14.3, heat: 1 / 3, perSwing: 3, dry: 3, clods: [4, 6] },
+  build: { swing: 1.2, heat: 1 / 3 },
+  dig: { turn: 0.8, spinUp: 0.15, bite: 1.0, lift: 4, ramp: 0.85, rampAt: 6, rampLift: 2, r0: 3, grow: 1, steps: 6, drift: 4, into: 2, reach: 14.3, heat: 1 / 3, dry: 3, clods: [4, 6] },
 };

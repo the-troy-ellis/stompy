@@ -66,6 +66,9 @@ export const FEEL = {
   scoopSoft:   { kick: 0.1, shake: 0.05, flash: 0, white: 0, squash: 0.02, wobble: 0.05, bass: 0.15, duck: 0, dust: 0.5, haptic: 6, push: 0 },
   scoop:       { kick: 0.45, shake: 0.3, flash: 0, white: 0, squash: 0.05, wobble: 0.3, bass: 0.7, duck: 0.25, dust: 1, haptic: 20, push: 0 },
   scoopCrack:  { kick: 1.0, shake: 0.8, flash: 0, white: 0, squash: 0.12, wobble: 0.7, bass: 1.1, duck: 0.5, dust: 3, haptic: 60, push: 0 },
+  // A builder's piece slamming in (docs/specs/31-builder.md), k 0.6 to 1 through its run; a building's last piece, built.
+  slam:        { kick: 0.8, shake: 0.6, flash: 0, white: 0, squash: 0.1, wobble: 0.5, bass: 0.9, duck: 0.4, dust: 2, haptic: 45, push: 0 },
+  built:       { kick: 1.2, shake: 1.0, flash: 0, white: 0, squash: 0.25, wobble: 0.6, bass: 1.3, duck: 0.6, dust: 4, haptic: 90, push: 0 },
   settle:      { kick: 0.05, shake: 0.12, flash: 0, white: 0, squash: 0, wobble: 0.1, bass: 0.5, duck: 0.1, dust: 0, haptic: 15, push: 0 },   // a fine patch slumping back (docs/specs/27-fine-dig.md), by how near
   whiff:       { kick: 0.3, shake: 0, flash: 0, white: 0, squash: 0, wobble: 0.2, bass: 0, duck: 0, dust: 0, haptic: 0, push: 0 },
   // a missile blast's shove, k = 1 - distance / BLAST_R (the camera response is the explosion row)

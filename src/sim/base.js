@@ -99,6 +99,7 @@ export function placeSite(G, f) {
 }
 // How far a site is built: its work, never past what the ore in it pays for.
 export const siteProg = s => min(s.work / s.swings, s.ore / s.need);
+export const siteDone = s => s.work >= s.swings && s.ore >= s.need;   // its last piece in (docs/specs/31-builder.md)
 // Whether a bucket swing would build it now: the work is behind the ore.
 export const siteWork = s => s.work < s.swings * s.ore / s.need - 1e-9;
 // A bucket swing on a site (melee.js): one swing of work, if the ore allows.
@@ -111,14 +112,6 @@ export function buildSwing(G, m, e, work = true) {   // work false: a scoop betw
   return true;
 }
 export const placeFactory = (G, m) => placeBuilding(G, m, 'factory');
-
-// BUILD (the missile button while you drive a digger): held, the footprint
-// shows (G.buildAt, drawn by the HUD); let go, the picked building goes there.
-export function buildTrigger(G, m, held) {
-  if (!G.base || !m.ch.tool) { G.buildAt = null; return; }
-  if (held) G.buildAt = footprint(G, m);
-  else if (G.buildAt) { G.buildAt = null; placeBuilding(G, m); }
-}
 
 // A repair bay mends a crew mech on its pad: CONSTRUCT.bayRate a second, the
 // most damaged section first, never a section that is gone. Returns how much.
