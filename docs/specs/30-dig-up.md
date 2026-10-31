@@ -105,9 +105,16 @@ parked digger hauling out of one. The arms: a smoke screenshot.
 - **The arms from the cockpit** are a view model: the digger's arms hang
   beside its cab, 2.75 m out, and its buckets never pass in front of the
   eye. From the cockpit only, the shoulders are drawn at `COCKPIT_ARMS`
-  (2.9 m out, 1.4 m under and 1.5 m ahead of the eye): below and outside the
+  (2.9 m out, 1.4 m under and 1.5 m ahead of the eye; see Longer arms): below and outside the
   view, so the arms and buckets swing in from the windscreen's sides each
   turn and no shoulder hangs in the air. (First 3.2 m ahead and 1 m under:
   on a phone, with no dash drawn, the shoulders floated in view.) From
   outside the pose is unchanged.
+- **Longer arms** (the owner, 2026-10-31: "Should the arms on digger be a
+  bit longer so the shoulders can be further back? That would fit a bit
+  more with the amount of bit each dig is able to do"): each arm has a boom
+  `BOOM` (1.8 m, × scale) longer, with hazard rails and an elbow block, the
+  bucket at its end, from outside as from the cockpit. The cockpit shoulders
+  went back to `COCKPIT_ARMS` 2.9 m out, 2 m under and 0.4 m ahead of the
+  eye: well out of view, the boom reaching in from the windscreen's side.
 - The HUD's dirt shows whole loads (a 4 m corner is a fraction of one).

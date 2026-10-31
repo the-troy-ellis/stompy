@@ -22,6 +22,7 @@ const part = f => { const b = new Builder(); f(b); return b; };
 // round it, and left out of the HUD's wireframe (Builder.joint).
 const hinge = (b, at, d, len, col) => b.joint(j => j.cyl(chain(M.T(...at), M.RZ(Math.PI / 2), M.S(d, len, d)), col));
 const ball = (b, at, d, col) => b.joint(j => j.sphere(chain(M.T(...at), M.S(d, d, d)), col));
+const BOOM = 1.8;   // how much longer a digger's arm is than a fist arm, to its bucket (the owner, 2026-10-31: longer arms, for the bites it takes)
 const palette = ch => ({ c: ch.col, dark: mul(ch.col, 0.55), acc: ch.acc, glass: [0.08, 0.1, 0.13], tube: [0.06, 0.06, 0.07] });
 
 export function buildMechParts(ch) {
@@ -195,7 +196,7 @@ const BODY = {
   },
   // The digger (spec 20, placeholder name): a safety-yellow cab with a wide
   // window, black and yellow hazard stripes across its chest, an exhaust
-  // stack, and an open hopper on its back for the ore. Short thick arms end
+  // stack, and an open hopper on its back for the ore. Long booms end
   // in two buckets (the `fist` part, so they swing like PURPLE PUNCHER's):
   // a scoop open to the front with a row of teeth.
   digger(ch) {
@@ -214,16 +215,21 @@ const BODY = {
         b.cube(chain(M.T(0, 2.1, -0.75), M.S(3.2, 1.2, 0.2)), c);
         for (const sx of [1, -1]) b.cube(chain(M.T(sx * 1.55, 2.2, -1.6), M.S(0.2, 1.4, 1.9)), c, 1, 0.9);
       }),
+      // A long boom (an excavator's, for the bites it takes): the shoulder, the
+      // boom, and an elbow block the bucket hangs from, BOOM further down.
       arm: part(b => {
         b.cube(chain(M.T(0, -0.5, 0.15), M.S(1.2, 1.4, 1.3)), c);
+        b.cube(chain(M.T(0, -1.2 - BOOM / 2, 0.15), M.S(0.7, BOOM + 0.4, 0.8)), dark);         // the boom
+        for (const sx of [1, -1]) b.cube(chain(M.T(sx * 0.42, -1.2 - BOOM / 2, 0.15), M.S(0.12, BOOM, 0.5)), acc);   // its hazard rails
+        b.cube(chain(M.T(0, -1.2 - BOOM, 0.15), M.S(1.0, 0.6, 1.0)), c);                     // the elbow
         hinge(b, [0, 0.15, 0], 1.65, 1.45, dark);
       }),
-      // Hangs below the arm, open to the front; the bite swings it forward and down.
+      // Hangs below the boom, open to the front; the bite swings it forward and down.
       fist: part(b => {
-        b.cube(chain(M.T(0, -1.7, -0.35), M.S(1.9, 1.4, 0.2)), acc);                              // the back
-        b.cube(chain(M.T(0, -2.35, 0.35), M.S(1.9, 0.2, 1.5)), acc);                              // the floor
-        for (const sx of [1, -1]) b.cube(chain(M.T(sx * 0.9, -1.85, 0.25), M.S(0.16, 1.1, 1.3)), mul(acc, 1.6));   // the sides
-        for (let i = 0; i < 4; i++) b.cube(chain(M.T((i - 1.5) * 0.46, -2.4, 1.2), M.S(0.2, 0.18, 0.4)), dark);    // teeth
+        b.cube(chain(M.T(0, -1.7 - BOOM, -0.35), M.S(1.9, 1.4, 0.2)), acc);                       // the back
+        b.cube(chain(M.T(0, -2.35 - BOOM, 0.35), M.S(1.9, 0.2, 1.5)), acc);                       // the floor
+        for (const sx of [1, -1]) b.cube(chain(M.T(sx * 0.9, -1.85 - BOOM, 0.25), M.S(0.16, 1.1, 1.3)), mul(acc, 1.6));   // the sides
+        for (let i = 0; i < 4; i++) b.cube(chain(M.T((i - 1.5) * 0.46, -2.4 - BOOM, 1.2), M.S(0.2, 0.18, 0.4)), dark);    // teeth
       }),
     };
   },
