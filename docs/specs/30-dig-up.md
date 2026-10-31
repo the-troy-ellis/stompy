@@ -104,8 +104,10 @@ parked digger hauling out of one. The arms: a smoke screenshot.
   s; on 6 and 7 it now climbs out of the pit you dug (spec 29's open point).
 - **The arms from the cockpit** are a view model: the digger's arms hang
   beside its cab, 2.75 m out, and its buckets never pass in front of the
-  eye. From the cockpit only, the shoulders are drawn `COCKPIT_ARMS` (2.9 m
-  out, 1 m under and 3.2 m ahead of the eye), so the buckets swing up
-  through the windscreen's lower corners each turn. From outside the pose
-  is unchanged.
+  eye. From the cockpit only, the shoulders are drawn at `COCKPIT_ARMS`
+  (2.9 m out, 1.4 m under and 1.5 m ahead of the eye): below and outside the
+  view, so the arms and buckets swing in from the windscreen's sides each
+  turn and no shoulder hangs in the air. (First 3.2 m ahead and 1 m under:
+  on a phone, with no dash drawn, the shoulders floated in view.) From
+  outside the pose is unchanged.
 - The HUD's dirt shows whole loads (a 4 m corner is a fraction of one).
