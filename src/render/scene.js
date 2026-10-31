@@ -55,7 +55,7 @@ export const FIST_REST = -0.35;
 // out to each side, and up and ahead of the eye, in its body's units. Below and outside
 // the view (62° tall), so no shoulder hangs in the air: only the arms and buckets swing in
 // from the windscreen's sides (on a phone there's no dash to hide a shoulder behind).
-export const COCKPIT_ARMS = [2.9, -1.4, 1.5];
+export const COCKPIT_ARMS = [2.9, -2.0, 0.4];
 export function fistPose(m) {
   const st = m.melee, rest = { LA: FIST_REST, RA: FIST_REST, twist: 0 };
   if (!st || !st.arm) return rest;
