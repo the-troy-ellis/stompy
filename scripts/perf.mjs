@@ -112,6 +112,8 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   86.4k (46.7k) · scoop 65.0k (32.0k) · rain 83.4k (31.6k) · snow 75.4k
 //   (23.5k) · dust 70.1k (18.3k). Draws and garbage unchanged (spec 14: the
 //   cost is draw calls, not polygons); to be checked on a mid phone.
+// Your digger's arms from its cockpit (spec 30): the scoop scene's draws
+//   19/21 (15/17): two arms and two buckets, drawn as parts.
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
   menu:           { meanDraws: 14, peakDraws: 14, tris: 86000, allocKB: 38 },   // the menu's 60 frames are too few for drawWorld to be optimized, so its sums box a little
@@ -123,7 +125,7 @@ export const BUDGETS = {
   'bench-wrecks': { meanDraws: 91, peakDraws: 113, tris: 90500, allocKB: 285 },
   'bench-away':   { meanDraws: 43, peakDraws: 102, tris: 110000, allocKB: 200 },
   'bench-dig':    { meanDraws: 23, peakDraws: 24, tris: 99500, allocKB: 140 },   // three digs: the main thread only copies corners out and uploads what comes back; each makes a fine patch (spec 27)
-  scoop:          { meanDraws: 18, peakDraws: 19, tris: 75000, allocKB: 80 },   // DIG held 10 s at the range's mesa (spec 25): clods are particles, so no draws of their own; a fine patch round the face (spec 27)
+  scoop:          { meanDraws: 22, peakDraws: 24, tris: 75000, allocKB: 80 },   // DIG held 10 s at the range's mesa (spec 25): clods are particles, so no draws of their own; a fine patch round the face (spec 27); your arms from the cockpit, four draws (spec 30)
   rain:           { meanDraws: 21, peakDraws: 21, tris: 96000, allocKB: 110 },   // free-start in a downpour: one more draw (the rain), no more garbage
   snow:           { meanDraws: 19, peakDraws: 19, tris: 87000, allocKB: 95 },   // and in snow
   dust:           { meanDraws: 14, peakDraws: 14, tris: 81000, allocKB: 90 },   // and in a dust storm (2,500 grains)

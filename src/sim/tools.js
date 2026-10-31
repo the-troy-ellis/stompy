@@ -73,7 +73,7 @@ export function scoop(G, m, arm = 'L') {
     return;
   }
   const full = (m.ore || 0) >= m.ch.hopper;
-  bite(G, m, p, m.digRun.r, floorOf(m));
+  bite(G, m, p, m.digRun.r, m.digRun.fl, m.digRun.sl);
   m.dryScoops = m.biteCorners ? 0 : (m.dryScoops || 0) + 1;
   // Where it stood to dig: a parked digger comes back here (sim/miner.js), and
   // keeps its own heading there, only noting that the scoop dug.
@@ -125,6 +125,7 @@ function scoopFeel(G, m, p, arm) {
 // at the surface it finds then (none: nothing to dig).
 function runPoint(G, m) {
   const T = TOOL.dig, run = m.digRun, a = aimGround(G, m);
+  if (AIM.d[0][1] > RAMP_FROM && !m.parked) return rampPoint(G, m);   // aimed well up: a ramp (docs/specs/30-dig-up.md)
   if (a && run && run.k < T.steps && hypot(m.x - run.at[0], m.z - run.at[1]) < 2 && offLine(run.c, AIM.o, AIM.d[run.tilt]) < T.drift) {
     run.r = T.r0 + run.k++ * T.grow;
     return run.c;
@@ -133,8 +134,11 @@ function runPoint(G, m) {
   // fl: a face's run (aimed within LEVEL of level) is flat-bottomed at the
   // feet; a parked digger's tunnel stays at its mouth's level (sim/miner.js),
   // so no dip deepens into a pit. Aimed down at the floor, it's round (-Infinity).
-  const level = AIM.d[AIM.hit][1] > -LEVEL;
-  m.digRun = { c: a, r: T.r0, k: 1, at: [m.x, m.z], tilt: AIM.hit, fl: !level ? -Infinity : m.parked && m.site?.mouth ? m.site.mouth[1] : m.y };
+  // A parked digger in its own tunnel floors it at the mouth, unless it's
+  // down in a pit below that. Aimed up, it's a ramp (rampPoint).
+  const d = AIM.d[AIM.hit], level = d[1] > -LEVEL, h = hypot(d[0], d[2]) || 1, slope = d[1] > 0 ? min(T.ramp, d[1] / h) : 0;
+  const mo = m.parked && m.site?.mouth, fl = !level ? -Infinity : mo && m.y > mo[1] - 1 ? mo[1] : m.y;
+  m.digRun = { c: a, r: T.r0, k: 1, at: [m.x, m.z], tilt: AIM.hit, fl, sl: level && slope > 0 ? [slope * d[0] / h, slope * d[2] / h, m.x, m.z] : null };
   return a;
 }
 // A face's scoop (the level aim) keeps the floor: a flat-bottomed bite down
@@ -144,7 +148,27 @@ function runPoint(G, m) {
 // The floor is the feet's height where the run began, so scoops that reach
 // back under the digger never lower what it stands on.
 const LEVEL = sin(15 * PI / 180);
-const floorOf = m => m.digRun.fl;
+// Aimed up, a run cuts a ramp (docs/specs/30-dig-up.md): not where the aim
+// meets the ground (a wall overhead, or nothing in reach), but along the ramp
+// itself, centred rampAt metres ahead, rampLift over where its floor will be,
+// so each scoop clears the floor and the headroom over it. The floor slopes
+// up from the feet as steep as the aim, to TOOL.dig.ramp.
+const RAMP_FROM = sin(9 * PI / 180);   // the aim this far above level, or more, digs a ramp
+function rampPoint(G, m) {
+  const T = TOOL.dig, run = m.digRun, d = AIM.d[0];
+  if (run && run.ramp && run.k < T.steps && hypot(m.x - run.at[0], m.z - run.at[1]) < 2) {
+    run.r = T.r0 + run.k++ * T.grow;
+    return run.c;
+  }
+  const h = hypot(d[0], d[2]) || 1, fx = d[0] / h, fz = d[2] / h, slope = min(T.ramp, d[1] / h), D = T.rampAt * m.ch.scale;
+  const c = [m.x + fx * D, m.y + slope * D + T.rampLift, m.z + fz * D];
+  // Nothing to dig (open ground, the sky) if no ground stands over where the
+  // ramp would run, at its middle or as far as the run's last scoop reaches.
+  const far = D + T.r0 + T.grow * (T.steps - 1), C = G.ter.coarse;
+  if (C.height(c[0], c[2]) < c[1] - T.rampLift + 0.5 && C.height(m.x + fx * far, m.z + fz * far) < m.y + slope * far + 0.5) { m.digRun = null; return null; }
+  m.digRun = { c, r: T.r0, k: 1, at: [m.x, m.z], tilt: 0, ramp: true, fl: m.y, sl: [slope * fx, slope * fz, m.x, m.z] };
+  return c;
+}
 // How far a point is off a ray (o, unit d), ahead of its start; behind it is far.
 function offLine(c, o, d) {
   const vx = c[0] - o[0], vy = c[1] - o[1], vz = c[2] - o[2], t = vx * d[0] + vy * d[1] + vz * d[2];
@@ -169,7 +193,8 @@ export function aimGround(G, m) {
   let t = null;
   AIM.o = o;
   for (let i = 0; i < TILT.length; i++) { const down = (m.pitch || 0) + TILT[i]; AIM.d[i] = [sin(yaw) * cos(down), sin(down), cos(yaw) * cos(down)]; }
-  for (let i = 0; i < (m.parked ? 1 : TILT.length) && t == null; i++) {
+  const up = AIM.d[0][1] > RAMP_FROM;   // aimed well up: only up, to dig a ramp out (docs/specs/30-dig-up.md), never the floor's pit instead
+  for (let i = 0; i < (m.parked || up ? 1 : TILT.length) && t == null; i++) {
     DIR[0] = AIM.d[i][0]; DIR[1] = AIM.d[i][1]; DIR[2] = AIM.d[i][2];
     t = G.ter.coarse.ray(o, DIR, reach);
     AIM.hit = i;

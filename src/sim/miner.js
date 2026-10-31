@@ -25,6 +25,10 @@ const { atan2, hypot, sin, cos, abs, min } = Math;
 export const MINER = {
   arrive: 3,      // m: this near its site it stops and digs
   mouth: 6,       // m: this near its tunnel's mouth, it walks on straight (walkTo)
+  rampAfter: 3,   // s with no metre nearer and no way on it can walk, and a digger digs itself a ramp (walkTo, docs/specs/30-dig-up.md)
+  rampFor: 30,    // s a digger keeps at it before it gives the trip up (others: stuck)
+  rampLook: 8,    // m ahead it must be able to walk to stop digging and go on
+  rampPitch: 0.45,   // rad: it looks up all the way, for the steepest ramp (TOOL.dig.ramp's cap holds it walkable)
   face: 0.12,     // rad: this square to the site's heading before it holds DIG
   follow: 4,      // m: when no aim digs, the site moves this far ahead, after the face; or, if the face is in sight further on,
   stand: 8,       // m: to this far short of it (the face a run digs back runs well past the bucket's reach on the 4 m grid, docs/specs/29-ground-4m.md)
@@ -194,18 +198,33 @@ export function halt(m, dt) { m.throttle = 0; m.twist -= clampN(m.twist, -2 * dt
 // The steepest a mech walks up, rise over run, with a margin: its torso
 // meets a slope steeper than its height over its radius (sim/mech.js rockAt).
 const climbOf = m => { const g = geoOf(m); return 0.85 * g.torsoY / g.radius; };
+const headOf = m => geoOf(m).height * m.ch.scale * 0.95;   // the room it needs overhead: what its body is weighed to (sim/mech.js rockAt), so a tunnel it dug fits it
 export function walkTo(G, m, a, x, y, z, dt, giveUp) {
   // In or out of its own tunnel (docs/specs/29-ground-4m.md: on the 4 m grid
   // its walls are walls): when the straight way isn't one it can walk, by the
   // tunnel's mouth first, the way it came.
   const mo = m.site?.mouth;
-  if (mo && hypot(mo[0] - m.x, mo[2] - m.z) > MINER.mouth && hypot(x - m.x, z - m.z) > MINER.mouth && !walkable(walkGround(G.ter), m.x, m.y, m.z, x, z, 40, climbOf(m))) { x = mo[0]; y = mo[1]; z = mo[2]; }
-  const d = hypot(x - m.x, z - m.z), g = a.goal;
+  if (mo && hypot(mo[0] - m.x, mo[2] - m.z) > MINER.mouth && hypot(x - m.x, z - m.z) > MINER.mouth && !walkable(walkGround(G.ter), m.x, m.y, m.z, x, z, 40, climbOf(m), headOf(m))) { x = mo[0]; y = mo[1]; z = mo[2]; }
+  const d = hypot(x - m.x, z - m.z), g = a.goal, digs = m.ch.tool === 'dig';
   if (!g || g.x !== x || g.z !== z || d < g.best - 1 || G.time - g.seen > 1) a.goal = { x, z, best: d, t: G.time, seen: G.time };   // a new trip, nearer, or back after a break
-  else if (G.time - g.t > MINER.stuck) { a.goal = null; giveUp(); return halt(m, dt); }
+  else if (G.time - g.t > (digs ? MINER.rampFor : MINER.stuck)) { a.goal = null; giveUp(); return halt(m, dt); }
   else g.seen = G.time;
+  // A digger that's got no nearer for a while, with no way on it can walk (a
+  // pit, a wall too steep, a roof too low), digs one (docs/specs/30-dig-up.md):
+  // it faces the way it's going, looks up and holds DIG, and a scoop aimed up
+  // cuts a ramp (sim/tools.js). As soon as the way on is one it can walk, it walks it.
+  if (digs && a.goal && G.time - a.goal.t > MINER.rampAfter) {
+    const want = atan2(x - m.x, z - m.z), look = min(MINER.rampLook, d);
+    if (!walkable(walkGround(G.ter), m.x, m.y, m.z, m.x + sin(want) * look, m.z + cos(want) * look, Infinity, climbOf(m), headOf(m))) {
+      halt(m, dt);
+      m.yaw += clampN(wrapA(want - m.yaw), -m.ch.turn * dt, m.ch.turn * dt);
+      m.pitch = MINER.rampPitch;
+      m.toolHold = abs(wrapA(want - m.yaw)) < MINER.face;
+      return;
+    }
+  }
   let yaw = routeYaw(G, m, x, y, z) ?? atan2(x - m.x, z - m.z);
-  yaw = feelers(G, m, yaw, min(FEEL_M, d + 2), climbOf(m));
+  yaw = feelers(G, m, yaw, min(FEEL_M, d + 2), climbOf(m), headOf(m));
   const off = abs(wrapA(yaw - m.yaw));
   m.yaw += clampN(wrapA(yaw - m.yaw), -m.ch.turn * dt, m.ch.turn * dt);
   m.twist -= clampN(m.twist, -2 * dt, 2 * dt);

@@ -86,13 +86,13 @@ export function dig(G, p, r, owned = true) {
 // bite down to that floor (world/voxels.js dig; single player, as its ore is:
 // online a bite is a plain dig).
 export const seamOre = depth => CONSTRUCT.orePerSeam * Math.min(CONSTRUCT.seamMax, 1 + Math.max(0, depth) / CONSTRUCT.seamDeep);
-export function bite(G, m, p, r = CONSTRUCT.bucket, fl = -Infinity) {
+export function bite(G, m, p, r = CONSTRUCT.bucket, fl = -Infinity, sl = null) {
   m.seamBite = false; m.biteCorners = 0; m.biteOre = 0;
   if (!G.ter || online(G)) { dig(G, p, r, ownsDigs(G, m)); return 0; }
   const x = q(p[0], 0.25), y = q(p[1], 0.25), z = q(p[2], 0.25), seed = G.ter.seed;
   let got = 0, seams = 0;
   const tally = { rock: 0, soft: 0, corner: (cx, cy, cz, depth) => { if (seamAt(seed, cx, cy, cz)) { got += seamOre(depth); seams++; } else got += CONSTRUCT.orePerCorner; } };
-  confirmDig(G, [0, x, y, z, r], true, 1, tally, fl);
+  confirmDig(G, [0, x, y, z, r], true, 1, tally, fl, sl);
   // Whole ore into the hopper; the fraction rides on to the next bite (a 4 m
   // corner is an eighth of an 8 m one, docs/specs/29-ground-4m.md), so the
   // sum is the same in any order.
@@ -156,8 +156,8 @@ function logDig(G, e) {
 
 // One dig in the confirmed order: carved, the ground it leaves unheld falls,
 // and what stood there settles. `seen`: the falls are shown coming down.
-function confirmDig(G, e, seen, rock = DIG.rock, tally = null, fl = -Infinity) {
-  const [, x, y, z, r] = e, C = confirmed(G), b = C.dig([x, y, z], r, rock, tally, fl);
+function confirmDig(G, e, seen, rock = DIG.rock, tally = null, fl = -Infinity, sl = null) {
+  const [, x, y, z, r] = e, C = confirmed(G), b = C.dig([x, y, z], r, rock, tally, fl, sl);
   const falls = b ? C.islands(b).map(cells => C.fall(cells)) : [];
   // Then what still holds on but hangs too far off what holds it (the torque rule); a break can leave another.
   const weighed = G.digLog ? [] : null;

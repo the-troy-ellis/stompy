@@ -24,6 +24,10 @@
 //            corners: dirt comes in at about 70% of the punch's
 //   reach    m (times the chassis's scale) the aim looks for ground: the
 //            bucket's reach, as the punch's was
+//   ramp     the steepest a scoop aimed up slopes its floor, rise over run
+//            (docs/specs/30-dig-up.md): about 40°, under the digger's climb.
+//            A ramp's scoops are centred rampAt m ahead (× scale), rampLift m
+//            over where its floor will be
 //   heat     a scoop's heat
 //   perSwing scoops at a construction site that make one swing of work
 //            (docs/specs/23-construction-sites.md): today's pace
@@ -31,5 +35,5 @@
 //   dry      scoops in a row that turn no ground to air before a parked
 //            digger tries its next aim (sim/miner.js): about one old bite
 export const TOOL = {
-  dig: { turn: 0.8, spinUp: 0.15, bite: 1.0, lift: 4, r0: 3, grow: 1, steps: 6, drift: 4, into: 2, reach: 14.3, heat: 1 / 3, perSwing: 3, dry: 3, clods: [4, 6] },
+  dig: { turn: 0.8, spinUp: 0.15, bite: 1.0, lift: 4, ramp: 0.85, rampAt: 6, rampLift: 2, r0: 3, grow: 1, steps: 6, drift: 4, into: 2, reach: 14.3, heat: 1 / 3, perSwing: 3, dry: 3, clods: [4, 6] },
 };

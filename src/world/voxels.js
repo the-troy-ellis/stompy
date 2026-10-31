@@ -213,16 +213,19 @@ function groundApi(G) {
   // docs/specs/29-ground-4m.md): under its centre the sphere goes on down as
   // a cylinder of the same radius, and nothing goes below `fl`, so a tunnel
   // has a level floor and no toe of rock at the face.
-  function dig(p, r, rock = 0.5, tally = null, fl = -Infinity) {
+  // `sl` (with `fl`): the floor slopes up ahead (docs/specs/30-dig-up.md), as
+  // [gx, gz, ox, oz]: at (x, z) it's fl + max(0, gx (x − ox) + gz (z − oz)),
+  // so it rises the way the digger at (ox, oz) looks and never drops below fl.
+  function dig(p, r, rock = 0.5, tally = null, fl = -Infinity, sl = null) {
     const flat = fl > -Infinity, [i0, i1, j0, j1, k0, k1] = flat ? box([p[0], (fl + p[1] + r) / 2, p[2]], max(r, (p[1] + r - fl) / 2)) : box(p, r);   // flat: from the floor up
     if (i0 > i1 || j0 > j1 || k0 > k1) return;
     const base = G.base;
-    fine(p, r, DIG, rock, fl);
+    fine(p, r, DIG, rock, fl, sl);
     for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
-      const soft = base[i + PX * k] - SOFT, dx = -HALF + i * VS - p[0], dz = -HALF + k * VS - p[2];
+      const soft = base[i + PX * k] - SOFT, x = -HALF + i * VS, z = -HALF + k * VS, dx = x - p[0], dz = z - p[2], f = sl ? fl + max(0, sl[0] * (x - sl[2]) + sl[1] * (z - sl[3])) : fl;
       for (let j = j0; j <= j1; j++) {
         const y = Y0 + j * VS, o = cornerIndex(i, j, k), dist = benchDist(dx, y - p[1], dz, fl - y), was = D[o];
-        D[o] = Q(min((was - 128) / 127, max(dist - (y >= soft ? r : r * rock), fl - y) / DS));
+        D[o] = Q(min((was - 128) / 127, max(dist - (y >= soft ? r : r * rock), f - y) / DS));
         if (tally && was > 128 && D[o] <= 128) {
           if (y >= soft) tally.soft = (tally.soft || 0) + 1;
           else { tally.rock++; if (tally.corner) tally.corner(-HALF + i * VS, y, -HALF + k * VS, soft + SOFT - y); }
@@ -457,7 +460,7 @@ function groundApi(G) {
   // and `a`, `b` say which edit: CARVE (r), DIG (r, rock: a), BUILD (r), PILE
   // (h: a, foot radius: b). No closures: these loops run over tens of
   // thousands of corners, and a call through one boxes every number it returns.
-  function fine(c, r, op, a = 0, b2 = 0) {
+  function fine(c, r, op, a = 0, b2 = 0, sl = null) {
     const P = G.patches;
     if (!P) return;
     const reach = r + 2 * FS, low = op === DIG && b2 > -Infinity ? min(0, b2 - FS - (c[1] - reach)) : 0, b = fineBox(c, reach, low), near = !G.fineNear || hypot(c[0] - G.fineNear[0], c[2] - G.fineNear[1]) < G.fineNear[2];
@@ -470,7 +473,7 @@ function groundApi(G) {
         if (P.length > PATCH.max) P.find(q => !q.force).force = true;   // the oldest settles at once (sim/dig.js)
       }
     }
-    for (const p of P) if (overlaps(p, b)) editFine(p, c, reach, r, op, a, b2);   // their tops come when the 8 m grid has taken it too (touched)
+    for (const p of P) if (overlaps(p, b)) editFine(p, c, reach, r, op, a, b2, sl);   // their tops come when the 8 m grid has taken it too (touched)
     G.rev++;
   }
   // A new patch's bytes that `makePatch` didn't keep from the one it grew from: the ground as it reads now.
@@ -486,7 +489,7 @@ function groundApi(G) {
   // One edit into a patch, at each fine corner within `reach` of c, only where
   // the 8 m grid may change too (not bedrock, not the map's edge). A patch
   // caught settling keeps the slump so far as its own ground and stops.
-  function editFine(p, c, reach, r, op, a, b2) {
+  function editFine(p, c, reach, r, op, a, b2, sl) {
     if (p.blend > 0) bake(p);
     const i0 = max(0, floor((c[0] - reach - p.x0) / FS)), i1 = min(p.nx - 1, ceil((c[0] + reach - p.x0) / FS));
     const j0 = max(0, floor((min(c[1] - reach, op === DIG && b2 > -Infinity ? b2 - FS : Infinity) - p.y0) / FS)), j1 = min(p.ny - 1, ceil((c[1] + reach - p.y0) / FS));   // a flat-bottomed bite reaches down to its floor
@@ -495,12 +498,12 @@ function groundApi(G) {
     for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
       const x = p.x0 + i * FS, z = p.z0 + k * FS;
       if (x < xs || x > xe || z < xs || z > xe) continue;
-      const soft = op === DIG ? baseAt(x, z) - SOFT : 0, dd = hypot(x - c[0], z - c[2]), want = op === PILE && dd < b2 ? height(x, z) + a * (1 - dd / b2) : 0;
+      const soft = op === DIG ? baseAt(x, z) - SOFT : 0, dd = hypot(x - c[0], z - c[2]), f = sl ? b2 + max(0, sl[0] * (x - sl[2]) + sl[1] * (z - sl[3])) : b2, want = op === PILE && dd < b2 ? height(x, z) + a * (1 - dd / b2) : 0;
       for (let j = j0; j <= j1; j++) {
         const y = p.y0 + j * FS;
         if (y <= lo || y > ys) continue;
         const o = i + nx * j + nxy * k, d = (F[o] - 128) / 127, dist = op === DIG && b2 > -Infinity && y < c[1] ? dd : hypot(dd, y - c[1]);
-        F[o] = Q(op === CARVE ? min(d, (dist - r) / DS) : op === DIG ? min(d, max(dist - (y >= soft ? r : r * a), b2 - y) / DS)
+        F[o] = Q(op === CARVE ? min(d, (dist - r) / DS) : op === DIG ? min(d, max(dist - (y >= soft ? r : r * a), f - y) / DS)
           : op === BUILD ? max(d, (r - dist) / DS) : dd < b2 ? max(d, (want - y) / DS) : d);
       }
     }
