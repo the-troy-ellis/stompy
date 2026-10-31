@@ -120,12 +120,12 @@ export const navOf = G => (G.nav && G.nav.of === G.ter ? G.nav : (G.nav = { ...m
 
 // Whether a mech at (x, y, z) can walk the straight line to (x1, z1), the
 // first `reach` metres of it: stepped as the nav's links are, climbing no
-// steeper than `climb` (rise over run).
-export function walkable(ter, x, y, z, x1, z1, reach = Infinity, climb = CLIFF) {
-  const d = Math.min(hypot(x1 - x, z1 - z), reach), n = Math.ceil(d / STEP_M), ux = (x1 - x) / (hypot(x1 - x, z1 - z) || 1), uz = (z1 - z) / (hypot(x1 - x, z1 - z) || 1);
+// steeper than `climb` (rise over run), with `head` metres clear overhead.
+export function walkable(ter, x, y, z, x1, z1, reach = Infinity, climb = CLIFF, head = HEADROOM) {
+  const d = Math.min(hypot(x1 - x, z1 - z), reach), n = Math.ceil(d / STEP_M - 1e-6), ux = (x1 - x) / (hypot(x1 - x, z1 - z) || 1), uz = (z1 - z) / (hypot(x1 - x, z1 - z) || 1);   // - 1e-6: 8 m is four steps, not a fifth past it
   for (let i = 1; i <= n; i++) {
-    const px = x + ux * i * STEP_M, pz = z + uz * i * STEP_M, lid = y + climb * STEP_M + SLACK, g = ter.groundBelow(px, lid, pz);
-    if (g >= lid - 0.01 || ter.solid(px, g + HEADROOM, pz)) return false;
+    const t = min(i * STEP_M, d), px = x + ux * t, pz = z + uz * t, lid = y + climb * STEP_M + SLACK, g = ter.groundBelow(px, lid, pz);
+    if (g >= lid - 0.01 || ter.solid(px, g + head, pz)) return false;
     y = g;
   }
   return true;
@@ -154,14 +154,15 @@ export const FEEL_M = 12;
 const TRY = [0.45, 0.9, 1.35, 1.8, 2.4];
 // `reach`: how far to look, if the goal is nearer than FEEL_M (a digger a few
 // metres from its spot, the face it digs just past it).
-// `climb`: the steepest it walks up, if less than CLIFF (sim/miner.js: a crew mech's own).
-export function feelers(G, e, yaw, reach = FEEL_M, climb = CLIFF) {
-  if (feelOpen(G, e, yaw, reach, climb)) return yaw;   // plain calls, no closures: this runs every frame for every foe on the move
+// `climb`, `head`: the steepest it walks up and the room it needs overhead,
+// if less than CLIFF and HEADROOM (sim/miner.js: a crew mech's own).
+export function feelers(G, e, yaw, reach = FEEL_M, climb = CLIFF, head = HEADROOM) {
+  if (feelOpen(G, e, yaw, reach, climb, head)) return yaw;   // plain calls, no closures: this runs every frame for every foe on the move
   const side = e.ai.feelSide || 1;
   for (let i = 0; i < TRY.length; i++) {
-    if (feelOpen(G, e, yaw + side * TRY[i], reach, climb)) return yaw + side * TRY[i];
-    if (feelOpen(G, e, yaw - side * TRY[i], reach, climb)) { e.ai.feelSide = -side; return yaw - side * TRY[i]; }
+    if (feelOpen(G, e, yaw + side * TRY[i], reach, climb, head)) return yaw + side * TRY[i];
+    if (feelOpen(G, e, yaw - side * TRY[i], reach, climb, head)) { e.ai.feelSide = -side; return yaw - side * TRY[i]; }
   }
   return yaw;
 }
-function feelOpen(G, e, t, reach, climb) { return walkable(walkGround(G.ter), e.x, e.y, e.z, e.x + Math.sin(t) * reach, e.z + Math.cos(t) * reach, Infinity, climb); }
+function feelOpen(G, e, t, reach, climb, head) { return walkable(walkGround(G.ter), e.x, e.y, e.z, e.x + Math.sin(t) * reach, e.z + Math.cos(t) * reach, Infinity, climb, head); }

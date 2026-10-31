@@ -888,7 +888,7 @@ export function createHud(app) {
       wy += 14;
       ctx.fillStyle = can ? GREEN : DIM;
       ctx.fillText(G.touchUI ? 'DIRT' : `${CAT_KEY.fusion.padEnd(6)}DIRT`, wx, wy);
-      ctx.fillText(String(dirt).padStart(3), wx + 118, wy);
+      ctx.fillText(String(Math.floor(dirt)).padStart(3), wx + 118, wy);   // whole loads: a 4 m corner is a fraction of one (spec 29)
       ctx.fillStyle = '#031203'; ctx.fillRect(wx + 150, wy - 3, 40, 6);
       ctx.fillStyle = can ? GREEN : DIM; ctx.fillRect(wx + 150, wy - 3, 40 * dirt / CONSTRUCT.dirtMax, 6);
     }

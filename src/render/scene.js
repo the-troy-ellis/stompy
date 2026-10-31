@@ -51,6 +51,9 @@ export const legSplay = squash => clampN(squash / 0.25, 0, 1) * 0.2;
 // and it eases back over the recovery. Negative swings forward. `twist`
 // turns the torso away from the punch, then into it. Pure, for the tests.
 export const FIST_REST = -0.35;
+// A digger's shoulders as drawn from its own cockpit (docs/specs/30-dig-up.md): this far
+// out to each side, and up and ahead of the eye, in its body's units.
+export const COCKPIT_ARMS = [2.9, -1.0, 3.2];
 export function fistPose(m) {
   const st = m.melee, rest = { LA: FIST_REST, RA: FIST_REST, twist: 0 };
   if (!st || !st.arm) return rest;
@@ -241,7 +244,9 @@ export function createScene(app) {
     if (R.skinned) BONES.set(mat, bone * 16);
     else R.draw(mesh, mat, putTint);
   };
-  function drawMech(m, VPtint) {
+  // `armsOnly`: your own digger from the cockpit (docs/specs/30-dig-up.md):
+  // just its arms and buckets, drawn as parts (not skinned), so you see them dig.
+  function drawMech(m, VPtint, armsOnly = false) {
     // The hips drop by the sag spring (reactor down); the feet stay put and the knees take it up.
     const sag = (m.sag ? m.sag.x : 0) + (m.dying ? m.dying.drop || 0 : 0);   // and the buckle of a dying mech
     // A one-legged mech leans toward the gap (m.lean, radians of roll about its heading).
@@ -261,11 +266,11 @@ export function createScene(app) {
     const g = geoOf(m), back = mul(fwd, -1);
     if (R.skinned && !grab) BONES.fill(0);   // a part that isn't drawn this frame keeps a zero matrix
     putTint = tint;
-    put(BONE.hip, parts.hip, chain(BH, M.T(0, g.hip, 0)));
+    if (!armsOnly) put(BONE.hip, parts.hip, chain(BH, M.T(0, g.hip, 0)));
     const hull = M.apply(B, [0, g.hip, 0]);
     // Legs reach for wherever the feet actually are; the knee bends forward,
     // backward (bird legs) or out and up (the quadruped's spider legs).
-    m.feet.forEach((f, i) => {
+    if (!armsOnly) m.feet.forEach((f, i) => {
       const leg = g.legs[i];
       if (m.hp[leg.hx > 0 ? 'LL' : 'RL'] <= 0) return;   // the leg came off; it's lying somewhere behind
       const H = M.apply(BH, [leg.hx, g.hip, leg.hz]);
@@ -291,11 +296,15 @@ export function createScene(app) {
     const spin = spinPose(m);   // a digger's arms turning like a paddle wheel, DIG held (sim/tools.js)
     const TB = chain(B, M.T(0, g.torsoY + (m.torsoDrop || 0), 0), M.S(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5), M.RY(m.twist + (fists ? fists.twist : 0)), M.T(0, 0, pose.lunge), M.RX(wp - pose.lean + (m.torsoNod || 0) + (m.runLean || 0)), M.RZ(wr));   // torsoDrop, torsoNod: the pendulum body; runLean: a run's lean forward (sim/gait.js)
     if (DARK > 0.05 && parts.lamps) { const l = m.lampAt || (m.lampAt = [[0, 0, 0], [0, 0, 0]]); placeInto(TB, parts.lamps[0], l[0]); placeInto(TB, parts.lamps[1], l[1]); }   // the headlamps, drawn after the run
-    put(BONE.torso, parts.torso, TB);
+    if (!armsOnly) put(BONE.torso, parts.torso, TB);
     for (const [s, k, side] of [[1, 'LA', 0], [-1, 'RA', 1]]) {
       if (m.hp[k] <= 0) continue;
       // Fists follow the aim only a little; guns follow it all the way.
-      const AM = chain(TB, M.T(s * g.armX, g.armY, 0), M.RX(spin ? -m.pitch * 0.3 + FIST_REST - spin[k] : fists ? -m.pitch * 0.3 + fists[k] : -m.pitch + pose.arm));
+      // From the cockpit the shoulders are drawn in and forward of the eye (COCKPIT_ARMS), so the
+      // buckets sweep up through the windscreen's lower corners: the arms sit beside the cab, out of view.
+      const sh = armsOnly ? [s * COCKPIT_ARMS[0], g.eye[1] + COCKPIT_ARMS[1], g.eye[2] + COCKPIT_ARMS[2]] : [s * g.armX, g.armY, 0];
+      const AM = chain(TB, M.T(...sh), M.RX(spin ? -m.pitch * 0.3 + FIST_REST - spin[k] : fists ? -m.pitch * 0.3 + fists[k] : -m.pitch + pose.arm));
+      if (armsOnly) { R.draw(parts.arm, AM, tint); if (parts.fist) R.draw(parts.fist, AM, tint); continue; }
       put(BONE.arm[side], parts.arm, AM);
       if (parts.fist && grab) grab(BONE.arm[side], parts.fist, AM);
       else if (parts.fist && !R.skinned) R.draw(parts.fist, AM, tint);   // skinned, the fist rides on the arm's bone
@@ -306,7 +315,7 @@ export function createScene(app) {
         put(BONE.barrel[side], parts.barrel, chain(AM, M.T(...at), M.S(bw, bw, bl), M.T(-at[0], -at[1], -at[2])));
       }
     }
-    if (R.skinned && !grab) R.drawSkinned(parts.skin, BONES, tint);
+    if (R.skinned && !grab && !armsOnly) R.drawSkinned(parts.skin, BONES, tint);
     R.drawHeat = heatWas;
   }
   // A mech's pose as the HUD's damage diagram draws it: every part's edges
@@ -717,6 +726,8 @@ export function createScene(app) {
     for (const w of G.wrecks) if (seen(w.x, w.y + 2 * w.scale, w.z, 9 * w.scale)) drawWreck(w);
     R.drawHeat = 1;
     if (R.skinned) R.endSkinned();
+    // In a digger, from the cockpit, its own arms (docs/specs/30-dig-up.md): no invisible shovels.
+    if (P && P.alive && P.ch.tool === 'dig' && !shown(P) && G.state !== 'menu') drawMech(P, null, true);
     for (const w of G.wrecks) if (w.t < WRECK_BURN && seen(w.x, w.y + 2 * w.scale, w.z, 9 * w.scale)) drawBurn(w);
     for (const m of G.mechs) if (shown(m)) drawFlash(m);
     drawRemains();
