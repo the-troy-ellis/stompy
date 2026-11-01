@@ -26,6 +26,12 @@ the quiet and the warning happen; the cockpit is where the loud happens.
 
 ### Part 1: grow the crew
 
+> **Changed by [33-production.md](33-production.md):** in missions with an
+> assembly line, MAKE is on the line, and mechs are put together from parts
+> and a core, not bought with ore. The line, the cap and the objectives
+> below still hold; the prices become recipes. Missions with the factory
+> keep it as today.
+
 - **Tap the factory** on the map (nothing picked): the order bar becomes the
   **MAKE** bar, one button a mech, with its price:
 
@@ -94,7 +100,8 @@ the quiet and the warning happen; the cockpit is where the loud happens.
 - **Lodes:** a few rich patches per map (`ORE_LODES`, 3), each a ring on the
   map once any crew mech has come within 60 m of it: `ORE`. Before that,
   nothing shows. Found: the voice says `Ore found.`
-- **OUTPOST** (placeholder key `outpost`): a small silo, a site from BUILD.
+- **OUTPOST** (placeholder key `outpost`; **now a second silo**, spec 33:
+  silos are all one kind, ore is one pool, and each silo is a beacon): a small silo, a site from BUILD.
   Diggers and haulers unload at the nearest silo or outpost; its ore goes
   straight into the base's ore (one pool, no carrying between). Raiders go
   for outposts as for any building. NAMING in its PR.

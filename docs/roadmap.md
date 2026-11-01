@@ -366,6 +366,13 @@ get objectives about building; Free Play gets BASE · ENDLESS. Spec:
 [specs/32-base-loop.md](specs/32-base-loop.md). In three parts: grow the
 crew; defend from above (and ENDLESS); spread out.
 
+Then production ([specs/33-production.md](specs/33-production.md)): a machine
+shop, an isotope plant, a weapon lab and shop, and an open assembly line you
+can watch put mechs together; haulers carry every made thing; beacons draw
+your border, and a building knocked down outside it can be carried off.
+Missions start from nothing, or with a full, damaged or half-built base. In
+six parts.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
