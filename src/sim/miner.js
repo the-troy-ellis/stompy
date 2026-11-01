@@ -5,6 +5,7 @@ import { siteInReach, siteReach } from './tools.js';
 import { TOOL } from '../data/tools.js';
 import { routeYaw, feelers, walkable, walkGround, FEEL_M } from './ai/nav.js';
 import { padOf, siteWork, nearestSilo, oreRoom, needsRepair, repairCost } from './base.js';
+import { carryFor, thingAt, pickUp, putDown, pileAt } from './production.js';
 
 const { atan2, hypot, sin, cos, abs, min } = Math;
 
@@ -161,7 +162,8 @@ export function haul(G, m, dt, follow = null) {
     if (k < bd) { dig = d; bd = k; }
   }
   const silo = siloFor(G, m), ore = m.ore || 0;
-  if (follow) m.fetch = null;
+  if (follow) { m.fetch = null; if (m.carry) putDown(G, m); }
+  else if (carry(G, m, a, dt)) return;   // a part an assembly line wants: that first (spec 33)
   else if (fetch(G, m, a, nearestSilo(G, m.x, m.z), dt)) return;   // a site needs ore: that first (spec 23), from the nearest silo
   const heap = !follow && ore < m.ch.hopper && nearestHeap(G, m);
   if (heap && silo) {   // a fallen silo's ore on the ground (spec 33): scoop it up (base.js), then home with it
@@ -182,6 +184,34 @@ export function haul(G, m, dt, follow = null) {
   walkTo(G, m, a, x, dig.y, z, dt, () => {});
 }
 
+// Parts to an assembly line (docs/specs/33-production.md § Physical things
+// and haulers): carrying one, to the line's pile; with an empty tub, to the
+// nearest part a line wants (claimed, so two haulers don't go for one).
+// False when there's nothing to carry.
+function carry(G, m, a, dt) {
+  const b = G.base;
+  if (!b?.lines.length) return false;
+  if (m.carry && !b.things.includes(m.carry)) m.carry = null;
+  if (m.carry) {
+    const line = m.carry.to;
+    if (!line?.alive) { putDown(G, m); return false; }
+    const [x, z] = pileAt(line, b.things.filter(o => o.at === line).length);
+    m.job = 'CARRYING';
+    if (Math.hypot(x - m.x, z - m.z) < CONSTRUCT.handover * 0.6) { putDown(G, m, line); halt(m, dt); return true; }
+    walkTo(G, m, a, x, G.ter.height(x, z), z, dt, () => { putDown(G, m); });
+    return true;
+  }
+  if ((m.ore || 0) > 0) return false;   // the tub's for ore now: that first
+  const job = carryFor(G, m);
+  if (!job) { if (m.carryFor) m.carryFor.claim = null; m.carryFor = null; return false; }
+  if (m.carryFor && m.carryFor !== job.t && m.carryFor.claim === m) m.carryFor.claim = null;
+  job.t.claim = m; job.t.for = job.line; m.carryFor = job.t;
+  const [x, z] = thingAt(G, job.t);
+  m.job = 'FETCHING';
+  if (Math.hypot(x - m.x, z - m.z) < CONSTRUCT.handover * 0.6) { pickUp(job.t, m, job.line); halt(m, dt); return true; }
+  walkTo(G, m, a, x, G.ter.height(x, z), z, dt, () => { job.t.claim = null; m.carryFor = null; });
+  return true;
+}
 // Where a mech with ore takes it (spec 33): the nearest silo standing, if the
 // pool has room; null if it hasn't, or there's no silo.
 function siloFor(G, m) {

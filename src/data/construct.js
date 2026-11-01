@@ -37,6 +37,8 @@ import { NAMES } from './names.js';
 //   siloRoom      ore each standing silo adds to the pool's room (docs/specs/33-production.md)
 //   link          m: silos and beacons this near each other link; three
 //                 linked to each other make a triangle of territory
+//   crewMax       the crew's most, you included: an assembly line makes no
+//                 more past it (docs/specs/32-base-loop.md)
 //   repairOre     a builder's repairs: this share of a building's price mends
 //                 it from nothing to full, a swing at a time
 export const CONSTRUCT = {
@@ -46,7 +48,7 @@ export const CONSTRUCT = {
   salvage: { jackal: 10, light1: 10, kestrel: 20, sniper1: 20, warden: 35, puncher: 50 },
   siloHp: 600, factoryHp: 400, unload: 14, pickup: 8, footprint: 24, flat: 2,
   bayRate: 10, bayPad: 6,
-  siloRoom: 200, link: 200, repairOre: 0.5,
+  siloRoom: 200, link: 200, repairOre: 0.5, crewMax: 8,
 };
 // What BUILD puts down (docs/specs/21-mining.md § Buildings), in the order
 // BALLISTIC picks them: the price in ore, seconds going up, hit points, the
@@ -62,8 +64,10 @@ export const PLACE = {
   wall: { ore: 10, time: 2, swings: 6, hp: 300, w: 12, d: 3, flat: 3, segs: 3, snap: 5 },   // snap: how near a wall's free end a new one snaps on (m)
   silo: { ore: 40, swings: 8, hp: CONSTRUCT.siloHp, w: 16, d: 16, flat: 2 },   // another silo: room for ore, and a beacon (spec 33)
   beacon: { ore: 10, swings: 3, hp: 150, w: 5, d: 5, flat: 3 },   // a post that makes territory (spec 33)
+  shop: { ore: 60, swings: 10, hp: 500, w: 16, d: 12, flat: 2 },   // the machine shop: parts from ore (spec 33)
+  line: { ore: 100, swings: 16, hp: 700, w: 12, d: 40, flat: 2 },   // the open assembly line: mechs from parts (spec 33)
 };
-export const PLACE_ORDER = ['factory', 'bay', 'wall', 'silo', 'beacon'];
+export const PLACE_ORDER = ['factory', 'bay', 'wall', 'silo', 'beacon', 'shop', 'line'];
 // The buildings, as mission entities (sim/entities.js): unit meshes in mesh/props.js.
 // A bay is a gantry with a pad in front, like the silo; a wall slab is 4.2 m wide.
 const B = NAMES.buildings;
@@ -73,7 +77,35 @@ export const BUILDINGS = {
   bay: { kind: 'structure', mesh: 'bay', radius: 6, height: 8, team: 0, tags: ['bay'], label: B.bay },
   wall: { kind: 'structure', mesh: 'slab', radius: 2.2, height: 6, team: 0, tags: ['wall'], label: B.wall },
   beacon: { kind: 'structure', mesh: 'beacon', radius: 2, height: 12, team: 0, tags: ['beacon'], label: B.beacon },
+  shop: { kind: 'structure', mesh: 'shop', radius: 8, height: 10, team: 0, tags: ['shop'], label: B.shop },
+  line: { kind: 'structure', mesh: 'line', radius: 15, height: 14, team: 0, tags: ['line'], label: B.line },   // 12 m across, 40 m along its local z
 };
+// Production (docs/specs/33-production.md § The machine shop, § The assembly
+// line): parts by size, not by mech, each with its price in ore and the mech
+// whose mesh shows it on a pile (render only); what each mech takes, in its
+// bays' order (legs, body, then arms or tools; the core's bay, the third, is
+// free until isotopes come, part 3); and the line's numbers.
+export const PARTS = {
+  'legs.light': { kind: 'legs', ore: 8, show: 'hauler' },
+  'legs.heavy': { kind: 'legs', ore: 15, show: 'digger' },
+  'body.light': { kind: 'body', ore: 8, show: 'hauler' },
+  'body.heavy': { kind: 'body', ore: 15, show: 'digger' },
+  bucket: { kind: 'arms', ore: 10, show: 'digger' },
+  tub: { kind: 'arms', ore: 10, show: 'hauler' },
+  crane: { kind: 'arms', ore: 10, show: 'builder' },
+};
+export const RECIPES = {
+  digger: ['legs.heavy', 'body.heavy', 'bucket'],
+  hauler: ['legs.light', 'body.light', 'tub'],
+  builder: ['legs.heavy', 'body.light', 'crane'],
+};
+//   bays      the line's bays: legs, body, core, arms
+//   wait      mechs that can wait for the first bay
+//   bayTime   s a bay takes once its part is in
+//   press     s the shop takes to press a part
+//   pile      parts a shop's pile holds before it stops
+//   things    parts on the ground, the whole base's most
+export const LINE = { bays: 4, wait: 3, bayTime: 4, press: 6, pile: 6, things: 80 };
 // Ore spilled from a fallen silo (spec 33): a heap on the ground with no body
 // (a nav point's kind, so nothing bumps into it or shoots it), drawn by its
 // mesh, which a crew mech with room scoops up.

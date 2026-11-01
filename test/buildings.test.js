@@ -23,7 +23,7 @@ const said = G => G.fx.calls('say').map(c => c.args[0]);
 const finish = G => { for (const s of G.base.sites) { s.ore = s.need; s.work = s.swings; } stepFor(G, 0.05); };
 
 test('the command view\'s BUILD offers FACTORY, BAY, WALL, SILO, BEACON in turn (docs/specs/31-builder.md: no cockpit picks; spec 33 adds the last two)', () => {
-  assert.deepEqual(PLACE_ORDER, ['factory', 'bay', 'wall', 'silo', 'beacon']);
+  assert.deepEqual(PLACE_ORDER, ['factory', 'bay', 'wall', 'silo', 'beacon', 'shop', 'line']);
 });
 
 test('a bay goes down as a site; there can be more than one; the factory stays one, counting its site', () => {
