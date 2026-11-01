@@ -27,7 +27,7 @@ export function raidTarget(G, e) {
   if (!G.base) return null;
   for (const m of crewOf(G)) if (m.alive && hypot(m.x - e.x, m.z - e.z) < RAID_NEAR) return null;
   let best = null, bestD = Infinity;
-  for (const b of [G.base.silo, G.base.factory, ...(G.base.bays || [])]) {   // not walls (docs/specs/21-mining.md): raiders go round or through
+  for (const b of [...G.base.silos, G.base.factory, ...(G.base.bays || []), ...G.base.beacons]) {   // not walls (docs/specs/21-mining.md): raiders go round or through; beacons, so a raid opens the border (spec 33)
     if (!b || !b.alive) continue;
     const d = hypot(b.x - e.x, b.z - e.z);
     if (d < bestD) { best = b; bestD = d; }
@@ -42,7 +42,7 @@ export const salvageOf = (G, m) => (G.base && m.team !== 0 ? CONSTRUCT.salvage[m
 // silo. The wreck stays where it fell.
 export function stepSalvage(G) {
   const b = G.base;
-  if (!b || !b.silo.alive) return;
+  if (!b || !b.silos.some(e => e.alive)) return;
   for (const w of G.wrecks) {
     if (!w.salvage) continue;
     for (const m of crewOf(G)) {

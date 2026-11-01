@@ -1,4 +1,4 @@
-import { CONSTRUCT, BUILDINGS, PLACE, PLACE_ORDER } from '../data/construct.js';
+import { CONSTRUCT, BUILDINGS, PLACE, PLACE_ORDER, HEAP } from '../data/construct.js';
 import { NAMES } from '../data/names.js';
 import { addEntity } from './entities.js';
 import { newMech } from './state.js';
@@ -7,6 +7,7 @@ import { polar } from './placement.js';
 import { viewYaw } from './geom.js';
 import { feel } from './feel.js';
 import { msg } from './effects.js';
+import { territory, inTerritory } from './territory.js';
 
 // The base (docs/specs/20-build-and-fight.md § Two buildings): a silo that
 // holds the base's ore and salvage, where a digger unloads; a factory that
@@ -22,15 +23,48 @@ import { msg } from './effects.js';
 // (`buildSwing`, from melee.js), never past what the ore pays for. A wall's
 // slabs share one site. G.base = { ore, salvage, silo, factory, bays, walls,
 // pick, sites }; a building carries `prog` (0..1) and its full height; the
-// factory `job` (seconds into a mech, or null).
+// factory `job` (seconds into a mech, or null). Spec 33
+// (docs/specs/33-production.md): any number of silos (`silos`; `silo` is the
+// mission's own), the ore one pool with room for CONSTRUCT.siloRoom a silo
+// standing, ore spilled from a fallen one in `heaps`; `beacons`; and `land`,
+// the territory the silos and beacons make, with each building `exposed`
+// outside it. Builders repair for ore (`repairSwing`).
 const { sin, cos, hypot, atan2, abs, max, min } = Math;
 
 export function initBase(G, def) {
   G.base = null;
   if (!def.base) return;
   const { x, z } = polar(def.base.silo), silo = addEntity(G, { ...BUILDINGS.silo, x, z, yaw: atan2(-x, -z), hp: CONSTRUCT.siloHp, id: 'silo' });
-  G.base = { ore: CONSTRUCT.startOre, salvage: 0, silo, factory: null, bays: [], walls: [], pick: 0, sites: [] };
+  G.base = { ore: CONSTRUCT.startOre, salvage: 0, silo, silos: [silo], beacons: [], heaps: [], factory: null, bays: [], walls: [], pick: 0, sites: [], land: null, landT: 0 };
+  silo.counted = true;
+  survey(G);
 }
+
+// Spec 33 § Silos and the pool. A building is up when it stands and isn't a
+// site still going up (the mission's own silo never was one).
+export const isUp = e => e.alive && !e.site && (e.prog ?? 1) >= 1;
+export const silosUp = G => (G.base?.silos || []).filter(isUp);
+export const oreRoom = G => silosUp(G).length * CONSTRUCT.siloRoom;
+// The nearest silo standing to (x, z), or null.
+export function nearestSilo(G, x, z) {
+  let best = null, bd = Infinity;
+  for (const e of G.base?.silos || []) { const d = hypot(e.x - x, e.z - z); if (isUp(e) && d < bd) { best = e; bd = d; } }
+  return best;
+}
+// The base's own buildings that are up: what territory covers, or doesn't.
+export const buildingsUp = G => G.entities.filter(e => e.team === 0 && e.kind === 'structure' && isUp(e) && G.base && (e.tags.includes('silo') || e.place || e === G.base.factory));
+
+// Territory (spec 33 § Beacons and territory): the silos and beacons that are
+// up are the nodes; G.base.land = { nodes, links, tris }, and each building
+// up gets `exposed` (outside every triangle). Rebuilt a few times a second.
+export function survey(G) {
+  const b = G.base;
+  const nodes = [...b.silos, ...b.beacons].filter(isUp);
+  b.land = { nodes, ...territory(nodes, CONSTRUCT.link) };
+  for (const e of buildingsUp(G)) e.exposed = !inTerritory(nodes, b.land, e.x, e.z);
+}
+// Whether (x, z) is in the base's territory.
+export const inLand = (G, x, z) => !!G.base?.land && inTerritory(G.base.land.nodes, G.base.land, x, z);
 
 // Where a building's pad is: in front of it (its nose, +z turned by its yaw).
 export const padOf = (e, out = 0.9) => [e.x + sin(e.yaw) * e.radius * out, e.z + cos(e.yaw) * e.radius * out];
@@ -115,7 +149,7 @@ export function placeSite(G, f) {
     }
   } else {
     const e = rise(addEntity(G, { ...BUILDINGS[kind], x: f.x, z: f.z, yaw: f.yaw + Math.PI, hp: P.hp, ...(kind === 'factory' ? { id: 'factory' } : {}) }));   // its door or pad toward the digger
-    if (kind === 'factory') { e.job = null; b.factory = e; } else b.bays.push(e);
+    if (kind === 'factory') { e.job = null; b.factory = e; } else if (kind === 'silo') b.silos.push(e); else if (kind === 'beacon') b.beacons.push(e); else b.bays.push(e);
   }
   return site;
 }
@@ -134,6 +168,25 @@ export function buildSwing(G, m, e, work = true) {   // work false: a scoop betw
   return true;
 }
 export const placeFactory = (G, m) => placeBuilding(G, m, 'factory');
+// Repairs (spec 33 § Repairs): a builder's swing on a damaged building of the
+// base's mends a swing's share of it (as many swings as building one piece
+// of it took) and takes CONSTRUCT.repairOre of that share of its price from
+// the pool. No ore for it: NEEDS ORE, and nothing mended.
+export const kindOf = e => e.place || PLACE_ORDER.find(k => e.tags.includes(k)) || null;
+export const needsRepair = e => !!e && e.team === 0 && isUp(e) && Number.isFinite(e.hp) && e.hp < e.max - 1e-6 && !!PLACE[kindOf(e)];
+export function repairCost(e) {
+  const P = PLACE[kindOf(e)], n = P.segs || 1, swings = P.swings / n;
+  return { ore: P.ore / n * CONSTRUCT.repairOre / swings, hp: e.max / swings };
+}
+export function repairSwing(G, m, e) {
+  if (!needsRepair(e)) return false;
+  const c = repairCost(e), k = min(1, (e.max - e.hp) / c.hp), ore = c.ore * k;
+  if (G.base.ore < ore - 1e-9) { if (m === G.player) msg(G, 'NEEDS ORE', '#fc3'); return false; }
+  G.base.ore = max(0, G.base.ore - ore); e.hp = min(e.max, e.hp + c.hp * k);
+  if (m === G.player) msg(G, 'FIXING');
+  return true;
+}
+
 
 // A repair bay mends a crew mech on its pad: CONSTRUCT.bayRate a second, the
 // most damaged section first, never a section that is gone. Returns how much.
@@ -153,19 +206,27 @@ export function mend(m, amount) {
 }
 
 // Once a frame: diggers tip into a hauler beside them; diggers and haulers
-// unload at the silo; buildings go up; the factory builds; bays mend.
+// unload at any silo; a fallen silo spills; heaps are scooped; territory is
+// looked at; buildings go up; the factory builds; bays mend.
 export function stepBase(G, dt) {
   const b = G.base;
   if (!b) return;
   handover(G);
-  if (b.silo.alive) {
-    const [px, pz] = padOf(b.silo);
+  // Any silo standing takes ore into the one pool, as far as there's room.
+  for (const silo of b.silos) {
+    if (!isUp(silo)) continue;
+    const [px, pz] = padOf(silo);
     for (const m of G.crew || []) {
       if (!m.alive || !(m.ore > 0) || (m.fetch && m.parked) || hypot(m.x - px, m.z - pz) > CONSTRUCT.unload) continue;   // a hauler fetching for a site keeps what it loaded (sim/miner.js)
-      b.ore += m.ore; m.ore = 0;
+      const n = min(m.ore, oreRoom(G) - b.ore);
+      if (!(n > 0)) { if (m === G.player && !G.siloFull) msg(G, 'SILO FULL', '#fc3'); if (m === G.player) G.siloFull = true; continue; }
+      b.ore += n; m.ore -= n; G.siloFull = false;
       if (m === G.player) { G.fx.say('Ore in.'); msg(G, 'ORE IN'); }
     }
   }
+  spill(G);
+  scoopHeaps(G);
+  if ((b.landT -= dt) <= 0) { b.landT = 0.25; survey(G); }
   // Sites (spec 23): ore tips in, and each rises as far as it's built. A
   // wall's slabs share one and come up together; a site with none of its
   // parts standing is gone, and its ore with it.
@@ -203,6 +264,53 @@ export function stepBase(G, dt) {
   park(k); G.mechs.push(k);
   (G.crew ||= [G.player]).push(k);
   G.fx.say('New mech ready.');
+}
+
+// A silo that has fallen since the last look (spec 33 § Silos and the pool):
+// the pool drops to the room the rest have, and what's over spills as a heap
+// where it stood. A beacon or silo that falls: `Beacon lost.` / `Silo lost.`,
+// and territory is looked at again at once.
+function spill(G) {
+  const b = G.base;
+  let changed = false;
+  for (const e of b.silos) {
+    if (!e.counted && isUp(e)) { e.counted = true; changed = true; }
+    if (!e.counted || e.alive) continue;
+    e.counted = false; changed = true;
+    const over = b.ore - oreRoom(G);
+    if (over > 0) { b.ore -= over; addHeap(G, e.x, e.z, over); }
+    G.fx.say('Silo lost.');
+  }
+  for (const e of b.beacons) {
+    if (!e.counted && isUp(e)) { e.counted = true; changed = true; }
+    if (!e.counted || e.alive) continue;
+    e.counted = false; changed = true;
+    G.fx.say('Beacon lost.');
+  }
+  if (changed) { b.landT = 0; survey(G); }
+}
+// A heap of `ore` at (x, z), its size by how much is in it.
+const heapR = ore => 2 + Math.sqrt(ore) * 0.45;
+export function addHeap(G, x, z, ore) {
+  const e = addEntity(G, { ...HEAP, x, z, radius: heapR(ore) });
+  e.ore = ore;
+  G.base.heaps.push(e);
+  return e;
+}
+// A crew mech with room in its hopper, beside a heap, scoops it up.
+function scoopHeaps(G) {
+  const b = G.base;
+  for (const h of b.heaps) {
+    for (const m of G.crew || []) {
+      if (!h.alive || !m.alive || !m.ch.hopper || hypot(m.x - h.x, m.z - h.z) > CONSTRUCT.pickup + h.radius) continue;
+      const n = min(m.ch.hopper - (m.ore || 0), h.ore);
+      if (!(n > 0)) continue;
+      m.ore = (m.ore || 0) + n; h.ore -= n; h.radius = heapR(h.ore);
+      if (h.ore <= 1e-6) h.alive = false;
+      if (m === G.player) msg(G, 'ORE UP');
+    }
+  }
+  if (b.heaps.some(h => !h.alive)) b.heaps = b.heaps.filter(h => h.alive);
 }
 
 // A crew digger with ore, near a crew hauler with room (docs/specs/21-mining.md

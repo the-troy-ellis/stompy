@@ -18,6 +18,7 @@ import { HEAT, hotFrac, FEEL } from '../data/feel.js';
 import { makeSpring, stepSpring } from '../util/spring.js';
 import { liveKills, killWords } from '../net/killfeed.js';
 import { teamCss, teamName } from '../net/teams.js';
+import { oreRoom } from '../sim/base.js';
 import { TUT } from '../data/tutorial.js';
 
 const LAG_MS = 200;   // a round trip to the relay past this shows LAG (docs/specs/10-internet-play.md § Latency)
@@ -587,8 +588,9 @@ export function createHud(app) {
     let y0 = L.crew.y;
     if (b) {
       const f = b.factory;
-      ctx.fillStyle = b.silo.alive ? AMBER : '#622';
-      ctx.fillText(`ORE ${b.ore}  SALVAGE ${b.salvage}`, L.crew.x, y0); y0 += 12;
+      const room = oreRoom(G);
+      ctx.fillStyle = room > 0 ? AMBER : '#622';
+      ctx.fillText(`ORE ${Math.floor(b.ore)}/${room}  SALVAGE ${b.salvage}`, L.crew.x, y0); y0 += 12;   // the pool and its room (spec 33)
       if (f) {
         ctx.fillStyle = !f.alive ? '#622' : GREEN;
         ctx.fillText(!f.alive ? 'FACTORY DOWN' : f.site ? `FACTORY SITE ${Math.floor(f.prog * 100)}% · ORE ${Math.floor(f.site.ore)}/${f.site.need}` : f.job != null ? `NEW MECH ${Math.ceil(CONSTRUCT.mechTime - f.job)} s` : 'FACTORY', L.crew.x, y0);

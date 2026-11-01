@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
+| Status | part 1 built (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
 | Milestone | M14 (proposed), with [32-base-loop.md](32-base-loop.md) |
 | Size | L, split in six (§ Build order) |
 | Depends on | [20-build-and-fight.md](20-build-and-fight.md) (silo, factory, raids); [21-mining.md](21-mining.md) (seams, haulers); [22-command-view.md](22-command-view.md) (the map); [23-construction-sites.md](23-construction-sites.md) and [31-builder.md](31-builder.md) (sites, builders); [32-base-loop.md](32-base-loop.md) (raids from above, ENDLESS, lodes) |
@@ -314,6 +314,64 @@ A parked hauler picks a job in this order (`miner.js` `haul`, extended):
   keeps the factory, ore and salvage as today.
 - **Perf:** things on the ground are capped (`THINGS_MAX`, 80); a pile past
   its cap stops the building that makes it.
+
+## As built
+
+### Part 1: silos, the pool and territory
+
+- **Silos** (`base.js`): `G.base.silos` (the mission's own first), `isUp`,
+  `silosUp`, `oreRoom` (`CONSTRUCT.siloRoom` 200 a silo standing),
+  `nearestSilo`. BUILD's cycle is now FACTORY, BAY, WALL, SILO, BEACON
+  (`PLACE.silo`: 40 ore, 8 swings, 16 × 16 m).
+  - Any silo standing takes ore in, up to the room. Past it the rest stays
+    in the hopper, and the player sees `SILO FULL`.
+  - Parked diggers and haulers go to the nearest silo, and only while the
+    pool has room. Haulers fetch a site's ore from the nearest silo.
+  - The HUD and the map read `ORE 120/400`.
+- **Spills:** a silo falling drops the pool to the room left. What's over
+  lands as a heap where it stood (`addHeap`: a bodiless entity of the nav
+  kind with the `heap` mesh, sized by its ore), and the voice says
+  `Silo lost.`
+  - Any crew mech with hopper room beside a heap scoops it (`ORE UP` for
+    the player).
+  - Parked haulers go for heaps when there's a silo with room.
+  - The map labels a heap `ORE n`.
+- **Beacons** (`PLACE.beacon`: 10 ore, 3 swings, 150 hp; a post with a
+  glowing lamp, `beacon` mesh).
+- **Territory** (`sim/territory.js`, pure): links within `CONSTRUCT.link`
+  (200 m), triangles of three linked to each other, `inTerritory`.
+  - `base.js` `survey` rebuilds `G.base.land` four times a second, and at
+    once when a silo or beacon goes up or falls.
+  - `survey` marks each of the base's buildings that's up `exposed` when
+    it's outside every triangle.
+  - `Beacon lost.` when a beacon falls.
+  - Raids now count silos and beacons among the buildings they go for.
+- **The map** (`command.js`):
+  - Links are thin lines, and triangles a sparse dot screen in the crew's
+    colour (a dither, no see-through).
+  - BUILD BEACON or SILO's ghost draws, dashed, the links and triangles it
+    would add.
+  - An exposed building gets a small red open padlock and `EXPOSED`. These
+    show **only once the base has some territory**: before the first
+    triangle every building would be marked, which says nothing in today's
+    one-silo missions.
+  - A damaged building's label gives what's left (`BAY 40%`).
+- **Repairs** (`repairSwing`, `repairCost`, `needsRepair`): a builder's
+  BUILD on a damaged building of the base's mends a swing's share. A piece
+  takes the swings it took to build, and a full mend costs
+  `CONSTRUCT.repairOre` (half) of its price.
+  - `siteInReach` finds a site first, then a building to mend.
+  - Parked builders mend after sites, when the pool has ore for a swing;
+    their job reads `FIXING`.
+  - From the map, a builder picked plus a tap on a damaged building (or BUILD
+    on it) is the order, and the voice says `Fixing.`
+- **New text:** `SILO FULL`, `ORE UP`, `FIXING`, `Silo lost.`,
+  `Beacon lost.`, `EXPOSED`, `ORE 120/400`. `BEACON` is a placeholder.
+- **Tests:**
+  - `territory.test.js`: links, triangles, overlap holding, edges.
+  - `pool.test.js`: room, tipping in anywhere, the spill and scooping it,
+    exposed and `Beacon lost.`, the repair swing and its price, a parked
+    builder mending, the BUILD order on a damaged building.
 
 ## Code touchpoints
 

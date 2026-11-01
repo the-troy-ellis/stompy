@@ -2,6 +2,7 @@ import { wrapA, clampN } from '../util/math.js';
 import { crewOf } from './crew.js';
 import { MINER, haul, halt, walkTo, build } from './miner.js';
 import { think } from './ai.js';
+import { needsRepair } from './base.js';
 import { alertEnemy } from './ai/perception.js';
 
 const { atan2, hypot, sin, cos, abs } = Math;
@@ -53,7 +54,7 @@ export function can(m, kind) {
 export function give(G, mechs, order) {
   const { kind } = order, crew = crewOf(G);
   if (kind === 'follow' && !(order.target?.alive && order.target.ch.tool && crew.includes(order.target))) return 0;
-  if (kind === 'build' && !(order.target?.alive && order.target.site)) return 0;
+  if (kind === 'build' && !(order.target?.alive && (order.target.site || needsRepair(order.target)))) return 0;   // a site, or a building to mend (spec 33)
   if (kind === 'attack' && !(order.target?.alive && order.target.team !== 0 && G.mechs.includes(order.target))) return 0;
   if (kind === 'guard' && !(order.target?.alive && order.target.team === 0 && order.target.kind === 'structure')) return 0;
   let n = 0;
@@ -71,7 +72,7 @@ export function give(G, mechs, order) {
     if (m.ai) m.ai.goal = null;   // a fresh trip
     n++;
   }
-  if (n) G.fx.say(SAY[kind]);
+  if (n) G.fx.say(kind === 'build' && !order.target.site ? 'Fixing.' : SAY[kind]);
   return n;
 }
 
@@ -121,7 +122,7 @@ export function obey(G, m, dt) {
     return true;
   }
   if (o.kind === 'build') {
-    if (!o.target.alive || !o.target.site) { m.order = null; return false; }   // up, or gone
+    if (!o.target.alive || !(o.target.site || needsRepair(o.target))) { m.order = null; return false; }   // up (or mended), or gone
     build(G, m, a, o.target, dt);
     return true;
   }
