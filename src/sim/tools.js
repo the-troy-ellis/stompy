@@ -3,7 +3,7 @@ import { wrapA } from '../util/math.js';
 import { viewYaw } from './geom.js';
 import { STEP } from './mech.js';
 import { bite } from './dig.js';
-import { buildSwing, siteDone } from './base.js';
+import { buildSwing, siteDone, repairSwing, needsRepair } from './base.js';
 import { feel } from './feel.js';
 import { FEEL, HIT_STOP } from '../data/feel.js';
 import { particle, msg, spawnClods } from './effects.js';
@@ -49,11 +49,11 @@ function slam(G, m) {
     feel(G, 'whiff', { mech: m });
     return;
   }
-  const site = e.site;
-  if (!buildSwing(G, m, e, true)) { feel(G, 'whiff', { mech: m }); m.buildRun = null; return; }
+  const site = e.site || e;   // a damaged building, mended a swing at a time (spec 33), runs as a site does
+  if (!(e.site ? buildSwing(G, m, e, true) : repairSwing(G, m, e))) { feel(G, 'whiff', { mech: m }); m.buildRun = null; return; }
   const run = m.buildRun && m.buildRun.site === site ? m.buildRun : (m.buildRun = { site, k: 0 });
   run.k++;
-  const done = siteDone(site), into = min(1, (run.k - 1) / 5);
+  const done = e.site ? siteDone(site) : !needsRepair(e), into = min(1, (run.k - 1) / 5);
   feel(G, done ? 'built' : 'slam', { mech: m, k: done ? 1 : 0.6 + 0.4 * into, at });
   if (done) G.fx.sfx.built(at); else G.fx.sfx.slam(at, into);
   const p = [e.x, e.y + (e.height || 2), e.z], n = done ? 18 : 6;
@@ -242,18 +242,22 @@ export function aimGround(G, m) {
 }
 
 // The nearest live part of one of your team's construction sites in front of
-// the buckets and within their reach (docs/specs/23-construction-sites.md).
+// the buckets and within their reach (docs/specs/23-construction-sites.md);
+// with none, a damaged building of the base's there, to mend (spec 33).
 const ARC = 35 * PI / 180, REACH = 11;
 export function siteInReach(G, m) {
   const reach = REACH * m.ch.scale, facing = viewYaw(m);
-  let best = null, bd = Infinity;
-  for (const s of G.base?.sites || []) for (const e of s.parts) {
-    if (!e.alive || e.team !== m.team) continue;
-    const dx = e.x - m.x, dz = e.z - m.z, d = hypot(dx, dz) - e.radius;
-    if (d > reach || d >= bd || abs(wrapA(atan2(dx, dz) - facing)) > ARC) continue;
-    best = e; bd = d;
-  }
-  return best;
+  near.e = null; near.d = Infinity;
+  for (const s of G.base?.sites || []) for (const e of s.parts) nearer(e, m, reach, facing);
+  if (!near.e && G.base && m.team === 0) for (const e of G.entities) if (needsRepair(e)) nearer(e, m, reach, facing);   // nothing to build: something to mend (spec 33)
+  return near.e;
+}
+const near = { e: null, d: Infinity };   // siteInReach's best so far (no garbage a frame)
+function nearer(e, m, reach, facing) {
+  if (!e.alive || e.team !== m.team) return;
+  const dx = e.x - m.x, dz = e.z - m.z, d = hypot(dx, dz) - e.radius;
+  if (d > reach || d >= near.d || abs(wrapA(atan2(dx, dz) - facing)) > ARC) return;
+  near.e = e; near.d = d;
 }
 export const siteReach = m => REACH * m.ch.scale;   // how near a digger stands to build (sim/miner.js)
 

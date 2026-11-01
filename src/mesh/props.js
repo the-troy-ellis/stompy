@@ -214,6 +214,31 @@ const BUILD = {
     box(b, 0, 0, 0, 1.9, 0.3, 0.62, C.char, M.id(), 0.8, 0.9);
     box(b, 0.3, 0.3, 0.05, 0.8, 0.15, 0.5, C.ash, M.RY(0.4));
   },
+  // A beacon (docs/specs/33-production.md): a steel post on a concrete foot
+  // with hazard bands, a lamp box on top; the lamp itself is beaconGlow,
+  // drawn glowing, so the border reads at night.
+  beacon: b => {
+    box(b, 0, 0, 0, 1.6, 0.05, 1.6, C.concrete);
+    box(b, 0, 0.05, 0, 0.36, 0.83, 0.36, C.steel);
+    for (const y of [0.3, 0.55]) box(b, 0, y, 0, 0.4, 0.06, 0.4, C.hazard);
+    box(b, 0, 0.88, 0, 0.7, 0.07, 0.7, C.dark);
+  },
+  beaconGlow: b => box(b, 0, 0.95, 0, 0.5, 0.05, 0.5, C.hazard),
+  beaconWreck: b => {
+    box(b, 0, 0, 0, 1.6, 0.05, 1.6, C.char);
+    box(b, 0, 0.05, 0, 0.36, 0.2, 0.36, C.ash);
+    box(b, 0.2, 0.02, 0.2, 0.3, 0.06, 1.2, C.char, M.RY(0.6));
+  },
+  // Ore spilled from a fallen silo (spec 33): a low mound of rusty lumps,
+  // scaled by its radius every way (FLAT), so a small heap is low too.
+  heap: b => {
+    box(b, 0, 0, 0, 1.6, 0.16, 1.4, C.rock, M.RY(0.3));
+    box(b, 0.3, 0.05, -0.2, 0.75, 0.24, 0.65, C.rust, chain(M.RY(-0.4), M.RZ(0.25)));
+    box(b, -0.4, 0.04, 0.3, 0.6, 0.2, 0.5, C.rust, chain(M.RY(0.9), M.RX(-0.3)));
+    box(b, -0.2, 0.1, -0.45, 0.5, 0.18, 0.45, C.rock, chain(M.RY(1.3), M.RZ(-0.35)));
+    box(b, 0.05, 0.15, 0.05, 0.5, 0.2, 0.45, C.rust, chain(M.RY(0.2), M.RX(0.2)));
+  },
+
   factoryWreck: b => {
     box(b, 0, 0, 0, 1.9, 0.18, 1.5, C.char);
     box(b, -0.4, 0.18, 0.1, 0.9, 0.08, 0.7, C.ash, M.RY(0.3));
@@ -222,7 +247,7 @@ const BUILD = {
 };
 export const PROP_KEYS = Object.keys(BUILD);
 // Props that scale up with the radius rather than the height.
-const FLAT = new Set(['pad']);
+const FLAT = new Set(['pad', 'heap']);
 
 export function buildProps() {
   return Object.fromEntries(PROP_KEYS.map(k => [k, part(BUILD[k])]));

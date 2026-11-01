@@ -8,8 +8,9 @@ import { bindPointer } from '../input/pointer.js';
 import { pickNearest, pickInside } from '../sim/pick.js';
 import { crewOf, canCommand, commandUp, commandDown } from '../sim/crew.js';
 import { give, can } from '../sim/orders.js';
-import { PLACE, PLACE_ORDER, BUILDINGS } from '../data/construct.js';
-import { footprintAt, placeSite, snapWall } from '../sim/base.js';
+import { PLACE, PLACE_ORDER, BUILDINGS, CONSTRUCT } from '../data/construct.js';
+import { footprintAt, placeSite, snapWall, oreRoom, needsRepair } from '../sim/base.js';
+import { territory } from '../sim/territory.js';
 
 // The command view (docs/specs/22-command-view.md): the match from above
 // while the world runs on. MAP (Tab) goes up, BACK comes down into the mech
@@ -38,7 +39,7 @@ const D2R = Math.PI / 180;
 const siteLabel = (G, e) => {
   const n = NAMES.buildings[e.tags?.find(t => NAMES.buildings[t])] || '';
   if (e.site) return e.site.parts[e.site.parts.length >> 1] === e ? `${n} SITE · ORE ${Math.floor(e.site.ore)}/${e.site.need}` : '';
-  if (!e.tags?.includes('wall')) return n;
+  if (!e.tags?.includes('wall')) return Number.isFinite(e.hp) && e.hp < e.max ? `${n} ${Math.ceil(100 * e.hp / e.max)}%` : n;   // damaged: how much is left (spec 33: builders mend it)
   const st = BUILDINGS.wall.radius * 1.9, px = e.x + Math.cos(e.yaw || 0) * st, pz = e.z - Math.sin(e.yaw || 0) * st;
   return G.base?.walls.some(o => o.alive && !o.site && Math.hypot(o.x - px, o.z - pz) < st * 0.6) ? '' : n;
 };
@@ -120,7 +121,7 @@ export function createCommand(app) {
   // and the ground, with mechs picked, is GO.
   function tapAt(x, y) {
     if (C.place) return placeAt(x, y);
-    const m = crewAt(x, y), g = ground(x, y), e = siteAt(x, y);
+    const m = crewAt(x, y), g = ground(x, y), hurt = buildingAt(x, y), e = siteAt(x, y) || (needsRepair(hurt) ? hurt : null);   // a site, or a building to mend (spec 33)
     if (C.order === 'follow') { if (m) order({ kind: 'follow', target: m }); return; }
     if (C.order === 'build') { if (e) order({ kind: 'build', target: e }); return; }
     if (C.order === 'attack') { const f = foeAt(x, y); if (f) order({ kind: 'attack', target: f }); return; }
@@ -224,15 +225,68 @@ export function createCommand(app) {
     const crew = live(), reach = RADAR_RANGE * radarOf(G), things = [];
     for (const m of crew) things.push({ id: m, kind: 'start', x: m.x, y: m.y, z: m.z, face: -m.yaw / D2R, label: `${m === G.command.from ? '▶ ' : ''}${m.ch.name}${m.job ? ` · ${m.job}` : ''}` });
     for (const e of G.entities) if (e.alive && e.team === 0 && e.kind !== 'nav') things.push({ id: e, kind: 'structure', x: e.x, y: e.y, z: e.z, label: siteLabel(G, e) });
+    for (const h of G.base?.heaps || []) if (h.alive) things.push({ id: h, kind: 'structure', x: h.x, y: h.y, z: h.z, label: `ORE ${Math.floor(h.ore)}` });   // a fallen silo's spill (spec 33)
     for (const f of G.mechs) if (f.alive && f.team !== 0 && crew.some(m => Math.hypot(f.x - m.x, f.z - m.z) < reach)) things.push({ id: f, kind: 'foe', x: f.x, y: f.y, z: f.z, face: -f.yaw / D2R });
+    drawLand(ctx, view, pal);
     drawMap(ctx, view, { map: { bound: BOUND, height: G.ter.height, grid: 100 }, things, sel: C.picked, box: C.box, pal });
+    drawExposed(ctx, view, pal);
     drawOrders(ctx, view, crew, pal);
     if (C.place && C.ghost) drawGhost(ctx, view, pal);
     // The base, as the cockpit's panel has it.
     ctx.font = 'bold 11px "Lucida Console", monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    if (G.base) { ctx.fillStyle = pal.good; ctx.fillText(`ORE ${G.base.ore}  SALVAGE ${G.base.salvage}`, 14, 22); }
+    if (G.base) { ctx.fillStyle = pal.good; ctx.fillText(`ORE ${Math.floor(G.base.ore)}/${oreRoom(G)}  SALVAGE ${G.base.salvage}`, 14, 22); }
     drawCompass(ctx, 34, H - 34, C.cam.yaw, pal);
     if (G.padActive) drawPadAim(ctx, W, H, pal);
+  }
+
+  // Territory (docs/specs/33-production.md § Beacons and territory): each
+  // link a thin line, each triangle a sparse dot screen in the crew's colour
+  // (a dither, not a see-through fill). With BUILD SILO or BEACON's ghost
+  // out, the links and triangles it would add, dashed.
+  const dots = new Map();   // a dot pattern a colour, made once
+  function dotsOf(ctx, col) {
+    if (!dots.has(col)) {
+      const c = document.createElement('canvas'); c.width = c.height = 6;
+      const k = c.getContext('2d'); k.fillStyle = col; k.fillRect(0, 0, 1, 1); k.fillRect(3, 3, 1, 1);
+      dots.set(col, ctx.createPattern(c, 'repeat'));
+    }
+    return dots.get(col);
+  }
+  function drawLand(ctx, view, pal) {
+    const land = G.base?.land;
+    if (!land) return;
+    const S = n => view.toScreen(n.x, G.ter.height(n.x, n.z), n.z);
+    ctx.save();
+    const tri = (a, b, c) => { const p = [S(a), S(b), S(c)]; if (p.some(q => !q)) return; ctx.beginPath(); ctx.moveTo(p[0][0], p[0][1]); ctx.lineTo(p[1][0], p[1][1]); ctx.lineTo(p[2][0], p[2][1]); ctx.closePath(); ctx.fill(); };
+    const line = (a, b) => { const p = S(a), q = S(b); if (!p || !q) return; ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); };
+    ctx.fillStyle = dotsOf(ctx, pal.good); ctx.strokeStyle = pal.good; ctx.lineWidth = 1;
+    for (const [i, j, k] of land.tris) tri(land.nodes[i], land.nodes[j], land.nodes[k]);
+    for (const [i, j] of land.links) line(land.nodes[i], land.nodes[j]);
+    const g = (C.place === 'beacon' || C.place === 'silo') && C.ghost && ghostPrint();
+    if (g && !g.why) {   // what this one would add
+      const nodes = [...land.nodes, { x: g.x, z: g.z }], t = territory(nodes, CONSTRUCT.link), n = nodes.length - 1;
+      ctx.setLineDash([5, 4]);
+      for (const [i, j, k] of t.tris) if (k === n) tri(nodes[i], nodes[j], nodes[k]);
+      for (const [i, j] of t.links) if (j === n) line(nodes[i], nodes[j]);
+    }
+    ctx.restore();
+  }
+  // A building of yours outside the territory, once there is one: a small red
+  // open padlock under it, and EXPOSED when near enough to read.
+  function drawExposed(ctx, view, pal) {
+    if (!G.base?.land?.tris.length) return;
+    ctx.save(); ctx.strokeStyle = ctx.fillStyle = pal.bad; ctx.lineWidth = 1.5;
+    ctx.font = 'bold 9px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (const e of G.entities) {
+      if (!e.exposed || !e.alive || e.team !== 0) continue;
+      const p = view.toScreen(e.x, e.y, e.z);
+      if (!p) continue;
+      const x = p[0], y = p[1] + 26;   // under its label
+      ctx.strokeRect(x - 4, y + 4, 8, 6);
+      ctx.beginPath(); ctx.arc(x - 1, y + 3, 3, Math.PI, 2 * Math.PI); ctx.stroke();   // the shackle, open
+      if (view.mpp < 4) ctx.fillText('EXPOSED', x, y + 12);
+    }
+    ctx.restore();
   }
 
   // With a gamepad: the crosshair a press of A taps at, and the buttons.

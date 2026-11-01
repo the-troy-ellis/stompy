@@ -4,7 +4,7 @@ import { CONSTRUCT } from '../data/construct.js';
 import { siteInReach, siteReach } from './tools.js';
 import { TOOL } from '../data/tools.js';
 import { routeYaw, feelers, walkable, walkGround, FEEL_M } from './ai/nav.js';
-import { padOf, siteWork } from './base.js';
+import { padOf, siteWork, nearestSilo, oreRoom, needsRepair, repairCost } from './base.js';
 
 const { atan2, hypot, sin, cos, abs, min } = Math;
 
@@ -51,12 +51,12 @@ export function mine(G, m, dt) {
   // ore pays for; with none, it stands. A digger only digs, and brings a full
   // hopper to a site that needs ore (base.js tipIn takes it).
   if (m.ch.tool === 'build') {
-    const e = siteFor(G, m, a, false);
+    const e = siteFor(G, m, a, false) || mendFor(G, m, a);   // sites first, then mending (spec 33)
     if (e) return build(G, m, a, e, dt);
     m.job = null;
     return halt(m, dt);
   }
-  const silo = G.base?.silo?.alive ? G.base.silo : null, full = (m.ore || 0) >= m.ch.hopper;
+  const silo = siloFor(G, m), full = (m.ore || 0) >= m.ch.hopper;
   const e = full && siteFor(G, m, a, true);
   if (e) return build(G, m, a, e, dt);
   const h = full && hauler(G, m);
@@ -107,10 +107,22 @@ function siteFor(G, m, a, full) {
   }
   return best;
 }
+// The nearest damaged building of the base's a builder can mend now: the
+// pool has the ore for a swing. Null if none (or the last trip got stuck).
+function mendFor(G, m, a) {
+  if (!G.base) return null;
+  let best = null, bd = Infinity;
+  for (const e of G.entities) {
+    if (!needsRepair(e) || G.base.ore < repairCost(e).ore) continue;
+    const d = hypot(e.x - m.x, e.z - m.z);
+    if (d < bd && !(a.skip?.e === e && G.time < a.skip.until)) { best = e; bd = d; }
+  }
+  return best;
+}
 // To a site's part, square on: a builder holds BUILD (sim/tools.js slams the
 // pieces in); a digger bringing ore stands there while base.js tipIn takes it.
 export function build(G, m, a, e, dt) {
-  m.job = m.ch.tool === 'build' ? 'BUILDING' : 'DELIVERING';
+  m.job = m.ch.tool !== 'build' ? 'DELIVERING' : e.site ? 'BUILDING' : 'FIXING';
   const reach = siteReach(m), d = hypot(e.x - m.x, e.z - m.z) - e.radius;
   if (d > reach * 0.7) {
     const k = e.radius + reach * 0.5, x = e.x + (m.x - e.x) / (d + e.radius) * k, z = e.z + (m.z - e.z) / (d + e.radius) * k;
@@ -148,9 +160,15 @@ export function haul(G, m, dt, follow = null) {
     const k = hypot(d.x - m.x, d.z - m.z);
     if (k < bd) { dig = d; bd = k; }
   }
-  const silo = G.base?.silo?.alive ? G.base.silo : null, ore = m.ore || 0;
+  const silo = siloFor(G, m), ore = m.ore || 0;
   if (follow) m.fetch = null;
-  else if (fetch(G, m, a, silo, dt)) return;   // a site needs ore: that first (spec 23)
+  else if (fetch(G, m, a, nearestSilo(G, m.x, m.z), dt)) return;   // a site needs ore: that first (spec 23), from the nearest silo
+  const heap = !follow && ore < m.ch.hopper && nearestHeap(G, m);
+  if (heap && silo) {   // a fallen silo's ore on the ground (spec 33): scoop it up (base.js), then home with it
+    m.job = 'LOADING';
+    if (hypot(heap.x - m.x, heap.z - m.z) < CONSTRUCT.pickup * 0.6 + heap.radius) return halt(m, dt);
+    return walkTo(G, m, a, heap.x, heap.y, heap.z, dt, () => { m.job = null; });
+  }
   if (silo && (ore >= m.ch.hopper || (ore > 0 && !dig))) {
     const [px, pz] = padOf(silo);
     m.job = 'HAULING';
@@ -162,6 +180,19 @@ export function haul(G, m, dt, follow = null) {
   const yaw = dig.site ? dig.site.yaw : dig.yaw, x = dig.x - sin(yaw) * MINER.behind, z = dig.z - cos(yaw) * MINER.behind;
   if (hypot(x - m.x, z - m.z) < MINER.arrive * 2) return halt(m, dt);
   walkTo(G, m, a, x, dig.y, z, dt, () => {});
+}
+
+// Where a mech with ore takes it (spec 33): the nearest silo standing, if the
+// pool has room; null if it hasn't, or there's no silo.
+function siloFor(G, m) {
+  const e = nearestSilo(G, m.x, m.z);
+  return e && G.base.ore < oreRoom(G) ? e : null;
+}
+// The nearest heap of spilled ore, or null.
+function nearestHeap(G, m) {
+  let best = null, bd = Infinity;
+  for (const h of G.base?.heaps || []) { const d = hypot(h.x - m.x, h.z - m.z); if (h.alive && d < bd) { best = h; bd = d; } }
+  return best;
 }
 
 // A site that needs ore and no other hauler is feeding (spec 23): with ore,
