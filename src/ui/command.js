@@ -8,8 +8,8 @@ import { bindPointer } from '../input/pointer.js';
 import { pickNearest, pickInside } from '../sim/pick.js';
 import { crewOf, canCommand, commandUp, commandDown } from '../sim/crew.js';
 import { give, can } from '../sim/orders.js';
-import { PLACE, PLACE_ORDER } from '../data/construct.js';
-import { footprintAt, placeSite } from '../sim/base.js';
+import { PLACE, PLACE_ORDER, BUILDINGS } from '../data/construct.js';
+import { footprintAt, placeSite, snapWall } from '../sim/base.js';
 
 // The command view (docs/specs/22-command-view.md): the match from above
 // while the world runs on. MAP (Tab) goes up, BACK comes down into the mech
@@ -32,7 +32,16 @@ export const PADCAM = { pan: 0.9, turn: 1.6, zoom: 2.2 };   // a stick at full t
 
 const D2R = Math.PI / 180;
 // A building's label on the map; a site (docs/specs/23-construction-sites.md) says so, with its ore.
-const siteLabel = e => { const n = NAMES.buildings[e.tags?.find(t => NAMES.buildings[t])] || ''; return e.site ? `${n} SITE · ORE ${Math.floor(e.site.ore)}/${e.site.need}` : n; };
+// A structure's name on the map, or its site's progress. Once a site, on its
+// middle slab; once a run of built walls, on the slab at one end (spec 23 §
+// Snapping walls: runs go end to end, and a label a slab would smear).
+const siteLabel = (G, e) => {
+  const n = NAMES.buildings[e.tags?.find(t => NAMES.buildings[t])] || '';
+  if (e.site) return e.site.parts[e.site.parts.length >> 1] === e ? `${n} SITE · ORE ${Math.floor(e.site.ore)}/${e.site.need}` : '';
+  if (!e.tags?.includes('wall')) return n;
+  const st = BUILDINGS.wall.radius * 1.9, px = e.x + Math.cos(e.yaw || 0) * st, pz = e.z - Math.sin(e.yaw || 0) * st;
+  return G.base?.walls.some(o => o.alive && !o.site && Math.hypot(o.x - px, o.z - pz) < st * 0.6) ? '' : n;
+};
 export const BAR = ['go', 'dig', 'follow', 'stay', 'work', 'drive', 'build', 'attack', 'guard'];   // the order bar, in order (keys 1–9)
 
 export function createCommand(app) {
@@ -84,10 +93,12 @@ export function createCommand(app) {
     const shown = BAR.filter(k => !btn[k].hidden), lit = G.padActive && shown.length ? shown[C.padAt % shown.length] : null;
     for (const k of BAR) btn[k].classList.toggle('pad-focus', k === lit);
   };
-  // A site where the ghost is, facing away from the silo, if it fits.
+  // A site where the ghost is, facing away from the silo, if it fits; a wall
+  // near another wall's free end snaps on to it.
   const ghostPrint = () => {
     const s = G.base?.silo, g = C.ghost, yaw = s ? Math.atan2(g.x - s.x, g.z - s.z) : C.cam.yaw;
-    return footprintAt(G, g.x, g.z, yaw, C.place);
+    const w = C.place === 'wall' && snapWall(G, g.x, g.z);
+    return w ? footprintAt(G, w.x, w.z, w.yaw, 'wall') : footprintAt(G, g.x, g.z, yaw, C.place);
   };
   const order = o => { give(G, [...C.picked], o); C.order = null; sync(); };
   // The bar's buttons (and keys 1–6, in the bar's order).
@@ -127,7 +138,8 @@ export function createCommand(app) {
   }
 
   // Placing: a tap on the ghost (or where the pointer put it) puts the site
-  // down if it fits; a tap anywhere else moves the ghost there.
+  // down if it fits; a tap anywhere else moves the ghost there. After a wall,
+  // BUILD WALL stays on for the next.
   function placeAt(x, y) {
     const g = ground(x, y);
     if (!g) return;
@@ -136,7 +148,8 @@ export function createCommand(app) {
     if (f.why) { app.audio.sfx.beep(); return; }
     placeSite(G, f);
     app.audio.sfx.beep();
-    C.place = C.ghost = null;
+    if (C.place !== 'wall') C.place = null;   // walls stay picked, to lay the next one on
+    C.ghost = null;
     sync();
   }
   surface.addEventListener('mousemove', e => { if (C.place) { const r = surface.getBoundingClientRect(), g = ground(e.clientX - r.left, e.clientY - r.top); if (g) C.ghost = g; } });
@@ -210,7 +223,7 @@ export function createCommand(app) {
     const view = { W, H, mpp: mpp(), toScreen: (x, y, z) => groundToScreen(C.cam, { x, y, z }, W, H, VP) };
     const crew = live(), reach = RADAR_RANGE * radarOf(G), things = [];
     for (const m of crew) things.push({ id: m, kind: 'start', x: m.x, y: m.y, z: m.z, face: -m.yaw / D2R, label: `${m === G.command.from ? '▶ ' : ''}${m.ch.name}${m.job ? ` · ${m.job}` : ''}` });
-    for (const e of G.entities) if (e.alive && e.team === 0 && e.kind !== 'nav') things.push({ id: e, kind: 'structure', x: e.x, y: e.y, z: e.z, label: siteLabel(e) });
+    for (const e of G.entities) if (e.alive && e.team === 0 && e.kind !== 'nav') things.push({ id: e, kind: 'structure', x: e.x, y: e.y, z: e.z, label: siteLabel(G, e) });
     for (const f of G.mechs) if (f.alive && f.team !== 0 && crew.some(m => Math.hypot(f.x - m.x, f.z - m.z) < reach)) things.push({ id: f, kind: 'foe', x: f.x, y: f.y, z: f.z, face: -f.yaw / D2R });
     drawMap(ctx, view, { map: { bound: BOUND, height: G.ter.height, grid: 100 }, things, sel: C.picked, box: C.box, pal });
     drawOrders(ctx, view, crew, pal);

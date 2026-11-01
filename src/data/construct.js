@@ -53,7 +53,7 @@ export const CONSTRUCT = {
 export const PLACE = {
   factory: { ore: CONSTRUCT.factory, time: CONSTRUCT.buildTime, swings: 12, hp: CONSTRUCT.factoryHp, w: CONSTRUCT.footprint, d: CONSTRUCT.footprint, flat: CONSTRUCT.flat, one: true },
   bay: { ore: 30, time: 5, swings: 8, hp: 300, w: 16, d: 16, flat: 2 },
-  wall: { ore: 10, time: 2, swings: 6, hp: 300, w: 12, d: 3, flat: 3, segs: 3 },
+  wall: { ore: 10, time: 2, swings: 6, hp: 300, w: 12, d: 3, flat: 3, segs: 3, snap: 5 },   // snap: how near a wall's free end a new one snaps on (m)
 };
 export const PLACE_ORDER = ['factory', 'bay', 'wall'];
 // The buildings, as mission entities (sim/entities.js): unit meshes in mesh/props.js.
