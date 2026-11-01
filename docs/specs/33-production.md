@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | part 1 built (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
+| Status | parts 1 and 2 built (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
 | Milestone | M14 (proposed), with [32-base-loop.md](32-base-loop.md) |
 | Size | L, split in six (§ Build order) |
 | Depends on | [20-build-and-fight.md](20-build-and-fight.md) (silo, factory, raids); [21-mining.md](21-mining.md) (seams, haulers); [22-command-view.md](22-command-view.md) (the map); [23-construction-sites.md](23-construction-sites.md) and [31-builder.md](31-builder.md) (sites, builders); [32-base-loop.md](32-base-loop.md) (raids from above, ENDLESS, lodes) |
@@ -372,6 +372,66 @@ A parked hauler picks a job in this order (`miner.js` `haul`, extended):
   - `pool.test.js`: room, tipping in anywhere, the spill and scooping it,
     exposed and `Beacon lost.`, the repair swing and its price, a parked
     builder mending, the BUILD order on a damaged building.
+
+### Part 2: parts, the machine shop and the open line
+
+- **Data** (`construct.js`):
+  - `PARTS`: light and heavy legs and bodies, and the bucket, tub and crane,
+    each with its ore price and the mech whose mesh shows it on a pile.
+  - `RECIPES` for the digger, hauler and builder.
+  - `LINE`: 4 bays, 3 waiting, 4 s a bay, a press every 6 s, 6 parts to a
+    shop's pile, 80 parts on the ground.
+  - `CONSTRUCT.crewMax` is 8.
+  - `PLACE.shop` and `PLACE.line`. BUILD's cycle ends SHOP, LINE.
+- **`sim/production.js`** (new):
+  - **The shop** presses, from the pool, the first part a line wants that
+    nothing on the ground, on a hauler or in a press is there for yet
+    (`nextPart`). The part goes onto the shop's pile, with a thunk.
+  - **The line**: a mech in the queue goes into the first bay. Each bay
+    takes its part off the line's pile, thunks (the body's drop is the big
+    one), waits `bayTime`, then passes the mech on. The third bay, the
+    core, wants nothing until part 3.
+  - Off the last bay the mech walks out, parked, joins the crew on its own
+    job, and the voice says `New digger.` / `New hauler.` /
+    `New builder.`
+  - With the crew at its cap, the line won't start one (`CREW FULL`).
+  - The mech in the bays is a real mech kept off the field, drawn with
+    only `show` of its parts (`render/scene.js` `drawMech`).
+  - Thunks reach you within 40 m; past that only the half-built mech
+    squashes.
+- **Haulers** (`miner.js` `carry`): a parked hauler with an empty tub takes
+  the part a line wants soonest (furthest-on bay first), the nearest such,
+  and claims it so two don't go for one. It walks it to the line's pile
+  (`CARRYING`) and puts it down. A hauler ordered to FOLLOW puts its part
+  down where it is.
+- **The look:**
+  - `shop` mesh: a shed with an open press out front.
+  - `line` mesh: a 12 × 40 m pad under a gantry, open on every side.
+  - Parts drawn with the showing mech's own meshes: legs stood in a pair, a
+    body on the ground, an arm laid down. On a hauler they ride its back.
+- **The map:**
+  - A tap on an assembly line, with nothing picked, swaps the order bar for
+    MAKE: one button a mech (`BIG SCOOPER +1`: one waiting), and keys 1–3.
+    A tap elsewhere puts it away. The voice says `Making.`
+  - The line tapped is ringed, with `2 WAITING` or `CREW FULL`.
+  - Each bay waiting says `NEEDS LEGS` / `NEEDS A BODY` / `NEEDS ARMS`.
+  - Under a shop: `LEGS 1 · BODIES 0 · ARMS 2`.
+- **Not yet:**
+  - A tap on a waiting mech to take it out (`unqueue` is in the sim).
+  - The map's CARRY order (it comes with stealing, part 4).
+  - The player can't carry parts by hand; haulers do it parked.
+- **New text:** `Making.`, `New digger.`, `New hauler.`, `New builder.`,
+  `CARRYING`, `n WAITING`, `CREW FULL`, `NEEDS LEGS`, `NEEDS A BODY`,
+  `NEEDS ARMS`, `LEGS n · BODIES n · ARMS n`. `MACHINE SHOP` and
+  `ASSEMBLY LINE` are placeholders.
+- **Tests** (`production.test.js`):
+  - The bays' parts and wants.
+  - The queue and its limit.
+  - The shop pressing what's wanted, paid from the pool.
+  - A hauler carrying the parts and the line making a digger that joins the
+    crew.
+  - A bay waiting for its part.
+  - The crew's cap.
 
 ## Code touchpoints
 

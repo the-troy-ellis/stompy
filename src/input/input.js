@@ -8,7 +8,6 @@ import { nextSpectate, orbitSpectate } from '../net/spectate.js';
 import { darkness } from '../data/palettes.js';
 import { NAMES } from '../data/names.js';
 import { readPad, firstPad } from './gamepad.js';
-import { BAR } from '../ui/command.js';
 
 const { abs, hypot } = Math;
 
@@ -148,7 +147,7 @@ export function createInput(app) {
     // Esc only ever pauses: leaving pointer lock already pauses via
     // pointerlockchange, and a toggle here would immediately undo that.
     if (G.command && (e.code === 'Escape' || e.code === 'Tab')) { e.preventDefault(); app.command.close(); return; }   // BACK (ui/command.js)
-    if (G.command && /^Digit[1-9]$/.test(e.code)) { e.preventDefault(); app.command.press(BAR[e.code.slice(5) - 1]); return; }   // the order bar
+    if (G.command && /^Digit[1-9]$/.test(e.code)) { e.preventDefault(); app.command.key(e.code.slice(5) - 1); return; }   // the order bar (MAKE's, with an assembly line tapped)
     if (e.code === 'Tab' && !G.paused) { e.preventDefault(); app.command.open(); return; }   // MAP
     if (e.code === 'Escape') { e.preventDefault(); if (!G.paused) app.ui.pause(true); return; }
     if (e.code === 'KeyP') { e.preventDefault(); app.ui.pause(!G.paused); return; }

@@ -56,11 +56,15 @@ export function carryFor(G, m) {
       const k = want.indexOf(t.part);
       if (k >= 0) want.splice(k, 1);
     }
-    if (!want.length) continue;
-    for (const t of b.things) {
-      if (t.by || t.at?.tags.includes('line') || claimed(t) || !want.includes(t.part)) continue;
-      const [x, z] = thingAt(G, t), d = Math.hypot(x - m.x, z - m.z);
-      if (d < bd) { best = { t, line }; bd = d; }
+    // The part it wants soonest that there is one of, the nearest such; the
+    // wants come furthest-on first, so a bay waiting gets its part first.
+    for (const part of want) {
+      for (const t of b.things) {
+        if (t.part !== part || t.by || t.at?.tags.includes('line') || claimed(t)) continue;
+        const [x, z] = thingAt(G, t), d = Math.hypot(x - m.x, z - m.z);
+        if (d < bd) { best = { t, line }; bd = d; }
+      }
+      if (best) return best;
     }
   }
   return best;

@@ -8,9 +8,10 @@ import { bindPointer } from '../input/pointer.js';
 import { pickNearest, pickInside } from '../sim/pick.js';
 import { crewOf, canCommand, commandUp, commandDown } from '../sim/crew.js';
 import { give, can } from '../sim/orders.js';
-import { PLACE, PLACE_ORDER, BUILDINGS, CONSTRUCT } from '../data/construct.js';
+import { PLACE, PLACE_ORDER, BUILDINGS, CONSTRUCT, RECIPES, PARTS } from '../data/construct.js';
 import { footprintAt, placeSite, snapWall, oreRoom, needsRepair } from '../sim/base.js';
 import { territory } from '../sim/territory.js';
+import { queueMake, bayAt, bayPart, thingsAt } from '../sim/production.js';
 
 // The command view (docs/specs/22-command-view.md): the match from above
 // while the world runs on. MAP (Tab) goes up, BACK comes down into the mech
@@ -44,6 +45,7 @@ const siteLabel = (G, e) => {
   return G.base?.walls.some(o => o.alive && !o.site && Math.hypot(o.x - px, o.z - pz) < st * 0.6) ? '' : n;
 };
 export const BAR = ['go', 'dig', 'follow', 'stay', 'work', 'drive', 'build', 'attack', 'guard'];   // the order bar, in order (keys 1–9)
+export const MAKE = Object.keys(RECIPES);   // with an assembly line tapped, the bar is these instead (docs/specs/33-production.md), keys 1–3
 
 export function createCommand(app) {
   const G = app.G, wrap = app.wrap;
@@ -52,10 +54,10 @@ export function createCommand(app) {
   root.innerHTML = `
     <div class="cmd-surface"></div>
     <button class="cmd-btn cmd-back" data-c="back">BACK</button>
-    <div class="cmd-bar">${BAR.map(k => `<button class="cmd-btn" data-c="${k}" hidden>${k.toUpperCase()}</button>`).join('')}</div>`;
+    <div class="cmd-bar">${BAR.map(k => `<button class="cmd-btn" data-c="${k}" hidden>${k.toUpperCase()}</button>`).join('')}${MAKE.map(k => `<button class="cmd-btn" data-m="${k}" hidden>${NAMES.chassis[k]}</button>`).join('')}</div>`;
   wrap.insertBefore(root, app.ov);
-  const surface = root.querySelector('.cmd-surface'), btn = Object.fromEntries(BAR.map(k => [k, root.querySelector(`[data-c="${k}"]`)]));
-  const C = { cam: null, picked: new Set(), box: null, order: null, place: null, ghost: null, padAt: 0 };   // order: GO, DIG, FOLLOW or BUILD chosen, waiting for its tap; place: the kind of site BUILD puts down, ghost: where; padAt: the bar's button a gamepad has lit
+  const surface = root.querySelector('.cmd-surface'), btn = Object.fromEntries(BAR.map(k => [k, root.querySelector(`[data-c="${k}"]`)])), mk = Object.fromEntries(MAKE.map(k => [k, root.querySelector(`[data-m="${k}"]`)]));
+  const C = { cam: null, picked: new Set(), box: null, order: null, place: null, ghost: null, padAt: 0, make: null };   // make: the assembly line tapped, its MAKE bar up   // order: GO, DIG, FOLLOW or BUILD chosen, waiting for its tap; place: the kind of site BUILD puts down, ghost: where; padAt: the bar's button a gamepad has lit
 
   const size = () => ({ W: Math.max(1, wrap.clientWidth), H: Math.max(1, wrap.clientHeight) });
   const mpp = () => metresPerPixel(C.cam, size().H);
@@ -83,8 +85,14 @@ export function createCommand(app) {
     for (const m of C.picked) if (!m.alive) C.picked.delete(m);
     const p = [...C.picked];
     if (p.length) C.place = C.ghost = null;
+    if (p.length || C.place || !C.make?.alive) C.make = null;
+    for (const k of MAKE) {   // the line tapped: what it makes, and how many of each are waiting
+      const b = mk[k], n = C.make ? C.make.queue.filter(q => q === k).length : 0, label = `${NAMES.chassis[k]}${n ? ` +${n}` : ''}`;
+      if (b.hidden !== !C.make) b.hidden = !C.make;
+      if (b.textContent !== label) b.textContent = label;
+    }
     for (const k of BAR) {
-      const b = btn[k], show = k === 'drive' ? p.length === 1 : k === 'build' && !p.length ? !!G.base : p.some(m => can(m, k));
+      const b = btn[k], show = C.make ? false : k === 'drive' ? p.length === 1 : k === 'build' && !p.length ? !!G.base : p.some(m => can(m, k));
       if (b.hidden !== !show) b.hidden = !show;
       b.classList.toggle('on', C.order === k || (k === 'build' && !!C.place));
     }
@@ -117,6 +125,15 @@ export function createCommand(app) {
     C.order = C.order === k ? null : k;   // GO, DIG, FOLLOW: now tap where (or whom)
     sync();
   }
+  // MAKE: one of `kind` into the tapped line's queue (sim/production.js).
+  function make(kind) {
+    if (!C.make) return;
+    if (queueMake(G, C.make, kind)) G.fx.say('Making.');
+    else app.audio.sfx.beep();
+    sync();
+  }
+  // Keys 1–9: the bar's nth button (MAKE's, with a line tapped).
+  const key = n => (C.make ? MAKE[n] && make(MAKE[n]) : BAR[n] && press(BAR[n]));
   // A tap: with an order chosen, where it goes; else a crew mech picks it,
   // and the ground, with mechs picked, is GO.
   function tapAt(x, y) {
@@ -135,7 +152,8 @@ export function createCommand(app) {
     }
     if (C.order && g) return order({ kind: C.order, x: g.x, z: g.z });
     if (m) { C.picked = new Set([m]); sync(); return; }
-    if (g && C.picked.size) order({ kind: 'go', x: g.x, z: g.z });
+    if (g && C.picked.size) return order({ kind: 'go', x: g.x, z: g.z });
+    if (!C.order) { const b = buildingAt(x, y); C.make = b?.tags.includes('line') && C.make !== b ? b : null; sync(); }   // nothing picked: a tap on an assembly line brings up MAKE, anywhere else puts it away
   }
 
   // Placing: a tap on the ghost (or where the pointer put it) puts the site
@@ -181,6 +199,8 @@ export function createCommand(app) {
   const toggle = () => (G.command ? close() : open());
 
   root.addEventListener('click', e => {
+    const m = e.target.closest('[data-m]');
+    if (m) { make(m.dataset.m); return; }
     const b = e.target.closest('[data-c]');
     if (!b) return;
     if (b.dataset.c === 'back') close();
@@ -230,6 +250,7 @@ export function createCommand(app) {
     drawLand(ctx, view, pal);
     drawMap(ctx, view, { map: { bound: BOUND, height: G.ter.height, grid: 100 }, things, sel: C.picked, box: C.box, pal });
     drawExposed(ctx, view, pal);
+    drawProduction(ctx, view, pal);
     drawOrders(ctx, view, crew, pal);
     if (C.place && C.ghost) drawGhost(ctx, view, pal);
     // The base, as the cockpit's panel has it.
@@ -285,6 +306,37 @@ export function createCommand(app) {
       ctx.strokeRect(x - 4, y + 4, 8, 6);
       ctx.beginPath(); ctx.arc(x - 1, y + 3, 3, Math.PI, 2 * Math.PI); ctx.stroke();   // the shackle, open
       if (view.mpp < 4) ctx.fillText('EXPOSED', x, y + 12);
+    }
+    ctx.restore();
+  }
+
+  // Production (docs/specs/33-production.md): under each machine shop what's
+  // on its pile; at each bay of an assembly line, the part it waits for; the
+  // line tapped ringed, with how many are waiting, or CREW FULL. Near enough
+  // to read only.
+  const WORD = { legs: 'LEGS', body: 'A BODY', arms: 'ARMS' }, PLURAL = { legs: 'LEGS', body: 'BODIES', arms: 'ARMS' };
+  function drawProduction(ctx, view, pal) {
+    const b = G.base;
+    if (!b?.lines.length && !b?.shops.length) return;
+    ctx.save(); ctx.font = 'bold 9px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    const S = (x, z) => view.toScreen(x, G.ter.height(x, z), z);
+    if (view.mpp < 4) for (const s of b.shops) {
+      if (!s.alive || s.site) continue;
+      const p = S(s.x, s.z), n = { legs: 0, body: 0, arms: 0 };
+      if (!p) continue;
+      for (const t of thingsAt(G, s)) n[PARTS[t.part].kind]++;
+      ctx.fillStyle = pal.good; ctx.fillText(Object.keys(n).map(k => `${PLURAL[k]} ${n[k]}`).join(' · '), p[0], p[1] + 26);
+    }
+    for (const line of b.lines) {
+      if (!line.alive || line.site) continue;
+      const p = S(line.x, line.z);
+      if (line === C.make && p) { ctx.strokeStyle = pal.good; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], 22, 0, 7); ctx.stroke(); }
+      if (p && (line.queue.length || line.full)) { ctx.fillStyle = line.full ? pal.bad : pal.good; ctx.fillText(line.full ? 'CREW FULL' : `${line.queue.length} WAITING`, p[0], p[1] + 26); }
+      if (view.mpp >= 4) continue;
+      line.bays.forEach((j, i) => {
+        const part = j && !j.has && bayPart(j.kind, i), q = part && S(...bayAt(line, i));
+        if (q) { ctx.fillStyle = pal.bad; ctx.fillText(`NEEDS ${WORD[PARTS[part].kind]}`, q[0], q[1] - 14); }
+      });
     }
     ctx.restore();
   }
@@ -369,5 +421,5 @@ export function createCommand(app) {
 
   const screenOf = m => { const { W, H } = size(); return C.cam && groundToScreen(C.cam, { x: m.x, y: m.y ?? G.ter.height(m.x, m.z), z: m.z }, W, H); };   // where a mech (or a ground point) is on the screen (the smoke test taps it)
   const ghost = () => (C.place && C.ghost ? ghostPrint() : null);   // the site BUILD would put down, and why not (the smoke test looks for room)
-  return { C, open, close, toggle, press, pad, draw, view, screenOf, ghost, can: () => canCommand(G) };
+  return { C, open, close, toggle, press, key, make, pad, draw, view, screenOf, ghost, can: () => canCommand(G) };
 }
