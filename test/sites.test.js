@@ -9,7 +9,8 @@ import { recordFx } from '../src/sim/fx.js';
 import { update, noInput } from '../src/sim/update.js';
 import { rangeDef } from '../src/data/range.js';
 import { PLACE } from '../src/data/construct.js';
-import { footprintAt, placeSite, placeBuilding, siteProg } from '../src/sim/base.js';
+import { footprintAt, placeSite, placeBuilding, siteProg, snapWall } from '../src/sim/base.js';
+import { BUILDINGS } from '../src/data/construct.js';
 import { raidTarget } from '../src/sim/raid.js';
 import { destroyEntity } from '../src/sim/entities.js';
 import { commandUp } from '../src/sim/crew.js';
@@ -121,4 +122,23 @@ test('a destroyed factory site frees the one factory; raiders hunt sites', () =>
   run(G, 0.1);
   assert.equal(G.base.sites.length, 0);
   assert.equal(footprintAt(G, 200, 200, 0, 'factory').why, null);
+});
+
+test('a wall near another\'s free end snaps on: in line, or round a corner, a slab apart; and it fits', () => {
+  const G = game(), step = BUILDINGS.wall.radius * 1.9;
+  assert.equal(snapWall(G, 0, -120), null, 'no walls: no snap');
+  site(G, 'wall', 0, -120);
+  // yaw 0: the wall runs along x, slabs at -step, 0, step.
+  const line = snapWall(G, 3 * step + 1, -119);
+  assert.ok(line && Math.abs(line.x - 3 * step) < 1e-9 && Math.abs(line.z + 120) < 1e-9 && line.yaw === 0, 'in line, the next slab a slab on');
+  const f = footprintAt(G, line.x, line.z, line.yaw, 'wall');
+  assert.equal(f.why, null, 'touching ends fit');
+  const turn = snapWall(G, 2 * step, -120 + step + 0.5);
+  assert.ok(turn && Math.abs(turn.x - 2 * step) < 1e-9 && Math.abs(turn.z - (-120 + step)) < 1e-9 && Math.abs(Math.abs(turn.yaw) - Math.PI / 2) < 1e-9, 'round a corner');
+  assert.equal(footprintAt(G, turn.x, turn.z, turn.yaw, 'wall').why, null, 'the corner fits');
+  assert.equal(snapWall(G, 30, -100), null, 'too far: no snap');
+  placeSite(G, f);
+  const next = snapWall(G, 6 * step, -120);
+  assert.ok(next && Math.abs(next.x - 6 * step) < 1e-9, 'the new end, not the joined one');
+  assert.equal(snapWall(G, 0, -110), null, 'beside the middle: nothing');
 });

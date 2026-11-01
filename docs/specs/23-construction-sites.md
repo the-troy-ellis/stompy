@@ -132,6 +132,24 @@ digger off sites; WORK lets it build again.
 
 `placeBuilding(G, m)` (the cockpit) becomes a wrapper on `placeSite`.
 
+### Snapping walls
+
+Walls go down in runs, so a wall's ghost near another wall's free end snaps
+on to it:
+
+- **In line:** the next slab a slab past the end, same facing.
+- **Round a corner:** the first slab in that same spot, the wall turning a
+  right angle either way.
+- The nearest of these within `PLACE.wall.snap` (5 m) of the pointer wins.
+  A free end is a slab with no wall slab a slab past it, built or still a
+  site, so the middle of a run never snaps, and a joined end stops snapping.
+- Snapped slabs sit a slab apart, the same as inside one site, so they fit
+  (`footprintAt` says yes) with no special case.
+- After a wall goes down, `BUILD WALL` stays on for the next one. A tap on
+  BUILD (WALL is the last in its cycle), B on a gamepad, or picking a mech stops it.
+
+`base.js` `snapWall(G, x, z)` gives `{ x, z, yaw }` or null.
+
 ### Edge cases
 
 - **The one factory:** a factory site counts. A destroyed factory site
@@ -193,6 +211,15 @@ digger off sites; WORK lets it build again.
   the map with the mouse. Before it, the browser was
   checked by hand on desktop and touch: a factory site went down beside the
   silo.
+
+### Part 3: snapping walls
+
+- `base.js` `snapWall`, as in § Snapping walls, read by the map's ghost
+  (`command.js` `ghostPrint`). `BUILD WALL` stays on after a wall goes down.
+- The map labels a site once, on its middle slab, and a run of built walls
+  once, at one end. A label on every slab smeared into one line.
+- `sites.test.js` checks the snap in line and round a corner, that both fit,
+  and that a joined end and the middle of a run don't snap.
 
 ## Code touchpoints
 

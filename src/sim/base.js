@@ -70,6 +70,28 @@ export function footprintAt(G, x, z, yaw, kind = pickOf(G)) {
   return { x, z, yaw, w: P.w, d: P.d, r: max(hw, hd), kind, why };
 }
 
+// Where a wall placed near (x, z) snaps to (spec 23 § Snapping walls): on
+// from the free end of a wall or wall site already there, in line with it or
+// turning a right angle, slabs a slab apart. The nearest such spot within
+// PLACE.wall.snap of (x, z), as { x, z, yaw }, or null.
+export function snapWall(G, x, z) {
+  const step = BUILDINGS.wall.radius * 1.9, n = PLACE.wall.segs, mid = (n - 1) / 2;
+  const walls = G.entities.filter(e => e.alive && e.tags?.includes('wall'));
+  const taken = (px, pz) => walls.some(o => Math.hypot(o.x - px, o.z - pz) < step * 0.6);
+  let best = null, bd = PLACE.wall.snap;
+  const offer = (cx, cz, yaw) => { const d = hypot(cx - x, cz - z); if (d < bd) { bd = d; best = { x: cx, z: cz, yaw }; } };
+  for (const e of walls) {
+    const y = e.yaw || 0, rx = cos(y), rz = -sin(y), fx = sin(y), fz = cos(y);
+    for (const s of [-1, 1]) {
+      const ex = e.x + rx * s * step, ez = e.z + rz * s * step;   // the next slab's spot, past this end
+      if (taken(ex, ez)) continue;
+      offer(e.x + rx * s * step * (1 + mid), e.z + rz * s * step * (1 + mid), y);   // in line
+      for (const t of [-1, 1]) offer(ex + fx * t * step * mid, ez + fz * t * step * mid, y - Math.PI / 2);   // a corner, its first slab at that spot
+    }
+  }
+  return best;
+}
+
 // Put the picked building's site down where the footprint says (spec 23):
 // nothing is paid now. True if it went down.
 export function placeBuilding(G, m, kind = pickOf(G)) {
