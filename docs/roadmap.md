@@ -357,6 +357,15 @@ and blast-off; the flight; targeting and the insta-stomp; the AI and online.
 - **Part 2, the flight:** built.
 - **Part 3, targeting and the insta-stomp:** built (single player).
 
+## M14 — The base loop from above (proposed)
+
+Goal: a loop for the map. Spend ore on the mechs you want from the factory
+(more diggers, more ore), see a raid coming 20 s out and rally from above
+before dropping in, and spread out to richer ground with outposts. Missions
+get objectives about building; Free Play gets BASE · ENDLESS. Spec:
+[specs/32-base-loop.md](specs/32-base-loop.md). In three parts: grow the
+crew; defend from above (and ENDLESS); spread out.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
