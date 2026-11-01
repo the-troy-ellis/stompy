@@ -39,6 +39,10 @@ import { NAMES } from './names.js';
 //                 linked to each other make a triangle of territory
 //   crewMax       the crew's most, you included: an assembly line makes no
 //                 more past it (docs/specs/32-base-loop.md)
+//   isoPerCorner  isotopes a corner of an isotope seam gives (world/seams.js isoAt;
+//                 docs/specs/33-production.md); isoHeat the heat each whole one puts
+//                 in the digger; isoMax what one mech carries; isoRoom the pool's
+//                 room for them a silo standing
 //   repairOre     a builder's repairs: this share of a building's price mends
 //                 it from nothing to full, a swing at a time
 export const CONSTRUCT = {
@@ -49,6 +53,7 @@ export const CONSTRUCT = {
   siloHp: 600, factoryHp: 400, unload: 14, pickup: 8, footprint: 24, flat: 2,
   bayRate: 10, bayPad: 6,
   siloRoom: 200, link: 200, repairOre: 0.5, crewMax: 8,
+  isoPerCorner: 0.4, isoHeat: 4, isoMax: 20, isoRoom: 50,
 };
 // What BUILD puts down (docs/specs/21-mining.md § Buildings), in the order
 // BALLISTIC picks them: the price in ore, seconds going up, hit points, the
@@ -66,8 +71,9 @@ export const PLACE = {
   beacon: { ore: 10, swings: 3, hp: 150, w: 5, d: 5, flat: 3 },   // a post that makes territory (spec 33)
   shop: { ore: 60, swings: 10, hp: 500, w: 16, d: 12, flat: 2 },   // the machine shop: parts from ore (spec 33)
   line: { ore: 100, swings: 16, hp: 700, w: 12, d: 40, flat: 2 },   // the open assembly line: mechs from parts (spec 33)
+  plant: { ore: 80, swings: 12, hp: 500, w: 14, d: 14, flat: 2 },   // the isotope plant: cores from isotopes (spec 33)
 };
-export const PLACE_ORDER = ['factory', 'bay', 'wall', 'silo', 'beacon', 'shop', 'line'];
+export const PLACE_ORDER = ['factory', 'bay', 'wall', 'silo', 'beacon', 'shop', 'line', 'plant'];
 // The buildings, as mission entities (sim/entities.js): unit meshes in mesh/props.js.
 // A bay is a gantry with a pad in front, like the silo; a wall slab is 4.2 m wide.
 const B = NAMES.buildings;
@@ -79,12 +85,13 @@ export const BUILDINGS = {
   beacon: { kind: 'structure', mesh: 'beacon', radius: 2, height: 12, team: 0, tags: ['beacon'], label: B.beacon },
   shop: { kind: 'structure', mesh: 'shop', radius: 8, height: 10, team: 0, tags: ['shop'], label: B.shop },
   line: { kind: 'structure', mesh: 'line', radius: 15, height: 14, team: 0, tags: ['line'], label: B.line },   // 12 m across, 40 m along its local z
+  plant: { kind: 'structure', mesh: 'plant', radius: 7, height: 16, team: 0, tags: ['plant'], label: B.plant },
 };
 // Production (docs/specs/33-production.md § The machine shop, § The assembly
 // line): parts by size, not by mech, each with its price in ore and the mech
 // whose mesh shows it on a pile (render only); what each mech takes, in its
-// bays' order (legs, body, then arms or tools; the core's bay, the third, is
-// free until isotopes come, part 3); and the line's numbers.
+// bays' order (legs, body, then arms or tools; the third bay takes a core,
+// from the isotope plant); and the line's numbers.
 export const PARTS = {
   'legs.light': { kind: 'legs', ore: 8, show: 'hauler' },
   'legs.heavy': { kind: 'legs', ore: 15, show: 'digger' },
@@ -93,6 +100,7 @@ export const PARTS = {
   bucket: { kind: 'arms', ore: 10, show: 'digger' },
   tub: { kind: 'arms', ore: 10, show: 'hauler' },
   crane: { kind: 'arms', ore: 10, show: 'builder' },
+  core: { kind: 'core', iso: 10 },   // from the isotope plant, not the shop: every mech needs one
 };
 export const RECIPES = {
   digger: ['legs.heavy', 'body.heavy', 'bucket'],
@@ -102,10 +110,10 @@ export const RECIPES = {
 //   bays      the line's bays: legs, body, core, arms
 //   wait      mechs that can wait for the first bay
 //   bayTime   s a bay takes once its part is in
-//   press     s the shop takes to press a part
+//   press     s the shop takes to press a part; core, s the plant takes for a core
 //   pile      parts a shop's pile holds before it stops
 //   things    parts on the ground, the whole base's most
-export const LINE = { bays: 4, wait: 3, bayTime: 4, press: 6, pile: 6, things: 80 };
+export const LINE = { bays: 4, wait: 3, bayTime: 4, press: 6, core: 20, pile: 6, things: 80 };
 // Ore spilled from a fallen silo (spec 33): a heap on the ground with no body
 // (a nav point's kind, so nothing bumps into it or shoots it), drawn by its
 // mesh, which a crew mech with room scoops up.

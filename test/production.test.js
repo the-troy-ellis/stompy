@@ -30,15 +30,15 @@ const up = (G, kind, x, z) => {
 };
 // A shop and a line beside the silo, with ore in the pool.
 const yard = (G) => {
-  const s = G.base.silo, shop = up(G, 'shop', s.x + 50, s.z), line = up(G, 'line', s.x - 50, s.z + 20);
-  G.base.ore = 200;
-  return { shop, line };
+  const s = G.base.silo, shop = up(G, 'shop', s.x + 50, s.z), line = up(G, 'line', s.x - 50, s.z + 20), plant = up(G, 'plant', s.x + 50, s.z + 50);
+  G.base.ore = 200; G.base.iso = 30;
+  return { shop, line, plant };
 };
 
-test('a line wants each mech\'s parts in its bays\' order; the core\'s bay wants nothing yet', () => {
-  assert.deepEqual([0, 1, 2, 3].map(i => bayPart('digger', i)), ['legs.heavy', 'body.heavy', null, 'bucket']);
+test('a line wants each mech\'s parts in its bays\' order: legs, body, a core, arms', () => {
+  assert.deepEqual([0, 1, 2, 3].map(i => bayPart('digger', i)), ['legs.heavy', 'body.heavy', 'core', 'bucket']);
   const line = { bays: new Array(LINE.bays).fill(null), queue: ['hauler'] };
-  assert.deepEqual(lineWants(line), RECIPES.hauler);
+  assert.deepEqual(lineWants(line), [RECIPES.hauler[0], RECIPES.hauler[1], 'core', RECIPES.hauler[2]]);
 });
 
 test('the queue takes what a line makes, up to LINE.wait; a mech can come back out', () => {
@@ -95,4 +95,46 @@ test('the crew\'s cap stops the line', () => {
   queueMake(G, line, 'digger');
   run(G, 1);
   assert.ok(!line.bays[0] && line.full, 'CREW FULL');
+});
+
+test('digging an isotope seam brings isotopes and heat on top of the ore; a silo takes them into their own pool', async () => {
+  const { isoAt } = await import('../src/world/seams.js'), { bite } = await import('../src/sim/dig.js'), { padOf, isoRoom } = await import('../src/sim/base.js'), { shiftMech } = await import('../src/sim/walkView.js');
+  const G = createGame({ fx: recordFx(), seed: 4 });
+  startMatch(G, rangeDef({ ground: 'flat', crew: 'kestrel', base: 'silo' }), 4, false, 'digger', { terrainOpts: { flat: true } });
+  const P = G.player, seed = G.ter.seed, h = G.ter.height(P.x, P.z);
+  let spot = null;
+  for (let x = -300; x < 300 && !spot; x += 4) for (let z = -300; z < 300 && !spot; z += 4) for (let y = h - 4; y > h - 40 && !spot; y -= 4) if (isoAt(seed, x, y, z)) spot = [x, y, z];
+  assert.ok(spot, 'an isotope seam on this map');
+  const heat = P.heat;
+  for (let i = 0; i < 6 && !(P.iso > 0); i++) bite(G, P, [spot[0], spot[1] + i, spot[2]]);
+  assert.ok(P.iso > 0, `isotopes: ${P.iso}`);
+  assert.ok(P.heat > heat, 'it warms the digger');
+  assert.equal(isoRoom(G), CONSTRUCT.isoRoom);
+  const [px, pz] = padOf(G.base.silo), iso = P.iso;
+  shiftMech(P, px - P.x, pz - P.z);
+  run(G, 0.1);
+  assert.equal(G.base.iso, iso);
+  assert.equal(P.iso, 0);
+});
+
+test('the plant makes a core from the pool\'s isotopes only when a line wants one', () => {
+  const G = game(['kestrel']), { plant, line } = yard(G);
+  run(G, 2);
+  assert.equal(plant.brew, null, 'nothing wanted');
+  queueMake(G, line, 'digger');
+  run(G, 0.1);
+  assert.ok(plant.brew, 'a line will want a core');
+  assert.equal(G.base.iso, 30 - PARTS.core.iso);
+  run(G, LINE.core);
+  assert.deepEqual(thingsAt(G, plant).map(t => t.part), ['core']);
+  assert.equal(nextPart(G, true), null, 'one is enough for one mech');
+});
+
+test('a mech\'s wreck leaves its core on the ground for a hauler', async () => {
+  const { destroy } = await import('../src/sim/combat.js');
+  const G = game(['kestrel']), k = G.crew.find(m => m.type === 'kestrel');
+  destroy(G, k, null);
+  run(G, 6);
+  const c = G.base.things.find(t => t.part === 'core');
+  assert.ok(c && !c.at && Math.hypot(c.x - k.x, c.z - k.z) < 5, 'a loose core where it fell');
 });

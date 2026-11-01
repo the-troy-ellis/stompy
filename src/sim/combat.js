@@ -20,6 +20,7 @@ import { knock } from './knock.js';
 import { hitQueue, sendFx } from './hitqueue.js';
 import { coopDown, coopLives } from './coopRules.js';
 import { damageEntity } from './entities.js';
+import { LINE } from '../data/construct.js';
 import { dig, digOf, deathDig, ownsDigs } from './dig.js';
 
 const { sin, cos } = Math;
@@ -180,6 +181,7 @@ export function stepDying(G, dt) {
       d.angle = b * 0.12 + u * u * (Math.PI / 2 - 0.12) * 0.95;   // a lean during the buckle, then it falls faster as it goes
       if (u >= 1) {
         G.wrecks.push(makeWreck(G, m, d.roll));
+        if (G.base && G.base.things.length < LINE.things) G.base.things.push({ part: 'core', at: null, by: null, claim: null, x: m.x, z: m.z });   // its core survives, for a hauler to carry off (docs/specs/33-production.md)
         scorch(G, m.x, m.z, 5 * m.ch.scale);
         G.fx.sfx.boom([m.x, m.y, m.z], false);
         // Your own view stays where the fall left it until the debrief (or a

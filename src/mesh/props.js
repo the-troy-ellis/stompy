@@ -254,6 +254,17 @@ const BUILD = {
     box(b, 0, 0.88, 0.35, 0.82, 0.06, 0.1, C.steel);
     box(b, 0, 0.7, 0.35, 0.14, 0.18, 0.14, C.dark);
   },
+  // The isotope plant (docs/specs/33-production.md): a squat block with a
+  // short cooling tower and a slow belt out front; plantGlow is its window
+  // strip, drawn glowing, where the cores show.
+  plant: b => {
+    box(b, 0, 0, 0, 1.9, 0.04, 1.9, C.pad);
+    box(b, -0.3, 0.04, -0.2, 1.1, 0.45, 1.1, C.concrete);
+    b.cyl(chain(M.T(0.5, 0.4, -0.35), M.S(0.7, 0.8, 0.7)), C.steel, 8);
+    b.cyl(chain(M.T(0.5, 0.82, -0.35), M.S(0.62, 0.06, 0.62)), C.hazard, 8);
+    box(b, -0.1, 0.04, 0.6, 1.4, 0.12, 0.3, C.dark);
+  },
+  plantGlow: b => box(b, -0.3, 0.3, 0.36, 0.8, 0.08, 0.02, C.lava),
   // Ore spilled from a fallen silo (spec 33): a low mound of rusty lumps,
   // scaled by its radius every way (FLAT), so a small heap is low too.
   heap: b => {

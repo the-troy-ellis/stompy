@@ -79,8 +79,8 @@ export function putDown(G, m, line = null) {
   if (line?.alive) t.at = line; else { t.at = null; t.x = m.x; t.z = m.z; }
 }
 
-// What a mech takes in bay `i`: a part, or null (the core's bay, until part 3).
-export const bayPart = (kind, i) => (i === 2 ? null : RECIPES[kind][i < 2 ? i : 2]);
+// What a mech takes in bay `i`: its legs, its body, a core, its arms.
+export const bayPart = (kind, i) => (i === 2 ? 'core' : RECIPES[kind][i < 2 ? i : 2]);
 export const thingsAt = (G, e) => G.base.things.filter(t => t.at === e);
 
 // Put a mech of `kind` in a line's queue. False (and why, for the player) if
@@ -107,13 +107,14 @@ export function lineWants(line) {
 }
 // The first part the base's lines want that no thing on the ground (or on a
 // hauler, or in a press) is there for yet: what a shop presses next. Null if none.
-export function nextPart(G) {
+export function nextPart(G, cores = false) {   // cores: what the isotope plant makes; else, what a shop presses
   const spare = {};
   for (const t of G.base.things) spare[t.part] = (spare[t.part] || 0) + 1;
   for (const s of G.base.shops) if (s.alive && s.press) spare[s.press.part] = (spare[s.press.part] || 0) + 1;   // in a press now
+  for (const p of G.base.plants) if (p.alive && p.brew) spare.core = (spare.core || 0) + 1;   // a core on its way
   for (const line of G.base.lines) {
     if (!line.alive) continue;
-    for (const p of lineWants(line)) { if (spare[p] > 0) spare[p]--; else return p; }
+    for (const p of lineWants(line)) { if (spare[p] > 0) spare[p]--; else if (cores === (p === 'core')) return p; }
   }
   return null;
 }
@@ -124,6 +125,7 @@ const making = G => G.base.lines.reduce((n, l) => n + l.bays.filter(Boolean).len
 export function stepProduction(G, dt) {
   const b = G.base;
   for (const s of b.shops) if (s.alive && !s.site) press(G, s, dt);
+  for (const p of b.plants) if (p.alive && !p.site) brew(G, p, dt);
   for (const line of b.lines) {
     if (!line.alive) { line.bays.fill(null); line.queue.length = 0; continue; }
     if (!line.site) build(G, line, dt);
@@ -145,6 +147,23 @@ function press(G, s, dt) {
   thunk(G, s, x, z, 0.5);
 }
 
+// The isotope plant (docs/specs/33-production.md § The isotope plant and
+// cores): a core, from CORE isotopes in the pool, when a line will want one
+// that no core on the ground or on a hauler is there for.
+function brew(G, p, dt) {
+  const b = G.base;
+  if (!p.brew) {
+    if (thingsAt(G, p).length >= LINE.pile || b.things.length >= LINE.things || !nextPart(G, true) || b.iso < PARTS.core.iso) return;
+    b.iso -= PARTS.core.iso;
+    p.brew = { t: 0 };
+  }
+  if ((p.brew.t += dt) < LINE.core) return;
+  b.things.push({ part: 'core', at: p, by: null, claim: null });
+  p.brew = null;
+  const [x, z] = pileAt(p, thingsAt(G, p).length - 1);
+  thunk(G, p, x, z, 0.4);
+}
+
 function build(G, line, dt) {
   // From the furthest bay back, so a mech moves on into a bay just emptied next frame, not this one.
   for (let i = LINE.bays - 1; i >= 0; i--) {
@@ -157,6 +176,7 @@ function build(G, line, dt) {
       j.has = true; j.t = 0; j.shell.show = i + 1;
       const [x, z] = bayAt(line, i);
       thunk(G, j.shell, x, z, i === 1 ? 1 : 0.6);   // the body dropping on is the big one
+      if (i === 2 && G.player && Math.hypot(G.player.x - x, G.player.z - z) < NEAR) G.fx.say('Reactor online.');   // the hatch slams on its core
       continue;
     }
     if ((j.t += dt) < LINE.bayTime) continue;

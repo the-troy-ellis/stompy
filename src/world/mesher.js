@@ -17,7 +17,7 @@
 // normal, colour), as mesh/builder.js does.
 // The cube's 12 edges as corner pairs (corner c is x = c & 1, y = c >> 1 & 1, z = c >> 2).
 const EA = [0, 2, 4, 6, 0, 1, 4, 5, 0, 1, 2, 3], EB = [1, 3, 5, 7, 2, 3, 6, 7, 4, 5, 6, 7];
-import { seamAt } from './seams.js';
+import { seamAt, isoAt } from './seams.js';
 
 const { sin, floor, hypot, round } = Math;
 const SOFT = 6;   // world/voxels.js SOFT (not imported: the worker's bundle stays the mesher alone)
@@ -77,8 +77,8 @@ export function meshChunk(D, top, dims, o, s, pal, skip = null) {
     const gx = Math.min(Math.max((cx - o[0]) / s, 0), mx - 1e-4), gz = Math.min(Math.max((cz - o[2]) / s, 0), mz - 1e-4), ti = (gx | 0) + nx * (gz | 0), u = gx % 1, w = gz % 1;
     const roof = (top[ti] * (1 - u) + top[ti + 1] * u) * (1 - w) + (top[ti + nx] * (1 - u) + top[ti + nx + 1] * u) * w;
     if (ey <= 0.6) {   // a face: rock in bands, a seam in its ore colour
-      const ore = pal.ore && pal.seed != null && cy < roof - SOFT && seamAt(pal.seed, cx, cy, cz), c = ore ? pal.ore : pal.rock;
-      const f = (ore ? 1 : floor(cy / 6) & 1 ? 0.9 : 1.05) * (0.92 + r * 0.12);
+      const deep = pal.seed != null && cy < roof - SOFT, iso = deep && pal.iso && isoAt(pal.seed, cx, cy, cz), ore = !iso && deep && pal.ore && seamAt(pal.seed, cx, cy, cz);   // isotopes over ore where they cross (docs/specs/33-production.md)
+      const c = iso ? pal.iso : ore ? pal.ore : pal.rock, f = (iso || ore ? 1 : floor(cy / 6) & 1 ? 0.9 : 1.05) * (0.92 + r * 0.12);
       col0 = c[0] * f; col1 = c[1] * f; col2 = c[2] * f;
     }
     if (cy < roof - 4) { col0 *= 0.62; col1 *= 0.62; col2 *= 0.62; }
