@@ -1,6 +1,7 @@
 // The crowd scene (docs/specs/34-big-fights.md part 1): the sim alone, in
-// Node, with 12, 25, 50 and 100 foes in one fight, each really thinking and
-// shooting (unlike the bench, where nobody thinks). It measures how the sim's
+// Node, with 12, 25, 50 and 100 foes in one fight (and 50 marching in from
+// far off, 'far 50'), each really thinking and shooting (unlike the bench,
+// where nobody thinks). It measures how the sim's
 // cost grows with the number of mechs.
 //
 // For each size it runs a fixed Free Play match (seed 1234, dusk) with you
@@ -21,21 +22,23 @@ import { recordFx } from '../src/sim/fx.js';
 import { update, noInput } from '../src/sim/update.js';
 import { shiftMech } from '../src/sim/walkView.js';
 
-export const SIZES = [12, 25, 50, 100];
+export const SIZES = [12, 25, 50, 100, 'far 50'];   // 'far 50': fifty foes 600-1,100 m off, marching in, mostly out of sight (spec 34 part 3)
 // At 50 foes, today's counts plus ~15% (spec 34 lowers them part by part).
 export const CROWD_BUDGETS = { rays: 70, pairs: 2750 };   // main at spec 34: 60 and 11,356 mech reads; the grid (part 2): 2,391
 
 const DT = 1 / 60, WARM = 120, FRAMES = 300;
 const FOES = ['jackal', 'jackal', 'kestrel', 'jackal', 'warden'];
 
-function match(n) {
+function match(size) {
+  const far = typeof size === 'string', n = far ? Number(size.split(' ')[1]) : size;
   const G = createGame({ fx: recordFx(), seed: 1234 });
   startMatch(G, { name: 'Crowd', pal: 'dusk', foes: Array.from({ length: n }, (_, i) => FOES[i % FOES.length]), intel: '' }, 1234, false, 'kestrel');
   G.kind = 'free'; G.diff = 'normal'; G.mode = 'sp'; G.cheats = { god: true };   // you stay up, so the fight runs the whole 7 s
-  // All in, at once, the worst case: every foe aware, on rings 80 to 200 m out.
+  // All in, at once, the worst case: every foe aware, on rings 80 to 200 m
+  // out. Far: on rings 600 to 1,100 m out, aware, marching in (a raid).
   const P = G.player, foes = G.mechs.filter(m => m !== P && m.ai);
   foes.forEach((m, i) => {
-    const a = i * 2.39996, d = 80 + (i * 37) % 120;   // the golden angle: spread round, no two together
+    const a = i * 2.39996, d = far ? 600 + (i * 97) % 500 : 80 + (i * 37) % 120;   // the golden angle: spread round, no two together
     shiftMech(m, P.x + Math.sin(a) * d - m.x, P.z + Math.cos(a) * d - m.z);
     m.ai.aware = true; m.ai.frozen = false;
   });
@@ -72,7 +75,7 @@ export function report(out, scale = 1) {
   let over = [], prev = null;
   console.log(['crowd'.padEnd(14), ...['ms', 'x prev', 'rays', 'pairs', 'alive'].map(c => c.padStart(10))].join(''));
   for (const [n, r] of Object.entries(out)) {
-    const grow = prev ? (r.ms / prev.ms).toFixed(2) : '';
+    const grow = prev && !n.startsWith('far') ? (r.ms / prev.ms).toFixed(2) : '';
     const b = n === '50' ? CROWD_BUDGETS : {};
     const cell = k => `${r[k]}${b[k] && r[k] > b[k] * scale ? '!' : ''}`;
     for (const k of ['rays', 'pairs']) if (b[k] && r[k] > b[k] * scale) over.push(`${k} ${r[k]} > ${Math.round(b[k] * scale)}`);

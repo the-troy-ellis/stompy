@@ -9,7 +9,8 @@ import { keepRange, steer, strafeTick } from './ai/behaviours.js';
 import { planFor } from './ai/profiles.js';
 import { routeYaw, feelers } from './ai/nav.js';
 import { decideFire } from './ai/fire.js';
-import { PERCEPTION as K } from '../data/ai.js';
+import { PERCEPTION as K, FAR_THINK as FAR } from '../data/ai.js';
+import { mechsNear } from './near.js';
 import { revealing } from './waves.js';
 import { pilotsOf } from './hitqueue.js';
 import { raidTarget } from './raid.js';
@@ -34,6 +35,19 @@ export function preyOf(G, e) {
 
 // A foe that only stands there (e.ai.still: the test range): no throttle, no jets, no shots.
 export function stand(e) { e.throttle = 0; e.jetting = false; }
+
+// Whether `e` decides this frame (docs/specs/34-big-fights.md part 3): every
+// frame in a fight (it sees its prey, a foe of its own is within FAR.range,
+// or it was hit lately), else every FAR.every-th, staggered by `i`, its place
+// in G.mechs. A raid crossing the map, a patrol, a search: a quarter the work.
+const NEARBY = [];
+export function thinksNow(G, e, i) {
+  const a = e.ai;
+  if (a.seen || G.time - (a.hitAt ?? -Infinity) < FAR.hitFor || (G.frame + i) % FAR.every === 0) return true;
+  const k = mechsNear(G, e.x, e.z, FAR.range, NEARBY);
+  for (let j = 0; j < k; j++) { const o = NEARBY[j]; if (o.alive && o.team !== e.team && (o.x - e.x) ** 2 + (o.z - e.z) ** 2 < FAR.range ** 2) return true; }
+  return false;
+}
 
 // One enemy, one frame. State lives in e.ai. `prey`: whom to fight instead
 // of the one preyOf picks: a crew mech's ATTACK or GUARD order uses this same
