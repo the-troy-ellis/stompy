@@ -100,7 +100,9 @@ try {
     await page.keyboard.press('KeyP'); await page.waitForTimeout(200);
     // Win the mission through the real destroy path and reach the debrief.
     await page.evaluate(() => { const s = window.__stompy; for (const m of s.game.mechs) if (m.team && m.alive) s.kill(m); });
-    await page.waitForFunction(() => window.__stompy.game.state === 'debrief', null, { timeout: 8000 });
+    // The debrief comes 3.5 s of game time after the last death lands: on a
+    // slow runner, whose frames are clamped, that's 11-15 s of wall clock.
+    await page.waitForFunction(() => window.__stompy.game.state === 'debrief', null, { timeout: 30000 });
     const won = await page.evaluate(() => /MISSION COMPLETE/.test(document.querySelector('.mech-overlay').textContent));
     console.log(`desktop: debrief reached, won=${won}`);
     if (!won) { failed = true; console.error('FAIL: debrief did not show MISSION COMPLETE'); }
