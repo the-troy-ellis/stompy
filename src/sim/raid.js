@@ -1,6 +1,8 @@
 import { CHASSIS } from '../data/chassis.js';
 import { CONSTRUCT } from '../data/construct.js';
 import { crewOf } from './crew.js';
+import { stealRow } from './steal.js';
+import { isDown } from './down.js';
 import { msg } from './effects.js';
 
 // Raids and salvage (docs/specs/20-build-and-fight.md § The raid, § Raids go
@@ -27,8 +29,17 @@ export function raidTarget(G, e) {
   if (!G.base) return null;
   for (const m of crewOf(G)) if (m.alive && hypot(m.x - e.x, m.z - e.z) < RAID_NEAR) return null;
   let best = null, bestD = Infinity;
-  for (const b of [...G.base.silos, G.base.factory, ...(G.base.bays || []), ...G.base.beacons]) {   // not walls (docs/specs/21-mining.md): raiders go round or through; beacons, so a raid opens the border (spec 33)
-    if (!b || !b.alive) continue;
+  // On HARD (stealRow knock) a raid knocks an exposed building down for its
+  // thieves and leaves it at that: the exposed ones first, never one down.
+  const knock = stealRow(G).knock, list = [...G.base.silos, G.base.factory, ...(G.base.bays || []), ...G.base.beacons, ...(G.base.shops || []), ...(G.base.plants || []), ...(G.base.lines || [])];
+  if (knock) for (const b of list) {
+    if (!b?.alive || !b.exposed || isDown(b)) continue;
+    const d = hypot(b.x - e.x, b.z - e.z);
+    if (d < bestD) { best = b; bestD = d; }
+  }
+  if (best) return best;
+  for (const b of list) {   // not walls (docs/specs/21-mining.md): raiders go round or through; beacons, so a raid opens the border (spec 33)
+    if (!b || !b.alive || (knock && isDown(b))) continue;
     const d = hypot(b.x - e.x, b.z - e.z);
     if (d < bestD) { best = b; bestD = d; }
   }

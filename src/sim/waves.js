@@ -1,3 +1,4 @@
+import { thievesFor } from './steal.js';
 import { newMech } from './state.js';
 import { polar } from './placement.js';
 import { BOUND } from '../world/terrain.js';
@@ -27,6 +28,8 @@ export function waveFoes(G, foes) {
 export const revealing = (G, m) => (m.ai?.revealUntil ?? 0) > G.time;
 export function spawnWave(G, foes, { from = 'ring', dist = WAVE_DIST, reveal = 0, raid = false } = {}) {
   const rng = G.rng, P = G.player, nav = typeof from === 'string' && from !== 'ring' ? G.entities.find(e => e.id === from) : null;
+  const thieves = raid ? thievesFor(G) : [], raidN = G.base?.raids || 0;   // foe haulers with the raid, by difficulty (docs/specs/33-production.md § What foes do)
+  if (thieves.length) foes = [...foes, ...thieves];
   return foes.map((t, i) => {
     let x, z;
     if (nav) { const a = rng.range(0, 2 * PI), r = rng.range(8, 30); x = nav.x + sin(a) * r; z = nav.z + cos(a) * r; }
@@ -37,6 +40,7 @@ export function spawnWave(G, foes, { from = 'ring', dist = WAVE_DIST, reveal = 0
     m.ai.aware = true;
     if (reveal) m.ai.revealUntil = G.time + reveal;
     if (raid) m.ai.raid = true;   // it goes for the base (raid.js)
+    if (raid && i >= foes.length - thieves.length) { m.ai.thief = true; m.ai.raidN = raidN; }   // a thief: sim/steal.js thieve
     G.mechs.push(m);
     return m;
   });

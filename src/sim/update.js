@@ -33,6 +33,7 @@ import { walkStep } from './walkView.js';
 import { dig, dump, stepFalls, stepFinePatches } from './dig.js';
 import { stepTool, siteInReach, aimGround } from './tools.js';
 import { airSteer, jetLock } from './jets.js';
+import { thieve } from './steal.js';
 import { DIG } from '../data/weapons.js';
 
 const { sin, abs, min, max, hypot, cos } = Math;
@@ -142,6 +143,7 @@ export function update(G, input, dt) {
     }
     if (m.team !== 0 && m.alive && !m.script) {   // the bench's cast is on a script
       if (m.ai.still || cheat(G, 'freeze')) { stand(m); m.ai.frozen = !m.ai.still; }   // a range's target; FOES FROZEN (sim/cheats.js)
+      else if (m.ai.thief) thieve(G, m, dt);   // a raid's foe hauler (sim/steal.js)
       else { if (m.ai.frozen) { m.ai.frozen = false; m.ai.aware = true; } think(G, m, dt); }   // unfrozen: awake, and after you
     }
     if (m.alive) { stepMech(G, m, dt); meleeTick(G, m, dt); }
