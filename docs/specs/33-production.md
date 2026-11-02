@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | parts 1 to 5 built (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
+| Status | parts 1 to 5 and part 6's first half built (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
 | Milestone | M14 (proposed), with [32-base-loop.md](32-base-loop.md) |
 | Size | L, split in six (§ Build order) |
 | Depends on | [20-build-and-fight.md](20-build-and-fight.md) (silo, factory, raids); [21-mining.md](21-mining.md) (seams, haulers); [22-command-view.md](22-command-view.md) (the map); [23-construction-sites.md](23-construction-sites.md) and [31-builder.md](31-builder.md) (sites, builders); [32-base-loop.md](32-base-loop.md) (raids from above, ENDLESS, lodes) |
@@ -607,6 +607,43 @@ A parked hauler picks a job in this order (`miner.js` `haul`, extended):
   - The lab working a weapon out, one at a time, this mission only.
   - The weapon shop making the guns a queued BARRY wants.
   - A BARRY coming off the line with its guns and joining the crew.
+
+### Part 6a: mission bases
+
+- **A mission's base** (`base.js` `initBase`, `startBuilding`) can now say:
+  - `ore` and `iso`: what the pools start with.
+  - `buildings: [{ kind, at: [bearing, dist], face, hp, prog, rubble }]`:
+    - a building up from the start, with nothing said for it;
+    - `hp`, the share of its health it has (a quarter or less: down);
+    - `prog` under 1, a site that far along, with the ore and swings in it to
+      match;
+    - `rubble`, only its wreck (or a heap, for a kind with no wreck mesh).
+  - `things: [{ part, n, at: kind }]`: parts in the pile of the first
+    building of that kind.
+- **Rubble** is in the way of a site (`footprintAt` says no room). A builder
+  clears it in three swings (`clearSwing`; the job reads `CLEARING`), and
+  parked builders do so after sites and mending. Shooting it clears it too.
+  Cleared, nothing is left.
+- **The range's BASE picker** (debug menu) has three yards round its silo,
+  each with two haulers and a builder:
+  - `A FULL YARD`: the whole chain, three beacons, 150 ore, 30 isotopes,
+    legs and a core in their piles.
+  - `A DAMAGED YARD`: the line down, every other building at half, a beacon
+    in rubble (so most of the yard is exposed), 60 ore.
+  - `A HALF YARD`: the line 40% up, the plant and weapon shop 60%.
+- **Fixed:** the line's crew-full flag was `full`, which is also every
+  building's full height. Since part 2 every line showed `CREW FULL` on the
+  map, and the flag overwrote its height. It's `crewFull` now.
+- **Still to come (6b):** the mission editor placing these buildings, with a
+  state slider.
+- **New text:** `CLEARING`, `RUBBLE`, `A FULL YARD`, `A DAMAGED YARD`,
+  `A HALF YARD`.
+- **Tests** (`startBase.test.js`):
+  - The full yard: all working, territory drawn, the pools, the piles,
+    nothing said.
+  - The damaged yard: the line down, others hurt, rubble in the way.
+  - Rubble cleared by a builder.
+  - The half yard's sites, with the ore and swings to match.
 
 ## Code touchpoints
 

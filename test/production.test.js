@@ -94,7 +94,7 @@ test('the crew\'s cap stops the line', () => {
   while (G.crew.length < CONSTRUCT.crewMax) G.crew.push({ ...G.crew[0], alive: true });
   queueMake(G, line, 'digger');
   run(G, 1);
-  assert.ok(!line.bays[0] && line.full, 'CREW FULL');
+  assert.ok(!line.bays[0] && line.crewFull, 'CREW FULL');
 });
 
 test('digging an isotope seam brings isotopes and heat on top of the ore; a silo takes them into their own pool', async () => {

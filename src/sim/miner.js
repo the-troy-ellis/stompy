@@ -4,7 +4,7 @@ import { CONSTRUCT } from '../data/construct.js';
 import { siteInReach, siteReach } from './tools.js';
 import { TOOL } from '../data/tools.js';
 import { routeYaw, feelers, walkable, walkGround, FEEL_M } from './ai/nav.js';
-import { padOf, siteWork, nearestSilo, oreRoom, needsRepair, repairCost } from './base.js';
+import { padOf, siteWork, nearestSilo, oreRoom, needsRepair, repairCost, isRubble } from './base.js';
 import { carryFor, thingAt, pickUp, putDown, pileAt } from './production.js';
 
 const { atan2, hypot, sin, cos, abs, min } = Math;
@@ -52,7 +52,7 @@ export function mine(G, m, dt) {
   // ore pays for; with none, it stands. A digger only digs, and brings a full
   // hopper to a site that needs ore (base.js tipIn takes it).
   if (m.ch.tool === 'build') {
-    const e = siteFor(G, m, a, false) || mendFor(G, m, a);   // sites first, then mending (spec 33)
+    const e = siteFor(G, m, a, false) || mendFor(G, m, a) || rubbleFor(G, m, a);   // sites first, then mending, then rubble (spec 33)
     if (e) return build(G, m, a, e, dt);
     m.job = null;
     return halt(m, dt);
@@ -120,10 +120,20 @@ function mendFor(G, m, a) {
   }
   return best;
 }
+// The nearest rubble, or null (or the last trip to it got stuck).
+function rubbleFor(G, m, a) {
+  let best = null, bd = Infinity;
+  for (const e of G.entities) {
+    if (!isRubble(e)) continue;
+    const d = hypot(e.x - m.x, e.z - m.z);
+    if (d < bd && !(a.skip?.e === e && G.time < a.skip.until)) { best = e; bd = d; }
+  }
+  return best;
+}
 // To a site's part, square on: a builder holds BUILD (sim/tools.js slams the
 // pieces in); a digger bringing ore stands there while base.js tipIn takes it.
 export function build(G, m, a, e, dt) {
-  m.job = m.ch.tool !== 'build' ? 'DELIVERING' : e.site ? 'BUILDING' : 'FIXING';
+  m.job = m.ch.tool !== 'build' ? 'DELIVERING' : e.site ? 'BUILDING' : isRubble(e) ? 'CLEARING' : 'FIXING';
   const reach = siteReach(m), d = hypot(e.x - m.x, e.z - m.z) - e.radius;
   if (d > reach * 0.7) {
     const k = e.radius + reach * 0.5, x = e.x + (m.x - e.x) / (d + e.radius) * k, z = e.z + (m.z - e.z) / (d + e.radius) * k;

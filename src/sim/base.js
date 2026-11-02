@@ -1,4 +1,4 @@
-import { CONSTRUCT, BUILDINGS, PLACE, PLACE_ORDER, HEAP, LINE } from '../data/construct.js';
+import { CONSTRUCT, BUILDINGS, PLACE, PLACE_ORDER, HEAP, LINE, STEAL } from '../data/construct.js';
 import { NAMES } from '../data/names.js';
 import { addEntity } from './entities.js';
 import { newMech } from './state.js';
@@ -38,12 +38,53 @@ export function initBase(G, def) {
   G.base = null;
   if (!def.base) return;
   const { x, z } = polar(def.base.silo), silo = addEntity(G, { ...BUILDINGS.silo, x, z, yaw: atan2(-x, -z), hp: CONSTRUCT.siloHp, id: 'silo' });
-  G.base = { ore: CONSTRUCT.startOre, iso: 0, salvage: 0, silo, silos: [silo], beacons: [], heaps: [], shops: [], lines: [], plants: [], labs: [], armories: [], things: [], factory: null, bays: [], walls: [], pick: 0, sites: [], land: null, landT: 0 };
+  G.base = { ore: def.base.ore ?? CONSTRUCT.startOre, iso: def.base.iso ?? 0, salvage: 0, silo, silos: [silo], beacons: [], heaps: [], shops: [], lines: [], plants: [], labs: [], armories: [], things: [], factory: null, bays: [], walls: [], pick: 0, sites: [], land: null, landT: 0 };
   silo.counted = true;
   if (def.base.known) G.base.known = new Set(def.base.known);   // weapons worked out at the start (spec 33 § The weapon lab)
   // Abandoned buildings out on the map (spec 33 § Stealing): nobody's, down, for the taking.
   for (const n of def.base.neutral || []) { const p = polar(n.at); addBuilding(G, n.kind, p.x, p.z, (n.face || 0) * Math.PI / 180); }
+  // The base it starts with (spec 33 § Missions and their bases): each building up,
+  // damaged, half built, or rubble; then the parts already in their piles.
+  for (const d of def.base.buildings || []) startBuilding(G, d);
+  for (const t of def.base.things || []) {
+    const at = G.entities.find(e => e.alive && e.team === 0 && e.place === t.at && !e.site);
+    if (at) for (let i = 0; i < (t.n || 1); i++) G.base.things.push({ part: t.part, at, by: null, claim: null });
+  }
   survey(G);
+}
+
+// Rubble (spec 33 § Missions and their bases): a builder's swing on it
+// clears a third, and three clear it away, nothing left; shooting it does too.
+export const isRubble = e => !!e && e.alive && e.tags.includes('rubble');
+export function clearSwing(G, m, e) {
+  if (!isRubble(e)) return false;
+  e.hp -= RUBBLE_HP / 3 + 1e-6;
+  if (e.hp <= 0) { e.alive = false; e.wreck = false; }
+  if (m === G.player) msg(G, 'CLEARING');
+  return true;
+}
+
+// One of a mission's starting buildings: `{ kind, at: [bearing, dist], face,
+// hp, prog, rubble }`. `prog` under 1 puts it down as a site that far along
+// (ore and swings in it to match); `hp` is the share of its health it has
+// (a quarter or less: down); `rubble` leaves only its wreck, in the way of a
+// site, cleared by a builder (clearSwing) or by shooting it.
+const RUBBLE_HP = 60, WRECKED = ['silo', 'slab', 'factory', 'beacon', 'bay'];   // the buildings with a wreck mesh of their own (mesh/props.js); the rest leave a heap
+export function startBuilding(G, d) {
+  const p = polar(d.at), yaw = (d.face || 0) * Math.PI / 180, P = PLACE[d.kind];
+  if (d.rubble) {
+    const m = BUILDINGS[d.kind].mesh;
+    return addEntity(G, { kind: 'structure', mesh: WRECKED.includes(m) ? `${m}Wreck` : 'heap', x: p.x, z: p.z, yaw, radius: BUILDINGS[d.kind].radius, height: 3, team: STEAL.neutral, hp: RUBBLE_HP, tags: ['rubble'], label: 'RUBBLE' });
+  }
+  const site = placeSite(G, { x: p.x, z: p.z, yaw: yaw - Math.PI, w: P.w, d: P.d, kind: d.kind });   // placeSite turns it round to face its digger
+  const prog = d.prog ?? 1;
+  site.ore = Math.round(site.need * prog); site.work = Math.floor(site.swings * prog);
+  for (const e of site.parts) {
+    if (prog >= 1) { e.prog = 1; e.height = e.full; e.site = null; }
+    if (d.hp != null) e.hp = e.max * d.hp;
+  }
+  if (prog >= 1) G.base.sites = G.base.sites.filter(s => s !== site);   // up from the start: no "up" said for it
+  return site.parts[0];
 }
 
 // Spec 33 § Silos and the pool. A building is up when it stands and isn't a
