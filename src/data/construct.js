@@ -1,4 +1,5 @@
 import { NAMES } from './names.js';
+import { WEAPONS } from './weapons.js';
 
 // Build and fight (docs/specs/20-build-and-fight.md): the construction
 // numbers. Starting values, to tweak in play.
@@ -72,8 +73,10 @@ export const PLACE = {
   shop: { ore: 60, swings: 10, hp: 500, w: 16, d: 12, flat: 2 },   // the machine shop: parts from ore (spec 33)
   line: { ore: 100, swings: 16, hp: 700, w: 12, d: 40, flat: 2 },   // the open assembly line: mechs from parts (spec 33)
   plant: { ore: 80, swings: 12, hp: 500, w: 14, d: 14, flat: 2 },   // the isotope plant: cores from isotopes (spec 33)
+  lab: { ore: 60, swings: 10, hp: 400, w: 12, d: 20, flat: 2 },   // the weapon lab: works out a weapon, this mission (spec 33)
+  armory: { ore: 60, swings: 10, hp: 500, w: 12, d: 12, flat: 2 },   // the weapon shop: guns that are worked out (spec 33)
 };
-export const PLACE_ORDER = ['factory', 'bay', 'wall', 'silo', 'beacon', 'shop', 'line', 'plant'];
+export const PLACE_ORDER = ['factory', 'bay', 'wall', 'silo', 'beacon', 'shop', 'line', 'plant', 'lab', 'armory'];
 // The buildings, as mission entities (sim/entities.js): unit meshes in mesh/props.js.
 // A bay is a gantry with a pad in front, like the silo; a wall slab is 4.2 m wide.
 const B = NAMES.buildings;
@@ -86,6 +89,8 @@ export const BUILDINGS = {
   shop: { kind: 'structure', mesh: 'shop', radius: 8, height: 10, team: 0, tags: ['shop'], label: B.shop },
   line: { kind: 'structure', mesh: 'line', radius: 15, height: 14, team: 0, tags: ['line'], label: B.line },   // 12 m across, 40 m along its local z
   plant: { kind: 'structure', mesh: 'plant', radius: 7, height: 16, team: 0, tags: ['plant'], label: B.plant },
+  lab: { kind: 'structure', mesh: 'lab', radius: 10, height: 9, team: 0, tags: ['lab'], label: B.lab },   // a shed and its test range, 20 m along
+  armory: { kind: 'structure', mesh: 'armory', radius: 6, height: 9, team: 0, tags: ['armory'], label: B.armory },
 };
 // Production (docs/specs/33-production.md § The machine shop, § The assembly
 // line): parts by size, not by mech, each with its price in ore and the mech
@@ -101,19 +106,30 @@ export const PARTS = {
   tub: { kind: 'arms', ore: 10, show: 'hauler' },
   crane: { kind: 'arms', ore: 10, show: 'builder' },
   core: { kind: 'core', iso: 10 },   // from the isotope plant, not the shop: every mech needs one
+  'arms.gun': { kind: 'arms', ore: 10, show: 'kestrel' },   // a fighter's arms, its guns bolted on with them
+  // Guns (docs/specs/33-production.md § The weapon lab and weapon shop), one a
+  // weapon, from the weapon shop: 8 ore and more by its tons, at most 25.
+  ...Object.fromEntries(Object.keys(WEAPONS).filter(k => k !== 'fusion').map(k => [`gun.${k}`, { kind: 'gun', weapon: k, ore: Math.min(25, Math.round(8 + WEAPONS[k].tons * 1.5)) }])),
 };
 export const RECIPES = {
   digger: ['legs.heavy', 'body.heavy', 'bucket'],
   hauler: ['legs.light', 'body.light', 'tub'],
   builder: ['legs.heavy', 'body.light', 'crane'],
+  kestrel: ['legs.light', 'body.light', 'arms.gun'],   // BARRY: its last bay takes its guns too (FIGHTERS)
 };
+// Mechs off the line that fight: their last bay takes a gun a hardpoint, the
+// stock one if it's worked out, else one of its kind that is (sim/production.js gunsFor).
+export const FIGHTERS = ['kestrel'];
+// Weapons worked out at a mission's start unless it says (`base.known`).
+export const KNOWN = ['laser', 'mg'];
 //   bays      the line's bays: legs, body, core, arms
 //   wait      mechs that can wait for the first bay
 //   bayTime   s a bay takes once its part is in
-//   press     s the shop takes to press a part; core, s the plant takes for a core
+//   press     s the shop takes to press a part; core, s the plant takes for a core;
+//             gun, s the weapon shop takes for a gun; research, s the lab takes for a weapon
 //   pile      parts a shop's pile holds before it stops
 //   things    parts on the ground, the whole base's most
-export const LINE = { bays: 4, wait: 3, bayTime: 4, press: 6, core: 20, pile: 6, things: 80 };
+export const LINE = { bays: 4, wait: 3, bayTime: 4, press: 6, core: 20, gun: 8, research: 60, pile: 6, things: 80 };
 // Ore spilled from a fallen silo (spec 33): a heap on the ground with no body
 // (a nav point's kind, so nothing bumps into it or shoots it), drawn by its
 // mesh, which a crew mech with room scoops up.
@@ -127,5 +143,5 @@ export const HEAP = { kind: 'nav', mesh: 'heap', team: 0, tags: ['heap'], trigge
 // are nobody's: abandoned, down from the start.
 export const STEAL = {
   down: 0.25, speed: 0.5, faster: 1.3, neutral: 2,
-  lift: { beacon: 1, wall: 1, silo: 2, shop: 2, bay: 2, plant: 3, factory: 3, line: 4 },
+  lift: { beacon: 1, wall: 1, silo: 2, shop: 2, bay: 2, lab: 2, armory: 2, plant: 3, factory: 3, line: 4 },
 };
