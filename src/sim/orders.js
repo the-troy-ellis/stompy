@@ -3,6 +3,7 @@ import { crewOf } from './crew.js';
 import { MINER, haul, halt, walkTo, build } from './miner.js';
 import { think } from './ai.js';
 import { needsRepair } from './base.js';
+import { canLift, slotOf, carriersOf } from './steal.js';
 import { alertEnemy } from './ai/perception.js';
 
 const { atan2, hypot, sin, cos, abs } = Math;
@@ -25,6 +26,9 @@ const { atan2, hypot, sin, cos, abs } = Math;
 //   guard   a fighter: stay by `target`, one of your buildings, and fight any
 //           foe that comes within ORDER.guard of it, never chasing it past
 //           ORDER.leash
+//   carry   haulers: lift `target`, a building down outside its owner's
+//           territory, and walk it to `to` = { x, z, yaw } (sim/steal.js;
+//           docs/specs/33-production.md § Stealing); then stay
 //   work    (given, never kept) back to its own job
 export const ORDER = {
   arrive: 4,      // m: this near a GO point, it stays
@@ -33,8 +37,8 @@ export const ORDER = {
   leash: 260,     // m: and lets it go past this far from the building
   post: 18,       // m: off the building's side, where a guard waits
 };
-export const ORDERS = ['go', 'dig', 'follow', 'build', 'attack', 'guard', 'stay', 'work'];
-export const SAY = { go: 'Going.', dig: 'Digging.', follow: 'Following.', build: 'Building.', attack: 'Attacking.', guard: 'Guarding.', stay: 'Staying.', work: 'Back to work.' };
+export const ORDERS = ['go', 'dig', 'follow', 'build', 'attack', 'guard', 'carry', 'stay', 'work'];
+export const SAY = { go: 'Going.', dig: 'Digging.', follow: 'Following.', build: 'Building.', attack: 'Attacking.', guard: 'Guarding.', carry: 'Lifting.', stay: 'Staying.', work: 'Back to work.' };
 
 // Who can take an order: anyone GO and STAY; DIG a digger; BUILD a builder;
 // FOLLOW a hauler; WORK whoever has a job of its own; ATTACK and GUARD a
@@ -43,7 +47,7 @@ export function can(m, kind) {
   if (kind === 'attack' || kind === 'guard') return !m.ch.hopper && !m.ch.tool;
   if (kind === 'dig') return m.ch.tool === 'dig';
   if (kind === 'build') return m.ch.tool === 'build';   // builders build (docs/specs/31-builder.md)
-  if (kind === 'follow') return !!m.ch.hopper && !m.ch.tool;
+  if (kind === 'follow' || kind === 'carry') return !!m.ch.hopper && !m.ch.tool;   // haulers
   if (kind === 'work') return !!m.ch.hopper || !!m.ch.tool;
   return kind === 'go' || kind === 'stay';
 }
@@ -57,12 +61,13 @@ export function give(G, mechs, order) {
   if (kind === 'build' && !(order.target?.alive && (order.target.site || needsRepair(order.target)))) return 0;   // a site, or a building to mend (spec 33)
   if (kind === 'attack' && !(order.target?.alive && order.target.team !== 0 && G.mechs.includes(order.target))) return 0;
   if (kind === 'guard' && !(order.target?.alive && order.target.team === 0 && order.target.kind === 'structure')) return 0;
+  if (kind === 'carry' && !(canLift(G, order.target) && order.to)) return 0;
   let n = 0;
   for (const m of mechs) {
     if (!m.alive || !crew.includes(m) || !can(m, kind)) continue;
     if (kind === 'work') m.order = null;
     else if (kind === 'stay') m.order = { kind };
-    else if (kind === 'follow' || kind === 'build' || kind === 'attack' || kind === 'guard') m.order = { kind, target: order.target };
+    else if (kind === 'follow' || kind === 'build' || kind === 'attack' || kind === 'guard' || kind === 'carry') m.order = { kind, target: order.target };
     else if (kind === 'go') m.order = { kind, x: order.x, y: G.ter.height(order.x, order.z), z: order.z };
     else if (kind === 'dig') {
       const yaw = atan2(order.x - m.x, order.z - m.z), d = standAt(G, m, order.x, order.z, yaw);
@@ -72,6 +77,7 @@ export function give(G, mechs, order) {
     if (m.ai) m.ai.goal = null;   // a fresh trip
     n++;
   }
+  if (n && kind === 'carry') order.target.carry = { to: { x: order.to.x, z: order.to.z, yaw: order.to.yaw }, lifted: false };
   if (n) G.fx.say(kind === 'build' && !order.target.site ? 'Fixing.' : SAY[kind]);
   return n;
 }
@@ -118,6 +124,15 @@ export function obey(G, m, dt) {
     // Back to its post: off the building's side toward where it is.
     const k = b.radius + ORDER.post, d0 = hypot(m.x - b.x, m.z - b.z) || 1, x = b.x + (m.x - b.x) / d0 * k, z = b.z + (m.z - b.z) / d0 * k;
     if (hypot(x - m.x, z - m.z) > ORDER.arrive * 2) walkTo(G, m, a, x, G.ter.height(x, z), z, dt, () => {});
+    else halt(m, dt);
+    return true;
+  }
+  if (o.kind === 'carry') {   // to its place round the building's edge, and with it while it's lifted
+    const e = o.target;
+    if (!e.alive || !e.carry) { m.order = { kind: 'stay' }; return obey(G, m, dt); }
+    const by = carriersOf(G, e), [x, z] = slotOf(e, by.indexOf(m), by.length);
+    m.job = 'CARRYING';
+    if (hypot(x - m.x, z - m.z) > 2) walkTo(G, m, a, x, G.ter.height(x, z), z, dt, () => {});
     else halt(m, dt);
     return true;
   }

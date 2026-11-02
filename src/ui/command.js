@@ -9,7 +9,9 @@ import { pickNearest, pickInside } from '../sim/pick.js';
 import { crewOf, canCommand, commandUp, commandDown } from '../sim/crew.js';
 import { give, can } from '../sim/orders.js';
 import { PLACE, PLACE_ORDER, BUILDINGS, CONSTRUCT, RECIPES, PARTS } from '../data/construct.js';
-import { footprintAt, placeSite, snapWall, oreRoom, isoRoom, needsRepair } from '../sim/base.js';
+import { footprintAt, placeSite, snapWall, oreRoom, isoRoom, needsRepair, kindOf, inLand } from '../sim/base.js';
+import { canLift } from '../sim/steal.js';
+import { isDown } from '../sim/down.js';
 import { territory } from '../sim/territory.js';
 import { queueMake, bayAt, bayPart, thingsAt } from '../sim/production.js';
 
@@ -44,7 +46,7 @@ const siteLabel = (G, e) => {
   const st = BUILDINGS.wall.radius * 1.9, px = e.x + Math.cos(e.yaw || 0) * st, pz = e.z - Math.sin(e.yaw || 0) * st;
   return G.base?.walls.some(o => o.alive && !o.site && Math.hypot(o.x - px, o.z - pz) < st * 0.6) ? '' : n;
 };
-export const BAR = ['go', 'dig', 'follow', 'stay', 'work', 'drive', 'build', 'attack', 'guard'];   // the order bar, in order (keys 1–9)
+export const BAR = ['go', 'dig', 'follow', 'stay', 'work', 'drive', 'build', 'attack', 'guard', 'carry'];   // the order bar, in order (keys 1–9; CARRY, the tenth, by tap or pad)
 export const MAKE = Object.keys(RECIPES);   // with an assembly line tapped, the bar is these instead (docs/specs/33-production.md), keys 1–3
 
 export function createCommand(app) {
@@ -57,7 +59,7 @@ export function createCommand(app) {
     <div class="cmd-bar">${BAR.map(k => `<button class="cmd-btn" data-c="${k}" hidden>${k.toUpperCase()}</button>`).join('')}${MAKE.map(k => `<button class="cmd-btn" data-m="${k}" hidden>${NAMES.chassis[k]}</button>`).join('')}</div>`;
   wrap.insertBefore(root, app.ov);
   const surface = root.querySelector('.cmd-surface'), btn = Object.fromEntries(BAR.map(k => [k, root.querySelector(`[data-c="${k}"]`)])), mk = Object.fromEntries(MAKE.map(k => [k, root.querySelector(`[data-m="${k}"]`)]));
-  const C = { cam: null, picked: new Set(), box: null, order: null, place: null, ghost: null, padAt: 0, make: null };   // make: the assembly line tapped, its MAKE bar up   // order: GO, DIG, FOLLOW or BUILD chosen, waiting for its tap; place: the kind of site BUILD puts down, ghost: where; padAt: the bar's button a gamepad has lit
+  const C = { cam: null, picked: new Set(), box: null, order: null, place: null, ghost: null, padAt: 0, make: null, lift: null };   // make: the assembly line tapped, its MAKE bar up; lift: the building CARRY picked, its ghost where it goes   // order: GO, DIG, FOLLOW or BUILD chosen, waiting for its tap; place: the kind of site BUILD puts down, ghost: where; padAt: the bar's button a gamepad has lit
 
   const size = () => ({ W: Math.max(1, wrap.clientWidth), H: Math.max(1, wrap.clientHeight) });
   const mpp = () => metresPerPixel(C.cam, size().H);
@@ -74,6 +76,10 @@ export function createCommand(app) {
   const buildingAt = (sx, sy) => {
     const g = ground(sx, sy), ours = G.entities.filter(e => e.alive && e.team === 0 && e.kind === 'structure' && !e.site);
     return g && pickNearest(ours.map(e => ({ id: e, x: e.x, z: e.z, r: e.radius })), g.x, g.z, COMMAND.finger * mpp())?.id;
+  };
+  const liftAt = (sx, sy) => {   // a building CARRY can take: down, not yours, outside its owner's border (sim/steal.js)
+    const g = ground(sx, sy), them = G.entities.filter(e => canLift(G, e));
+    return g && pickNearest(them.map(e => ({ id: e, x: e.x, z: e.z, r: e.radius })), g.x, g.z, COMMAND.finger * mpp())?.id;
   };
   const siteAt = (sx, sy) => {
     const g = ground(sx, sy), parts = (G.base?.sites || []).flatMap(s => s.parts.filter(e => e.alive));
@@ -99,6 +105,7 @@ export function createCommand(app) {
     const label = C.place ? `BUILD ${NAMES.buildings[C.place]}` : 'BUILD';
     if (btn.build.textContent !== label) btn.build.textContent = label;
     if (C.order && btn[C.order].hidden) C.order = null;
+    if (C.order !== 'carry') C.lift = null;
     const shown = BAR.filter(k => !btn[k].hidden), lit = G.padActive && shown.length ? shown[C.padAt % shown.length] : null;
     for (const k of BAR) btn[k].classList.toggle('pad-focus', k === lit);
   };
@@ -106,6 +113,7 @@ export function createCommand(app) {
   // near another wall's free end snaps on to it.
   const ghostPrint = () => {
     const s = G.base?.silo, g = C.ghost, yaw = s ? Math.atan2(g.x - s.x, g.z - s.z) : C.cam.yaw;
+    if (C.lift) { const f = footprintAt(G, g.x, g.z, yaw, kindOf(C.lift)); if (f.why === 'built') f.why = null; f.inside = inLand(G, g.x, g.z); return f; }   // where a CARRY sets it down: inside your border, it's yours
     const w = C.place === 'wall' && snapWall(G, g.x, g.z);
     return w ? footprintAt(G, w.x, w.z, w.yaw, 'wall') : footprintAt(G, g.x, g.z, yaw, C.place);
   };
@@ -141,6 +149,16 @@ export function createCommand(app) {
     const m = crewAt(x, y), g = ground(x, y), hurt = buildingAt(x, y), e = siteAt(x, y) || (needsRepair(hurt) ? hurt : null);   // a site, or a building to mend (spec 33)
     if (C.order === 'follow') { if (m) order({ kind: 'follow', target: m }); return; }
     if (C.order === 'build') { if (e) order({ kind: 'build', target: e }); return; }
+    if (C.order === 'carry') {   // first the building, then where it goes (a tap moves the ghost there; a tap on the ghost sends them)
+      if (!C.lift) { const b = liftAt(x, y); if (b) { C.lift = b; C.ghost = g; } return; }
+      if (!g) return;
+      if (!C.ghost || Math.hypot(g.x - C.ghost.x, g.z - C.ghost.z) > PLACE[kindOf(C.lift)].w / 2) { C.ghost = g; return; }
+      const f = ghostPrint();
+      if (f.why) { app.audio.sfx.beep(); return; }
+      give(G, [...C.picked], { kind: 'carry', target: C.lift, to: { x: f.x, z: f.z, yaw: f.yaw } });
+      C.order = null; C.lift = C.ghost = null; sync();
+      return;
+    }
     if (C.order === 'attack') { const f = foeAt(x, y); if (f) order({ kind: 'attack', target: f }); return; }
     if (C.order === 'guard') { const b = buildingAt(x, y); if (b) order({ kind: 'guard', target: b }); return; }
     const fighters = [...C.picked].some(p => can(p, 'attack'));
@@ -171,7 +189,7 @@ export function createCommand(app) {
     C.ghost = null;
     sync();
   }
-  surface.addEventListener('mousemove', e => { if (C.place) { const r = surface.getBoundingClientRect(), g = ground(e.clientX - r.left, e.clientY - r.top); if (g) C.ghost = g; } });
+  surface.addEventListener('mousemove', e => { if (C.place || C.lift) { const r = surface.getBoundingClientRect(), g = ground(e.clientX - r.left, e.clientY - r.top); if (g) C.ghost = g; } });
 
   // Up: the camera over the mech you were in, COMMAND.across metres of ground across the screen.
   function open() {
@@ -245,6 +263,7 @@ export function createCommand(app) {
     const crew = live(), reach = RADAR_RANGE * radarOf(G), things = [];
     for (const m of crew) things.push({ id: m, kind: 'start', x: m.x, y: m.y, z: m.z, face: -m.yaw / D2R, label: `${m === G.command.from ? '▶ ' : ''}${m.ch.name}${m.job ? ` · ${m.job}` : ''}` });
     for (const e of G.entities) if (e.alive && e.team === 0 && e.kind !== 'nav') things.push({ id: e, kind: 'structure', x: e.x, y: e.y, z: e.z, label: siteLabel(G, e) });
+    for (const e of G.entities) if (e.alive && e.team !== 0 && e.kind === 'structure' && PLACE[kindOf(e)]) things.push({ id: e, kind: 'structure', x: e.x, y: e.y, z: e.z, label: `${NAMES.buildings[kindOf(e)]}${isDown(e) ? ' · DOWN' : ''}` });   // a foe's or nobody's building (spec 33 § Stealing)
     for (const t of G.base?.things || []) if (!t.at && !t.by) things.push({ id: t, kind: 'structure', x: t.x, y: G.ter.height(t.x, t.z), z: t.z, label: t.part === 'core' ? 'CORE' : 'PART' });   // loose on the ground: a wreck's core (spec 33)
     for (const h of G.base?.heaps || []) if (h.alive) things.push({ id: h, kind: 'structure', x: h.x, y: h.y, z: h.z, label: `ORE ${Math.floor(h.ore)}` });   // a fallen silo's spill (spec 33)
     for (const f of G.mechs) if (f.alive && f.team !== 0 && crew.some(m => Math.hypot(f.x - m.x, f.z - m.z) < reach)) things.push({ id: f, kind: 'foe', x: f.x, y: f.y, z: f.z, face: -f.yaw / D2R });
@@ -253,7 +272,8 @@ export function createCommand(app) {
     drawExposed(ctx, view, pal);
     drawProduction(ctx, view, pal);
     drawOrders(ctx, view, crew, pal);
-    if (C.place && C.ghost) drawGhost(ctx, view, pal);
+    if ((C.place || C.lift) && C.ghost) drawGhost(ctx, view, pal);
+    drawLiftable(ctx, view);
     // The base, as the cockpit's panel has it.
     ctx.font = 'bold 11px "Lucida Console", monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     if (G.base) { ctx.fillStyle = pal.good; ctx.fillText(`ORE ${Math.floor(G.base.ore)}/${oreRoom(G)}${G.base.iso || G.base.plants.length ? `  ISO ${G.base.iso}/${isoRoom(G)}` : ''}  SALVAGE ${G.base.salvage}`, 14, 22); }
@@ -346,6 +366,21 @@ export function createCommand(app) {
     ctx.restore();
   }
 
+  // Buildings CARRY could take now: an up arrow over each, while you have a
+  // hauler; the one picked, ringed.
+  function drawLiftable(ctx, view) {
+    if (!live().some(m => can(m, 'carry'))) return;
+    ctx.save(); ctx.strokeStyle = '#fc3'; ctx.lineWidth = 2;
+    for (const e of G.entities) {
+      if (!canLift(G, e) || (e.carry && e !== C.lift)) continue;   // already on its way
+      const p = view.toScreen(e.x, e.y + e.height, e.z);
+      if (!p) continue;
+      ctx.beginPath(); ctx.moveTo(p[0], p[1] - 4); ctx.lineTo(p[0], p[1] - 18); ctx.moveTo(p[0] - 5, p[1] - 13); ctx.lineTo(p[0], p[1] - 18); ctx.lineTo(p[0] + 5, p[1] - 13); ctx.stroke();
+      if (e === C.lift) { ctx.beginPath(); ctx.arc(p[0], p[1] + 10, 20, 0, 7); ctx.stroke(); }
+    }
+    ctx.restore();
+  }
+
   // With a gamepad: the crosshair a press of A taps at, and the buttons.
   function drawPadAim(ctx, W, H, pal) {
     const x = W / 2, y = H / 2;
@@ -390,11 +425,11 @@ export function createCommand(app) {
     const f = ghostPrint(), hw = f.w / 2, hd = f.d / 2, s = Math.sin(f.yaw), c = Math.cos(f.yaw);
     const pts = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([u, v]) => { const x = f.x + u * c + v * s, z = f.z - u * s + v * c; return view.toScreen(x, G.ter.height(x, z) + 0.5, z); });
     if (pts.some(p => !p)) return;
-    const col = f.why ? pal.bad : pal.good, mid = view.toScreen(f.x, G.ter.height(f.x, f.z), f.z);
+    const col = f.why ? pal.bad : C.lift && !f.inside ? '#fc3' : pal.good, mid = view.toScreen(f.x, G.ter.height(f.x, f.z), f.z);
     ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
     ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.stroke();
     ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.font = 'bold 11px "Lucida Console", monospace';
-    if (mid) ctx.fillText(f.why === 'room' ? 'NO ROOM' : f.why === 'built' ? 'BUILT' : `${NAMES.buildings[f.kind]} · ${PLACE[f.kind].ore} ORE`, mid[0], mid[1]);
+    if (mid) ctx.fillText(f.why === 'room' ? 'NO ROOM' : f.why === 'built' ? 'BUILT' : C.lift ? (f.inside ? `${NAMES.buildings[f.kind]} · YOURS HERE` : 'OUTSIDE YOUR BORDER') : `${NAMES.buildings[f.kind]} · ${PLACE[f.kind].ore} ORE`, mid[0], mid[1]);
     ctx.restore();
   }
 
@@ -410,7 +445,7 @@ export function createCommand(app) {
     if (a.twist) rotateAbout(C.cam, a.twist * PADCAM.turn * dt, mid());
     if (a.pitch) zoomAt(C.cam, Math.pow(PADCAM.zoom, -a.pitch * dt), mid());
     after();
-    if (C.place) { const g = mid(); if (g) C.ghost = g; }
+    if (C.place || C.lift) { const g = mid(); if (g) C.ghost = g; }
     if (k.back) { close(); return; }
     if (k.a) tapAt(W / 2, H / 2);
     if (k.x) {
