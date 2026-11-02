@@ -1,4 +1,4 @@
-import { seamAt } from '../world/seams.js';
+import { seamAt, isoAt } from '../world/seams.js';
 import { cheat } from './cheats.js';
 import { BIG_DIG } from '../data/debug.js';
 import { DIG, CRUSH, TORQUE, WEAPONS } from '../data/weapons.js';
@@ -87,11 +87,11 @@ export function dig(G, p, r, owned = true) {
 // online a bite is a plain dig).
 export const seamOre = depth => CONSTRUCT.orePerSeam * Math.min(CONSTRUCT.seamMax, 1 + Math.max(0, depth) / CONSTRUCT.seamDeep);
 export function bite(G, m, p, r = CONSTRUCT.bucket, fl = -Infinity, sl = null) {
-  m.seamBite = false; m.biteCorners = 0; m.biteOre = 0;
+  m.seamBite = false; m.biteCorners = 0; m.biteOre = 0; m.isoBite = false;
   if (!G.ter || online(G)) { dig(G, p, r, ownsDigs(G, m)); return 0; }
   const x = q(p[0], 0.25), y = q(p[1], 0.25), z = q(p[2], 0.25), seed = G.ter.seed;
-  let got = 0, seams = 0;
-  const tally = { rock: 0, soft: 0, corner: (cx, cy, cz, depth) => { if (seamAt(seed, cx, cy, cz)) { got += seamOre(depth); seams++; } else got += CONSTRUCT.orePerCorner; } };
+  let got = 0, seams = 0, iso = 0;
+  const tally = { rock: 0, soft: 0, corner: (cx, cy, cz, depth) => { if (isoAt(seed, cx, cy, cz)) iso += CONSTRUCT.isoPerCorner; if (seamAt(seed, cx, cy, cz)) { got += seamOre(depth); seams++; } else got += CONSTRUCT.orePerCorner; } };
   confirmDig(G, [0, x, y, z, r], true, 1, tally, fl, sl);
   // Whole ore into the hopper; the fraction rides on to the next bite (a 4 m
   // corner is an eighth of an 8 m one, docs/specs/29-ground-4m.md), so the
@@ -101,6 +101,16 @@ export function bite(G, m, p, r = CONSTRUCT.bucket, fl = -Infinity, sl = null) {
   const ore = Math.max(0, Math.min(m.ch.hopper - (m.ore || 0), whole));
   m.ore = (m.ore || 0) + ore;
   m.biteOre = ore;   // whole ore this bite put in the hopper: the crack (sim/tools.js scoopTier)
+  // Isotopes (docs/specs/33-production.md): whole ones ride with the ore, up
+  // to CONSTRUCT.isoMax, the fraction carried on; each heats the digger.
+  if (iso > 0 || m.isoCarry) {
+    const wantIso = iso + (m.isoCarry || 0), wholeIso = Math.floor(wantIso + 1e-9);
+    m.isoCarry = wantIso - wholeIso;
+    const n = Math.max(0, Math.min(CONSTRUCT.isoMax - (m.iso || 0), wholeIso));
+    m.iso = (m.iso || 0) + n;
+    m.heat += n * CONSTRUCT.isoHeat;
+    if (n > 0) m.isoBite = true;
+  }
   m.seamBite = seams > 0;
   m.biteCorners = tally.soft + tally.rock;   // none: the bucket scraped the hole's side (sim/miner.js moves on)
   m.biteRock = tally.rock > 0;   // what its clods look like (sim/tools.js)

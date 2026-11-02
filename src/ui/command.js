@@ -9,7 +9,7 @@ import { pickNearest, pickInside } from '../sim/pick.js';
 import { crewOf, canCommand, commandUp, commandDown } from '../sim/crew.js';
 import { give, can } from '../sim/orders.js';
 import { PLACE, PLACE_ORDER, BUILDINGS, CONSTRUCT, RECIPES, PARTS } from '../data/construct.js';
-import { footprintAt, placeSite, snapWall, oreRoom, needsRepair } from '../sim/base.js';
+import { footprintAt, placeSite, snapWall, oreRoom, isoRoom, needsRepair } from '../sim/base.js';
 import { territory } from '../sim/territory.js';
 import { queueMake, bayAt, bayPart, thingsAt } from '../sim/production.js';
 
@@ -245,6 +245,7 @@ export function createCommand(app) {
     const crew = live(), reach = RADAR_RANGE * radarOf(G), things = [];
     for (const m of crew) things.push({ id: m, kind: 'start', x: m.x, y: m.y, z: m.z, face: -m.yaw / D2R, label: `${m === G.command.from ? '▶ ' : ''}${m.ch.name}${m.job ? ` · ${m.job}` : ''}` });
     for (const e of G.entities) if (e.alive && e.team === 0 && e.kind !== 'nav') things.push({ id: e, kind: 'structure', x: e.x, y: e.y, z: e.z, label: siteLabel(G, e) });
+    for (const t of G.base?.things || []) if (!t.at && !t.by) things.push({ id: t, kind: 'structure', x: t.x, y: G.ter.height(t.x, t.z), z: t.z, label: t.part === 'core' ? 'CORE' : 'PART' });   // loose on the ground: a wreck's core (spec 33)
     for (const h of G.base?.heaps || []) if (h.alive) things.push({ id: h, kind: 'structure', x: h.x, y: h.y, z: h.z, label: `ORE ${Math.floor(h.ore)}` });   // a fallen silo's spill (spec 33)
     for (const f of G.mechs) if (f.alive && f.team !== 0 && crew.some(m => Math.hypot(f.x - m.x, f.z - m.z) < reach)) things.push({ id: f, kind: 'foe', x: f.x, y: f.y, z: f.z, face: -f.yaw / D2R });
     drawLand(ctx, view, pal);
@@ -255,7 +256,7 @@ export function createCommand(app) {
     if (C.place && C.ghost) drawGhost(ctx, view, pal);
     // The base, as the cockpit's panel has it.
     ctx.font = 'bold 11px "Lucida Console", monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    if (G.base) { ctx.fillStyle = pal.good; ctx.fillText(`ORE ${Math.floor(G.base.ore)}/${oreRoom(G)}  SALVAGE ${G.base.salvage}`, 14, 22); }
+    if (G.base) { ctx.fillStyle = pal.good; ctx.fillText(`ORE ${Math.floor(G.base.ore)}/${oreRoom(G)}${G.base.iso || G.base.plants.length ? `  ISO ${G.base.iso}/${isoRoom(G)}` : ''}  SALVAGE ${G.base.salvage}`, 14, 22); }
     drawCompass(ctx, 34, H - 34, C.cam.yaw, pal);
     if (G.padActive) drawPadAim(ctx, W, H, pal);
   }
@@ -314,10 +315,10 @@ export function createCommand(app) {
   // on its pile; at each bay of an assembly line, the part it waits for; the
   // line tapped ringed, with how many are waiting, or CREW FULL. Near enough
   // to read only.
-  const WORD = { legs: 'LEGS', body: 'A BODY', arms: 'ARMS' }, PLURAL = { legs: 'LEGS', body: 'BODIES', arms: 'ARMS' };
+  const WORD = { legs: 'LEGS', body: 'A BODY', core: 'A CORE', arms: 'ARMS' }, PLURAL = { legs: 'LEGS', body: 'BODIES', arms: 'ARMS' };
   function drawProduction(ctx, view, pal) {
     const b = G.base;
-    if (!b?.lines.length && !b?.shops.length) return;
+    if (!b?.lines.length && !b?.shops.length && !b?.plants.length) return;
     ctx.save(); ctx.font = 'bold 9px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     const S = (x, z) => view.toScreen(x, G.ter.height(x, z), z);
     if (view.mpp < 4) for (const s of b.shops) {
@@ -326,6 +327,10 @@ export function createCommand(app) {
       if (!p) continue;
       for (const t of thingsAt(G, s)) n[PARTS[t.part].kind]++;
       ctx.fillStyle = pal.good; ctx.fillText(Object.keys(n).map(k => `${PLURAL[k]} ${n[k]}`).join(' · '), p[0], p[1] + 26);
+    }
+    if (view.mpp < 4) for (const pl of b.plants) {   // the isotope plant: its cores
+      const p = !pl.site && pl.alive && S(pl.x, pl.z);
+      if (p) { ctx.fillStyle = pal.good; ctx.fillText(`CORES ${thingsAt(G, pl).length}${pl.brew ? ' +1' : ''}`, p[0], p[1] + 26); }
     }
     for (const line of b.lines) {
       if (!line.alive || line.site) continue;

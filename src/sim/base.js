@@ -36,7 +36,7 @@ export function initBase(G, def) {
   G.base = null;
   if (!def.base) return;
   const { x, z } = polar(def.base.silo), silo = addEntity(G, { ...BUILDINGS.silo, x, z, yaw: atan2(-x, -z), hp: CONSTRUCT.siloHp, id: 'silo' });
-  G.base = { ore: CONSTRUCT.startOre, salvage: 0, silo, silos: [silo], beacons: [], heaps: [], shops: [], lines: [], things: [], factory: null, bays: [], walls: [], pick: 0, sites: [], land: null, landT: 0 };
+  G.base = { ore: CONSTRUCT.startOre, iso: 0, salvage: 0, silo, silos: [silo], beacons: [], heaps: [], shops: [], lines: [], plants: [], things: [], factory: null, bays: [], walls: [], pick: 0, sites: [], land: null, landT: 0 };
   silo.counted = true;
   survey(G);
 }
@@ -46,6 +46,7 @@ export function initBase(G, def) {
 export const isUp = e => e.alive && !e.site && (e.prog ?? 1) >= 1;
 export const silosUp = G => (G.base?.silos || []).filter(isUp);
 export const oreRoom = G => silosUp(G).length * CONSTRUCT.siloRoom;
+export const isoRoom = G => silosUp(G).length * CONSTRUCT.isoRoom;   // isotopes, a pool of their own (spec 33 part 3)
 // The nearest silo standing to (x, z), or null.
 export function nearestSilo(G, x, z) {
   let best = null, bd = Infinity;
@@ -151,7 +152,7 @@ export function placeSite(G, f) {
   } else {
     const e = rise(addEntity(G, { ...BUILDINGS[kind], x: f.x, z: f.z, yaw: f.yaw + Math.PI, hp: P.hp, ...(kind === 'factory' ? { id: 'factory' } : {}) }));   // its door or pad toward the digger
     if (kind === 'factory') { e.job = null; b.factory = e; } else if (kind === 'silo') b.silos.push(e); else if (kind === 'beacon') b.beacons.push(e);
-    else if (kind === 'shop') { e.press = null; b.shops.push(e); } else if (kind === 'line') { e.bays = new Array(LINE.bays).fill(null); e.queue = []; b.lines.push(e); } else b.bays.push(e);
+    else if (kind === 'shop') { e.press = null; b.shops.push(e); } else if (kind === 'plant') { e.brew = null; b.plants.push(e); } else if (kind === 'line') { e.bays = new Array(LINE.bays).fill(null); e.queue = []; b.lines.push(e); } else b.bays.push(e);
   }
   return site;
 }
@@ -219,7 +220,9 @@ export function stepBase(G, dt) {
     if (!isUp(silo)) continue;
     const [px, pz] = padOf(silo);
     for (const m of G.crew || []) {
-      if (!m.alive || !(m.ore > 0) || (m.fetch && m.parked) || hypot(m.x - px, m.z - pz) > CONSTRUCT.unload) continue;   // a hauler fetching for a site keeps what it loaded (sim/miner.js)
+      if (!m.alive || !(m.ore > 0 || m.iso > 0) || (m.fetch && m.parked) || hypot(m.x - px, m.z - pz) > CONSTRUCT.unload) continue;   // a hauler fetching for a site keeps what it loaded (sim/miner.js)
+      if (m.iso > 0) { const k = min(m.iso, isoRoom(G) - b.iso); if (k > 0) { b.iso += k; m.iso -= k; if (m === G.player) msg(G, 'ISOTOPES IN'); } }
+      if (!(m.ore > 0)) continue;
       const n = min(m.ore, oreRoom(G) - b.ore);
       if (!(n > 0)) { if (m === G.player && !G.siloFull) msg(G, 'SILO FULL', '#fc3'); if (m === G.player) G.siloFull = true; continue; }
       b.ore += n; m.ore -= n; G.siloFull = false;
@@ -328,6 +331,7 @@ export function handover(G) {
       if (!d.alive || !d.ch.tool || !(d.ore > 0) || hypot(d.x - h.x, d.z - h.z) > CONSTRUCT.handover) continue;
       const n = Math.min(room, d.ore);
       d.ore -= n; h.ore = (h.ore || 0) + n;
+      if (d.iso > 0) { const k = Math.min(d.iso, CONSTRUCT.isoMax - (h.iso || 0)); d.iso -= k; h.iso = (h.iso || 0) + k; }   // its isotopes go across with the ore (spec 33)
       if (d === G.player || h === G.player) msg(G, 'ORE ACROSS');
     }
   }

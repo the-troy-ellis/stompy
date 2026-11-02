@@ -417,7 +417,13 @@ export function createScene(app) {
   const PART_TINT = [0.9, 0.88, 0.85];
   function drawThings() {
     for (const t of G.base?.things || []) {
-      const P = PARTS[t.part], parts = R.mechParts[P.show], sc = CHASSIS[P.show].scale, [x, z] = thingAt(G, t);
+      const P = PARTS[t.part], [x, z] = thingAt(G, t);
+      if (P.kind === 'core') {   // a reactor core: a block in the isotopes' own colour, drawn glowing
+        const y = t.by ? t.by.y + 2.4 * t.by.ch.scale : G.ter.height(x, z);
+        if (seen(x, y + 1, z, 3)) R.draw(R.meshes.cube, chain(M.T(x, y + 1, z), M.RY(G.time * 0.6), M.S(1.4, 1.8, 1.4)), G.pal.iso || [0.7, 1, 0.2], 1);
+        continue;
+      }
+      const parts = R.mechParts[P.show], sc = CHASSIS[P.show].scale;
       if (!parts) continue;
       const y = t.by ? t.by.y + 2.4 * t.by.ch.scale : G.ter.height(x, z), yaw = t.by ? t.by.yaw : (t.at?.yaw || 0);
       if (!seen(x, y + 2, z, 6 * sc)) continue;

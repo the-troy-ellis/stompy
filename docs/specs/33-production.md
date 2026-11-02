@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | parts 1 and 2 built (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
+| Status | parts 1 to 3 built (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
 | Milestone | M14 (proposed), with [32-base-loop.md](32-base-loop.md) |
 | Size | L, split in six (§ Build order) |
 | Depends on | [20-build-and-fight.md](20-build-and-fight.md) (silo, factory, raids); [21-mining.md](21-mining.md) (seams, haulers); [22-command-view.md](22-command-view.md) (the map); [23-construction-sites.md](23-construction-sites.md) and [31-builder.md](31-builder.md) (sites, builders); [32-base-loop.md](32-base-loop.md) (raids from above, ENDLESS, lodes) |
@@ -432,6 +432,46 @@ A parked hauler picks a job in this order (`miner.js` `haul`, extended):
     crew.
   - A bay waiting for its part.
   - The crew's cap.
+
+### Part 3: isotopes and cores
+
+- **Seams** (`world/seams.js` `isoAt`): rarer, thinner bands than ore (47 m
+  apart), on their own phase so they cross the ore's.
+  - The mesher colours them `pal.iso`, a flat bright colour each biome has
+    of its own: lime in the desert, magenta on the ice, cyan on the volcanic
+    plain.
+  - Where isotopes and ore cross, the face shows isotopes.
+- **Digging** (`dig.js` `bite`): an isotope corner gives
+  `CONSTRUCT.isoPerCorner` (0.4) **on top of** its ore, so digging's ore
+  pace is unchanged (the 80-seed test holds). Whole isotopes go into
+  `m.iso` (at most `isoMax`, 20), with the fraction carried on, and each
+  heats the digger by `isoHeat` (4). Dig too much too fast and the heat
+  shuts it down as any heat does.
+- **The pool:** a silo takes isotopes into `G.base.iso`, with room for
+  `isoRoom` (50) a silo standing (`ISOTOPES IN`). They go across to a
+  hauler with the ore. The HUD and the map read `ISO 20/50` once there are
+  any, or a plant.
+- **The isotope plant** (`PLACE.plant`: 80 ore, 12 swings, 500 hp; a squat
+  block with a cooling tower and a glowing window):
+  - It makes a core from `PARTS.core.iso` (10) isotopes every `LINE.core`
+    (20 s), only when a line will want one that no core is there for.
+  - The core goes onto the plant's pile. Shops never press cores.
+- **The core bay:** the line's third bay takes a core. A player within 40 m
+  hears `Reactor online.` as the hatch slams.
+- **Wrecks** (`combat.js`): in a base mission, every mech's wreck, the
+  crew's or a foe's, leaves its core loose on the ground. A hauler carries
+  it to a line that wants one, and the map marks it `CORE`.
+- **The look:** a core is a block in the isotopes' colour, drawn glowing,
+  turning slowly. Under the plant on the map: `CORES n` (`+1` while one is
+  brewing). A bay waiting says `NEEDS A CORE`.
+- **New text:** `ISOTOPES IN`, `ISO n/n`, `CORES n`, `NEEDS A CORE`,
+  `CORE`. `ISOTOPE PLANT` is a placeholder.
+- **Tests** (`production.test.js`):
+  - The bays' parts with the core.
+  - Digging an isotope seam: isotopes and heat on top of the ore, and the
+    silo taking them.
+  - The plant making a core only when one is wanted, paid from the pool.
+  - A wreck leaving its core.
 
 ## Code touchpoints
 
