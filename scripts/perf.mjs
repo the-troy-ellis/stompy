@@ -118,6 +118,9 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   buffers, ~19-22 MB everywhere; heapMB, the JS heap plus typed arrays, ~58
 //   MB until the first dig asks what falls (its 25 MB mark grid) and the
 //   fights' wrecks, ~100 MB after.
+// The fall checks' scratch grows with use, not the map (spec 35 part 2): the
+//   25.6 MB mark grid and the 16 MB list made at the first fall are gone, so
+//   every scene after it holds ~61 MB, not ~100; budgets 70.
 // Less garbage in the sim (spec 34 part 4: muzzles and eyes from scratch
 //   matrices, steering in place, lists compacted in place): bench-fight 180
 //   KB (201), bench-deaths 219 (234); their budgets come down to that plus ~20%.
@@ -127,16 +130,16 @@ export const BUDGETS = {
   'free-start':   { meanDraws: 22, peakDraws: 22, tris: 109000, allocKB: 125, gpuMB: 24, heapMB: 67 },
   'bench-walk':   { meanDraws: 27, peakDraws: 29, tris: 102000, allocKB: 150, gpuMB: 23, heapMB: 67 },
   'bench-run':    { meanDraws: 27, peakDraws: 43, tris: 90500, allocKB: 120, gpuMB: 23, heapMB: 68 },
-  'bench-fight':  { meanDraws: 68, peakDraws: 92, tris: 91500, allocKB: 220, gpuMB: 23, heapMB: 116 },   // craters make fine patches (spec 27)
-  'bench-deaths': { meanDraws: 91, peakDraws: 98, tris: 87500, allocKB: 265, gpuMB: 25, heapMB: 116 },
-  'bench-wrecks': { meanDraws: 91, peakDraws: 113, tris: 90500, allocKB: 285, gpuMB: 25, heapMB: 116 },
-  'bench-away':   { meanDraws: 43, peakDraws: 102, tris: 110000, allocKB: 200, gpuMB: 25, heapMB: 116 },
-  'bench-dig':    { meanDraws: 23, peakDraws: 24, tris: 99500, allocKB: 140, gpuMB: 25, heapMB: 116 },   // three digs: the main thread only copies corners out and uploads what comes back; each makes a fine patch (spec 27)
-  scoop:          { meanDraws: 22, peakDraws: 24, tris: 75000, allocKB: 80, gpuMB: 26, heapMB: 117 },   // DIG held 10 s at the range's mesa (spec 25): clods are particles, so no draws of their own; a fine patch round the face (spec 27); your arms from the cockpit, four draws (spec 30)
-  rain:           { meanDraws: 21, peakDraws: 21, tris: 96000, allocKB: 110, gpuMB: 25, heapMB: 116 },   // free-start in a downpour: one more draw (the rain), no more garbage
-  snow:           { meanDraws: 19, peakDraws: 19, tris: 87000, allocKB: 95, gpuMB: 25, heapMB: 116 },   // and in snow
-  dust:           { meanDraws: 14, peakDraws: 14, tris: 81000, allocKB: 90, gpuMB: 25, heapMB: 116 },   // and in a dust storm (2,500 grains)
-  'map-sweep':    { meanDraws: 7, peakDraws: 29, tris: 78500, allocKB: 90, gpuMB: 24, heapMB: 116 },   // the map view carried over the whole map (spec 34): with #392 undone it holds 27.5 MB on the GPU and 123 MB of heap
+  'bench-fight':  { meanDraws: 68, peakDraws: 92, tris: 91500, allocKB: 220, gpuMB: 23, heapMB: 70 },   // craters make fine patches (spec 27)
+  'bench-deaths': { meanDraws: 91, peakDraws: 98, tris: 87500, allocKB: 265, gpuMB: 25, heapMB: 70 },
+  'bench-wrecks': { meanDraws: 91, peakDraws: 113, tris: 90500, allocKB: 285, gpuMB: 25, heapMB: 70 },
+  'bench-away':   { meanDraws: 43, peakDraws: 102, tris: 110000, allocKB: 200, gpuMB: 25, heapMB: 70 },
+  'bench-dig':    { meanDraws: 23, peakDraws: 24, tris: 99500, allocKB: 140, gpuMB: 25, heapMB: 70 },   // three digs: the main thread only copies corners out and uploads what comes back; each makes a fine patch (spec 27)
+  scoop:          { meanDraws: 22, peakDraws: 24, tris: 75000, allocKB: 80, gpuMB: 26, heapMB: 70 },   // DIG held 10 s at the range's mesa (spec 25): clods are particles, so no draws of their own; a fine patch round the face (spec 27); your arms from the cockpit, four draws (spec 30)
+  rain:           { meanDraws: 21, peakDraws: 21, tris: 96000, allocKB: 110, gpuMB: 25, heapMB: 70 },   // free-start in a downpour: one more draw (the rain), no more garbage
+  snow:           { meanDraws: 19, peakDraws: 19, tris: 87000, allocKB: 95, gpuMB: 25, heapMB: 70 },   // and in snow
+  dust:           { meanDraws: 14, peakDraws: 14, tris: 81000, allocKB: 90, gpuMB: 25, heapMB: 70 },   // and in a dust storm (2,500 grains)
+  'map-sweep':    { meanDraws: 7, peakDraws: 29, tris: 78500, allocKB: 90, gpuMB: 24, heapMB: 70 },   // the map view carried over the whole map (spec 34): with #392 undone it holds 27.5 MB on the GPU (and, before spec 35 part 2, 123 MB of heap)
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;
