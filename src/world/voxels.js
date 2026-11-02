@@ -1,3 +1,4 @@
+import { Grid } from './grid.js';
 import { makeTerrain, HALF } from './terrain.js';
 import { clampN } from '../util/math.js';
 import { polar } from '../sim/placement.js';
@@ -68,16 +69,34 @@ export const scratchBytes = () => (LIST ? LIST.byteLength + STACK.byteLength + H
 // optional): { landmarks: [...], strokes: [[op, x, y, z, r], ...], pockets }.
 // `opts.height(x, z)` replaces the hills (tests: a ramp, a ridge).
 export function makeGround(seed, opts = {}, def = {}) {
-  const base = opts.height ? { height: opts.height } : makeTerrain(seed, opts), D = new Uint8Array(PX * PY * PZ), top = new Float32Array(PX * PZ);
+  const base = opts.height ? { height: opts.height } : makeTerrain(seed, opts), top = new Float32Array(PX * PZ);
   const g = def.ground || {};
   // The base: "height minus y" in cells, so a flat pad's top lands exactly on its height.
+  // Rock up to a DS under the surface, air from a DS over it, a ramp between.
+  // Each column's height first, then the corners chunk by chunk (world/grid.js):
+  // a chunk all rock or all air is shared, so the whole box is never held.
+  // Each column: its height (doubles: the bytes must match what the heights
+  // gave before, to the last ramp byte), the top of its rock and the bottom of its air.
+  const H = new Float64Array(PX * PZ), JR = new Int16Array(PX * PZ), JA = new Int16Array(PX * PZ);
   for (let k = 0; k < PZ; k++) for (let i = 0; i < PX; i++) {
-    const edge = i === 0 || k === 0 || i === NX || k === NZ, h = base.height(-HALF + i * VS, -HALF + k * VS);
-    // Rock up to a DS under the surface, air from a DS over it, a ramp between.
-    const jr = edge ? BEDROCK : Math.min(NY - 1, Math.max(BEDROCK, floor((h - DS - Y0) / VS))), ja = edge ? BEDROCK + 1 : Math.min(NY, ceil((h + DS - Y0) / VS));
-    let o = cornerIndex(i, 0, k);
-    for (let j = 0; j < PY; j++, o += PX) D[o] = j <= jr ? 255 : j >= ja || j === NY ? 1 : Q((h - (Y0 + j * VS)) / DS);
+    const c = i + PX * k, edge = i === 0 || k === 0 || i === NX || k === NZ, h = H[c] = base.height(-HALF + i * VS, -HALF + k * VS);
+    JR[c] = edge ? BEDROCK : Math.min(NY - 1, Math.max(BEDROCK, floor((h - DS - Y0) / VS)));
+    JA[c] = edge ? BEDROCK + 1 : Math.min(NY, ceil((h + DS - Y0) / VS));
   }
+  const D = new Grid(PX, PY, PZ, (c, i0, j0, k0) => {
+    // Under every column's rock, or over every column's ramp: a chunk all rock or all air, no bytes to work out.
+    let lo = Infinity, hi = -Infinity;
+    for (let k = k0; k < k0 + 16; k++) for (let i = i0; i < i0 + 16; i++) {
+      if (i >= PX || k >= PZ) { hi = Infinity; continue; }   // past the box: air, which the grid's own fill covers
+      const q = i + PX * k; if (JR[q] < lo) lo = JR[q]; if (JA[q] > hi) hi = JA[q];
+    }
+    if (j0 + 7 <= lo && j0 + 7 < NY) return 255;
+    if (j0 >= hi && hi !== Infinity) return 1;
+    for (let k = k0; k < k0 + 16; k++) for (let i = i0; i < i0 + 16; i++) {
+      const inside = i < PX && k < PZ, q = i + PX * k, h = inside ? H[q] : 0, jr = inside ? JR[q] : -1, ja = inside ? JA[q] : 0;
+      for (let j = j0; j < j0 + 8; j++) c[Grid.local(i, j, k)] = j >= PY ? 1 : j <= jr ? 255 : j >= ja || j === NY ? 1 : Q((h - (Y0 + j * VS)) / DS);
+    }
+  });
   const G = { D, top, seed, flat: !!opts.flat, dirty: new Set(), rev: 0, patches: null, fineNear: null };   // patches, fineNear: fine digging (fineOn), there from the start so the object keeps its shape
   const ground = Object.assign(G, groundApi(G));
   ground.retop(0, NX, 0, NZ);
@@ -91,7 +110,7 @@ export function makeGround(seed, opts = {}, def = {}) {
 
 function groundApi(G) {
   const { D, top } = G;
-  const val = (i, j, k) => (D[cornerIndex(i, j, k)] - 128) / 127;
+  const val = (i, j, k) => (D.at(i, j, k) - 128) / 127;
   // The ground anywhere: the newest fine patch the point is in (world/finePatch.js,
   // docs/specs/27-fine-dig.md), else the 8 m grid. Every query reads it.
   function sample(x, y, z) {
@@ -108,9 +127,9 @@ function groundApi(G) {
     if (fy <= 0) return 1;
     if (fx < 0 || fz < 0 || fx >= NX || fz >= NZ || fy >= NY) return -1;
     const i = fx | 0, j = fy | 0, k = fz | 0, u = fx - i, v = fy - j, w = fz - k;
-    const o = cornerIndex(i, j, k), oy = o + PX, oz = o + PX * PY, oyz = oz + PX;   // plain numbers, no closures: this runs thousands of times a frame
-    const a = (D[o] * (1 - u) + D[o + 1] * u) * (1 - v) + (D[oy] * (1 - u) + D[oy + 1] * u) * v;
-    const b = (D[oz] * (1 - u) + D[oz + 1] * u) * (1 - v) + (D[oyz] * (1 - u) + D[oyz + 1] * u) * v;
+    // plain numbers, no closures: this runs thousands of times a frame (at: world/grid.js, a chunk and a byte)
+    const a = (D.at(i, j, k) * (1 - u) + D.at(i + 1, j, k) * u) * (1 - v) + (D.at(i, j + 1, k) * (1 - u) + D.at(i + 1, j + 1, k) * u) * v;
+    const b = (D.at(i, j, k + 1) * (1 - u) + D.at(i + 1, j, k + 1) * u) * (1 - v) + (D.at(i, j + 1, k + 1) * (1 - u) + D.at(i + 1, j + 1, k + 1) * u) * v;
     return ((a * (1 - w) + b * w) - 128) / 127;
   }
   // The top surface under the sky: a fine patch's over it, else the 8 m grid's.
@@ -195,10 +214,10 @@ function groundApi(G) {
   }
   // One corner column's top: the highest crossing from rock to air, in metres.
   function topOf(i, k) {
-    let o = cornerIndex(i, NY, k), j = NY;
-    while (j > 0 && D[o] <= 128) { o -= PX; j--; }
+    let j = NY;
+    while (j > 0 && D.at(i, j, k) <= 128) j--;
     if (j >= NY) return Y0 + NY * VS;
-    const a = D[o] - 128, b = D[o + PX] - 128;
+    const a = D.at(i, j, k) - 128, b = D.at(i, j + 1, k) - 128;
     return Y0 + (j + a / (a - b)) * VS;
   }
   const retop = (i0, i1, k0, k1) => { for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) top[i + PX * k] = topOf(i, k); };
@@ -228,7 +247,7 @@ function groundApi(G) {
     if (i0 > i1 || j0 > j1 || k0 > k1) return;
     for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const o = cornerIndex(i, j, k), dist = hypot(-HALF + i * VS - p[0], Y0 + j * VS - p[1], -HALF + k * VS - p[2]);
-      D[o] = Q(f((D[o] - 128) / 127, dist));
+      D.set(o, Q(f((D.get(o) - 128) / 127, dist)));
     }
     touched(i0, i1, j0, j1, k0, k1);
   }
@@ -257,9 +276,9 @@ function groundApi(G) {
     for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
       const soft = base[i + PX * k] - SOFT, x = -HALF + i * VS, z = -HALF + k * VS, dx = x - p[0], dz = z - p[2], f = sl ? fl + max(0, sl[0] * (x - sl[2]) + sl[1] * (z - sl[3])) : fl;
       for (let j = j0; j <= j1; j++) {
-        const y = Y0 + j * VS, o = cornerIndex(i, j, k), dist = benchDist(dx, y - p[1], dz, fl - y), was = D[o];
-        D[o] = Q(min((was - 128) / 127, max(dist - (y >= soft ? r : r * rock), f - y) / DS));
-        if (tally && was > 128 && D[o] <= 128) {
+        const y = Y0 + j * VS, dist = benchDist(dx, y - p[1], dz, fl - y), was = D.at(i, j, k), now = Q(min((was - 128) / 127, max(dist - (y >= soft ? r : r * rock), f - y) / DS));
+        D.put(i, j, k, now);
+        if (tally && was > 128 && now <= 128) {
           if (y >= soft) tally.soft = (tally.soft || 0) + 1;
           else { tally.rock++; if (tally.corner) tally.corner(-HALF + i * VS, y, -HALF + k * VS, soft + SOFT - y); }
         }
@@ -281,7 +300,7 @@ function groundApi(G) {
     let nl = 0;
     seeds: for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const s0 = cornerIndex(i, j, k);
-      if (D[s0] <= 128 || markOf(s0)) continue;
+      if (D.at(i, j, k) <= 128 || markOf(s0)) continue;
       if (nl > LIST_MAX - ISLAND_MAX - 8) break seeds;   // a huge check: the rest counts as held up
       while (nl + ISLAND_MAX + 8 > LIST.length && LIST.length < LIST_MAX) growList();   // room for this whole fill
       const start = nl;
@@ -291,7 +310,7 @@ function groundApi(G) {
         const o = STACK[--sp];
         for (let d = 0; d < 6; d++) {
           const n = o + STEPS[d];
-          if (D[n] <= 128) continue;   // air first: most neighbours, and no hash lookup
+          if (D.get(n) <= 128) continue;   // air first: most neighbours, and no hash lookup
           const m = markOf(n);
           if (m === 2) { up = true; break; }
           if (m) continue;
@@ -325,14 +344,14 @@ function groundApi(G) {
     const firstAir = (i, kk) => {
       const c = i + PX * kk;
       let v = air.get(c);
-      if (v === undefined) { v = BEDROCK + 1; while (v < NY && D[cornerIndex(i, v, kk)] > 128) v++; air.set(c, v); }
+      if (v === undefined) { v = BEDROCK + 1; while (v < NY && D.at(i, v, kk) > 128) v++; air.set(c, v); }
       return v;
     };
     const grounded = o => ((o / PX) | 0) % PY < firstAir(o % PX, (o / (PX * PY)) | 0);
     let nl = 0;
     for (let kk = k0; kk <= k1; kk++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const s0 = cornerIndex(i, j, kk);
-      if (D[s0] <= 128 || markOf(s0) || grounded(s0)) continue;
+      if (D.at(i, j, kk) <= 128 || markOf(s0) || grounded(s0)) continue;
       if (nl > LIST_MAX - ISLAND_MAX - 8) break;
       while (nl + ISLAND_MAX + 8 > LIST.length && LIST.length < LIST_MAX) growList();   // room for this whole fill
       const start = nl, cols = new Set();
@@ -342,7 +361,7 @@ function groundApi(G) {
         const o = STACK[--sp];
         for (let d = 0; d < 6; d++) {
           const n = o + STEPS[d];
-          if (D[n] <= 128 || markOf(n)) continue;
+          if (D.get(n) <= 128 || markOf(n)) continue;
           if (grounded(n)) { cols.add(n % PX + PX * ((n / (PX * PY)) | 0)); continue; }
           if (nl - start >= ISLAND_MAX) { big = true; continue; }   // too big to weigh here: part of the land
           setMark(n, 1); LIST[nl++] = n; STACK[sp++] = n;
@@ -379,22 +398,22 @@ function groundApi(G) {
     const bytes = new Uint8Array(cells.length), low = new Map();
     let i0 = NX, i1 = 0, j0 = NY, j1 = 0, k0 = NZ, k1 = 0;
     cells.forEach((o, n) => {
-      bytes[n] = D[o];
+      bytes[n] = D.get(o);
       const i = o % PX, j = ((o / PX) | 0) % PY, k = (o / (PX * PY)) | 0, col = i + PX * k;
       if (!low.has(col) || j < low.get(col)) low.set(col, j);
       i0 = min(i0, i); i1 = max(i1, i); j0 = min(j0, j); j1 = max(j1, j); k0 = min(k0, k); k1 = max(k1, k);
     });
     dropIn([i0 - 1, i1 + 1, 0, j1 + 1, k0 - 1, k1 + 1]);   // a fine patch there settles at once: the 8 m grid says what falls
-    for (const o of cells) D[o] = 1;
+    for (const o of cells) D.set(o, 1);
     let drop = NY;
     for (const [col, j] of low) {
       const i = col % PX, k = (col / PX) | 0;
       let jj = j - 1;
-      while (jj > 0 && D[cornerIndex(i, jj, k)] <= 128) jj--;
+      while (jj > 0 && D.at(i, jj, k) <= 128) jj--;
       drop = min(drop, j - 1 - jj);
     }
     const heap = cells.length >= SHATTER && drop > 0, prev = new Uint8Array(cells.length);   // prev: the bytes the heap went over (the renderer hides it until it lands)
-    if (heap) cells.forEach((o, n) => { const t = o - drop * PX; prev[n] = D[t]; if (bytes[n] > D[t]) D[t] = bytes[n]; });
+    if (heap) cells.forEach((o, n) => { const t = o - drop * PX, was = D.get(t); prev[n] = was; if (bytes[n] > was) D.set(t, bytes[n]); });
     touched(i0, i1, max(j0 - drop, BEDROCK + 1), j1, k0, k1);
     return { cells, bytes, prev, drop, heap, box: [i0, i1, j0, j1, k0, k1] };
   }
@@ -403,14 +422,14 @@ function groundApi(G) {
   function copyBox(from, b) {
     const [i0, i1, j0, j1, k0, k1] = b;
     dropIn(b);
-    for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) { const o = cornerIndex(i0, j, k); D.set(from.D.subarray(o, o + i1 - i0 + 1), o); }
+    for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) D.put(i, j, k, from.D.at(i, j, k));
     touched(i0, i1, j0, j1, k0, k1);
   }
   // A short fingerprint of the ground (FNV-1a over the bytes): two clients that
   // agree on it have the same ground (the smoke test and the sync tests).
   function hash() {
     let h = 0x811c9dc5;
-    for (let n = 0; n < D.length; n++) { h ^= D[n]; h = Math.imul(h, 0x01000193); }
+    for (let k = 0; k < PZ; k++) for (let j = 0; j < PY; j++) for (let i = 0; i < PX; i++) { h ^= D.at(i, j, k); h = Math.imul(h, 0x01000193); }   // corner-index order, as the bytes were
     return (h >>> 0).toString(16).padStart(8, '0');
   }
   const build = (p, r) => { fine(p, r, BUILD); shape(p, r, (d, dist) => max(d, (r - dist) / DS)); };
@@ -430,7 +449,7 @@ function groundApi(G) {
       const t = top[i + PX * k], want = t + h * (1 - d / r);
       // Each corner up the column takes the larger of the ground and the cone's surface.
       const ja = max(BEDROCK + 1, floor((t - DS - Y0) / VS)), jb = min(NY - 1, ceil((want + DS - Y0) / VS));
-      for (let j = ja; j <= jb; j++) { const o = cornerIndex(i, j, k); D[o] = Q(max((D[o] - 128) / 127, (want - (Y0 + j * VS)) / DS)); }
+      for (let j = ja; j <= jb; j++) D.put(i, j, k, Q(max((D.at(i, j, k) - 128) / 127, (want - (Y0 + j * VS)) / DS)));
       j0 = min(j0, ja); j1 = max(j1, jb);
     }
     if (j0 <= j1) touched(i0, i1, j0, j1, k0, k1);
@@ -449,7 +468,7 @@ function groundApi(G) {
       if (dist >= r) continue;
       const mean = (at(i - 1, j, k) + at(i + 1, j, k) + at(i, j - 1, k) + at(i, j + 1, k) + at(i, j, k - 1) + at(i, j, k + 1)) / 6;
       const d = at(i, j, k);
-      D[cornerIndex(i, j, k)] = Q(d + (mean - d) * 0.6 * (1 - dist / r));
+      D.put(i, j, k, Q(d + (mean - d) * 0.6 * (1 - dist / r)));
     }
     touched(i0, i1, j0, j1, k0, k1);
   }
@@ -464,7 +483,7 @@ function groundApi(G) {
     for (let k = k0; k <= k1; k++) for (let j = BEDROCK + 1; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const x = -HALF + i * VS, y = Y0 + j * VS, z = -HALF + k * VS, o = cornerIndex(i, j, k);
       const side = min(x - x0, x1 - x, z - z0, z1 - z), d = grade === Infinity ? min(top - y, side) : min(top - y, side * grade - y) / Math.hypot(1, grade);
-      D[o] = Q(max((D[o] - 128) / 127, d / DS));
+      D.set(o, Q(max((D.get(o) - 128) / 127, d / DS)));
     }
     touched(i0, i1, BEDROCK + 1, j1, k0, k1);
   }
@@ -659,8 +678,7 @@ function landmark(ground, l) {
   const j0 = clampN(floor((bounds[1] - Y0) / VS), BEDROCK + 1, NY - 1), j1 = clampN(ceil((bounds[4] - Y0) / VS), BEDROCK + 1, NY - 1);
   const k0 = clampN(floor((bounds[2] + HALF) / VS), 1, NZ - 1), k1 = clampN(ceil((bounds[5] + HALF) / VS), 1, NZ - 1);
   for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-    const o = cornerIndex(i, j, k);
-    D[o] = Q(f((D[o] - 128) / 127, -HALF + i * VS, Y0 + j * VS, -HALF + k * VS));
+    D.put(i, j, k, Q(f((D.at(i, j, k) - 128) / 127, -HALF + i * VS, Y0 + j * VS, -HALF + k * VS)));
   }
   ground.retop(i0, i1, k0, k1);
 }
@@ -673,14 +691,14 @@ function pockets(ground, seed) {
     for (let j = BEDROCK + 2; j < NY; j++) {
       const y = Y0 + j * VS;
       if (y > surf - 18) break;
-      if (hash(i >> 2, j >> 1, k >> 2) > 0.93) { const o = cornerIndex(i, j, k); D[o] = Q(-0.6); }
+      if (hash(i >> 2, j >> 1, k >> 2) > 0.93) D.put(i, j, k, Q(-0.6));
     }
   }
 }
 
 // A second ground with the same bytes (the net's confirmed ground, sim/dig.js).
 export function cloneGround(g) {
-  const c = { D: g.D.slice(), top: g.top.slice(), base: g.base, seed: g.seed, flat: g.flat, dirty: new Set(), rev: 0, patches: null, fineNear: null };
+  const c = { D: g.D.clone(), top: g.top.slice(), base: g.base, seed: g.seed, flat: g.flat, dirty: new Set(), rev: 0, patches: null, fineNear: null };
   return Object.assign(c, groundApi(c));
 }
 
@@ -694,7 +712,7 @@ export function blockCorners(ground, i0, j0, k0, dims, step = 1) {
     T[i + nx * k] = out ? Y0 : ground.top[gi + PX * gk];
     for (let j = 0; j < ny; j++) {
       const gj = j0 + j * step;
-      D[i + nx * (j + ny * k)] = gj < 0 ? 255 : out || gj > NY ? 1 : G[cornerIndex(gi, gj, gk)];
+      D[i + nx * (j + ny * k)] = gj < 0 ? 255 : out || gj > NY ? 1 : G.at(gi, gj, gk);
     }
   }
   return { D, T, o: [-HALF + i0 * VS, Y0 + j0 * VS, -HALF + k0 * VS], dims, s: VS * step };

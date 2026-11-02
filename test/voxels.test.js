@@ -7,7 +7,7 @@ import { flatZones, polar } from '../src/sim/placement.js';
 
 let s = 1;
 const r = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-const same = (a, b) => a.D.length === b.D.length && a.D.every((v, i) => v === b.D[i]);
+const same = (a, b) => a.D.length === b.D.length && a.hash() === b.hash();   // every byte, in order (FNV-1a over the corners)
 
 test('every mission keeps its hills: the top is within 2 m of the old height at 1,000 points', () => {
   MISSIONS.forEach((def, n) => {
@@ -44,12 +44,12 @@ test('carving is the same in any order; it marks the chunks it touched and lower
 test('bedrock and the edges hold, whatever is dug or built', () => {
   const g = makeGround(3, { flat: true });
   g.carve([0, Y0 + VS, 0], 40);
-  for (let i = NX / 2 - 3; i <= NX / 2 + 3; i++) for (let j = 0; j * VS <= 8; j++) assert.equal(g.D[cornerIndex(i, j, NZ / 2)], 255, 'bedrock: 8 m of it');
+  for (let i = NX / 2 - 3; i <= NX / 2 + 3; i++) for (let j = 0; j * VS <= 8; j++) assert.equal(g.D.get(cornerIndex(i, j, NZ / 2)), 255, 'bedrock: 8 m of it');
   assert.ok(g.groundBelow(0, 50, 0) > Y0 + VS);
   g.build([-HALF + 4, 20, 0], 30);
   g.build([0, Y0 + NY * VS - 4, 0], 30);
-  for (let j = 0; j <= NY; j++) assert.ok(g.D[cornerIndex(0, j, NZ / 2)] === (j * VS <= 8 ? 255 : 1), 'the edge stays air');
-  for (let i = 0; i <= NX; i += 16) assert.equal(g.D[cornerIndex(i, NY, NZ / 2)], 1, 'and so does the top');
+  for (let j = 0; j <= NY; j++) assert.ok(g.D.get(cornerIndex(0, j, NZ / 2)) === (j * VS <= 8 ? 255 : 1), 'the edge stays air');
+  for (let i = 0; i <= NX; i += 16) assert.equal(g.D.get(cornerIndex(i, NY, NZ / 2)), 1, 'and so does the top');
 });
 
 test('strokes replay to the same bytes; smooth softens a step', () => {
