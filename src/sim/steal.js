@@ -100,7 +100,7 @@ function lost(G, e) {
   const b = G.base, kind = kindOf(e);
   e.carry = null; e.alive = false; e.wreck = false;
   for (const t of b.things || []) if (t.at === e) { t.at = null; t.x = e.x; t.z = e.z; }   // its pile stays behind, loose
-  for (const k of ['silos', 'beacons', 'shops', 'plants', 'lines', 'walls', 'bays']) if (b[k]?.includes(e)) b[k] = b[k].filter(o => o !== e);
+  for (const k of ['silos', 'beacons', 'shops', 'plants', 'lines', 'walls', 'bays', 'labs', 'armories']) if (b[k]?.includes(e)) b[k] = b[k].filter(o => o !== e);
   if (b.factory === e) b.factory = null;
   const n = NAMES.buildings[kind] || 'Building';
   G.fx.say(`${n[0]}${n.slice(1).toLowerCase()} lost.`);
@@ -140,6 +140,8 @@ function take(G, e, kind) {
   else if (kind === 'beacon') b.beacons.push(e);
   else if (kind === 'shop') { e.press = null; b.shops.push(e); }
   else if (kind === 'plant') { e.brew = null; b.plants.push(e); }
+  else if (kind === 'lab') { e.work = null; b.labs.push(e); }
+  else if (kind === 'armory') { e.press = null; b.armories.push(e); }
   else if (kind === 'line') { e.bays ||= new Array(LINE.bays).fill(null); e.queue ||= []; b.lines.push(e); }
   else if (kind === 'wall') b.walls.push(e);
   else if (kind === 'factory' && !b.factory?.alive) { e.job = null; b.factory = e; }

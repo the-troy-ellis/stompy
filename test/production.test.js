@@ -43,7 +43,7 @@ test('a line wants each mech\'s parts in its bays\' order: legs, body, a core, a
 
 test('the queue takes what a line makes, up to LINE.wait; a mech can come back out', () => {
   const G = game(), { line } = yard(G);
-  assert.equal(queueMake(G, line, 'kestrel'), false, 'not a line mech');
+  assert.equal(queueMake(G, line, 'warden'), false, 'not a line mech');
   for (let i = 0; i < LINE.wait; i++) assert.ok(queueMake(G, line, 'digger'));
   assert.equal(queueMake(G, line, 'digger'), false, 'full');
   unqueue(line, 0);
