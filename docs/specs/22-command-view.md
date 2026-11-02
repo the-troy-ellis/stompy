@@ -230,6 +230,28 @@ mech picks it; foes and buildings can't be picked in this slice. With
   - `command-pad`: View, X twice to the KESTREL, the stick pans, A gives GO
     at the crosshair, the D-pad lights DRIVE and Y drives it.
 
+### Fix: the map going black on phones
+
+- **Seen:** on an iPhone the 3D view went black shortly after the map opened,
+  while the map's markers kept drawing. iOS takes the WebGL context away when
+  the page asks the GPU for too much.
+- **Why:** the ground (`render/ground.js`) meshed its full-detail chunks for
+  every 256 m square that came within about 360 m of the eye, and never let
+  them go. From above, the map's eye sweeps the whole map as you pan, so the
+  4 m grid's big chunk meshes piled up on the GPU.
+- **Now:**
+  - Up in the map view, `ground.tick(…, fetch = false)` takes no new
+    full-detail squares. It draws the far meshes, and near ones only where
+    they're already up.
+  - Everywhere, a square past `LET_GO` (600 m) gives its chunks back
+    (`letGo`), so what's on the GPU stays what's round you.
+  - Measured on a 390 × 844 screen: 9 squares up in the cockpit, still 9
+    after panning the map end to end, and 8 after flying 900 m away.
+- **If the context is lost anyway** (`main.js`): the page keeps it
+  restorable and says `THE VIEW WENT OUT. TAP TO START AGAIN.` It reloads
+  when the context comes back, or on the tap. Nothing is rebuilt in place,
+  so the match starts over.
+
 ## Code touchpoints
 
 - `src/sim/orders.js` (new): `give`, `obey`, and `ORDER` (arrive and

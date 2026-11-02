@@ -92,6 +92,17 @@ function start(root) {
     return;
   }
   R.look = look;
+  // The phone can take the 3D view away when it runs short (a lost WebGL
+  // context): keep it restorable, say so, and start again when it comes back
+  // (or on a tap, if it doesn't). Nothing is rebuilt in place.
+  cv.addEventListener('webglcontextlost', e => {
+    e.preventDefault();
+    const d = document.createElement('div');
+    d.className = 'gl-lost'; d.textContent = 'THE VIEW WENT OUT. TAP TO START AGAIN.';
+    d.addEventListener('click', () => location.reload());
+    wrap.appendChild(d);
+  });
+  cv.addEventListener('webglcontextrestored', () => location.reload());
   const prefs = loadPrefs();
   // ?relay=host[:port] or a ws[s]:// address: saved as the RELAY field (net/relay.js).
   const qRelay = normalRelay(params.get('relay'), location.protocol === 'https:');
