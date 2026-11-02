@@ -247,8 +247,8 @@ function build(G, line, dt) {
     shiftMech(j.shell, x1 - x0, z1 - z0);
   }
   if (!line.bays[0] && line.queue.length) {
-    if (crewOf(G).filter(m => m.alive).length + making(G) >= CONSTRUCT.crewMax) { line.full = true; return; }
-    line.full = false;
+    if (crewOf(G).filter(m => m.alive).length + making(G) >= CONSTRUCT.crewMax) { line.crewFull = true; return; }
+    line.crewFull = false;
     const kind = line.queue.shift(), [x, z] = bayAt(line, 0);
     const shell = newMech(G, kind, 0, x, z, line.yaw);
     shell.show = 0;

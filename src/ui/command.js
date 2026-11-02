@@ -378,7 +378,7 @@ export function createCommand(app) {
       if (!line.alive || line.site) continue;
       const p = S(line.x, line.z);
       if (line === C.make && p) { ctx.strokeStyle = pal.good; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], 22, 0, 7); ctx.stroke(); }
-      if (p && (line.queue.length || line.full)) { ctx.fillStyle = line.full ? pal.bad : pal.good; ctx.fillText(line.full ? 'CREW FULL' : `${line.queue.length} WAITING`, p[0], p[1] + 26); }
+      if (p && (line.queue.length || line.crewFull)) { ctx.fillStyle = line.crewFull ? pal.bad : pal.good; ctx.fillText(line.crewFull ? 'CREW FULL' : `${line.queue.length} WAITING`, p[0], p[1] + 26); }
       if (view.mpp >= 4) continue;
       line.bays.forEach((j, i) => {
         const left = j && !j.has ? bayParts(G, j.kind, i, j.plan) : [];
