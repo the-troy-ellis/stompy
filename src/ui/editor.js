@@ -12,6 +12,7 @@
 // sim/pick.js, render/markers.js, sim/sight.js); this file is what turns a
 // mission into things to draw and pick, and edits back into the mission.
 import { MISSIONS, SHAPES } from '../data/missions.js';
+import { PLACE_ORDER } from '../data/construct.js';
 import { NAMES } from '../data/names.js';
 import { MECH_ORDER } from '../data/chassis.js';
 import { PALS } from '../data/palettes.js';
@@ -39,7 +40,7 @@ const fresh = def => fromSource(toSource(def));   // a deep copy that is exactly
 const D2R = Math.PI / 180;
 
 // The palette: what the next tap places. ROUTE stays on until it is tapped again.
-const TOOLS = ['FOE', 'STRUCTURE', 'TURRET', 'VEHICLE', 'NAV', 'PAD', 'ROUTE'];
+const TOOLS = ['FOE', 'STRUCTURE', 'TURRET', 'VEHICLE', 'NAV', 'PAD', 'BUILDING', 'ROUTE'];
 const NEW_ID = { structure: 'relay', turret: 'launcher', vehicle: 'truck', nav: 'nav', pad: 'lz' };
 const MESHES = [...new Set(Object.values(SHAPES).map(s => s.mesh))];
 
@@ -70,6 +71,15 @@ export function mapThings(def, G) {
       routes.push({ id: `route.${entityId(e, i)}`, owner: entityId(e, i), pts: e.path.map(q => { const w = polar(q); return { ...w, y: h(w.x, w.z) }; }) });
     }
   });
+  // The base it starts with (docs/specs/33-production.md § Missions and their bases): its silo, and each building with its state.
+  if (def.base?.silo) {
+    const p = polar(def.base.silo);
+    things.push({ id: 'base.silo', kind: 'structure', ...p, y: h(p.x, p.z), r: 7, label: 'SILO' });
+    (def.base.buildings || []).forEach((b, i) => {
+      const q = polar(b.at), st = stateOf(b);
+      things.push({ id: `base.${i}`, kind: 'structure', ...q, y: h(q.x, q.z), r: 6, label: `${NAMES.buildings[b.kind] || b.kind}${st ? ` · ${STATES.find(x => x[0] === st)[1]}` : ''}` });
+    });
+  }
   const allWaves = [...(def.waves || []).map((w, k) => [w, `waves.${k}`]),
     ...(def.objectives || []).flatMap((o, n) => (o.waves || []).map((w, k) => [w, `objectives.${n}.waves.${k}`]))];
   allWaves.forEach(([w, id], n) => {
@@ -86,6 +96,17 @@ export function mapThings(def, G) {
 }
 const entityId = (e, i) => `entities.${e.id ?? i}`;
 const entityKind = e => (e.kind === 'nav' ? (e.mesh === 'pad' ? 'pad' : 'nav') : e.kind || 'structure');
+// A base building's state, as the panel names it: up (''), damaged, down,
+// half built or rubble; and what each sets on it (sim/base.js startBuilding).
+export const STATES = [['', 'UP'], ['damaged', 'DAMAGED'], ['down', 'DOWN'], ['half', 'HALF BUILT'], ['rubble', 'RUBBLE']];
+export const stateOf = b => (b.rubble ? 'rubble' : (b.prog ?? 1) < 1 ? 'half' : (b.hp ?? 1) <= 0.25 ? 'down' : (b.hp ?? 1) < 1 ? 'damaged' : '');
+export function setState(b, st) {
+  delete b.hp; delete b.prog; delete b.rubble;
+  if (st === 'damaged') b.hp = 0.5;
+  else if (st === 'down') b.hp = 0.2;
+  else if (st === 'half') b.prog = 0.5;
+  else if (st === 'rubble') b.rubble = true;
+}
 
 // ---- Edits on the mission itself: plain functions on the definition, so
 // they are tested headlessly (test/editorEdits.test.js). `id`s are the ones
@@ -96,6 +117,12 @@ export function findSource(def, id) {
   if (id === 'start') return { list: 'start', item: def.start || null };
   const [list, k] = id.split('.');
   if (list === 'foes') { const i = +k; return def.foes?.[i] != null ? { list, index: i, item: def.foes[i] } : null; }
+  if (list === 'base') {   // the base's silo, or one of its buildings
+    if (!def.base) return null;
+    if (k === 'silo') return { list, silo: true, item: def.base };
+    const i = +k;
+    return def.base.buildings?.[i] ? { list, index: i, item: def.base.buildings[i] } : null;
+  }
   if (list === 'entities') {
     const i = (def.entities || []).findIndex((e, j) => String(e.id ?? j) === k);
     return i < 0 ? null : { list, index: i, item: def.entities[i] };
@@ -109,6 +136,7 @@ export function moveTo(def, id, x, z) {
   const s = findSource(def, id);
   if (!s) return;
   if (s.list === 'foes' && typeof s.item === 'string') def.foes[s.index] = { type: s.item, at };
+  else if (s.silo) def.base.silo = at;
   else s.item.at = at;
 }
 // Point a foe or the start at a bearing, in 5° steps.
@@ -116,6 +144,7 @@ export function faceTo(def, id, bearing) {
   const f = ((Math.round(bearing / 5) * 5) % 360 + 360) % 360;
   if (id === 'start') { def.start = [...(def.start || [0, 0]).slice(0, 2), f]; return; }
   const s = findSource(def, id);
+  if (s?.list === 'base' && !s.silo) { s.item.face = f; return; }
   if (s?.list !== 'foes') return;
   if (typeof s.item === 'string') def.foes[s.index] = { type: s.item, face: f };
   else s.item.face = f;
@@ -125,6 +154,11 @@ export function place(def, tool, x, z) {
   const at = roundPolar(toPolar(x, z));
   def.foes = def.foes || [];
   if (tool === 'FOE') { def.foes.push({ type: 'jackal', at }); return `foes.${def.foes.length - 1}`; }
+  if (tool === 'BUILDING') {   // a base's first is its silo; then buildings, a machine shop to start with
+    if (!def.base) { def.base = { silo: at }; return 'base.silo'; }
+    (def.base.buildings ||= []).push({ kind: 'shop', at });
+    return `base.${def.base.buildings.length - 1}`;
+  }
   const kind = { STRUCTURE: 'structure', TURRET: 'turret', VEHICLE: 'vehicle', NAV: 'nav', PAD: 'pad' }[tool];
   if (!kind) return null;
   const ents = def.entities = def.entities || [], base = NEW_ID[kind];
@@ -144,6 +178,11 @@ export function remove(def, ids) {
   const gone = new Set(ids.filter(id => id.startsWith('entities.')).map(id => findSource(def, id)?.item).filter(Boolean));
   if (def.entities) def.entities = def.entities.filter(e => !gone.has(e));
   if (ids.includes('start')) delete def.start;
+  if (ids.includes('base.silo')) delete def.base;   // no silo, no base
+  else if (def.base?.buildings) {
+    const drop = new Set(ids.filter(id => /^base\.\d+$/.test(id)).map(id => +id.split('.')[1]));
+    def.base.buildings = def.base.buildings.filter((_, i) => !drop.has(i));
+  }
 }
 // A vehicle's route, and every vehicle that drives the same one (a convoy).
 export function routeOf(def, id) {
@@ -419,6 +458,8 @@ export function createEditor(app) {
     ['height', 'HEIGHT', 'num'], ['radius', 'RADIUS', 'num'], ['hp', 'HP', 'text'], ['pad', 'FLAT PAD', 'num'],
   ];
   const VEHICLE_FIELDS = [['speed', 'SPEED', 'num']];
+  const BUILDING_FIELDS = [['kind', 'BUILDING', 'sel', PLACE_ORDER.map(k => [k, NAMES.buildings[k]])], ['state', 'STATE', 'sel', STATES], ['face', 'FACING °', 'num']];
+  const SILO_FIELDS = [['ore', 'ORE', 'num'], ['iso', 'ISOTOPES', 'num']];   // what the base starts with
   const START_FIELDS = [['face', 'FACING °', 'num']];
   function fieldRow([k, label, kind, opts], v) {
     const val = v == null ? '' : Array.isArray(v) ? v.join(', ') : v === Infinity ? 'Infinity' : String(v);
@@ -451,8 +492,9 @@ export function createEditor(app) {
     if (id === 'start') fields = START_FIELDS;
     else if (src?.list === 'foes') fields = FOE_FIELDS;
     else if (src?.list === 'entities') fields = [...ENTITY_FIELDS, ...(src.item.kind === 'vehicle' ? VEHICLE_FIELDS : [])];
-    const item = id === 'start' ? { face: E.def.start?.[2] } : typeof src?.item === 'string' ? { type: src.item } : src?.item || {};
-    const at = id === 'start' ? E.def.start : item.at;
+    else if (src?.list === 'base') fields = src.silo ? SILO_FIELDS : BUILDING_FIELDS;
+    const item = id === 'start' ? { face: E.def.start?.[2] } : typeof src?.item === 'string' ? { type: src.item } : src?.list === 'base' && !src.silo ? { ...src.item, state: stateOf(src.item) } : src?.item || {};
+    const at = id === 'start' ? E.def.start : src?.silo ? E.def.base.silo : item.at;
     html += `<p>${esc(titleOf(id))}${at ? ` <span class="ed-at">${at[0]}° ${at[1]} m</span>` : ''}</p><div class="ed-fields" data-for="${esc(id)}">${fields.map(f => fieldRow(f, item[f[0]])).join('')}</div>`;
     if (t?.kind === 'vehicle') html += `<p class="ed-hint">ITS ROUTE HAS ${routeOf(E.def, id)?.path.length || 0} POINTS. ROUTE CHANGES IT.</p>`;
     if (t?.kind === 'foe') html += '<p class="ed-hint">HOLD IT (OR L) TO SEE WHAT IT SEES.</p>';
@@ -461,13 +503,14 @@ export function createEditor(app) {
   selBox.addEventListener('change', e => {
     const f = e.target.closest('[data-f]'), box = e.target.closest('[data-for]');
     if (!f || !box) return;
-    const id = box.dataset.for, k = f.dataset.f, spec = [...FOE_FIELDS, ...ENTITY_FIELDS, ...VEHICLE_FIELDS].find(x => x[0] === k);
+    const id = box.dataset.for, k = f.dataset.f, spec = [...FOE_FIELDS, ...ENTITY_FIELDS, ...VEHICLE_FIELDS, ...BUILDING_FIELDS, ...SILO_FIELDS].find(x => x[0] === k);
     if (id === 'start') { if (k === 'face') faceTo(E.def, 'start', +f.value || 0); }
     else {
       const s = findSource(E.def, id);
       if (!s) return;
       if (s.list === 'foes' && typeof s.item === 'string') { E.def.foes[s.index] = { type: s.item }; s.item = E.def.foes[s.index]; }
-      setField(s.item, k, spec?.[2] || 'text', f.value);
+      if (k === 'state') setState(s.item, f.value);
+      else setField(s.item, k, spec?.[2] || 'text', f.value);
       if (k === 'id' && s.list === 'entities') E.sel = new Set([entityId(s.item, s.index)]);
     }
     edited();

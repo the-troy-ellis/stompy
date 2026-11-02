@@ -373,6 +373,9 @@ your border, and a building knocked down outside it can be carried off.
 Missions start from nothing, or with a full, damaged or half-built base. In
 six parts.
 
+- **Built:** all six parts of spec 33 (part 6 in two: mission bases, then
+  the editor).
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):

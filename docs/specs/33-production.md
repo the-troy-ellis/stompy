@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | parts 1 to 5 and part 6's first half built (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
+| Status | built, all six parts (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
 | Milestone | M14 (proposed), with [32-base-loop.md](32-base-loop.md) |
 | Size | L, split in six (§ Build order) |
 | Depends on | [20-build-and-fight.md](20-build-and-fight.md) (silo, factory, raids); [21-mining.md](21-mining.md) (seams, haulers); [22-command-view.md](22-command-view.md) (the map); [23-construction-sites.md](23-construction-sites.md) and [31-builder.md](31-builder.md) (sites, builders); [32-base-loop.md](32-base-loop.md) (raids from above, ENDLESS, lodes) |
@@ -634,8 +634,6 @@ A parked hauler picks a job in this order (`miner.js` `haul`, extended):
 - **Fixed:** the line's crew-full flag was `full`, which is also every
   building's full height. Since part 2 every line showed `CREW FULL` on the
   map, and the flag overwrote its height. It's `crewFull` now.
-- **Still to come (6b):** the mission editor placing these buildings, with a
-  state slider.
 - **New text:** `CLEARING`, `RUBBLE`, `A FULL YARD`, `A DAMAGED YARD`,
   `A HALF YARD`.
 - **Tests** (`startBase.test.js`):
@@ -644,6 +642,25 @@ A parked hauler picks a job in this order (`miner.js` `haul`, extended):
   - The damaged yard: the line down, others hurt, rubble in the way.
   - Rubble cleared by a builder.
   - The half yard's sites, with the ore and swings to match.
+
+### Part 6b: bases in the mission editor
+
+- **BUILDING** on the editor's palette (`ui/editor.js`): a mission's first
+  tap puts down its base's silo, and later ones a building (a machine shop
+  to start with).
+- **On the map:** the silo and each building, labelled with its kind and
+  state (`ASSEMBLY LINE · HALF BUILT`). They're moved, turned and deleted
+  as anything else is. Deleting the silo deletes the base.
+- **The panel:**
+  - A building has BUILDING (any kind BUILD makes), STATE and FACING.
+  - STATE is a select, not a slider, which is quicker with a thumb: UP,
+    DAMAGED (half its health), DOWN (a fifth), HALF BUILT (a site half done)
+    or RUBBLE.
+  - The silo has the base's starting ORE and ISOTOPES.
+- **Export and import** carry `base` as it is (`missionIO`), and PLAY starts
+  it as `initBase` does.
+- **Tests** (`editorEdits.test.js`): the silo then a building; each state
+  set and read back; moved, turned, exported and read back; removed.
 
 ## Code touchpoints
 
