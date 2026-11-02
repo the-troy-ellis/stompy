@@ -11,7 +11,7 @@ import { geoOf } from '../data/geo.js';
 import { center, eyeOf, muzzle, rayHit, viewYaw } from './geom.js';
 import { stepMech } from './mech.js';
 import { gait } from './gait.js';
-import { think, stand } from './ai.js';
+import { think, stand, thinksNow } from './ai.js';
 import { mine, haul } from './miner.js';
 import { obey } from './orders.js';
 import { groupPass } from './ai/group.js';
@@ -133,7 +133,9 @@ function frame(G, input, dt) {
   if (G.guide) steerVolley(G, dt);
 
   groupPass(G, dt);
+  let mi = -1;
   for (const m of G.mechs) {
+    mi++;
     if (m.remote) {
       if (m.alive) { netInterp(m, dt, G.clock); stepFeel(m, dt); gait(G, m, dt); meleeGhost(m, dt, m.net?.pu || 0); }
       else m.melee = null;
@@ -152,7 +154,11 @@ function frame(G, input, dt) {
     if (m.team !== 0 && m.alive && !m.script) {   // the bench's cast is on a script
       if (m.ai.still || cheat(G, 'freeze')) { stand(m); m.ai.frozen = !m.ai.still; }   // a range's target; FOES FROZEN (sim/cheats.js)
       else if (m.ai.thief) thieve(G, m, dt);   // a raid's foe hauler (sim/steal.js)
-      else { if (m.ai.frozen) { m.ai.frozen = false; m.ai.aware = true; } think(G, m, dt); }   // unfrozen: awake, and after you
+      else {
+        if (m.ai.frozen) { m.ai.frozen = false; m.ai.aware = true; }   // unfrozen: awake, and after you
+        // Far from any fight it decides every 4th frame, with the time it missed (ai.js thinksNow, spec 34).
+        if (thinksNow(G, m, mi)) { think(G, m, dt + (m.ai.owed || 0)); m.ai.owed = 0; } else m.ai.owed = (m.ai.owed || 0) + dt;
+      }
     }
     if (m.alive) { stepMech(G, m, dt); meleeTick(G, m, dt); }
     if (m.ch.tool) stepTool(G, m, dt);   // DIG: the arms' spin and its scoops (sim/tools.js)

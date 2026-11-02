@@ -145,8 +145,9 @@ Run the whole list; it takes about eight minutes. Report deviations in the PR.
   budgeted; `map-sweep` carries the map view's camera over the whole map.
   After the browser, the crowd scene (`scripts/crowd.mjs`, spec 34; also
   `node scripts/crowd.mjs` alone) runs the sim in Node with 12, 25, 50 and
-  100 foes all fighting, printing ms per frame, how that grows with the
-  crowd, and ground rays and mech reads per frame; the counts at 50 are
+  100 foes all fighting, and 50 marching in from far off, printing ms per
+  frame, how that grows with the crowd, and ground rays and mech reads per
+  frame; the counts at 50 are
   budgeted (`CROWD_BUDGETS`).
   The fight scenes are the bench's segments (`src/sim/bench.js`, `bench-*`):
   a scripted scene where nobody thinks or takes damage, so a change to the

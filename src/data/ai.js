@@ -60,3 +60,9 @@ export const PERCEPTION = {
   searchFor: 20,      // s spent searching around the last known position
   searchRadius: 80,   // m around it
 };
+
+// Far foes think less often (docs/specs/34-big-fights.md part 3): one that
+// can't see its prey, has no foe of its own within `range` m and wasn't hit
+// in the last `hitFor` s decides every `every`th frame, staggered, with the
+// time it missed; it walks on its last decision in between.
+export const FAR_THINK = { range: 400, every: 4, hitFor: 2 };

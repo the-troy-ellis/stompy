@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (parts 1–2) |
+| Status | in progress (parts 1–3) |
 | Milestone | M14 |
 | Size | L (in four parts) |
 | Depends on | [14-look-and-performance.md](14-look-and-performance.md), [33-production.md](33-production.md) |
@@ -100,17 +100,25 @@ would use later. It's built for mechs first, because that's where the time goes.
 
 ### Part 3: think less when far
 
-- **Far foes think less often.** A foe more than 400 m from every pilot and
-  every crew mech, and not hit in the last 2 s, runs `think` every 4th frame.
-  The frames are staggered by its id, so the work stays even. Between those
-  frames it keeps its last throttle, turn and aim. Its feet, gait and
-  physics still step every frame, so feet never slide. Raids crossing a big
-  map get cheap. Fights near you are unchanged.
+- **Far foes think less often** (`FAR_THINK` in `data/ai.js`, `thinksNow`
+  in `sim/ai.js`). A foe that can't see its prey, has no mech of another
+  team within 400 m and wasn't hit in the last 2 s runs `think` every 4th
+  frame. The frames are staggered by its place in `G.mechs`, so the work
+  stays even. When it does think, it gets all the time it missed, so its
+  turns, timers and strafing add up to the same as thinking every frame:
+  about 4° of turn every 4th frame, at 400 m or more. Between those frames
+  it walks on with its last throttle. Its feet, gait and physics still step
+  every frame, so feet never slide.
+  - A foe that sees its prey thinks every frame however far off: on HARD
+    foes see 800 m, and could be firing at you.
+  - Measured: fifty foes marching in from 600 to 1,100 m cost 25–35% less
+    (0.61–0.79 ms against 0.82–1.27 ms here). A far patrol was already cheap
+    and gains nothing measurable. Fights near you are unchanged.
 - **Sight is already checked less often.** Each foe looks every 0.15 s,
   staggered (`AI.lookEvery`, spec 05), so there's nothing to do there. The
   rays left are shots, beams and the nav's feelers.
-- These change when things happen, not what happens. The AI tests stay
-  as they are. Any test that shifts by a frame says so and why.
+- This changes when far foes decide, not what fights do. Every existing AI
+  test passes unchanged.
 
 ### Part 4: no garbage in the sim's hot loops
 
