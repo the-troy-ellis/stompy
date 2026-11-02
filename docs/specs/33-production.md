@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | parts 1 to 4 built (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
+| Status | parts 1 to 5 built (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
 | Milestone | M14 (proposed), with [32-base-loop.md](32-base-loop.md) |
 | Size | L, split in six (§ Build order) |
 | Depends on | [20-build-and-fight.md](20-build-and-fight.md) (silo, factory, raids); [21-mining.md](21-mining.md) (seams, haulers); [22-command-view.md](22-command-view.md) (the map); [23-construction-sites.md](23-construction-sites.md) and [31-builder.md](31-builder.md) (sites, builders); [32-base-loop.md](32-base-loop.md) (raids from above, ENDLESS, lodes) |
@@ -564,6 +564,49 @@ A parked hauler picks a job in this order (`miner.js` `haul`, extended):
   - Hit on NORMAL they drop it and run; on HARD they keep at it.
   - HARD raiders going for an exposed building and leaving it once it's
     down.
+
+### Part 5: weapons
+
+- **Known weapons** (`production.js` `knownOf`): this mission's, a `Set` on
+  `G.base.known`. At the start it's the mission's `base.known`, else `KNOWN`
+  (BIG ZAPPER and RATATAT). Nothing carries over.
+- **The weapon lab** (`PLACE.lab`: 60 ore, 10 swings, 400 hp; a shed at the
+  back of an open test range, 12 × 20 m):
+  - `startStudy` works out one weapon at a time (`work`), any weapon but the
+    OOPS BUTTON that isn't known, in `LINE.research` (60 s). A muzzle flash
+    in the weapon's colour shows on its range every 1.2 s.
+  - Done: it's known, and the voice says `ANGRY BEES. Works.`
+  - On the map, a tap on a lab with nothing picked swaps the bar for the
+    weapons left to work out (keys 1–9). The voice says `Testing.` While
+    it's at one the bar is empty and the lab reads `ANGRY BEES 40%`.
+- **Guns** (`PARTS['gun.<weapon>']`): one a weapon, 8 ore and more by its
+  tons, at most 25 (MG 10 to BIG BONKER 25).
+- **The weapon shop** (`PLACE.armory`: 60 ore, 10 swings, 500 hp; a shed
+  with a rack out front) makes, from the pool, the gun a line will want that
+  no gun is there for (`nextPart(G, 'gun')`), every `LINE.gun` (8 s). On the
+  map it reads `GUNS 2` (`+1` while one's being made).
+- **BARRY off the line:**
+  - `RECIPES.kestrel` is light legs, a light body, a core, and gun arms
+    (`arms.gun`). MAKE now offers it (keys 1–4).
+  - Its last bay also takes a gun for each hardpoint (`gunsFor`): its stock
+    weapon if known, else the first known one of its kind, else EMPTY. With
+    the start's weapons that's two BIG ZAPPERs and a RATATAT, and its
+    missile hardpoint stays empty until a missile is worked out.
+  - The guns are fixed (`plan`) when it reaches that bay, and bolted on with
+    its arms (`applyLoadout`).
+  - A bay now takes a list of things (`bayParts`), each as it comes. The
+    map's bay label names the first one still missing (`NEEDS GUNS`).
+  - The voice says `New mech ready.`, as the factory's does.
+- **The look:** a gun is a dark barrel on a block, on the rack or a hauler's
+  back.
+- **New text:** `Testing.`, `ANGRY BEES. Works.` (by weapon),
+  `ANGRY BEES 40%`, `GUNS n`, `NEEDS GUNS`. `WEAPON LAB` and `WEAPON SHOP`
+  are placeholders.
+- **Tests** (`weapons.test.js`):
+  - What's known at the start, and the guns a BARRY gets.
+  - The lab working a weapon out, one at a time, this mission only.
+  - The weapon shop making the guns a queued BARRY wants.
+  - A BARRY coming off the line with its guns and joining the crew.
 
 ## Code touchpoints
 

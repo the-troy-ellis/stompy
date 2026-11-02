@@ -38,8 +38,9 @@ export function initBase(G, def) {
   G.base = null;
   if (!def.base) return;
   const { x, z } = polar(def.base.silo), silo = addEntity(G, { ...BUILDINGS.silo, x, z, yaw: atan2(-x, -z), hp: CONSTRUCT.siloHp, id: 'silo' });
-  G.base = { ore: CONSTRUCT.startOre, iso: 0, salvage: 0, silo, silos: [silo], beacons: [], heaps: [], shops: [], lines: [], plants: [], things: [], factory: null, bays: [], walls: [], pick: 0, sites: [], land: null, landT: 0 };
+  G.base = { ore: CONSTRUCT.startOre, iso: 0, salvage: 0, silo, silos: [silo], beacons: [], heaps: [], shops: [], lines: [], plants: [], labs: [], armories: [], things: [], factory: null, bays: [], walls: [], pick: 0, sites: [], land: null, landT: 0 };
   silo.counted = true;
+  if (def.base.known) G.base.known = new Set(def.base.known);   // weapons worked out at the start (spec 33 § The weapon lab)
   // Abandoned buildings out on the map (spec 33 § Stealing): nobody's, down, for the taking.
   for (const n of def.base.neutral || []) { const p = polar(n.at); addBuilding(G, n.kind, p.x, p.z, (n.face || 0) * Math.PI / 180); }
   survey(G);
@@ -156,7 +157,7 @@ export function placeSite(G, f) {
   } else {
     const e = rise(addEntity(G, { ...BUILDINGS[kind], x: f.x, z: f.z, yaw: f.yaw + Math.PI, hp: P.hp, ...(kind === 'factory' ? { id: 'factory' } : {}) }));   // its door or pad toward the digger
     if (kind === 'factory') { e.job = null; b.factory = e; } else if (kind === 'silo') b.silos.push(e); else if (kind === 'beacon') b.beacons.push(e);
-    else if (kind === 'shop') { e.press = null; b.shops.push(e); } else if (kind === 'plant') { e.brew = null; b.plants.push(e); } else if (kind === 'line') { e.bays = new Array(LINE.bays).fill(null); e.queue = []; b.lines.push(e); } else b.bays.push(e);
+    else if (kind === 'shop') { e.press = null; b.shops.push(e); } else if (kind === 'plant') { e.brew = null; b.plants.push(e); } else if (kind === 'lab') { e.work = null; b.labs.push(e); } else if (kind === 'armory') { e.press = null; b.armories.push(e); } else if (kind === 'line') { e.bays = new Array(LINE.bays).fill(null); e.queue = []; b.lines.push(e); } else b.bays.push(e);
   }
   return site;
 }

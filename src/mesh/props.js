@@ -265,6 +265,28 @@ const BUILD = {
     box(b, -0.1, 0.04, 0.6, 1.4, 0.12, 0.3, C.dark);
   },
   plantGlow: b => box(b, -0.3, 0.3, 0.36, 0.8, 0.08, 0.02, C.lava),
+  // The weapon lab (docs/specs/33-production.md): a shed at the back, and in
+  // front its open test range, a gun on a stand and a target block at the far
+  // end that it shoots at while it works a weapon out.
+  lab: b => {
+    box(b, 0, 0, 0, 1.2, 0.03, 2.0, C.pad);
+    box(b, 0, 0.03, -0.65, 1.1, 0.6, 0.6, C.concrete);
+    box(b, 0, 0.63, -0.65, 1.16, 0.06, 0.66, C.steel);
+    box(b, 0, 0.03, -0.1, 0.12, 0.3, 0.12, C.steel);
+    box(b, 0, 0.33, -0.05, 0.14, 0.12, 0.4, C.dark);
+    box(b, 0, 0.03, 0.85, 0.4, 0.45, 0.2, C.rust);
+    for (const x of [-0.55, 0.55]) box(b, x, 0.03, 0.4, 0.04, 0.1, 1.1, C.hazard);
+  },
+  // The weapon shop: a low shed with a hazard-striped door and, out front,
+  // a rack where the guns it makes wait.
+  armory: b => {
+    box(b, 0, 0, 0, 1.9, 0.04, 1.9, C.pad);
+    box(b, 0, 0.04, -0.3, 1.6, 0.7, 1.1, C.concrete);
+    box(b, 0, 0.74, -0.3, 1.66, 0.07, 1.16, C.dark);
+    box(b, 0, 0.04, 0.26, 0.7, 0.5, 0.04, C.hazard);
+    for (const x of [-0.6, 0.6]) box(b, x, 0.04, 0.65, 0.08, 0.35, 0.08, C.steel);
+    box(b, 0, 0.36, 0.65, 1.3, 0.06, 0.1, C.steel);
+  },
   // Ore spilled from a fallen silo (spec 33): a low mound of rusty lumps,
   // scaled by its radius every way (FLAT), so a small heap is low too.
   heap: b => {

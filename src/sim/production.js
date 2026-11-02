@@ -1,4 +1,8 @@
-import { LINE, PARTS, RECIPES, CONSTRUCT } from '../data/construct.js';
+import { LINE, PARTS, RECIPES, CONSTRUCT, FIGHTERS, KNOWN } from '../data/construct.js';
+import { CHASSIS } from '../data/chassis.js';
+import { WEAPONS, CAT_OF } from '../data/weapons.js';
+import { NAMES } from '../data/names.js';
+import { applyLoadout, stockLoadout } from './loadout.js';
 import { newMech } from './state.js';
 import { park, crewOf } from './crew.js';
 import { feel } from './feel.js';
@@ -51,7 +55,7 @@ export function carryFor(G, m) {
   let best = null, bd = Infinity;
   for (const line of b.lines) {
     if (!line.alive || line.site) continue;
-    const want = lineWants(line);
+    const want = lineWants(line, G);
     for (const t of b.things) {   // what's there, or on its way there, already
       if (t.at !== line && t.to !== line && !(claimed(t) && t.for === line)) continue;
       const k = want.indexOf(t.part);
@@ -82,6 +86,22 @@ export function putDown(G, m, line = null) {
 
 // What a mech takes in bay `i`: its legs, its body, a core, its arms.
 export const bayPart = (kind, i) => (i === 2 ? 'core' : RECIPES[kind][i < 2 ? i : 2]);
+// The weapons worked out this mission (spec 33 § The weapon lab): the
+// mission's `base.known`, or KNOWN, and what the lab has done since.
+export const knownOf = G => (G?.base ? (G.base.known ||= new Set(KNOWN)) : new Set(KNOWN));
+// A fighter's guns, a hardpoint each in its order: the stock weapon if it's
+// worked out, else the first worked-out one of its kind; null (EMPTY) if none is.
+export function gunsFor(G, kind) {
+  const known = knownOf(G);
+  return CHASSIS[kind].hardpoints.map(h => (known.has(h.stock) ? h.stock : [...known].find(w => CAT_OF[w] === h.cat && w !== 'fusion') || null));
+}
+// Everything bay `i` takes: its part, and for a fighter's last bay its guns
+// too (`plan`: the guns fixed when it got there, else as they'd be now).
+export function bayParts(G, kind, i, plan = null) {
+  const p = bayPart(kind, i);
+  if (i < LINE.bays - 1 || !FIGHTERS.includes(kind)) return [p];
+  return [p, ...(plan || gunsFor(G, kind)).filter(Boolean).map(w => `gun.${w}`)];
+}
 export const thingsAt = (G, e) => G.base.things.filter(t => t.at === e);
 
 // Put a mech of `kind` in a line's queue. False (and why, for the player) if
@@ -96,26 +116,32 @@ export function unqueue(line, i) { line.queue.splice(i, 1); }
 
 // The parts a line still wants, in the order it will want them: the mechs in
 // its bays from the furthest on, then the ones waiting.
-export function lineWants(line) {
+export function lineWants(line, G = null) {
   const want = [];
   for (let i = LINE.bays - 1; i >= 0; i--) {
     const j = line.bays[i];
     if (!j) continue;
-    for (let k = j.has ? i + 1 : i; k < LINE.bays; k++) { const p = bayPart(j.kind, k); if (p) want.push(p); }
+    for (let k = j.has ? i + 1 : i; k < LINE.bays; k++) {
+      const need = bayParts(G, j.kind, k, j.plan);
+      if (k === i) for (const p of j.got || []) { const n = need.indexOf(p); if (n >= 0) need.splice(n, 1); }   // what this bay has had already
+      want.push(...need);
+    }
   }
-  for (const kind of line.queue) for (let k = 0; k < LINE.bays; k++) { const p = bayPart(kind, k); if (p) want.push(p); }
+  for (const kind of line.queue) for (let k = 0; k < LINE.bays; k++) want.push(...bayParts(G, kind, k));
   return want;
 }
 // The first part the base's lines want that no thing on the ground (or on a
 // hauler, or in a press) is there for yet: what a shop presses next. Null if none.
-export function nextPart(G, cores = false) {   // cores: what the isotope plant makes; else, what a shop presses
+const maker = p => (p === 'core' ? 'core' : PARTS[p].kind === 'gun' ? 'gun' : 'part');   // who makes it: the plant, the weapon shop, the machine shop
+export function nextPart(G, what = 'part') {   // what: 'core' (true, as before) the isotope plant's, 'gun' the weapon shop's, 'part' a machine shop's
+  if (what === true) what = 'core';
   const spare = {};
   for (const t of G.base.things) spare[t.part] = (spare[t.part] || 0) + 1;
-  for (const s of G.base.shops) if (s.alive && s.press) spare[s.press.part] = (spare[s.press.part] || 0) + 1;   // in a press now
+  for (const s of [...G.base.shops, ...(G.base.armories || [])]) if (s.alive && s.press) spare[s.press.part] = (spare[s.press.part] || 0) + 1;   // in a press now
   for (const p of G.base.plants) if (p.alive && p.brew) spare.core = (spare.core || 0) + 1;   // a core on its way
   for (const line of G.base.lines) {
     if (!line.alive) continue;
-    for (const p of lineWants(line)) { if (spare[p] > 0) spare[p]--; else if (cores === (p === 'core')) return p; }
+    for (const p of lineWants(line, G)) { if (spare[p] > 0) spare[p]--; else if (maker(p) === what) return p; }
   }
   return null;
 }
@@ -127,21 +153,23 @@ export function stepProduction(G, dt) {
   const b = G.base;
   for (const s of b.shops) if (works(s)) press(G, s, dt);   // down, or riding on haulers: nothing
   for (const p of b.plants) if (works(p)) brew(G, p, dt);
+  for (const a of b.armories || []) if (works(a)) press(G, a, dt, 'gun');   // guns, as a shop presses parts
+  for (const l of b.labs || []) if (works(l)) study(G, l, dt);
   for (const line of b.lines) {
     if (!line.alive) { line.bays.fill(null); line.queue.length = 0; continue; }
     if (works(line)) build(G, line, dt);
   }
 }
 
-function press(G, s, dt) {
+function press(G, s, dt, what = 'part') {
   const b = G.base;
   if (!s.press) {
-    const part = thingsAt(G, s).length < LINE.pile && b.things.length < LINE.things && nextPart(G);
+    const part = thingsAt(G, s).length < LINE.pile && b.things.length < LINE.things && nextPart(G, what);
     if (!part || b.ore < PARTS[part].ore) return;
     b.ore -= PARTS[part].ore;
     s.press = { part, t: 0 };
   }
-  if ((s.press.t += dt) < LINE.press) return;
+  if ((s.press.t += dt) < (what === 'gun' ? LINE.gun : LINE.press)) return;
   b.things.push({ part: s.press.part, at: s, by: null, claim: null });
   s.press = null;
   const [x, z] = pileAt(s, thingsAt(G, s).length - 1);
@@ -165,16 +193,47 @@ function brew(G, p, dt) {
   thunk(G, p, x, z, 0.4);
 }
 
+// The weapon lab (docs/specs/33-production.md § The weapon lab): works out
+// one weapon at a time (`work` = { weapon, t }), LINE.research s, for this
+// mission only; you see it at it, a muzzle flash on its range now and then.
+export const studyable = G => Object.keys(WEAPONS).filter(w => w !== 'fusion' && !knownOf(G).has(w));
+export function study(G, l, dt) {
+  if (!l.work) return;
+  if ((l.work.flash = (l.work.flash || 0) - dt) <= 0) {
+    l.work.flash = 1.2;
+    const [x, z] = at(l, 0, l.radius * 0.6);
+    particle(G, [x, G.ter.height(x, z) + 2, z], [0, 1, 0], 0.15, 1.2, WEAPONS[l.work.weapon].col || [1, 0.8, 0.4], 'spark');
+  }
+  if ((l.work.t += dt) < LINE.research) return;
+  knownOf(G).add(l.work.weapon);
+  G.fx.say(`${NAMES.weapons[l.work.weapon]}. Works.`);
+  l.work = null;
+}
+// Put the lab to `weapon`. False if it's at one, or it's known, or no weapon.
+export function startStudy(G, l, weapon) {
+  if (!works(l) || l.work || !studyable(G).includes(weapon)) return false;
+  l.work = { weapon, t: 0 };
+  return true;
+}
+
 function build(G, line, dt) {
   // From the furthest bay back, so a mech moves on into a bay just emptied next frame, not this one.
   for (let i = LINE.bays - 1; i >= 0; i--) {
     const j = line.bays[i];
     if (!j) continue;
     if (!j.has) {
-      const p = bayPart(j.kind, i), t = p && G.base.things.find(o => o.at === line && o.part === p);
-      if (p && !t) continue;   // waiting for its part
-      if (t) G.base.things.splice(G.base.things.indexOf(t), 1);
-      j.has = true; j.t = 0; j.shell.show = i + 1;
+      if (i === LINE.bays - 1 && FIGHTERS.includes(j.kind)) j.plan ||= gunsFor(G, j.kind);   // its guns, fixed as it gets to its last bay
+      const need = bayParts(G, j.kind, i, j.plan);
+      for (const p of (j.got ||= [])) { const n = need.indexOf(p); if (n >= 0) need.splice(n, 1); }
+      for (const p of [...need]) {   // whatever of it is on the line's pile goes in
+        const t = G.base.things.find(o => o.at === line && o.part === p);
+        if (!t) continue;
+        G.base.things.splice(G.base.things.indexOf(t), 1);
+        j.got.push(p); need.splice(need.indexOf(p), 1);
+      }
+      if (need.length) continue;   // waiting for the rest
+      j.has = true; j.t = 0; j.got = []; j.shell.show = i + 1;
+      if (j.plan && i === LINE.bays - 1) { const lo = stockLoadout(j.kind); CHASSIS[j.kind].hardpoints.forEach((h, k) => { lo.hp[h.id] = j.plan[k]; }); applyLoadout(G, j.shell, lo); }   // its guns bolted on
       const [x, z] = bayAt(line, i);
       thunk(G, j.shell, x, z, i === 1 ? 1 : 0.6);   // the body dropping on is the big one
       if (i === 2 && G.player && Math.hypot(G.player.x - x, G.player.z - z) < NEAR) G.fx.say('Reactor online.');   // the hatch slams on its core
@@ -205,7 +264,7 @@ function walkOut(G, line, j) {
   park(m);
   G.mechs.push(m);
   (G.crew ||= [G.player]).push(m);
-  G.fx.say(`New ${j.kind}.`);
+  G.fx.say(FIGHTERS.includes(j.kind) ? 'New mech ready.' : `New ${j.kind}.`);   // a fighter: the factory's line
   if (G.command) msg(G, `NEW ${m.ch.name}`);
 }
 

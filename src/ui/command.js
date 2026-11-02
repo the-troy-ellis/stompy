@@ -8,12 +8,13 @@ import { bindPointer } from '../input/pointer.js';
 import { pickNearest, pickInside } from '../sim/pick.js';
 import { crewOf, canCommand, commandUp, commandDown } from '../sim/crew.js';
 import { give, can } from '../sim/orders.js';
-import { PLACE, PLACE_ORDER, BUILDINGS, CONSTRUCT, RECIPES, PARTS } from '../data/construct.js';
+import { PLACE, PLACE_ORDER, BUILDINGS, CONSTRUCT, RECIPES, PARTS, LINE } from '../data/construct.js';
 import { footprintAt, placeSite, snapWall, oreRoom, isoRoom, needsRepair, kindOf, inLand } from '../sim/base.js';
 import { canLift } from '../sim/steal.js';
-import { isDown } from '../sim/down.js';
+import { isDown, works } from '../sim/down.js';
 import { territory } from '../sim/territory.js';
-import { queueMake, bayAt, bayPart, thingsAt } from '../sim/production.js';
+import { queueMake, bayAt, bayParts, thingsAt, studyable, startStudy } from '../sim/production.js';
+import { WEAPONS } from '../data/weapons.js';
 
 // The command view (docs/specs/22-command-view.md): the match from above
 // while the world runs on. MAP (Tab) goes up, BACK comes down into the mech
@@ -47,7 +48,8 @@ const siteLabel = (G, e) => {
   return G.base?.walls.some(o => o.alive && !o.site && Math.hypot(o.x - px, o.z - pz) < st * 0.6) ? '' : n;
 };
 export const BAR = ['go', 'dig', 'follow', 'stay', 'work', 'drive', 'build', 'attack', 'guard', 'carry'];   // the order bar, in order (keys 1–9; CARRY, the tenth, by tap or pad)
-export const MAKE = Object.keys(RECIPES);   // with an assembly line tapped, the bar is these instead (docs/specs/33-production.md), keys 1–3
+export const MAKE = Object.keys(RECIPES);   // with an assembly line tapped, the bar is these instead (docs/specs/33-production.md), keys 1–4
+export const STUDY = Object.keys(WEAPONS).filter(w => w !== 'fusion');   // with a weapon lab tapped, the weapons it could work out
 
 export function createCommand(app) {
   const G = app.G, wrap = app.wrap;
@@ -56,10 +58,10 @@ export function createCommand(app) {
   root.innerHTML = `
     <div class="cmd-surface"></div>
     <button class="cmd-btn cmd-back" data-c="back">BACK</button>
-    <div class="cmd-bar">${BAR.map(k => `<button class="cmd-btn" data-c="${k}" hidden>${k.toUpperCase()}</button>`).join('')}${MAKE.map(k => `<button class="cmd-btn" data-m="${k}" hidden>${NAMES.chassis[k]}</button>`).join('')}</div>`;
+    <div class="cmd-bar">${BAR.map(k => `<button class="cmd-btn" data-c="${k}" hidden>${k.toUpperCase()}</button>`).join('')}${MAKE.map(k => `<button class="cmd-btn" data-m="${k}" hidden>${NAMES.chassis[k]}</button>`).join('')}${STUDY.map(k => `<button class="cmd-btn" data-r="${k}" hidden>${NAMES.weapons[k]}</button>`).join('')}</div>`;
   wrap.insertBefore(root, app.ov);
-  const surface = root.querySelector('.cmd-surface'), btn = Object.fromEntries(BAR.map(k => [k, root.querySelector(`[data-c="${k}"]`)])), mk = Object.fromEntries(MAKE.map(k => [k, root.querySelector(`[data-m="${k}"]`)]));
-  const C = { cam: null, picked: new Set(), box: null, order: null, place: null, ghost: null, padAt: 0, make: null, lift: null };   // make: the assembly line tapped, its MAKE bar up; lift: the building CARRY picked, its ghost where it goes   // order: GO, DIG, FOLLOW or BUILD chosen, waiting for its tap; place: the kind of site BUILD puts down, ghost: where; padAt: the bar's button a gamepad has lit
+  const surface = root.querySelector('.cmd-surface'), btn = Object.fromEntries(BAR.map(k => [k, root.querySelector(`[data-c="${k}"]`)])), mk = Object.fromEntries(MAKE.map(k => [k, root.querySelector(`[data-m="${k}"]`)])), rs = Object.fromEntries(STUDY.map(k => [k, root.querySelector(`[data-r="${k}"]`)]));
+  const C = { cam: null, picked: new Set(), box: null, order: null, place: null, ghost: null, padAt: 0, make: null, lift: null, lab: null };   // make: the assembly line tapped, its MAKE bar up; lift: the building CARRY picked, its ghost where it goes   // order: GO, DIG, FOLLOW or BUILD chosen, waiting for its tap; place: the kind of site BUILD puts down, ghost: where; padAt: the bar's button a gamepad has lit
 
   const size = () => ({ W: Math.max(1, wrap.clientWidth), H: Math.max(1, wrap.clientHeight) });
   const mpp = () => metresPerPixel(C.cam, size().H);
@@ -92,13 +94,16 @@ export function createCommand(app) {
     const p = [...C.picked];
     if (p.length) C.place = C.ghost = null;
     if (p.length || C.place || !C.make?.alive) C.make = null;
+    if (p.length || C.place || !C.lab?.alive) C.lab = null;
+    const open = C.lab && studyable(G);   // the lab tapped: what's left to work out, unless it's at one
+    for (const k of STUDY) { const show = !!open && !C.lab.work && open.includes(k); if (rs[k].hidden !== !show) rs[k].hidden = !show; }
     for (const k of MAKE) {   // the line tapped: what it makes, and how many of each are waiting
       const b = mk[k], n = C.make ? C.make.queue.filter(q => q === k).length : 0, label = `${NAMES.chassis[k]}${n ? ` +${n}` : ''}`;
       if (b.hidden !== !C.make) b.hidden = !C.make;
       if (b.textContent !== label) b.textContent = label;
     }
     for (const k of BAR) {
-      const b = btn[k], show = C.make ? false : k === 'drive' ? p.length === 1 : k === 'build' && !p.length ? !!G.base : p.some(m => can(m, k));
+      const b = btn[k], show = C.make || C.lab ? false : k === 'drive' ? p.length === 1 : k === 'build' && !p.length ? !!G.base : p.some(m => can(m, k));
       if (b.hidden !== !show) b.hidden = !show;
       b.classList.toggle('on', C.order === k || (k === 'build' && !!C.place));
     }
@@ -141,7 +146,13 @@ export function createCommand(app) {
     sync();
   }
   // Keys 1–9: the bar's nth button (MAKE's, with a line tapped).
-  const key = n => (C.make ? MAKE[n] && make(MAKE[n]) : BAR[n] && press(BAR[n]));
+  function study(w) {   // the lab tapped: work `w` out (sim/production.js)
+    if (!C.lab) return;
+    if (startStudy(G, C.lab, w)) G.fx.say('Testing.');
+    else app.audio.sfx.beep();
+    sync();
+  }
+  const key = n => { if (C.lab) { const shown = STUDY.filter(k => !rs[k].hidden); return shown[n] && study(shown[n]); } return C.make ? MAKE[n] && make(MAKE[n]) : BAR[n] && press(BAR[n]); };
   // A tap: with an order chosen, where it goes; else a crew mech picks it,
   // and the ground, with mechs picked, is GO.
   function tapAt(x, y) {
@@ -171,7 +182,7 @@ export function createCommand(app) {
     if (C.order && g) return order({ kind: C.order, x: g.x, z: g.z });
     if (m) { C.picked = new Set([m]); sync(); return; }
     if (g && C.picked.size) return order({ kind: 'go', x: g.x, z: g.z });
-    if (!C.order) { const b = buildingAt(x, y); C.make = b?.tags.includes('line') && C.make !== b ? b : null; sync(); }   // nothing picked: a tap on an assembly line brings up MAKE, anywhere else puts it away
+    if (!C.order) { const b = buildingAt(x, y); C.make = b?.tags.includes('line') && C.make !== b ? b : null; C.lab = b?.tags.includes('lab') && C.lab !== b ? b : null; sync(); }   // nothing picked: a tap on an assembly line brings up MAKE, on a weapon lab what it could work out; anywhere else puts them away
   }
 
   // Placing: a tap on the ghost (or where the pointer put it) puts the site
@@ -219,6 +230,8 @@ export function createCommand(app) {
   root.addEventListener('click', e => {
     const m = e.target.closest('[data-m]');
     if (m) { make(m.dataset.m); return; }
+    const r = e.target.closest('[data-r]');
+    if (r) { study(r.dataset.r); return; }
     const b = e.target.closest('[data-c]');
     if (!b) return;
     if (b.dataset.c === 'back') close();
@@ -335,10 +348,10 @@ export function createCommand(app) {
   // on its pile; at each bay of an assembly line, the part it waits for; the
   // line tapped ringed, with how many are waiting, or CREW FULL. Near enough
   // to read only.
-  const WORD = { legs: 'LEGS', body: 'A BODY', core: 'A CORE', arms: 'ARMS' }, PLURAL = { legs: 'LEGS', body: 'BODIES', arms: 'ARMS' };
+  const WORD = { legs: 'LEGS', body: 'A BODY', core: 'A CORE', arms: 'ARMS', gun: 'GUNS' }, PLURAL = { legs: 'LEGS', body: 'BODIES', arms: 'ARMS' };
   function drawProduction(ctx, view, pal) {
     const b = G.base;
-    if (!b?.lines.length && !b?.shops.length && !b?.plants.length) return;
+    if (!b?.lines.length && !b?.shops.length && !b?.plants.length && !b?.labs?.length && !b?.armories?.length) return;
     ctx.save(); ctx.font = 'bold 9px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     const S = (x, z) => view.toScreen(x, G.ter.height(x, z), z);
     if (view.mpp < 4) for (const s of b.shops) {
@@ -347,6 +360,15 @@ export function createCommand(app) {
       if (!p) continue;
       for (const t of thingsAt(G, s)) n[PARTS[t.part].kind]++;
       ctx.fillStyle = pal.good; ctx.fillText(Object.keys(n).map(k => `${PLURAL[k]} ${n[k]}`).join(' · '), p[0], p[1] + 26);
+    }
+    if (view.mpp < 4) for (const l of b.labs || []) {   // the weapon lab: what it's working out
+      const p = works(l) && S(l.x, l.z);
+      if (p && l.work) { ctx.fillStyle = pal.good; ctx.fillText(`${NAMES.weapons[l.work.weapon]} ${Math.floor(100 * l.work.t / LINE.research)}%`, p[0], p[1] + 26); }
+      if (p && l === C.lab) { ctx.strokeStyle = pal.good; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], 22, 0, 7); ctx.stroke(); }
+    }
+    if (view.mpp < 4) for (const a of b.armories || []) {   // the weapon shop: its rack
+      const p = works(a) && S(a.x, a.z);
+      if (p) { ctx.fillStyle = pal.good; ctx.fillText(`GUNS ${thingsAt(G, a).length}${a.press ? ' +1' : ''}`, p[0], p[1] + 26); }
     }
     if (view.mpp < 4) for (const pl of b.plants) {   // the isotope plant: its cores
       const p = !pl.site && pl.alive && S(pl.x, pl.z);
@@ -359,7 +381,9 @@ export function createCommand(app) {
       if (p && (line.queue.length || line.full)) { ctx.fillStyle = line.full ? pal.bad : pal.good; ctx.fillText(line.full ? 'CREW FULL' : `${line.queue.length} WAITING`, p[0], p[1] + 26); }
       if (view.mpp >= 4) continue;
       line.bays.forEach((j, i) => {
-        const part = j && !j.has && bayPart(j.kind, i), q = part && S(...bayAt(line, i));
+        const left = j && !j.has ? bayParts(G, j.kind, i, j.plan) : [];
+        for (const g of j?.got || []) { const n = left.indexOf(g); if (n >= 0) left.splice(n, 1); }
+        const part = left[0], q = part && S(...bayAt(line, i));   // the first thing it's still waiting for
         if (q) { ctx.fillStyle = pal.bad; ctx.fillText(`NEEDS ${WORD[PARTS[part].kind]}`, q[0], q[1] - 14); }
       });
     }

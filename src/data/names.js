@@ -19,7 +19,7 @@ export const NAMES = {
   },
   // Campaign missions by key. Act I's are the owner's, picked after seeing them (docs/workflow.md § Naming).
   // The base's buildings (docs/specs/20-build-and-fight.md, 21-mining.md): placeholders.
-  buildings: { silo: 'SILO', factory: 'FACTORY', bay: 'BAY', wall: 'WALL', beacon: 'BEACON', shop: 'MACHINE SHOP', line: 'ASSEMBLY LINE', plant: 'ISOTOPE PLANT' },   // BEACON, MACHINE SHOP, ASSEMBLY LINE, ISOTOPE PLANT placeholders (docs/specs/33-production.md)
+  buildings: { silo: 'SILO', factory: 'FACTORY', bay: 'BAY', wall: 'WALL', beacon: 'BEACON', shop: 'MACHINE SHOP', line: 'ASSEMBLY LINE', plant: 'ISOTOPE PLANT', lab: 'WEAPON LAB', armory: 'WEAPON SHOP' },   // BEACON, MACHINE SHOP, ASSEMBLY LINE, ISOTOPE PLANT, WEAPON LAB, WEAPON SHOP placeholders (docs/specs/33-production.md)
   // The construction mechs' tools, on their primary button (docs/specs/25-hold-to-dig.md).
   tools: { dig: 'DIG', build: 'BUILD' },
   missions: { m01: 'LIL SNOOZERS', m02: 'TOWER TOPPLER', m03: 'HELPLESS LIL BUDDIES', m04: 'FOUR LEGS BAD', b01: 'FIRST FACTORY', y01: 'THE YARD' },   // b01: spec 20's base mission; y01: the DEBUG tab's yard, a placeholder
