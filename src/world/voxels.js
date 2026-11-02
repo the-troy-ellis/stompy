@@ -29,7 +29,40 @@ const BEDROCK = 2;   // corners j <= 2 stay solid: 8 m of bedrock
 // A fill past this many corners is part of the land (held up); an island under SHATTER corners breaks up as it lands.
 export const ISLAND_MAX = 32768, SHATTER = 64, TORQUE_GROW = 12;   // TORQUE_GROW: the torque rule's check box, cells around a dig. All three the same metres as on the 8 m grid (spec 29)
 const LIST_MAX = 1 << 22;
-let MARK = null, LIST = null, STACK = null;   // the support check's scratch (groundApi islands)
+// The support and torque checks' scratch (groundApi islands, overhangs),
+// shared by every ground. It grows with what a check visits, never with the
+// map (docs/specs/35-bigger-maps.md part 2): the marks are a hash of corner
+// index to 1 (in this fill) or 2 (held up), cleared at once by a new
+// generation; LIST, every corner marked, doubles up to LIST_MAX as needed.
+let LIST = null, STACK = null, HK = null, HV = null, HS = null, HBITS = 0, HN = 0, GEN = 0;
+const scratch = () => {
+  if (LIST) return;
+  LIST = new Int32Array(1 << 14); STACK = new Int32Array(ISLAND_MAX + 8);
+  HBITS = 15; HK = new Int32Array(1 << HBITS); HV = new Uint8Array(1 << HBITS); HS = new Uint32Array(1 << HBITS);
+};
+const slot = o => Math.imul(o, 0x9E3779B1) >>> (32 - HBITS);   // the high bits of a multiplicative hash
+function markOf(o) {
+  const mask = (1 << HBITS) - 1;
+  for (let h = slot(o); HS[h] === GEN; h = (h + 1) & mask) if (HK[h] === o) return HV[h];
+  return 0;
+}
+function setMark(o, v) {
+  if (HN * 2 >= 1 << HBITS) growMarks();
+  const mask = (1 << HBITS) - 1;
+  let h = slot(o);
+  for (; HS[h] === GEN; h = (h + 1) & mask) if (HK[h] === o) { HV[h] = v; return; }
+  HS[h] = GEN; HK[h] = o; HV[h] = v; HN++;
+}
+function growMarks() {
+  const K = HK, V = HV, S = HS, n = K.length;
+  HBITS++; HK = new Int32Array(1 << HBITS); HV = new Uint8Array(1 << HBITS); HS = new Uint32Array(1 << HBITS);
+  const g = GEN; GEN = 1; HN = 0;
+  for (let i = 0; i < n; i++) if (S[i] === g) setMark(K[i], V[i]);
+}
+function clearMarks() { HN = 0; if (++GEN === 0xffffffff) { HS.fill(0); GEN = 1; } }
+const growList = () => { const L = new Int32Array(Math.min(LIST_MAX, LIST.length * 2)); L.set(LIST); LIST = L; };
+// The scratch's bytes now (tests: it never grows with the map).
+export const scratchBytes = () => (LIST ? LIST.byteLength + STACK.byteLength + HK.byteLength + HV.byteLength + HS.byteLength : 0);
 
 // Builds the ground for a seed and a mission definition. `def.ground` (all
 // optional): { landmarks: [...], strokes: [[op, x, y, z, r], ...], pockets }.
@@ -243,31 +276,33 @@ function groundApi(G) {
   function islands(b) {
     const i0 = clampN(b[0] - 1, 1, NX - 1), i1 = clampN(b[1] + 1, 1, NX - 1), j0 = clampN(b[2] - 1, BEDROCK + 1, NY - 1), j1 = clampN(b[3] + 1, BEDROCK + 1, NY - 1);
     const k0 = clampN(b[4] - 1, 1, NZ - 1), k1 = clampN(b[5] + 1, 1, NZ - 1), out = [];
-    // Typed scratch shared by every ground, no garbage per dig: MARK 1 is in
-    // this fill, 2 held up; LIST is every corner marked, cleared at the end.
-    if (!MARK) { MARK = new Uint8Array(PX * PY * PZ); LIST = new Int32Array(LIST_MAX); STACK = new Int32Array(ISLAND_MAX + 8); }
+    // The marks: 1 is in this fill, 2 held up; LIST is every corner marked.
+    scratch(); clearMarks();
     let nl = 0;
     seeds: for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const s0 = cornerIndex(i, j, k);
-      if (D[s0] <= 128 || MARK[s0]) continue;
+      if (D[s0] <= 128 || markOf(s0)) continue;
       if (nl > LIST_MAX - ISLAND_MAX - 8) break seeds;   // a huge check: the rest counts as held up
+      while (nl + ISLAND_MAX + 8 > LIST.length && LIST.length < LIST_MAX) growList();   // room for this whole fill
       const start = nl;
       let sp = 0, up = false;
-      MARK[s0] = 1; LIST[nl++] = s0; STACK[sp++] = s0;
+      setMark(s0, 1); LIST[nl++] = s0; STACK[sp++] = s0;
       while (sp && !up) {
         const o = STACK[--sp];
         for (let d = 0; d < 6; d++) {
-          const n = o + STEPS[d], m = MARK[n];
+          const n = o + STEPS[d];
+          if (D[n] <= 128) continue;   // air first: most neighbours, and no hash lookup
+          const m = markOf(n);
           if (m === 2) { up = true; break; }
-          if (m || D[n] <= 128) continue;
+          if (m) continue;
           if (((n / PX) | 0) % PY <= BEDROCK || nl - start >= ISLAND_MAX) { up = true; break; }
-          MARK[n] = 1; LIST[nl++] = n; STACK[sp++] = n;
+          setMark(n, 1); LIST[nl++] = n; STACK[sp++] = n;
         }
       }
       if (!up) out.push(LIST.slice(start, nl).sort());
-      for (let q = start; q < nl; q++) MARK[LIST[q]] = 2;
+      for (let q = start; q < nl; q++) setMark(LIST[q], 2);
     }
-    for (let q = 0; q < nl; q++) MARK[LIST[q]] = 0;
+    clearMarks();
     return out;
   }
   // Overhangs that can't hold their weight (spec 18 § the torque rule). In
@@ -285,7 +320,7 @@ function groundApi(G) {
   function overhangs(b, k, ratios, weighed) {
     const i0 = clampN(b[0] - TORQUE_GROW, 1, NX - 1), i1 = clampN(b[1] + TORQUE_GROW, 1, NX - 1), j0 = clampN(b[2] - TORQUE_GROW, BEDROCK + 1, NY - 1), j1 = clampN(b[3] + TORQUE_GROW, BEDROCK + 1, NY - 1);
     const k0 = clampN(b[4] - TORQUE_GROW, 1, NZ - 1), k1 = clampN(b[5] + TORQUE_GROW, 1, NZ - 1), out = [], air = new Map();
-    if (!MARK) { MARK = new Uint8Array(PX * PY * PZ); LIST = new Int32Array(LIST_MAX); STACK = new Int32Array(ISLAND_MAX + 8); }
+    scratch(); clearMarks();
     // The first air going up a column from bedrock: under it, the column is grounded.
     const firstAir = (i, kk) => {
       const c = i + PX * kk;
@@ -297,19 +332,20 @@ function groundApi(G) {
     let nl = 0;
     for (let kk = k0; kk <= k1; kk++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const s0 = cornerIndex(i, j, kk);
-      if (D[s0] <= 128 || MARK[s0] || grounded(s0)) continue;
+      if (D[s0] <= 128 || markOf(s0) || grounded(s0)) continue;
       if (nl > LIST_MAX - ISLAND_MAX - 8) break;
+      while (nl + ISLAND_MAX + 8 > LIST.length && LIST.length < LIST_MAX) growList();   // room for this whole fill
       const start = nl, cols = new Set();
       let sp = 0, big = false;
-      MARK[s0] = 1; LIST[nl++] = s0; STACK[sp++] = s0;
+      setMark(s0, 1); LIST[nl++] = s0; STACK[sp++] = s0;
       while (sp) {
         const o = STACK[--sp];
         for (let d = 0; d < 6; d++) {
           const n = o + STEPS[d];
-          if (MARK[n] || D[n] <= 128) continue;
+          if (D[n] <= 128 || markOf(n)) continue;
           if (grounded(n)) { cols.add(n % PX + PX * ((n / (PX * PY)) | 0)); continue; }
           if (nl - start >= ISLAND_MAX) { big = true; continue; }   // too big to weigh here: part of the land
-          MARK[n] = 1; LIST[nl++] = n; STACK[sp++] = n;
+          setMark(n, 1); LIST[nl++] = n; STACK[sp++] = n;
         }
       }
       if (big || !cols.size) continue;   // no attachments: an island, which the support fill drops
@@ -331,7 +367,7 @@ function groundApi(G) {
       }
       if (load > k * cols.size) out.push(LIST.slice(start, nl).sort());
     }
-    for (let q = 0; q < nl; q++) MARK[LIST[q]] = 0;
+    clearMarks();
     return out;
   }
   // An island comes down: cut out, dropped whole cells straight down to the
