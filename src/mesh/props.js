@@ -229,6 +229,31 @@ const BUILD = {
     box(b, 0, 0.05, 0, 0.36, 0.2, 0.36, C.ash);
     box(b, 0.2, 0.02, 0.2, 0.3, 0.06, 1.2, C.char, M.RY(0.6));
   },
+  // The machine shop (docs/specs/33-production.md): a shed with a steel roof
+  // and a stack, and out front, open, the press: two posts, a hazard head, the
+  // ram over a dark anvil, where each part is stamped.
+  shop: b => {
+    box(b, 0, 0, 0, 1.9, 0.04, 1.6, C.pad);
+    box(b, 0, 0.04, -0.35, 1.8, 0.66, 0.85, C.concrete);
+    box(b, 0, 0.7, -0.35, 1.86, 0.06, 0.92, C.steel);
+    box(b, 0.7, 0.7, -0.6, 0.12, 0.3, 0.12, C.rust);
+    for (const x of [-0.35, 0.35]) box(b, x, 0.04, 0.45, 0.12, 0.78, 0.12, C.steel);
+    box(b, 0, 0.82, 0.45, 0.9, 0.14, 0.24, C.hazard);
+    box(b, 0, 0.42, 0.45, 0.42, 0.36, 0.3, C.dark);
+    box(b, 0, 0.04, 0.45, 0.6, 0.08, 0.5, C.dark);
+  },
+  // The open assembly line: a long concrete pad (12 m by 40, along +z) under
+  // a gantry, two hazard rails on four posts and a bridge across them, and no
+  // roof or walls, so the mechs being made are in plain view.
+  line: b => {
+    box(b, 0, 0, 0, 0.8, 0.03, 2.66, C.concrete);
+    for (const x of [-0.38, 0.38]) {
+      for (const z of [-1.25, 1.25]) box(b, x, 0.03, z, 0.06, 0.92, 0.06, C.steel);
+      box(b, x, 0.93, 0, 0.07, 0.07, 2.6, C.hazard);
+    }
+    box(b, 0, 0.88, 0.35, 0.82, 0.06, 0.1, C.steel);
+    box(b, 0, 0.7, 0.35, 0.14, 0.18, 0.14, C.dark);
+  },
   // Ore spilled from a fallen silo (spec 33): a low mound of rusty lumps,
   // scaled by its radius every way (FLAT), so a small heap is low too.
   heap: b => {

@@ -1,4 +1,4 @@
-import { CONSTRUCT, BUILDINGS, PLACE, PLACE_ORDER, HEAP } from '../data/construct.js';
+import { CONSTRUCT, BUILDINGS, PLACE, PLACE_ORDER, HEAP, LINE } from '../data/construct.js';
 import { NAMES } from '../data/names.js';
 import { addEntity } from './entities.js';
 import { newMech } from './state.js';
@@ -8,6 +8,7 @@ import { viewYaw } from './geom.js';
 import { feel } from './feel.js';
 import { msg } from './effects.js';
 import { territory, inTerritory } from './territory.js';
+import { stepProduction } from './production.js';
 
 // The base (docs/specs/20-build-and-fight.md § Two buildings): a silo that
 // holds the base's ore and salvage, where a digger unloads; a factory that
@@ -35,7 +36,7 @@ export function initBase(G, def) {
   G.base = null;
   if (!def.base) return;
   const { x, z } = polar(def.base.silo), silo = addEntity(G, { ...BUILDINGS.silo, x, z, yaw: atan2(-x, -z), hp: CONSTRUCT.siloHp, id: 'silo' });
-  G.base = { ore: CONSTRUCT.startOre, salvage: 0, silo, silos: [silo], beacons: [], heaps: [], factory: null, bays: [], walls: [], pick: 0, sites: [], land: null, landT: 0 };
+  G.base = { ore: CONSTRUCT.startOre, salvage: 0, silo, silos: [silo], beacons: [], heaps: [], shops: [], lines: [], things: [], factory: null, bays: [], walls: [], pick: 0, sites: [], land: null, landT: 0 };
   silo.counted = true;
   survey(G);
 }
@@ -149,7 +150,8 @@ export function placeSite(G, f) {
     }
   } else {
     const e = rise(addEntity(G, { ...BUILDINGS[kind], x: f.x, z: f.z, yaw: f.yaw + Math.PI, hp: P.hp, ...(kind === 'factory' ? { id: 'factory' } : {}) }));   // its door or pad toward the digger
-    if (kind === 'factory') { e.job = null; b.factory = e; } else if (kind === 'silo') b.silos.push(e); else if (kind === 'beacon') b.beacons.push(e); else b.bays.push(e);
+    if (kind === 'factory') { e.job = null; b.factory = e; } else if (kind === 'silo') b.silos.push(e); else if (kind === 'beacon') b.beacons.push(e);
+    else if (kind === 'shop') { e.press = null; b.shops.push(e); } else if (kind === 'line') { e.bays = new Array(LINE.bays).fill(null); e.queue = []; b.lines.push(e); } else b.bays.push(e);
   }
   return site;
 }
@@ -227,6 +229,7 @@ export function stepBase(G, dt) {
   spill(G);
   scoopHeaps(G);
   if ((b.landT -= dt) <= 0) { b.landT = 0.25; survey(G); }
+  stepProduction(G, dt);   // shops press parts, lines put mechs together (spec 33)
   // Sites (spec 23): ore tips in, and each rises as far as it's built. A
   // wall's slabs share one and come up together; a site with none of its
   // parts standing is gone, and its ore with it.

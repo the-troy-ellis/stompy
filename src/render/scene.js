@@ -26,6 +26,9 @@ import { SCORCH_MAX } from '../sim/effects.js';
 import { propInto } from '../mesh/props.js';
 import { batchEntities, clearProps, makePropBatches } from './propBatch.js';
 import { WEAPONS } from '../data/weapons.js';
+import { PARTS } from '../data/construct.js';
+import { CHASSIS } from '../data/chassis.js';
+import { thingAt } from '../sim/production.js';
 
 // Every matrix the renderer builds comes from a per-frame arena (render() resets
 // it), so drawing allocates no matrices; apply, persp and lookAt are M's own.
@@ -268,6 +271,7 @@ export function createScene(app) {
     const g = geoOf(m), back = mul(fwd, -1);
     if (R.skinned && !grab) BONES.fill(0);   // a part that isn't drawn this frame keeps a zero matrix
     putTint = tint;
+    const show = m.show ?? 4;   // a mech on an assembly line: legs (1), body (2), core (3), arms (4) (sim/production.js)
     if (!armsOnly) put(BONE.hip, parts.hip, chain(BH, M.T(0, g.hip, 0)));
     const hull = M.apply(B, [0, g.hip, 0]);
     // Legs reach for wherever the feet actually are; the knee bends forward,
@@ -298,9 +302,9 @@ export function createScene(app) {
     const spin = spinPose(m);   // a digger's arms turning like a paddle wheel, DIG held (sim/tools.js)
     const TB = chain(B, M.T(0, g.torsoY + (m.torsoDrop || 0), 0), M.S(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5), M.RY(m.twist + (fists ? fists.twist : 0)), M.T(0, 0, pose.lunge), M.RX(wp - pose.lean + (m.torsoNod || 0) + (m.runLean || 0)), M.RZ(wr));   // torsoDrop, torsoNod: the pendulum body; runLean: a run's lean forward (sim/gait.js)
     if (DARK > 0.05 && parts.lamps) { const l = m.lampAt || (m.lampAt = [[0, 0, 0], [0, 0, 0]]); placeInto(TB, parts.lamps[0], l[0]); placeInto(TB, parts.lamps[1], l[1]); }   // the headlamps, drawn after the run
-    if (!armsOnly) put(BONE.torso, parts.torso, TB);
+    if (!armsOnly && show >= 2) put(BONE.torso, parts.torso, TB);
     for (const [s, k, side] of [[1, 'LA', 0], [-1, 'RA', 1]]) {
-      if (m.hp[k] <= 0) continue;
+      if (m.hp[k] <= 0 || show < 4) continue;
       // Fists follow the aim only a little; guns follow it all the way.
       // From the cockpit the shoulders are drawn in and forward of the eye (COCKPIT_ARMS), so the
       // buckets sweep up through the windscreen's lower corners: the arms sit beside the cab, out of view.
@@ -406,6 +410,24 @@ export function createScene(app) {
         if (!parts || !parts[d.part] || !seen(d.p[0], d.p[1], d.p[2], 5 * d.scale)) continue;
         R.draw(parts[d.part], chain(M.T(...d.p), M.RY(d.rot[1]), M.RX(d.rot[0]), M.RZ(d.rot[2]), M.S(d.scale)), [0.6, 0.58, 0.56]);   // at the end it sinks (sim/effects.js)
       }
+  }
+  // Parts (docs/specs/33-production.md § Physical things): each in its pile or
+  // on its hauler's back, drawn with the mesh of the mech PARTS shows it on:
+  // a pair of legs stood up, a body on the ground, an arm laid down.
+  const PART_TINT = [0.9, 0.88, 0.85];
+  function drawThings() {
+    for (const t of G.base?.things || []) {
+      const P = PARTS[t.part], parts = R.mechParts[P.show], sc = CHASSIS[P.show].scale, [x, z] = thingAt(G, t);
+      if (!parts) continue;
+      const y = t.by ? t.by.y + 2.4 * t.by.ch.scale : G.ter.height(x, z), yaw = t.by ? t.by.yaw : (t.at?.yaw || 0);
+      if (!seen(x, y + 2, z, 6 * sc)) continue;
+      const base = chain(M.T(x, y, z), M.RY(yaw), M.S(sc));
+      if (P.kind === 'legs') for (const sx of [-0.8, 0.8]) {
+        R.draw(parts.lleg, chain(base, M.T(sx, 2.6, 0)), PART_TINT);
+        R.draw(parts.foot, chain(base, M.T(sx, 0, 0)), PART_TINT);
+      } else if (P.kind === 'body') R.draw(parts.torso, base, PART_TINT);
+      else { const arm = chain(base, M.T(0, 0.6, -1.5), M.RX(PI / 2)); R.draw(parts.arm, arm, PART_TINT); if (parts.fist) R.draw(parts.fist, arm, PART_TINT); }
+    }
   }
   // A wreck: the torso, hip and one leg's two halves in a heap; skinned, one
   // draw on the mech's own mesh with the other bones left at zero.
@@ -724,6 +746,7 @@ export function createScene(app) {
     const shown = m => (m.alive || m.dying) && (m !== P || gd || G.state === 'menu' || G.state === 'edit' || walkCam) && seen(m.x, m.y + 6 * m.ch.scale, m.z, (m.dying ? 16 : 10) * m.ch.scale);
     if (R.skinned) R.beginSkinned();
     for (const m of G.mechs) if (shown(m)) drawMech(m);
+    for (const line of G.base?.lines || []) for (const j of line.bays || []) if (j?.shell.show && seen(j.shell.x, j.shell.y + 5, j.shell.z, 12)) drawMech(j.shell);   // mechs being made (sim/production.js)
     R.drawHeat = 0.45;
     for (const w of G.wrecks) if (seen(w.x, w.y + 2 * w.scale, w.z, 9 * w.scale)) drawWreck(w);
     R.drawHeat = 1;
@@ -733,6 +756,7 @@ export function createScene(app) {
     for (const w of G.wrecks) if (w.t < WRECK_BURN && seen(w.x, w.y + 2 * w.scale, w.z, 9 * w.scale)) drawBurn(w);
     for (const m of G.mechs) if (shown(m)) drawFlash(m);
     drawRemains();
+    drawThings();
     drawLanding();
     drawEntities(eye);
     drawShotsAndBeams(eye, gd);
