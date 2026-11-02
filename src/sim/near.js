@@ -49,7 +49,6 @@ const usable = G => G.near?.on && G.near.list === G.mechs;
 function all(G, out) {
   const M = G.mechs;
   for (let i = 0; i < M.length; i++) out[i] = M[i];
-  out.length = M.length;
   return M.length;
 }
 
@@ -64,33 +63,36 @@ function gather(G, x0, z0, x1, z1, keep, out) {
   for (let a = 1; a < k; a++) { const v = idx[a]; let b = a - 1; while (b >= 0 && idx[b] > v) { idx[b + 1] = idx[b]; b--; } idx[b + 1] = v; }   // squares visited row by row: back into G.mechs order (a handful; no garbage)
   for (let j = 0; j < k; j++) out[j] = M[idx[j]];
   for (let i = N.count; i < M.length; i++) out[k++] = M[i];   // added this frame: not in the grid
-  out.length = k;
-  return k;
+  return k;   // out keeps its length (shrinking it would only make it grow again): read the first k
 }
 
 // The mechs whose middle may be within `r` m of (x, z) on the ground: fills
-// `out` (the caller's own array, reused) and returns how many. Callers add
+// the start of `out` (the caller's own array, reused) and returns how many;
+// what's past that is stale. Callers add
 // nearRadius(G) when they measure to a mech's side, not its middle.
-let qx = 0, qz = 0, qr2 = 0;
-const inCircle = m => { const dx = m.x - qx, dz = m.z - qz; return dx * dx + dz * dz <= qr2; };
+// The query's numbers live in a typed array: a module-level `let` holding a
+// fraction is a boxed number, a new one every time it's set (spec 34 part 4).
+const Q = new Float64Array(3);   // the circle: x, z, r²
+const inCircle = m => { const dx = m.x - Q[0], dz = m.z - Q[1]; return dx * dx + dz * dz <= Q[2]; };
 export function mechsNear(G, x, z, r, out) {
   if (!usable(G)) return all(G, out);
   const R = r + NEAR_PAD;
-  qx = x; qz = z; qr2 = R * R;
+  Q[0] = x; Q[1] = z; Q[2] = R * R;
   return gather(G, x - R, z - R, x + R, z + R, inCircle, out);
 }
 
 // The mechs whose middle may be within `pad` m of the segment (x0, z0) to
 // (x1, z1) on the ground: a shot's step, a beam. Fills `out`, returns how many.
-let sx = 0, sz = 0, sdx = 0, sdz = 0, sl2 = 0, sp2 = 0;
+const S = new Float64Array(6);   // the segment: x0, z0, dx, dz, |d|², pad²
 const nearSeg = m => {
-  const ax = m.x - sx, az = m.z - sz, t = sl2 > 0 ? Math.max(0, Math.min(1, (ax * sdx + az * sdz) / sl2)) : 0;
-  const ex = ax - sdx * t, ez = az - sdz * t;
-  return ex * ex + ez * ez <= sp2;
+  const ax = m.x - S[0], az = m.z - S[1], dx = S[2], dz = S[3], l2 = S[4], t = l2 > 0 ? Math.max(0, Math.min(1, (ax * dx + az * dz) / l2)) : 0;
+  const ex = ax - dx * t, ez = az - dz * t;
+  return ex * ex + ez * ez <= S[5];
 };
 export function mechsAlong(G, x0, z0, x1, z1, pad, out) {
   if (!usable(G)) return all(G, out);
   const P = pad + NEAR_PAD;
-  sx = x0; sz = z0; sdx = x1 - x0; sdz = z1 - z0; sl2 = sdx * sdx + sdz * sdz; sp2 = P * P;
+  const dx = x1 - x0, dz = z1 - z0;
+  S[0] = x0; S[1] = z0; S[2] = dx; S[3] = dz; S[4] = dx * dx + dz * dz; S[5] = P * P;
   return gather(G, Math.min(x0, x1) - P, Math.min(z0, z1) - P, Math.max(x0, x1) + P, Math.max(z0, z1) + P, nearSeg, out);
 }

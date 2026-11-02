@@ -112,3 +112,12 @@ export function boxVisible(planes, lo, hi) {
   }
   return true;
 }
+
+// Drop the items `keep` says no to, in place, in order (no new array: the
+// sim's per-frame lists, docs/specs/34-big-fights.md part 4). Returns `a`.
+export function keepIf(a, keep) {
+  let n = 0;
+  for (let i = 0; i < a.length; i++) if (keep(a[i])) a[n++] = a[i];
+  a.length = n;
+  return a;
+}

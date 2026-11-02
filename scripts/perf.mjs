@@ -118,14 +118,17 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   buffers, ~19-22 MB everywhere; heapMB, the JS heap plus typed arrays, ~58
 //   MB until the first dig asks what falls (its 25 MB mark grid) and the
 //   fights' wrecks, ~100 MB after.
+// Less garbage in the sim (spec 34 part 4: muzzles and eyes from scratch
+//   matrices, steering in place, lists compacted in place): bench-fight 180
+//   KB (201), bench-deaths 219 (234); their budgets come down to that plus ~20%.
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
   menu:           { meanDraws: 14, peakDraws: 14, tris: 86000, allocKB: 38, gpuMB: 24, heapMB: 64 },   // the menu's 60 frames are too few for drawWorld to be optimized, so its sums box a little
   'free-start':   { meanDraws: 22, peakDraws: 22, tris: 109000, allocKB: 125, gpuMB: 24, heapMB: 67 },
   'bench-walk':   { meanDraws: 27, peakDraws: 29, tris: 102000, allocKB: 150, gpuMB: 23, heapMB: 67 },
   'bench-run':    { meanDraws: 27, peakDraws: 43, tris: 90500, allocKB: 120, gpuMB: 23, heapMB: 68 },
-  'bench-fight':  { meanDraws: 68, peakDraws: 92, tris: 91500, allocKB: 270, gpuMB: 23, heapMB: 116 },   // craters make fine patches (spec 27)
-  'bench-deaths': { meanDraws: 91, peakDraws: 98, tris: 87500, allocKB: 340, gpuMB: 25, heapMB: 116 },
+  'bench-fight':  { meanDraws: 68, peakDraws: 92, tris: 91500, allocKB: 220, gpuMB: 23, heapMB: 116 },   // craters make fine patches (spec 27)
+  'bench-deaths': { meanDraws: 91, peakDraws: 98, tris: 87500, allocKB: 265, gpuMB: 25, heapMB: 116 },
   'bench-wrecks': { meanDraws: 91, peakDraws: 113, tris: 90500, allocKB: 285, gpuMB: 25, heapMB: 116 },
   'bench-away':   { meanDraws: 43, peakDraws: 102, tris: 110000, allocKB: 200, gpuMB: 25, heapMB: 116 },
   'bench-dig':    { meanDraws: 23, peakDraws: 24, tris: 99500, allocKB: 140, gpuMB: 25, heapMB: 116 },   // three digs: the main thread only copies corners out and uploads what comes back; each makes a fine patch (spec 27)

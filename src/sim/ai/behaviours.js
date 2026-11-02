@@ -156,6 +156,8 @@ export const ridge = (G, e, ctx, dt, { relocate = 0 } = {}) => {
 export const brawler = (G, e, ctx) => ({ moveYaw: ctx.toYaw, thr: ctx.dist > ctx.reachE * 0.8 ? 1 : 0 });
 
 // --- shapers ---------------------------------------------------------------
+// Each changes the out it is given and returns it: the driver's out is a new
+// object every call, so no shaper copies it (spec 34 part 4).
 
 // Heavies advance together: no faster than the slowest ally within 150 m.
 export const holdLine = (G, e, ctx, out) => {
@@ -167,11 +169,12 @@ export const holdLine = (G, e, ctx, out) => {
     if (o === e || o.team !== e.team || !o.alive) continue;
     if (hypot(o.x - e.x, o.z - e.z) <= B.lineRange) slowest = min(slowest, top(o));
   }
-  return slowest < top(e) ? { ...out, thr: min(out.thr, slowest / top(e)) } : out;
+  if (slowest < top(e)) out.thr = min(out.thr, slowest / top(e));   // in place: every driver's out is its own (spec 34 part 4)
+  return out;
 };
 
 // Turn for home well before the fence.
-export const avoidEdge = (G, e, ctx, out) => (abs(e.x) > BOUND - 60 || abs(e.z) > BOUND - 60 ? { ...out, moveYaw: atan2(-e.x, -e.z) } : out);
+export const avoidEdge = (G, e, ctx, out) => { if (abs(e.x) > BOUND - 60 || abs(e.z) > BOUND - 60) out.moveYaw = atan2(-e.x, -e.z); return out; };
 
 // Steer around an ally that is close and ahead; the collision pass only
 // separates once they touch.
@@ -184,7 +187,8 @@ export const avoidAllies = (G, e, ctx, out) => {
     if (d > gap) continue;
     const rel = wrapA(atan2(dx, dz) - out.moveYaw);
     if (abs(rel) > PI / 2) continue;   // behind: not in the way
-    return { ...out, moveYaw: out.moveYaw - Math.sign(rel || 1) * 0.7 * (1 - d / gap) - Math.sign(rel || 1) * 0.3 };
+    out.moveYaw = out.moveYaw - Math.sign(rel || 1) * 0.7 * (1 - d / gap) - Math.sign(rel || 1) * 0.3;
+    return out;
   }
   return out;
 };
