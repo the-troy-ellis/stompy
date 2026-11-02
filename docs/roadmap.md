@@ -376,6 +376,11 @@ six parts.
 - **Built:** all six parts of spec 33 (part 6 in two: mission bases, then
   the editor).
 
+Then big fights ([specs/34-big-fights.md](specs/34-big-fights.md)): the
+sim's cost grows in step with the mechs, not faster, so a phone holds its
+frame in a big battle. Measured in a crowd scene first, then a grid of the
+mechs, far foes thinking less often, and no garbage in the sim's hot loops. In four parts.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
