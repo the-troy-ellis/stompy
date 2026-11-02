@@ -75,8 +75,11 @@ try {
     if (!(diff[0] === 'hard' && diff[1] === 'hard')) { failed = true; console.error('FAIL: the difficulty picker did not reach the game'); }
     if (diff[2] !== 'kestrel') { failed = true; console.error(`FAIL: HEAVY on a fresh save should fall back to KESTRELs, with no heavy unlocked yet (${diff[2]})`); }
     const x0 = await page.evaluate(() => [window.__stompy.game.player.x, window.__stompy.game.player.z, window.__stompy.game.frame]);
+    // W held for at least 2.5 s and until the mech is 5 m on (up to 15 s): a
+    // slow runner draws only ~20 frames in 2.5 s, and the mech walks by frames.
     await page.keyboard.down('KeyW');
     await page.waitForTimeout(2500);
+    await page.waitForFunction(([x, z]) => { const p = window.__stompy.game.player; return Math.hypot(p.x - x, p.z - z) > 5.5; }, x0, { timeout: 12500 }).catch(() => {});
     await page.keyboard.up('KeyW');
     const x1 = await page.evaluate(() => [window.__stompy.game.player.x, window.__stompy.game.player.z, window.__stompy.game.frame]);
     const moved = Math.hypot(x1[0] - x0[0], x1[1] - x0[1]);
