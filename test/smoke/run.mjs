@@ -75,8 +75,11 @@ try {
     if (!(diff[0] === 'hard' && diff[1] === 'hard')) { failed = true; console.error('FAIL: the difficulty picker did not reach the game'); }
     if (diff[2] !== 'kestrel') { failed = true; console.error(`FAIL: HEAVY on a fresh save should fall back to KESTRELs, with no heavy unlocked yet (${diff[2]})`); }
     const x0 = await page.evaluate(() => [window.__stompy.game.player.x, window.__stompy.game.player.z, window.__stompy.game.frame]);
+    // W held for at least 2.5 s and until the mech is 5 m on (up to 15 s): a
+    // slow runner draws only ~20 frames in 2.5 s, and the mech walks by frames.
     await page.keyboard.down('KeyW');
     await page.waitForTimeout(2500);
+    await page.waitForFunction(([x, z]) => { const p = window.__stompy.game.player; return Math.hypot(p.x - x, p.z - z) > 5.5; }, x0, { timeout: 12500 }).catch(() => {});
     await page.keyboard.up('KeyW');
     const x1 = await page.evaluate(() => [window.__stompy.game.player.x, window.__stompy.game.player.z, window.__stompy.game.frame]);
     const moved = Math.hypot(x1[0] - x0[0], x1[1] - x0[1]);
@@ -673,8 +676,14 @@ try {
     await page.waitForTimeout(400);
     const P = () => page.evaluate(() => { const g = window.__stompy.game, p = g.player; return { thr: p.throttle, twist: p.twist, yaw: p.yaw, heat: p.heat, paused: g.paused, tui: !document.querySelector('.touch-ui').hidden }; });
     const s0 = await P();
+    // Held until the stick has done its work (at least as long as before), not
+    // for a fixed time: a slow runner's frames come further apart, and a
+    // fixed 900 ms once left the throttle at 0.49 of the 0.5 asked for.
+    const until = (fn, arg) => page.waitForFunction(fn, arg, { timeout: 5000 }).catch(() => {});
     await hold(() => window.__pad.axis(1, -1), 900);   // left stick up: throttle
+    await until(t => window.__stompy.game.player.throttle > t + 0.55, s0.thr);
     await hold(() => { window.__pad.axis(1, 0); window.__pad.axis(0, -1); window.__pad.axis(2, 1); }, 500);   // legs left, torso right
+    await until(([y, w]) => { const p = window.__stompy.game.player; return p.yaw - y > 0.15 && p.twist - w < -0.3; }, [s0.yaw, s0.twist]);
     await page.evaluate(() => { window.__pad.axis(0, 0); window.__pad.axis(2, 0); });
     const s1 = await P();
     await hold(() => window.__pad.set(7, true), 700);   // RT: the energy weapons

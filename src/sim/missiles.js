@@ -9,6 +9,7 @@ import { damageEntity, solid } from './entities.js';
 import { FEEL } from '../data/feel.js';
 import { sendsFx } from './hitqueue.js';
 import { dig } from './dig.js';
+import { mechsNear, nearRadius } from './near.js';
 
 const { atan2, hypot, max } = Math;
 
@@ -81,8 +82,11 @@ export function endGuide(G, detonate) {
 // Splash: anything within BLAST_R takes damage falling off with distance,
 // on the side facing the blast. Not the mech it hit directly (that took
 // the full hit), and never the mech that fired it.
+const BY = [];
 export function blast(G, p, dmg, owner, direct) {
-  for (const m of G.mechs) {
+  const k = mechsNear(G, p[0], p[2], BLAST_R + nearRadius(G), BY);   // spec 34: only the mechs nearby
+  for (let j = 0; j < k; j++) {
+    const m = BY[j];
     if (!m.alive || m === owner || m === direct) continue;
     const g = geoOf(m), R = g.radius * m.ch.scale, top = m.y + g.height * m.ch.scale;
     const hx = p[0] - m.x, hz = p[2] - m.z, hd = hypot(hx, hz);

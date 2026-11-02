@@ -23,7 +23,7 @@ import { shiftMech } from '../src/sim/walkView.js';
 
 export const SIZES = [12, 25, 50, 100];
 // At 50 foes, today's counts plus ~15% (spec 34 lowers them part by part).
-export const CROWD_BUDGETS = { rays: 70, pairs: 13100 };   // main at spec 34: 60 and 11,356
+export const CROWD_BUDGETS = { rays: 70, pairs: 2750 };   // main at spec 34: 60 and 11,356 mech reads; the grid (part 2): 2,391
 
 const DT = 1 / 60, WARM = 120, FRAMES = 300;
 const FOES = ['jackal', 'jackal', 'kestrel', 'jackal', 'warden'];

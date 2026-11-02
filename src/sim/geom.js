@@ -1,6 +1,7 @@
 import { M, add, chain, mul, sub, len } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { sceneryAlong } from './entities.js';
+import { mechsAlong, nearRadius } from './near.js';
 
 const { sqrt } = Math;
 
@@ -51,10 +52,12 @@ export function rayTerrain(G, o, d, maxT) {
 }
 // Structures and vehicles are cylinders too (entities.js); a nav point has no body.
 export function rayEnt(o, d, e) { return rayUpright(o, d, e.x, e.y, e.z, e.radius, e.height); }
-const NEAR = [];
+const NEAR = [], BY = [];
 export function rayHit(G, o, d, maxT, ignore) {
   let bt = Infinity, bm = null, be = null;
-  for (const m of G.mechs) {
+  const k = mechsAlong(G, o[0], o[2], o[0] + d[0] * maxT, o[2] + d[2] * maxT, nearRadius(G), BY);   // spec 34: only the mechs along it
+  for (let j = 0; j < k; j++) {
+    const m = BY[j];
     if (!m.alive || m === ignore) continue;
     const t = rayCyl(o, d, m);
     if (t != null && t <= maxT && t < bt) { bt = t; bm = m; be = null; }

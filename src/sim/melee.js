@@ -10,6 +10,7 @@ import { hitQueue, sendFx } from './hitqueue.js';
 import { feel } from './feel.js';
 import { fxPunch } from '../net/protocol.js';
 import { damageEntity, solid, sceneryNear } from './entities.js';
+import { mechsNear, nearRadius } from './near.js';
 
 const { atan2, hypot, sin, cos } = Math;
 
@@ -42,12 +43,14 @@ export function meleeGhost(m, dt, pu) {
   if (m.melee.t >= def.windup + def.recover) m.melee = null;
 }
 
-const NEAR = [];
+const NEAR = [], BY = [];
 // The mech this one's swing would land on right now, or null.
 export function meleeTarget(G, m) {
   const def = meleeOf(m), c = center(m), facing = viewYaw(m), reach = def.reach * m.ch.scale;
   let best = null, bestD = Infinity;
-  for (const t of G.mechs) {
+  const k = mechsNear(G, m.x, m.z, reach + nearRadius(G), BY);   // spec 34: only the mechs nearby
+  for (let j = 0; j < k; j++) {
+    const t = BY[j];
     if (t === m || !t.alive) continue;
     const dx = t.x - m.x, dz = t.z - m.z, d = hypot(dx, dz) - geoOf(t).radius * t.ch.scale;
     if (d > reach || d >= bestD) continue;
@@ -116,8 +119,9 @@ export function meleeTick(G, m, dt) {
 export function tryStomp(G, m, airT) {
   const def = meleeOf(m);
   if (airT < def.stompAir) return null;
-  const gm = geoOf(m), rm = gm.radius * m.ch.scale;
-  for (const t of G.mechs) {
+  const gm = geoOf(m), rm = gm.radius * m.ch.scale, k = mechsNear(G, m.x, m.z, (rm + nearRadius(G)) * 1.2, BY);
+  for (let j = 0; j < k; j++) {
+    const t = BY[j];
     if (t === m || !t.alive) continue;
     const gt = geoOf(t), top = t.y + gt.height * t.ch.scale, dx = t.x - m.x, dz = t.z - m.z, hd = hypot(dx, dz);
     // Feet passing through the top of the target this frame, and over it.
