@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | parts 1 to 3 and part 4's first half built (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
+| Status | parts 1 to 4 built (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
 | Milestone | M14 (proposed), with [32-base-loop.md](32-base-loop.md) |
 | Size | L, split in six (§ Build order) |
 | Depends on | [20-build-and-fight.md](20-build-and-fight.md) (silo, factory, raids); [21-mining.md](21-mining.md) (seams, haulers); [22-command-view.md](22-command-view.md) (the map); [23-construction-sites.md](23-construction-sites.md) and [31-builder.md](31-builder.md) (sites, builders); [32-base-loop.md](32-base-loop.md) (raids from above, ENDLESS, lodes) |
@@ -515,7 +515,6 @@ A parked hauler picks a job in this order (`miner.js` `haul`, extended):
     the haulers.
   - A foe's or nobody's buildings are marked with their name and `· DOWN`,
     and a yellow up arrow over each one CARRY could take.
-- **Not yet (part 4b):** foes stealing yours by difficulty; `Shop lost.`
 - **New text:** `Building down.`, `Lifting.`, `DROPPED`,
   `Taken. It's ours now.`, `CARRY`, `YOURS HERE`, `OUTSIDE YOUR BORDER`,
   `· DOWN`.
@@ -527,6 +526,44 @@ A parked hauler picks a job in this order (`miner.js` `haul`, extended):
   - Two haulers carrying a shop home and taking it.
   - One hauler being too few, and a hauler lost on the way dropping it.
   - Setting down outside your border.
+
+### Part 4b: foes steal by difficulty
+
+- **The row** (`data/ai.js` `DIFF[...].steal`):
+  - EASY never.
+  - NORMAL every third raid: 2 haulers, no knocking down, a hit sends them
+    running, and the voice warns (`Haulers with that raid.`).
+  - HARD every raid: as many as the biggest exposed building takes (2 to
+    4), the raid knocks down for them, a hit doesn't stop them, no
+    warning.
+  - A mission's `steal: 'hard'` overrides the difficulty.
+- **Thieves** (`waves.js` `spawnWave` with `raid: true` asks `thievesFor`;
+  `steal.js` `thieve` runs them instead of the foes' brain):
+  - Each goes for the nearest building of yours it and its raid's other
+    thieves can lift: down, outside your territory, and needing no more of
+    them than there are. They CARRY it, as your haulers do, to where they
+    came from.
+  - Arrived, it's gone: off the base's lists, no wreck, its pile left
+    loose where it stood, and the voice says `Machine shop lost.` (its kind's
+    name). They walk off the map.
+  - Hit on NORMAL, they drop it and run.
+  - With nothing to take they trail the nearest raider; with none left,
+    they go home.
+- **HARD raids** (`raid.js` `raidTarget`): the nearest exposed building
+  first, and never one that's down, so it's left at a quarter for the
+  thieves. Raids at any difficulty now count shops, plants and lines among
+  the buildings they go for.
+- **Not yet:** thieves look like your haulers (yellow); the map shows them
+  red, as foes.
+- **New text:** `Haulers with that raid.`, `Machine shop lost.` (and so on by
+  kind).
+- **Tests** (`thieves.test.js`):
+  - The row by difficulty.
+  - A shop that's down and exposed carried off and lost.
+  - One inside your territory left alone.
+  - Hit on NORMAL they drop it and run; on HARD they keep at it.
+  - HARD raiders going for an exposed building and leaving it once it's
+    down.
 
 ## Code touchpoints
 

@@ -1,11 +1,14 @@
 // AI numbers that are not balance (docs/specs/05-ai.md). Difficulty scales
 // skill, never stats; `G.diff` picks the row (the setting lives in prefs.diff
 // and the match copies it). `react` is the pause between first sight and
-// doing anything about it.
+// doing anything about it. `steal` (docs/specs/33-production.md § What foes
+// do): foe haulers come with every `every`th raid (0: never), `most` of them;
+// `knock`, the raid knocks an exposed building down for them first; `back`,
+// hit, they drop it and come back for it, not run; `warn`, the voice says so.
 export const DIFF = {
-  easy: { label: 'EASY', sight: 400, heatCap: 60, aimErr: 1.4, sections: false, react: 1.5 },
-  normal: { label: 'NORMAL', sight: 600, heatCap: 72, aimErr: 1.0, sections: false, react: 0.8 },
-  hard: { label: 'HARD', sight: 800, heatCap: 85, aimErr: 0.7, sections: true, react: 0.3 },
+  easy: { label: 'EASY', sight: 400, heatCap: 60, aimErr: 1.4, sections: false, react: 1.5, steal: { every: 0 } },
+  normal: { label: 'NORMAL', sight: 600, heatCap: 72, aimErr: 1.0, sections: false, react: 0.8, steal: { every: 3, most: 2, knock: false, back: false, warn: true } },
+  hard: { label: 'HARD', sight: 800, heatCap: 85, aimErr: 0.7, sections: true, react: 0.3, steal: { every: 1, most: 4, knock: true, back: true, warn: false } },
 };
 export const DIFF_ORDER = ['easy', 'normal', 'hard'];
 
