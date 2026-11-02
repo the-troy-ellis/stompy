@@ -152,7 +152,7 @@ export function createScene(app) {
   // A chunk is drawn when its box is in view and some of it is nearer than the fog's end.
   const ID = M0.id(), SUNK = M0.T(0, -2, 0);   // the ground is drawn where it is; its far groups a little lower (render/ground.js)
   function drawWorld(eye) {
-    ground.tick(eye, G.falls);
+    ground.tick(eye, G.falls, !G.command);   // up in the map view: no new near ground (render/ground.js)
     ground.draw(eye, FOG[1], PLANES, ID, SUNK);
     if (!world.buf) return;
     RUN.buf = world.buf; RUN.count = 0;
@@ -796,5 +796,5 @@ export function createScene(app) {
 
 
   const view = { get W() { return W; }, get H() { return H; }, get dpr() { return dpr; } };
-  return { resize, render, uploadWorld, view, poseWire, groundReady: () => ground.ready(), groundPending: ground.pending };
+  return { resize, render, uploadWorld, view, poseWire, groundReady: () => ground.ready(), groundPending: ground.pending, groundHeld: ground.held };
 }

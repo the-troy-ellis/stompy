@@ -13,7 +13,10 @@ import { FS } from '../world/finePatch.js';
 // right around you when a world loads is meshed at once, and without a worker
 // the queue is meshed here, a couple of ms a frame. A dig marks chunks dirty
 // (world/voxels.js), and they and the far meshes over them are meshed again.
-const LOD_AT = 300, NEAR_NOW = 200, BUDGET_MS = 2, SEND_MAX = 32, G2 = 4, GX = Math.ceil(CX / G2), GZ = Math.ceil(CZ / G2), SIZE = CS * VS * G2;
+// A group's chunks are let go again past LET_GO, so what's on the GPU stays
+// what's round you; the map (`fetch` false) takes no new ones at all: from
+// above it draws far meshes, and near ones only where they're already up.
+const LOD_AT = 300, NEAR_NOW = 200, LET_GO = 600, BUDGET_MS = 2, SEND_MAX = 32, G2 = 4, GX = Math.ceil(CX / G2), GZ = Math.ceil(CZ / G2), SIZE = CS * VS * G2;
 const FAR = 1 << 16;   // a job id at or past this is a group's far mesh
 const plain = (p, seed) => ({ low: p.low, mid: p.mid, high: p.high, rock: p.rock, ore: p.ore, iso: p.iso, seed });   // seed: where the seams run (world/seams.js)
 const groupDist = (g, eye) => {   // from eye to the group's square, flat
@@ -110,7 +113,7 @@ export function createGround(R) {
 
   // Each frame, before drawing: what the sim dug, what came near, then send or mesh some, then upload.
   let lastEye = [0, 0, 0];
-  function tick(eye, falls = []) {
+  function tick(eye, falls = [], fetch = true) {
     falling = falls;
     if (!ground) return;
     lastEye = eye;
@@ -132,8 +135,9 @@ export function createGround(R) {
       added = true;
     }
     for (let gi = 0; gi < groups.length; gi++) {
-      const gr = groups[gi];
-      if (!gr.wanted && groupDist(gi, eye) < LOD_AT + 64) { gr.wanted = true; for (const id of CHUNKS_OF[gi]) want(id); added = true; }
+      const gr = groups[gi], d = groupDist(gi, eye);
+      if (fetch && !gr.wanted && d < LOD_AT + 64) { gr.wanted = true; for (const id of CHUNKS_OF[gi]) want(id); added = true; }
+      else if (fetch && gr.wanted && d > LET_GO) letGo(gi);
     }
     if (added) queue.sort(byDistance(eye));
     if (queue.length) {
@@ -152,6 +156,19 @@ export function createGround(R) {
     upload();
     tickPatches(eye);
   }
+
+  // A group gone far: its chunks off the GPU and forgotten (a job for one in
+  // the worker comes back stale and is dropped), so it's drawn far again and
+  // meshed afresh if it comes near.
+  function letGo(gi) {
+    const gr = groups[gi];
+    gr.wanted = false; gr.left = 0;
+    for (const id of CHUNKS_OF[gi]) { if (waiting[id]) { ver[id]++; waiting[id] = 0; } mesh[id] = null; }
+    queue = queue.filter(id => id >= FAR || chunkGroup(id) !== gi);
+    if (gr.near.buf) gl.deleteBuffer(gr.near.buf);
+    gr.near = newPart();
+  }
+  const held = () => groups.filter(g => g.wanted).length;   // groups with their chunks up (the perf harness and a test read it)
 
   // Fine patches (world/finePatch.js, docs/specs/27-fine-dig.md): each meshed
   // whole at 2 m in the worker (here without one), at most 10 times a second
@@ -289,5 +306,5 @@ export function createGround(R) {
     while (queue.length || inFlight) { await new Promise(r => setTimeout(r, 5)); tick(eye); }
   }
   const pending = () => queue.length + inFlight;
-  return { load, tick, draw, ready, pending };
+  return { load, tick, draw, ready, pending, held };
 }
