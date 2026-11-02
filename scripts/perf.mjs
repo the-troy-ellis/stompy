@@ -114,21 +114,26 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 //   cost is draw calls, not polygons); to be checked on a mid phone.
 // Your digger's arms from its cockpit (spec 30): the scoop scene's draws
 //   19/21 (15/17): two arms and two buckets, drawn as parts.
+// What each scene holds at its end (spec 34 part 1): gpuMB, the bytes in GL
+//   buffers, ~19-22 MB everywhere; heapMB, the JS heap plus typed arrays, ~58
+//   MB until the first dig asks what falls (its 25 MB mark grid) and the
+//   fights' wrecks, ~100 MB after.
 // Budgets are the latest numbers plus ~15%.
 export const BUDGETS = {
-  menu:           { meanDraws: 14, peakDraws: 14, tris: 86000, allocKB: 38 },   // the menu's 60 frames are too few for drawWorld to be optimized, so its sums box a little
-  'free-start':   { meanDraws: 22, peakDraws: 22, tris: 109000, allocKB: 125 },
-  'bench-walk':   { meanDraws: 27, peakDraws: 29, tris: 102000, allocKB: 150 },
-  'bench-run':    { meanDraws: 27, peakDraws: 43, tris: 90500, allocKB: 120 },
-  'bench-fight':  { meanDraws: 68, peakDraws: 92, tris: 91500, allocKB: 270 },   // craters make fine patches (spec 27)
-  'bench-deaths': { meanDraws: 91, peakDraws: 98, tris: 87500, allocKB: 340 },
-  'bench-wrecks': { meanDraws: 91, peakDraws: 113, tris: 90500, allocKB: 285 },
-  'bench-away':   { meanDraws: 43, peakDraws: 102, tris: 110000, allocKB: 200 },
-  'bench-dig':    { meanDraws: 23, peakDraws: 24, tris: 99500, allocKB: 140 },   // three digs: the main thread only copies corners out and uploads what comes back; each makes a fine patch (spec 27)
-  scoop:          { meanDraws: 22, peakDraws: 24, tris: 75000, allocKB: 80 },   // DIG held 10 s at the range's mesa (spec 25): clods are particles, so no draws of their own; a fine patch round the face (spec 27); your arms from the cockpit, four draws (spec 30)
-  rain:           { meanDraws: 21, peakDraws: 21, tris: 96000, allocKB: 110 },   // free-start in a downpour: one more draw (the rain), no more garbage
-  snow:           { meanDraws: 19, peakDraws: 19, tris: 87000, allocKB: 95 },   // and in snow
-  dust:           { meanDraws: 14, peakDraws: 14, tris: 81000, allocKB: 90 },   // and in a dust storm (2,500 grains)
+  menu:           { meanDraws: 14, peakDraws: 14, tris: 86000, allocKB: 38, gpuMB: 24, heapMB: 64 },   // the menu's 60 frames are too few for drawWorld to be optimized, so its sums box a little
+  'free-start':   { meanDraws: 22, peakDraws: 22, tris: 109000, allocKB: 125, gpuMB: 24, heapMB: 67 },
+  'bench-walk':   { meanDraws: 27, peakDraws: 29, tris: 102000, allocKB: 150, gpuMB: 23, heapMB: 67 },
+  'bench-run':    { meanDraws: 27, peakDraws: 43, tris: 90500, allocKB: 120, gpuMB: 23, heapMB: 68 },
+  'bench-fight':  { meanDraws: 68, peakDraws: 92, tris: 91500, allocKB: 270, gpuMB: 23, heapMB: 116 },   // craters make fine patches (spec 27)
+  'bench-deaths': { meanDraws: 91, peakDraws: 98, tris: 87500, allocKB: 340, gpuMB: 25, heapMB: 116 },
+  'bench-wrecks': { meanDraws: 91, peakDraws: 113, tris: 90500, allocKB: 285, gpuMB: 25, heapMB: 116 },
+  'bench-away':   { meanDraws: 43, peakDraws: 102, tris: 110000, allocKB: 200, gpuMB: 25, heapMB: 116 },
+  'bench-dig':    { meanDraws: 23, peakDraws: 24, tris: 99500, allocKB: 140, gpuMB: 25, heapMB: 116 },   // three digs: the main thread only copies corners out and uploads what comes back; each makes a fine patch (spec 27)
+  scoop:          { meanDraws: 22, peakDraws: 24, tris: 75000, allocKB: 80, gpuMB: 26, heapMB: 117 },   // DIG held 10 s at the range's mesa (spec 25): clods are particles, so no draws of their own; a fine patch round the face (spec 27); your arms from the cockpit, four draws (spec 30)
+  rain:           { meanDraws: 21, peakDraws: 21, tris: 96000, allocKB: 110, gpuMB: 25, heapMB: 116 },   // free-start in a downpour: one more draw (the rain), no more garbage
+  snow:           { meanDraws: 19, peakDraws: 19, tris: 87000, allocKB: 95, gpuMB: 25, heapMB: 116 },   // and in snow
+  dust:           { meanDraws: 14, peakDraws: 14, tris: 81000, allocKB: 90, gpuMB: 25, heapMB: 116 },   // and in a dust storm (2,500 grains)
+  'map-sweep':    { meanDraws: 7, peakDraws: 29, tris: 78500, allocKB: 90, gpuMB: 24, heapMB: 116 },   // the map view carried over the whole map (spec 34): with #392 undone it holds 27.5 MB on the GPU and 123 MB of heap
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;
@@ -157,6 +162,8 @@ function setup() {
     for (let i = 0; i < n; i++) {
       G.clock += 1000 / 60;
       const t0 = now();
+      window.__each?.(i);   // a scene's own per-frame step (the map scene's camera sweep)
+      if (window.__settle && i % 30 === 29) await new Promise(r => setTimeout(r, window.__settle));   // let the ground's worker answer (map-sweep): it meshes off this loop
       if (G.state === 'menu') app.ui.menuTick(1 / 60);
       else update(G, input ? Object.assign(noInput(), input) : noInput(), 1 / 60);
       S.tris = 0;
@@ -183,6 +190,19 @@ try {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(() => { localStorage.clear(); localStorage.setItem('stompy.camp.mission', '0'); });
+  // Bytes held in GL buffers (spec 34 part 1: the phone's GPU memory, which
+  // ran out in the map view before #392), from the page's first buffer on.
+  await page.addInitScript(() => {
+    const P = window.WebGLRenderingContext.prototype, held = new Map(), bound = new Map(), gpu = window.__gpu = { bytes: 0 };
+    const { bindBuffer, bufferData, deleteBuffer } = P;
+    P.bindBuffer = function (t, b) { bound.set(t, b); return bindBuffer.call(this, t, b); };
+    P.bufferData = function (t, d, ...r) {
+      const b = bound.get(t);
+      if (b) { const n = typeof d === 'number' ? d : d.byteLength; gpu.bytes += n - (held.get(b) || 0); held.set(b, n); }
+      return bufferData.call(this, t, d, ...r);
+    };
+    P.deleteBuffer = function (b) { gpu.bytes -= held.get(b) || 0; held.delete(b); return deleteBuffer.call(this, b); };
+  });
   await page.goto(URL_);
   await page.waitForSelector('.mm-title', { timeout: 15000 });
   await page.evaluate(() => window.__stompy.app.scene.groundReady());
@@ -214,8 +234,10 @@ try {
       console.log(`top allocators, ${name} (KB/frame):`);
       Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 12).forEach(([k, v]) => console.log(String(Math.round(v / frames / 1024)).padStart(6), k));
     }
+    await cdp.send('HeapProfiler.collectGarbage');   // then what it holds: the JS heap plus typed arrays' memory (the voxel grid's 25 MB is one)
+    const { usedSize, backingStorageSize = 0 } = await cdp.send('Runtime.getHeapUsage'), gpuB = await page.evaluate(() => window.__gpu.bytes);
     const mean = a => a.reduce((x, y) => x + y, 0) / a.length, med = a => [...a].sort((x, y) => x - y)[a.length >> 1];
-    results[name] = { frames, meanDraws: Math.round(mean(f.draws)), peakDraws: Math.max(...f.draws), tris: Math.round(Math.max(...f.tris)), parts: Math.round(mean(f.parts)), peakParts: Math.max(...f.parts), allocKB: Math.round(bytes / frames / 1024),
+    results[name] = { frames, meanDraws: Math.round(mean(f.draws)), peakDraws: Math.max(...f.draws), tris: Math.round(Math.max(...f.tris)), parts: Math.round(mean(f.parts)), peakParts: Math.max(...f.parts), gpuMB: +(gpuB / 2 ** 20).toFixed(1), heapMB: +((usedSize + backingStorageSize) / 2 ** 20).toFixed(1), allocKB: Math.round(bytes / frames / 1024),
       simMs: +med(f.sim).toFixed(2), sceneMs: +med(f.scene).toFixed(2), hudMs: +med(f.hud).toFixed(2) };   // medians; this machine's, software GL: for comparing, not budgets
   };
 
@@ -284,6 +306,26 @@ try {
     }, [pal, weather]);
     await scene(name, 60, 30);
   }
+  // The map view swept end to end (spec 34 part 1; the phone crash #392
+  // fixed): the range's full yard from above, its camera carried across the
+  // whole map and back over 10 s. What it holds on the GPU is budgeted, so
+  // ground meshes it fetches and never lets go fail here, not on a phone.
+  await page.evaluate(async () => {
+    const { startMatch } = await import('/src/sim/state.js');
+    const { rangeDef } = await import('/src/data/range.js');
+    const { BOUND } = await import('/src/world/terrain.js');
+    const G = window.__stompy.game, app = window.__stompy.app;
+    startMatch(G, rangeDef({ base: 'yard' }), 7, false, 'kestrel');
+    G.kind = 'range'; G.diff = 'normal';
+    app.scene.uploadWorld(); app.ui.launch();
+    await app.scene.groundReady();
+    window.requestAnimationFrame = () => 0;
+    app.command.toggle();
+    window.__settle = 150;
+    window.__each = i => { const c = app.command.C.cam, a = i / 600 * Math.PI * 2; c.x = Math.sin(a) * BOUND * 0.9; c.z = Math.sin(a * 2) * BOUND * 0.9; };
+  });
+  await scene('map-sweep', 600);
+  await page.evaluate(() => { window.__each = null; window.__settle = 0; window.__stompy.app.command.toggle(); });
 
   await browser.close();
   if (errors.length) { failed = true; console.error('page errors:\n' + errors.join('\n')); }
@@ -293,13 +335,17 @@ try {
   server.kill();
 }
 
-const cols = ['meanDraws', 'peakDraws', 'tris', 'parts', 'peakParts', 'allocKB', 'simMs', 'sceneMs', 'hudMs'];   // the ms columns have no budgets (machine-dependent)
+const cols = ['meanDraws', 'peakDraws', 'tris', 'parts', 'peakParts', 'allocKB', 'gpuMB', 'heapMB', 'simMs', 'sceneMs', 'hudMs'];   // the ms columns have no budgets (machine-dependent)
 console.log(['scene'.padEnd(14), ...cols.map(c => c.padStart(10))].join(''));
 for (const [name, r] of Object.entries(results)) {
   const b = Object.fromEntries(Object.entries(BUDGETS[name] || {}).map(([k, v]) => [k, Math.round(v * SCALE)])), over = cols.filter(c => b[c] != null && r[c] > b[c]);
   if (over.length) failed = true;
   console.log([name.padEnd(14), ...cols.map(c => `${r[c]}${b[c] != null ? (r[c] > b[c] ? '!' : '') : ''}`.padStart(10))].join('') + (over.length ? `   OVER: ${over.map(c => `${c} ${r[c]} > ${b[c]}`).join(', ')}` : ''));
 }
-writeFileSync('test-results/perf.json', JSON.stringify({ results, budgets: BUDGETS }, null, 2));
+// The sim alone with a crowd (spec 34 part 1): ms, ground rays and mech reads per frame.
+const { crowd: runCrowd, report: crowdReport, CROWD_BUDGETS } = await import('./crowd.mjs');
+const crowd = runCrowd();
+if (crowdReport(crowd, SCALE).length) failed = true;
+writeFileSync('test-results/perf.json', JSON.stringify({ results, budgets: BUDGETS, crowd, crowdBudgets: CROWD_BUDGETS }, null, 2));
 console.log(failed ? 'perf: OVER BUDGET (or errored)' : 'perf: OK');
 process.exit(failed ? 1 : 0);
