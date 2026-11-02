@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | parts 1 to 3 built (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
+| Status | parts 1 to 3 and part 4's first half built (talked through with the owner, 2026-11-01; every rule below is theirs or a default they agreed) |
 | Milestone | M14 (proposed), with [32-base-loop.md](32-base-loop.md) |
 | Size | L, split in six (§ Build order) |
 | Depends on | [20-build-and-fight.md](20-build-and-fight.md) (silo, factory, raids); [21-mining.md](21-mining.md) (seams, haulers); [22-command-view.md](22-command-view.md) (the map); [23-construction-sites.md](23-construction-sites.md) and [31-builder.md](31-builder.md) (sites, builders); [32-base-loop.md](32-base-loop.md) (raids from above, ENDLESS, lodes) |
@@ -472,6 +472,61 @@ A parked hauler picks a job in this order (`miner.js` `haul`, extended):
     silo taking them.
   - The plant making a core only when one is wanted, paid from the pool.
   - A wreck leaving its core.
+
+### Part 4a: down, lifting, carrying, taking
+
+- **Down** (`sim/down.js`): `isDown` is at `STEAL.down` (a quarter) of full
+  health or less. `works` is up, not down, and not riding on haulers.
+  - A building down stops working: a silo holds nothing (its room goes,
+    and what's over spills), a beacon or silo draws no border, a shop,
+    plant or line makes nothing, a factory or bay idles.
+  - Mended above a quarter (a builder's repair), it works again.
+  - It smokes. The base's own say `Building down.`
+- **What can be lifted** (`sim/steal.js` `canLift`): a building (a kind BUILD
+  knows) that isn't yours, is down, and is outside every triangle of its
+  owner's (`landOf`: team 0 is the base's land; a foe's comes from its own
+  standing silos and beacons; nobody's has none).
+- **CARRY** (`orders.js`, haulers): `{ kind: 'carry', target, to }` sets
+  `target.carry` and sends each hauler to its place round the building's
+  edge (`slotOf`).
+  - With `STEAL.lift` of them there (by kind: a beacon or wall 1; a silo,
+    shop or bay 2; a plant or factory 3; a line 4), it rises 3 m onto
+    their tubs.
+  - It goes straight to `to` at half a hauler's pace, faster with more
+    haulers than it needs (up to 1.3 times).
+  - With fewer than it needs on the way (one fell or was ordered off), it
+    drops where it is, unharmed (`DROPPED`), and waits.
+  - The voice says `Lifting.` For now the building goes straight there,
+    not round slopes.
+- **Setting down** (`setDown`): at `to`, with a thunk and dust.
+  - Inside your territory it's yours (`Taken. It's ours now.`): team 0, in
+    the base's lists by kind, at the health it had, so a builder mends it
+    back to work.
+  - Outside, it stays its owner's where it now stands. The haulers stay.
+- **Nobody's buildings:** a mission's base can list
+  `neutral: [{ kind, at: [bearing, dist], face }]`, put down at a quarter
+  (`addBuilding`, team `STEAL.neutral`). The yard has an old machine shop
+  and beacon past the mesa.
+- **The map:**
+  - CARRY on the bar with haulers picked (the tenth button: tap or pad).
+  - Tap the building, then where it goes. The ghost is its footprint:
+    green `MACHINE SHOP · YOURS HERE` inside your border, amber
+    `OUTSIDE YOUR BORDER` outside, red `NO ROOM`. A tap on the ghost sends
+    the haulers.
+  - A foe's or nobody's buildings are marked with their name and `· DOWN`,
+    and a yellow up arrow over each one CARRY could take.
+- **Not yet (part 4b):** foes stealing yours by difficulty; `Shop lost.`
+- **New text:** `Building down.`, `Lifting.`, `DROPPED`,
+  `Taken. It's ours now.`, `CARRY`, `YOURS HERE`, `OUTSIDE YOUR BORDER`,
+  `· DOWN`.
+- **Tests** (`steal.test.js`):
+  - Down and back.
+  - A down shop pressing nothing.
+  - What can be lifted, including a foe's shop inside its border until a
+    beacon falls.
+  - Two haulers carrying a shop home and taking it.
+  - One hauler being too few, and a hauler lost on the way dropping it.
+  - Setting down outside your border.
 
 ## Code touchpoints
 

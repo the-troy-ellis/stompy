@@ -118,3 +118,14 @@ export const LINE = { bays: 4, wait: 3, bayTime: 4, press: 6, core: 20, pile: 6,
 // (a nav point's kind, so nothing bumps into it or shoots it), drawn by its
 // mesh, which a crew mech with room scoops up.
 export const HEAP = { kind: 'nav', mesh: 'heap', team: 0, tags: ['heap'], trigger: 0, height: 2, label: 'ORE' };
+
+// Stealing (docs/specs/33-production.md § Stealing): a building at `down` of
+// its full health or less stops working; one down and outside every triangle
+// of its owner's can be lifted by `lift` haulers (by its kind) and walked off
+// at `speed` of a hauler's pace (up to `faster` with more than it needs); set
+// down inside the thief's territory, it's theirs. Buildings of `neutral` team
+// are nobody's: abandoned, down from the start.
+export const STEAL = {
+  down: 0.25, speed: 0.5, faster: 1.3, neutral: 2,
+  lift: { beacon: 1, wall: 1, silo: 2, shop: 2, bay: 2, plant: 3, factory: 3, line: 4 },
+};

@@ -149,7 +149,7 @@ export const BASE_MISSION = {
 export const YARD_MISSION = {
   key: 'y01', pal: 'dusk', seed: 31, pilot: 'digger',
   ground: BASE_MISSION.ground,
-  base: BASE_MISSION.base,
+  base: { ...BASE_MISSION.base, neutral: [{ kind: 'shop', at: [200, 280] }, { kind: 'beacon', at: [215, 330] }] },   // an old shop and beacon, nobody's, to carry home (docs/specs/33-production.md § Stealing)
   flat: BASE_MISSION.flat,
   crew: [{ type: 'digger', at: [90, 30], face: 0 }, { type: 'hauler', at: [60, 45], face: 0 }, { type: 'builder', at: [120, 40], face: 0 }],
   foes: [],

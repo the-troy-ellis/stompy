@@ -4,6 +4,7 @@ import { park, crewOf } from './crew.js';
 import { feel } from './feel.js';
 import { particle, msg } from './effects.js';
 import { shiftMech } from './walkView.js';
+import { works } from './down.js';
 
 // Production (docs/specs/33-production.md part 2). Built things are
 // physical: every part is a thing on the ground, G.base.things =
@@ -124,11 +125,11 @@ const making = G => G.base.lines.reduce((n, l) => n + l.bays.filter(Boolean).len
 // Once a frame (sim/base.js stepBase): the shops press, the lines build.
 export function stepProduction(G, dt) {
   const b = G.base;
-  for (const s of b.shops) if (s.alive && !s.site) press(G, s, dt);
-  for (const p of b.plants) if (p.alive && !p.site) brew(G, p, dt);
+  for (const s of b.shops) if (works(s)) press(G, s, dt);   // down, or riding on haulers: nothing
+  for (const p of b.plants) if (works(p)) brew(G, p, dt);
   for (const line of b.lines) {
     if (!line.alive) { line.bays.fill(null); line.queue.length = 0; continue; }
-    if (!line.site) build(G, line, dt);
+    if (works(line)) build(G, line, dt);
   }
 }
 
