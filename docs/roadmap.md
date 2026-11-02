@@ -381,6 +381,12 @@ sim's cost grows in step with the mechs, not faster, so a phone holds its
 frame in a big battle. Measured in a crowd scene first, then a grid of the
 mechs, far foes thinking less often, and no garbage in the sim's hot loops. In four parts.
 
+Then bigger maps ([specs/35-bigger-maps.md](specs/35-bigger-maps.md)): memory
+that follows what's been dug and what's near you, not the map's size, so a
+phone holds a map twice as wide; then a size per mission (S, M, L: 2.3, 3.5
+and 4.6 km). In five parts: measure, the fall check's scratch, the ground in
+chunks, far ground by distance, a size per map.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
