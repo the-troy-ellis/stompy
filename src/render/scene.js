@@ -418,6 +418,13 @@ export function createScene(app) {
   function drawThings() {
     for (const t of G.base?.things || []) {
       const P = PARTS[t.part], [x, z] = thingAt(G, t);
+      if (P.kind === 'gun') {   // a gun: a dark barrel on a little block, laid on the rack or riding a hauler
+        const y = t.by ? t.by.y + 2.4 * t.by.ch.scale : G.ter.height(x, z), yaw = t.by ? t.by.yaw : (t.at?.yaw || 0);
+        if (!seen(x, y + 1, z, 3)) continue;
+        R.draw(R.meshes.cube, chain(M.T(x, y + 0.4, z), M.RY(yaw), M.S(1, 0.8, 1)), [0.32, 0.33, 0.34]);
+        R.draw(R.meshes.cube, chain(M.T(x, y + 1, z), M.RY(yaw), M.S(0.45, 0.45, 3)), [0.18, 0.18, 0.2]);
+        continue;
+      }
       if (P.kind === 'core') {   // a reactor core: a block in the isotopes' own colour, drawn glowing
         const y = t.by ? t.by.y + 2.4 * t.by.ch.scale : G.ter.height(x, z);
         if (seen(x, y + 1, z, 3)) R.draw(R.meshes.cube, chain(M.T(x, y + 1, z), M.RY(G.time * 0.6), M.S(1.4, 1.8, 1.4)), G.pal.iso || [0.7, 1, 0.2], 1);
