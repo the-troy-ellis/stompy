@@ -126,3 +126,32 @@ test('a mission with every objective type, made with the editor, exports and is 
   assert.equal(G.state, 'over', `still running: ${G.objectives.map(o => `${o.def.type}:${o.state}`).join(', ')}`);
   assert.equal(G.won, true, G.objectives.map(o => `${o.def.type}:${o.state}`).join(', '));
 });
+
+// docs/specs/33-production.md § Missions and their bases (part 6b).
+test('BUILDING: the first is the base\'s silo, then buildings with a state; moved, turned, removed; and it exports', async () => {
+  const { stateOf, setState } = await import('../src/ui/editor.js');
+  const d = copy('m02'), p = polar([10, 100]), q = polar([20, 160]);
+  assert.ok(!d.base);
+  assert.equal(place(d, 'BUILDING', p.x, p.z), 'base.silo');
+  assert.deepEqual(d.base, { silo: [10, 100] });
+  assert.equal(place(d, 'BUILDING', q.x, q.z), 'base.0');
+  assert.deepEqual(d.base.buildings, [{ kind: 'shop', at: [20, 160] }]);
+  const b = findSource(d, 'base.0').item;
+  for (const [st, want] of [['damaged', { hp: 0.5 }], ['down', { hp: 0.2 }], ['half', { prog: 0.5 }], ['rubble', { rubble: true }], ['', {}]]) {
+    setState(b, st);
+    assert.deepEqual({ ...b, kind: undefined, at: undefined }, { kind: undefined, at: undefined, ...want }, st || 'up');
+    assert.equal(stateOf(b), st);
+  }
+  const r = polar([30, 200]);
+  moveTo(d, 'base.0', r.x, r.z); faceTo(d, 'base.0', 92);
+  assert.deepEqual(b.at, [30, 200]); assert.equal(b.face, 90);
+  moveTo(d, 'base.silo', q.x, q.z);
+  assert.deepEqual(d.base.silo, [20, 160]);
+  setState(b, 'half');
+  assert.equal(check(fromSource(toSource(d))).length, check(d).length, 'it exports and reads back the same');
+  assert.deepEqual(fromSource(toSource(d)).base, d.base);
+  remove(d, ['base.0']);
+  assert.deepEqual(d.base.buildings, []);
+  remove(d, ['base.silo']);
+  assert.ok(!d.base, 'no silo, no base');
+});
