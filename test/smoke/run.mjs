@@ -673,8 +673,14 @@ try {
     await page.waitForTimeout(400);
     const P = () => page.evaluate(() => { const g = window.__stompy.game, p = g.player; return { thr: p.throttle, twist: p.twist, yaw: p.yaw, heat: p.heat, paused: g.paused, tui: !document.querySelector('.touch-ui').hidden }; });
     const s0 = await P();
+    // Held until the stick has done its work (at least as long as before), not
+    // for a fixed time: a slow runner's frames come further apart, and a
+    // fixed 900 ms once left the throttle at 0.49 of the 0.5 asked for.
+    const until = (fn, arg) => page.waitForFunction(fn, arg, { timeout: 5000 }).catch(() => {});
     await hold(() => window.__pad.axis(1, -1), 900);   // left stick up: throttle
+    await until(t => window.__stompy.game.player.throttle > t + 0.55, s0.thr);
     await hold(() => { window.__pad.axis(1, 0); window.__pad.axis(0, -1); window.__pad.axis(2, 1); }, 500);   // legs left, torso right
+    await until(([y, w]) => { const p = window.__stompy.game.player; return p.yaw - y > 0.15 && p.twist - w < -0.3; }, [s0.yaw, s0.twist]);
     await page.evaluate(() => { window.__pad.axis(0, 0); window.__pad.axis(2, 0); });
     const s1 = await P();
     await hold(() => window.__pad.set(7, true), 700);   // RT: the energy weapons
