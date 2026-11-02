@@ -4,7 +4,7 @@ import { stepBase } from './base.js';
 import { stepSalvage } from './raid.js';
 import { blendPal } from '../data/palettes.js';
 import { tickWeather } from './weather.js';
-import { add, clampN, dirOf, dot, len, mul, norm, sub } from '../util/math.js';
+import { add, clampN, dirOf, dot, len, mul, norm, sub, keepIf } from '../util/math.js';
 import { stepParticles } from './particles.js';
 import { WEAPONS, CAT_OF } from '../data/weapons.js';
 import { geoOf } from '../data/geo.js';
@@ -183,7 +183,7 @@ function frame(G, input, dt) {
   stepDying(G, dt);
   updatePulses(G, dt);
   for (const b of G.beams) b.life -= dt;
-  G.beams = G.beams.filter(b => b.life > 0);
+  keepIf(G.beams, b => b.life > 0);
   const rng = G.rng;
   stepParticles(G, dt);
   stepDebris(G, dt);
@@ -204,7 +204,7 @@ function frame(G, input, dt) {
     if (w.t < WRECK_BURN && rng.chance(dt * 5)) particle(G, [w.x + rng.range(-2, 2), w.y + 2, w.z + rng.range(-2, 2)], [rng.range(-0.5, 0.5), rng.range(3, 5), rng.range(-0.5, 0.5)], rng.range(2, 3.5), rng.range(1, 2.2), [0.18, 0.17, 0.17], 'smoke');
   }
   for (const m of G.msgs) m.t -= dt;
-  G.msgs = G.msgs.filter(m => m.t > 0);
+  keepIf(G.msgs, m => m.t > 0);
   G.flash = max(0, G.flash - dt * (G.reducedMotion ? 2.4 : 1.2));   // reduced motion: shorter flashes
   G.shake = max(0, G.shake - dt * 2.2);
   G.kick = max(0, G.kick - dt * 5);

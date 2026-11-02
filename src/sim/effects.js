@@ -1,4 +1,4 @@
-import { add, clampN, len, mul, norm, sub, TAU } from '../util/math.js';
+import { add, clampN, len, mul, norm, sub, TAU, keepIf } from '../util/math.js';
 import { feel } from './feel.js';
 import { spawn, KINDS, CLOD_SINK } from './particles.js';
 
@@ -56,7 +56,7 @@ export function stepDebris(G, dt) {
       }
     } else if (d.t > d.life - DEBRIS_SINK) d.p[1] -= dt * 0.9 * d.scale;
   }
-  G.debris = G.debris.filter(d => d.t < d.life);
+  keepIf(G.debris, d => d.t < d.life);
 }
 
 // Section-specific hit effects (roadmap M1: hit feedback). Sparks fan off

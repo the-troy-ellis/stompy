@@ -7,6 +7,25 @@ const { sqrt } = Math;
 
 export const frame = m => chain(M.T(m.x, m.y + (m.bob || 0), m.z), M.RY(m.yaw), M.S(m.ch.scale));
 export const torsoFrame = m => chain(frame(m), M.T(0, geoOf(m).torsoY + (m.torsoDrop || 0), 0), M.RY(m.twist));   // torsoDrop: the pendulum body's lag (sim/gait.js)
+// torsoFrame without the garbage (spec 34 part 4): the same Float32 steps in
+// the same order, into scratch matrices, so the numbers are the same to the
+// bit. Good until the next call: read it at once (muzzle, eyeOf).
+const F16 = () => new Float32Array(16), W = [F16(), F16(), F16(), F16(), F16(), F16(), F16(), F16(), F16()];
+function mulInto(o, a, b) {
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+  return o;
+}
+const idInto = o => { o.fill(0); o[0] = o[5] = o[10] = o[15] = 1; return o; };
+const tInto = (o, x, y, z) => { idInto(o); o[12] = x; o[13] = y; o[14] = z; return o; };
+const ryInto = (o, a) => { const c = Math.cos(a), s = Math.sin(a); idInto(o); o[0] = c; o[2] = -s; o[8] = s; o[10] = c; return o; };
+const sInto = (o, k) => { idInto(o); o[0] = o[5] = o[10] = k; return o; };
+function torsoNow(m) {
+  const [t1, r1, s1, t2, r2, a, b, c, d] = W;
+  mulInto(a, tInto(t1, m.x, m.y + (m.bob || 0), m.z), ryInto(r1, m.yaw));
+  mulInto(b, a, sInto(s1, m.ch.scale));
+  mulInto(c, b, tInto(t2, 0, geoOf(m).torsoY + (m.torsoDrop || 0), 0));
+  return mulInto(d, c, ryInto(r2, m.twist));
+}
 export const center = m => [m.x, m.y + 4.2 * m.ch.scale, m.z];
 // Where a shell fired now from `from` at `speed` m/s meets a mech walking
 // on its heading: two passes of time-of-flight are plenty at these ranges.
@@ -17,11 +36,11 @@ export function leadPoint(from, t, speed) {
   return p;
 }
 export function muzzle(m, w) {
-  const tf = torsoFrame(m), g = geoOf(m);
+  const tf = torsoNow(m), g = geoOf(m);
   if (w.mount === 'T') return M.apply(tf, w.def.kind === 'missile' ? [w.side % 2 ? -1.25 : 1.25, g.rackY, 0.6] : [-0.9, g.acY, 1.6]);
   return M.apply(tf, [(w.mount === 'LA' ? 1 : -1) * g.armX, g.armY - 1.2, 2.4]);
 }
-export const eyeOf = m => M.apply(torsoFrame(m), geoOf(m).eye);
+export const eyeOf = m => M.apply(torsoNow(m), geoOf(m).eye);
 export const viewYaw = m => m.yaw + m.twist;
 
 // Mechs are vertical cylinders for hits.

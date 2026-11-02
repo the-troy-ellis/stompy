@@ -114,12 +114,30 @@ would use later. It's built for mechs first, because that's where the time goes.
 
 ### Part 4: no garbage in the sim's hot loops
 
+Measured first: a 50-foe fight made about 1,080 KB of garbage a frame in
+Node. Done, each giving the same numbers to the bit (a seeded 30 s fight
+hashes the same as before):
+
+- `torsoFrame` built five new matrices and four products for every muzzle
+  and eye, 116 KB a frame. `muzzle` and `eyeOf` now use scratch matrices,
+  with the same Float32 steps in the same order.
 - The steering shapers change `out` in place instead of spreading a new
-  object (`{ ...out, moveYaw }`) for every foe every frame.
-- `G.shots`, `G.parts` and the like are compacted in place instead of
-  `filter`ed into new arrays each frame, as spec 14's P3 did for the
-  renderer.
-- Whatever else `PERF_TOP=1` shows in the crowd scene.
+  object (`{ ...out, moveYaw }`) for every foe every frame. Every driver's
+  `out` is a new object, so nothing else holds it.
+- `G.shots`, `G.beams`, `G.debris`, `G.pulses`, `G.falls` and `G.msgs` are
+  compacted in place (`keepIf` in `util/math.js`) instead of `filter`ed
+  into new arrays each frame.
+- The grid's lookups no longer shrink the caller's array (which only made it
+  grow again), and keep their query in typed arrays.
+
+The result: about 15% less in Node (920 KB a frame), and 4–9% less in the
+browser bench (`bench-fight` 201 → 180 KB, `bench-deaths` 234 → 219 KB).
+Mean frame time doesn't move measurably; on a phone, less garbage means
+fewer GC hitches. What's left is spread thin: the ground's rays and samples,
+`gait` and `stepMech`, small vectors returned from functions and numbers
+boxed on calls that aren't inlined. Each is a few percent, and the ground's
+hot loops were already tuned for the browser (spec 14). Not worth the churn
+until a phone shows hitches.
 
 ### Not in this spec
 

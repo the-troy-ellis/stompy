@@ -1,7 +1,7 @@
 import { cheat } from './cheats.js';
 import { nextCrew, HANDOVER } from './crew.js';
 import { salvageOf } from './raid.js';
-import { add, mul, norm, sub } from '../util/math.js';
+import { add, mul, norm, sub, keepIf } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { SECT_NAME } from '../data/chassis.js';
 import { center, muzzle, rayHit, viewYaw } from './geom.js';
@@ -343,5 +343,5 @@ export function stepShots(G, dt) {
     } else s.p = add(s.p, mul(s.v, dt));
     if (s.life <= 0 && s.kind === 'missile' && !hit) { if (!s.ghost) blast(G, s.p, s.dmg, s.owner, null); dig(G, s.p, digOf(s.type), !s.ghost); explode(G, s.p, false); }
   }
-  G.shots = G.shots.filter(s => s.life > 0);
+  keepIf(G.shots, s => s.life > 0);
 }

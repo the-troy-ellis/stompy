@@ -1,4 +1,4 @@
-import { add, clampN, dot, len, mul, norm, sub, wrapA } from '../util/math.js';
+import { add, clampN, dot, len, mul, norm, sub, wrapA, keepIf } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { WEAPONS } from '../data/weapons.js';
 import { center, muzzle, rayHit, rayTerrain } from './geom.js';
@@ -115,5 +115,5 @@ export function updatePulses(G, dt) {
       if (pu.shooter === G.player) { G.stats.hits++; G.hitMark = 0.6; }
     } else { t.hp.T = 0; destroy(G, t, pu.shooter); }
   }
-  G.pulses = G.pulses.filter(pu => pu.t < pu.dur + 0.25);
+  keepIf(G.pulses, pu => pu.t < pu.dur + 0.25);
 }

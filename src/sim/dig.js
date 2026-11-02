@@ -1,3 +1,4 @@
+import { keepIf } from '../util/math.js';
 import { seamAt, isoAt } from '../world/seams.js';
 import { cheat } from './cheats.js';
 import { BIG_DIG } from '../data/debug.js';
@@ -229,7 +230,7 @@ export function stepFalls(G, dt) {
       if (f.heap) G.ter.mark([i0, i1, Math.max(j0 - f.drop, 2), j1 - f.drop, k0, k1]);   // the heap shows now (render/ground.js hid it while it fell)
     }
   }
-  G.falls = G.falls.filter(f => !f.landed);
+  keepIf(G.falls, f => !f.landed);
 }
 // A fall lands: the mechs under it take the crush (on the client that owns
 // each), props and structures under it break, and the landing thunks.
