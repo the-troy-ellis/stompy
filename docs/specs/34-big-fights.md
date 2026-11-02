@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (part 1) |
+| Status | in progress (parts 1–2) |
 | Milestone | M14 |
 | Size | L (in four parts) |
 | Depends on | [14-look-and-performance.md](14-look-and-performance.md), [33-production.md](33-production.md) |
@@ -84,6 +84,9 @@ A grid of the mechs, rebuilt once per frame (`src/sim/near.js`):
   - A shout to allies (`perception.js`): the shout's range.
   - `rayHit`'s mech test (`geom.js`): the squares along the shot's step.
   - `blast` (`missiles.js`): its radius. `nearMiss` (`fusion.js`): along the beam.
+  - Mechs pushing each other apart (`update.js`), which checked every pair
+    of live mechs every frame: now each mech against those it may touch,
+    the pairs in the same order.
 - Mechs move during the frame, so each lookup pads `r` by the farthest any
   mech can move in a frame. A wrong miss is worse than a spare check.
 - **Same answers.** A headless test runs a seeded fight twice, once with the grid
@@ -95,7 +98,7 @@ A grid of the mechs, rebuilt once per frame (`src/sim/near.js`):
 The same grid is what fog of war and a spatial index for buildings and things
 would use later. It's built for mechs first, because that's where the time goes.
 
-### Part 3: think less when far, look less often
+### Part 3: think less when far
 
 - **Far foes think less often.** A foe more than 400 m from every pilot and
   every crew mech, and not hit in the last 2 s, runs `think` every 4th frame.
@@ -103,10 +106,9 @@ would use later. It's built for mechs first, because that's where the time goes.
   frames it keeps its last throttle, turn and aim. Its feet, gait and
   physics still step every frame, so feet never slide. Raids crossing a big
   map get cheap. Fights near you are unchanged.
-- **Sight is checked less often.** `perceive`'s ray to its prey runs every 6th
-  frame per foe, staggered, plus at once when it is hit or its prey fires.
-  Between checks it keeps the last answer. Spec 05's reaction delays (0.3 s
-  at the least, on HARD) are longer than 6 frames, so no foe reacts later than it does today.
+- **Sight is already checked less often.** Each foe looks every 0.15 s,
+  staggered (`AI.lookEvery`, spec 05), so there's nothing to do there. The
+  rays left are shots, beams and the nav's feelers.
 - These change when things happen, not what happens. The AI tests stay
   as they are. Any test that shifts by a frame says so and why.
 
@@ -138,7 +140,6 @@ would use later. It's built for mechs first, because that's where the time goes.
 - `src/sim/melee.js`, `src/sim/ai/behaviours.js`, `src/sim/ai/perception.js`,
   `src/sim/geom.js`, `src/sim/missiles.js`, `src/sim/fusion.js`: lookups
   through `mechsNear`.
-- `src/sim/ai/perception.js`: the staggered sight check.
 - `src/sim/ai/behaviours.js`, `src/sim/combat.js`, `src/sim/effects.js`:
   no spread objects, lists compacted in place.
 - `docs/architecture.md`: `near.js` on the map. `docs/workflow.md`: the
@@ -165,7 +166,7 @@ No network message changes. Co-op's host runs the foes as today.
   finds, at the map's edges and across squares, with mechs moving mid-frame.
   A seeded 20-mech fight ends identically either way.
 - `test/ai.test.js`: a far foe thinks every 4th frame, and every frame once
-  hit or within 400 m. A foe's sight answer is never more than 6 frames old.
+  hit or within 400 m.
 - The crowd scene is the measurement, not a test.
 
 ## Performance

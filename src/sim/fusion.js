@@ -8,6 +8,8 @@ import { r2 } from '../net/protocol.js';
 import { feel } from './feel.js';
 import { sendFx } from './hitqueue.js';
 import { dig, digOf } from './dig.js';
+import { mechsAlong, nearRadius } from './near.js';
+const BY = [];
 
 const { sin, abs, atan2, hypot, min, max } = Math;
 
@@ -55,7 +57,9 @@ export function fusionTick(G, m, dt, on) {
 // nothing (terrain) is in the way.
 export function nearMiss(G, m, mz, dir, d) {
   let best = null, bestD = Infinity;
-  for (const t of G.mechs) {
+  const k = mechsAlong(G, mz[0], mz[2], mz[0] + dir[0] * d.range, mz[2] + dir[2] * d.range, nearRadius(G) + d.slack, BY);   // spec 34: only the mechs along it
+  for (let j = 0; j < k; j++) {
+    const t = BY[j];
     if (!t.alive || t === m) continue;
     const c = center(t), v = sub(c, mz), along = dot(v, dir);
     if (along < 0 || along > d.range) continue;

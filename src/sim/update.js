@@ -28,6 +28,7 @@ import { tickObjectives } from './objectives.js';
 import { stepTurrets } from './turrets.js';
 import { tickCoopRespawn } from './coopRules.js';
 import { tickTutorial } from './tutorial.js';
+import { buildNear, dropNear, mechsNear, nearRadius } from './near.js';
 import { benchStep } from './bench.js';
 import { walkStep } from './walkView.js';
 import { dig, dump, stepFalls, stepFinePatches } from './dig.js';
@@ -48,7 +49,14 @@ export const noInput = () => ({ swap: false, thrUp: false, thrDown: false, stop:
 // One frame of the whole simulation. `input` is a snapshot (see noInput);
 // `dt` is seconds (capped by the caller). Everything the sim wants the
 // outside to do goes through G.fx.
+// One frame. The mechs' grid (near.js, spec 34) holds for its length.
 export function update(G, input, dt) {
+  buildNear(G);
+  const r = frame(G, input, dt);
+  dropNear(G);
+  return r;
+}
+function frame(G, input, dt) {
   G.time += dt;
   if (G.palRamp) { const r = G.palRamp; blendPal(r.from, r.to, Math.min(1, G.time / r.secs), G.pal); }   // dusk into night
   tickWeather(G);   // lightning and thunder (weather.js)
@@ -153,16 +161,13 @@ export function update(G, input, dt) {
     if (m !== P) m.beamOn = false;
   }
   coolArmour(G, dt);
-  // Mechs don't walk through each other.
-  const alive = G.mechs.filter(m => m.alive);
-  for (let i = 0; i < alive.length; i++) for (let j = i + 1; j < alive.length; j++) {
-    const a = alive[i], b = alive[j], dx = b.x - a.x, dz = b.z - a.z, d = hypot(dx, dz), r = geoOf(a).radius * a.ch.scale + geoOf(b).radius * b.ch.scale;
-    const over = a.y > b.y + geoOf(b).height * b.ch.scale - 0.5 || b.y > a.y + geoOf(a).height * a.ch.scale - 0.5;   // one is clear above the other
-    if (d < r && d > 0.01 && !over && !(a.remote && b.remote)) {
-      // Only move mechs this client owns; other pilots' clients move theirs.
-      const fa = a.remote ? 0 : b.remote ? 1 : 0.5, fb = b.remote ? 0 : a.remote ? 1 : 0.5, gap = r - d;
-      a.x -= (dx / d) * gap * fa; a.z -= (dz / d) * gap * fa; b.x += (dx / d) * gap * fb; b.z += (dz / d) * gap * fb;
-    }
+  // Mechs don't walk through each other: each pair once, the first in
+  // G.mechs before the second, from the grid (near.js, spec 34), in the
+  // order every pair would go.
+  const M = G.mechs;
+  for (let i = 0; i < M.length; i++) {
+    const a = M[i];
+    if (a.alive) apart(G, a);
   }
   stepEntities(G, dt);
   stepBase(G, dt);
@@ -213,5 +218,24 @@ export function update(G, input, dt) {
   if (G.state === 'over') {
     G.endT -= dt;
     if (G.endT <= 0) { G.state = 'debrief'; G.hooks.debrief?.(); }
+  }
+}
+
+// One mech's pushes against the live mechs after it in G.mechs that it overlaps.
+const PAIR = [];
+function apart(G, a) {
+  const k = mechsNear(G, a.x, a.z, geoOf(a).radius * a.ch.scale + nearRadius(G), PAIR);
+  let after = false;
+  for (let q = 0; q < k; q++) {
+    const b = PAIR[q];
+    if (b === a) { after = true; continue; }
+    if (!after || !b.alive) continue;
+    const dx = b.x - a.x, dz = b.z - a.z, d = hypot(dx, dz), r = geoOf(a).radius * a.ch.scale + geoOf(b).radius * b.ch.scale;
+    const over = a.y > b.y + geoOf(b).height * b.ch.scale - 0.5 || b.y > a.y + geoOf(a).height * a.ch.scale - 0.5;   // one is clear above the other
+    if (d < r && d > 0.01 && !over && !(a.remote && b.remote)) {
+      // Only move mechs this client owns; other pilots' clients move theirs.
+      const fa = a.remote ? 0 : b.remote ? 1 : 0.5, fb = b.remote ? 0 : a.remote ? 1 : 0.5, gap = r - d;
+      a.x -= (dx / d) * gap * fa; a.z -= (dz / d) * gap * fa; b.x += (dx / d) * gap * fb; b.z += (dz / d) * gap * fb;
+    }
   }
 }

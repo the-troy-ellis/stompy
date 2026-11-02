@@ -5,6 +5,8 @@ import { center } from '../geom.js';
 import { eyeAt, blocked } from '../sight.js';
 import { BEHAVIOUR as B } from '../../data/ai.js';
 import { gradeFactor, grips } from '../mech.js';
+import { mechsNear, nearRadius } from '../near.js';
+const BY = [];
 
 const { sin, cos, atan2, abs, hypot, min, PI } = Math;
 
@@ -159,7 +161,9 @@ export const brawler = (G, e, ctx) => ({ moveYaw: ctx.toYaw, thr: ctx.dist > ctx
 export const holdLine = (G, e, ctx, out) => {
   const top = m => m.maxSpeed ?? m.ch.speed;
   let slowest = top(e);
-  for (const o of G.mechs) {
+  const k = mechsNear(G, e.x, e.z, B.lineRange, BY);   // spec 34: only the mechs nearby
+  for (let j = 0; j < k; j++) {
+    const o = BY[j];
     if (o === e || o.team !== e.team || !o.alive) continue;
     if (hypot(o.x - e.x, o.z - e.z) <= B.lineRange) slowest = min(slowest, top(o));
   }
@@ -172,8 +176,9 @@ export const avoidEdge = (G, e, ctx, out) => (abs(e.x) > BOUND - 60 || abs(e.z) 
 // Steer around an ally that is close and ahead; the collision pass only
 // separates once they touch.
 export const avoidAllies = (G, e, ctx, out) => {
-  const re = geoOf(e).radius * e.ch.scale;
-  for (const o of G.mechs) {
+  const re = geoOf(e).radius * e.ch.scale, k = mechsNear(G, e.x, e.z, re + nearRadius(G) + B.allyGap, BY);   // spec 34: only the mechs nearby
+  for (let j = 0; j < k; j++) {
+    const o = BY[j];
     if (o === e || o.team !== e.team || !o.alive) continue;
     const dx = o.x - e.x, dz = o.z - e.z, d = hypot(dx, dz), gap = re + geoOf(o).radius * o.ch.scale + B.allyGap;
     if (d > gap) continue;

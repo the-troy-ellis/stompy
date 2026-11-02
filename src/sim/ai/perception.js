@@ -4,6 +4,8 @@ import { sub, len } from '../../util/math.js';
 import { diffOf, PERCEPTION as K } from '../../data/ai.js';
 import { darkness, NIGHT_SIGHT } from '../../data/palettes.js';
 import { radarOf } from '../../data/weather.js';
+import { mechsNear } from '../near.js';
+const BY = [];
 
 // What an enemy knows about the player (docs/specs/05-ai.md § Perception).
 // It sees the player with line of sight inside its sight range, or hears
@@ -54,7 +56,9 @@ export function alertEnemy(G, e, P, at = null) {
   if (a.lastSeen == null) a.lastSeen = G.time;   // a told or felt contact is good for the usual 8 s
   if (!a.belief) a.belief = { x: at ? at[0] : P.x, z: at ? at[2] : P.z, vx: 0, vz: 0, at: G.time };
   if (was) return;
-  for (const o of G.mechs) {
+  const k = mechsNear(G, e.x, e.z, K.shoutRange, BY);   // spec 34: only the mechs nearby
+  for (let j = 0; j < k; j++) {
+    const o = BY[j];
     if (o === e || o.team !== e.team || !o.alive || o.ai.aware || o.ai.shoutAt != null) continue;
     if (hypot(o.x - e.x, o.z - e.z) <= K.shoutRange) o.ai.shoutAt = G.time + K.shoutDelay;
   }
