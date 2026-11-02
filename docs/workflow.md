@@ -140,6 +140,14 @@ Run the whole list; it takes about eight minutes. Report deviations in the PR.
   software GL, for comparing before and after, so they have no budget.
   `PERF_CPU=1` lists each scene's busiest functions by share of the game's
   own JS time; `PERF_TOP=1` lists where the garbage comes from.
+  Each scene also reports what it holds in GL buffers (`gpuMB`, the phone's
+  GPU memory) and the JS heap after a collection (`heapMB`), both
+  budgeted; `map-sweep` carries the map view's camera over the whole map.
+  After the browser, the crowd scene (`scripts/crowd.mjs`, spec 34; also
+  `node scripts/crowd.mjs` alone) runs the sim in Node with 12, 25, 50 and
+  100 foes all fighting, printing ms per frame, how that grows with the
+  crowd, and ground rays and mech reads per frame; the counts at 50 are
+  budgeted (`CROWD_BUDGETS`).
   The fight scenes are the bench's segments (`src/sim/bench.js`, `bench-*`):
   a scripted scene where nobody thinks or takes damage, so a change to the
   AI, the walk or the dice doesn't move their numbers; only what is drawn does.
