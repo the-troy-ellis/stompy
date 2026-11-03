@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (parts 1–3) |
+| Status | built: part 1 (#394, the crowd scene and budgets), part 2 (#395, the grid of the mechs), part 3 (#396, far foes think every 4th frame), part 4 (#397, less garbage in the hot loops) |
 | Milestone | M14 |
 | Size | L (in four parts) |
 | Depends on | [14-look-and-performance.md](14-look-and-performance.md), [33-production.md](33-production.md) |
