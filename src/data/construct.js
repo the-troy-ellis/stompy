@@ -81,6 +81,10 @@ export const PLACE = {
 // range it can see, every `cd` s, its head turning `turn` rad/s; it fires
 // once it's within `aim` rad of on target.
 export const TOWER = { range: 120, cd: 1.6, turn: 2.2, aim: 0.12, weapon: 'ac', muzzle: 0.92 };
+// ENDLESS (spec 32 part 2): the first raid at `first` s, then every `every`;
+// raid n brings `base + floor(n / 2)` foes, never more than `most`, the heavier
+// mixes from raid `mixed` and `heavy` on.
+export const ENDLESS = { first: 90, every: 120, base: 2, most: 8, mixed: 3, heavy: 6 };
 export const PLACE_ORDER = ['factory', 'bay', 'wall', 'tower', 'silo', 'beacon', 'shop', 'line', 'plant', 'lab', 'armory'];
 // The buildings, as mission entities (sim/entities.js): unit meshes in mesh/props.js.
 // A bay is a gantry with a pad in front, like the silo; a wall slab is 4.2 m wide.

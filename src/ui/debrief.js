@@ -7,7 +7,7 @@ import { NAMES } from '../data/names.js';
 // listed objectives is plain ELIMINATE, which the KILLS line already covers.
 export function objectiveRows(G) {
   if (!G.def?.objectives || !G.objectives) return [];
-  return G.objectives.map(o => ({ text: resultText(G, o), ok: o.state === 'done', secondary: !!o.def.secondary }));
+  return G.objectives.filter(o => o.def.type !== 'endless').map(o => ({ text: resultText(G, o), ok: o.state === 'done', secondary: !!o.def.secondary }));   // ENDLESS's own line says it (ui/screens.js endlessLine)
 }
 
 function resultText(G, o) {
@@ -23,6 +23,7 @@ function resultText(G, o) {
     case 'extract': return d.within != null ? `EXTRACT IN ${fmtClock(d.within)}` : 'EXTRACT';
     case 'protect': return `PROTECT ${label(d.label || 'TARGETS')} ${o.alive ?? o.targets?.length ?? 0}/${o.total ?? o.targets?.length ?? 0}`;
     case 'keep': return `KEEP ${label(d.label || 'TARGETS')} UP`;
+    case 'endless': return `RAIDS ${o.n ?? 0}`;
     default: return d.type.toUpperCase();
   }
 }

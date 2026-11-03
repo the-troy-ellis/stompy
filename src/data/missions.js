@@ -142,6 +142,16 @@ export const BASE_MISSION = {
   intel: 'Dig the rock. Fill the silo. Build a factory. Keep the silo safe.',
   name: NAMES.missions.b01,
 };
+// ENDLESS (docs/specs/32-base-loop.md § Part 2): the base mission's ground
+// and crew, no objectives but the silo, and raids that keep coming, each a
+// little bigger (sim/objectives.js endless), until the silo falls.
+export const ENDLESS_MISSION = {
+  ...BASE_MISSION, key: 'e01',
+  objectives: [{ type: 'keep', targets: ['silo'], label: 'SILO' }, { type: 'endless' }],
+  waves: [],
+  intel: 'Raids keep coming. Each one bigger. Keep the silo up as long as you can.',
+  name: NAMES.missions.e01,
+};
 // The yard (docs/specs/19-debug-menu.md § The yard): the DEBUG tab's place
 // to try mining and construction with nobody shooting. Build and fight's
 // ground and silo, a second digger, a hauler and a builder in the crew, no foes, no
@@ -221,7 +231,7 @@ export function contractDef(n) {
   return def;
 }
 // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
-export const FP_MAPS = ['random', 'dusk', 'ice', 'volcanic', 'base', 'canyon'];   // base: BASE_MISSION, not a skirmish; canyon: data/maps.js CANYON, 3 km long (last: a saved pick is an index)
+export const FP_MAPS = ['random', 'dusk', 'ice', 'volcanic', 'base', 'canyon', 'endless'];   // base: BASE_MISSION, not a skirmish; canyon: data/maps.js CANYON, 3 km long (last: a saved pick is an index)
 // Free Play's WEATHER (RANDOM rolls one that suits the map, clear half the time)
 // and TIME (NORMAL is the map's own light).
 export const FP_WEATHER = ['clear', 'random', 'rain', 'snow', 'dust', 'fog'];

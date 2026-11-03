@@ -264,6 +264,7 @@ function walkOut(G, line, j) {
   park(m);
   G.mechs.push(m);
   (G.crew ||= [G.player]).push(m);
+  G.base.made = (G.base.made || 0) + 1;   // ENDLESS's end screen counts them (spec 32)
   G.fx.say(FIGHTERS.includes(j.kind) ? 'New mech ready.' : `New ${j.kind}.`);   // a fighter: the factory's line
   if (G.command) msg(G, `NEW ${m.ch.name}`);
 }
