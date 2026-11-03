@@ -84,6 +84,13 @@ export const TOWER = { range: 120, cd: 1.6, turn: 2.2, aim: 0.12, weapon: 'ac', 
 // ENDLESS (spec 32 part 2): the first raid at `first` s, then every `every`;
 // raid n brings `base + floor(n / 2)` foes, never more than `most`, the heavier
 // mixes from raid `mixed` and `heavy` on.
+// Spread out (docs/specs/32-base-loop.md § Part 3): a plain cut's ore by its
+// distance from the silo (world/seams.js oreSpread), and the lodes.
+//   ORE_SPREAD  near: share at the silo; at: 1 there; far: share by `out` (m)
+//   ORE_LODES   n a map, r: radius (m), mult: times a plain cut's ore,
+//               near/far: from the silo (m), find: a crew mech this close finds one
+export const ORE_SPREAD = { near: 0.6, at: 150, far: 1.3, out: 450 };
+export const ORE_LODES = { n: 3, r: 12.5, mult: 3, near: 200, far: 400, find: 60 };
 export const ENDLESS = { first: 90, every: 120, base: 2, most: 8, mixed: 3, heavy: 6 };
 export const PLACE_ORDER = ['factory', 'bay', 'wall', 'tower', 'silo', 'beacon', 'shop', 'line', 'plant', 'lab', 'armory'];
 // The buildings, as mission entities (sim/entities.js): unit meshes in mesh/props.js.

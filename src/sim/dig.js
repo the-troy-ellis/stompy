@@ -1,9 +1,9 @@
 import { keepIf } from '../util/math.js';
-import { seamAt, isoAt } from '../world/seams.js';
+import { seamAt, isoAt, oreSpread } from '../world/seams.js';
 import { cheat } from './cheats.js';
 import { BIG_DIG } from '../data/debug.js';
 import { DIG, CRUSH, TORQUE, WEAPONS } from '../data/weapons.js';
-import { CONSTRUCT } from '../data/construct.js';
+import { CONSTRUCT, ORE_SPREAD, ORE_LODES } from '../data/construct.js';
 import { FINE_DIG } from '../data/fineDig.js';
 import { sceneryNear, destroyEntity } from './entities.js';
 import { particle, msg } from './effects.js';
@@ -86,6 +86,15 @@ export function dig(G, p, r, owned = true) {
 // `m.biteCorners` to how many corners it turned to air. `fl`: a flat-bottomed
 // bite down to that floor (world/voxels.js dig; single player, as its ore is:
 // online a bite is a plain dig).
+// How rich the ground at (x, z) is (docs/specs/32-base-loop.md § Part 3): a
+// lode's ORE_LODES.mult, else thinner near the base's first silo and richer
+// past ORE_SPREAD.at; 1 with no base.
+export function oreHere(G, x, z) {
+  const b = G.base;
+  if (!b?.silo) return 1;
+  for (const l of b.lodes || []) if (Math.hypot(x - l.x, z - l.z) < l.r) return ORE_LODES.mult;
+  return oreSpread(Math.hypot(x - b.silo.x, z - b.silo.z), ORE_SPREAD);
+}
 export const seamOre = depth => CONSTRUCT.orePerSeam * Math.min(CONSTRUCT.seamMax, 1 + Math.max(0, depth) / CONSTRUCT.seamDeep);
 export function bite(G, m, p, r = CONSTRUCT.bucket, fl = -Infinity, sl = null) {
   m.seamBite = false; m.biteCorners = 0; m.biteOre = 0; m.isoBite = false;
@@ -94,6 +103,7 @@ export function bite(G, m, p, r = CONSTRUCT.bucket, fl = -Infinity, sl = null) {
   let got = 0, seams = 0, iso = 0;
   const tally = { rock: 0, soft: 0, corner: (cx, cy, cz, depth) => { if (isoAt(seed, cx, cy, cz)) iso += CONSTRUCT.isoPerCorner; if (seamAt(seed, cx, cy, cz)) { got += seamOre(depth); seams++; } else got += CONSTRUCT.orePerCorner; } };
   confirmDig(G, [0, x, y, z, r], true, 1, tally, fl, sl);
+  got *= oreHere(G, x, z);
   // Whole ore into the hopper; the fraction rides on to the next bite (a 4 m
   // corner is an eighth of an 8 m one, docs/specs/29-ground-4m.md), so the
   // sum is the same in any order.

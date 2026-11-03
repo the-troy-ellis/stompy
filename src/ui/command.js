@@ -9,7 +9,7 @@ import { pickNearest, pickInside } from '../sim/pick.js';
 import { crewOf, canCommand, commandUp, commandDown } from '../sim/crew.js';
 import { give, can } from '../sim/orders.js';
 import { PLACE, PLACE_ORDER, BUILDINGS, CONSTRUCT, RECIPES, PARTS, LINE } from '../data/construct.js';
-import { footprintAt, placeSite, snapWall, oreRoom, isoRoom, needsRepair, kindOf, inLand } from '../sim/base.js';
+import { footprintAt, placeSite, snapWall, oreRoom, isoRoom, needsRepair, kindOf, inLand, nearestSilo, padOf } from '../sim/base.js';
 import { canLift } from '../sim/steal.js';
 import { isDown, works } from '../sim/down.js';
 import { territory } from '../sim/territory.js';
@@ -291,6 +291,7 @@ export function createCommand(app) {
     drawMap(ctx, view, { map: { bound: [BX, BZ], height: G.ter.height, grid: 100 }, things, sel: C.picked, box: C.box, pal });
     drawExposed(ctx, view, pal);
     drawProduction(ctx, view, pal);
+    drawSpread(ctx, view, crew, pal);
     drawOrders(ctx, view, crew, pal);
     drawRaids(ctx, view, pal);
     if ((C.place || C.lift) && C.ghost) drawGhost(ctx, view, pal);
@@ -300,6 +301,34 @@ export function createCommand(app) {
     if (G.base) { ctx.fillStyle = pal.good; ctx.fillText(`ORE ${Math.floor(G.base.ore)}/${oreRoom(G)}${G.base.iso || G.base.plants.length ? `  ISO ${G.base.iso}/${isoRoom(G)}` : ''}  SALVAGE ${G.base.salvage}`, 14, 22); }
     drawCompass(ctx, 34, H - 34, C.cam.yaw, pal);
     if (G.padActive) drawPadAim(ctx, W, H, pal);
+  }
+
+  // Spread out (docs/specs/32-base-loop.md § Part 3): a found lode is a ring
+  // with `ORE`; each digger and hauler has a faint line to the silo it
+  // unloads at, so a long route reads, and a raid across it does too.
+  function drawSpread(ctx, view, crew, pal) {
+    if (!G.base) return;
+    ctx.save();
+    ctx.strokeStyle = pal.good; ctx.fillStyle = pal.good;
+    ctx.lineWidth = 1; ctx.setLineDash([2, 6]);
+    for (const m of crew) {
+      if (!m.ch.hopper || m.ch.tool === 'build') continue;
+      const s = nearestSilo(G, m.x, m.z);
+      if (!s) continue;
+      const [px, pz] = padOf(s), a = view.toScreen(m.x, m.y, m.z), b = view.toScreen(px, G.ter.height(px, pz), pz);
+      if (!a || !b) continue;
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    }
+    ctx.setLineDash([]); ctx.lineWidth = 2;
+    ctx.font = 'bold 11px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const l of G.base.lodes || []) {
+      if (!l.found) continue;
+      const p = view.toScreen(l.x, G.ter.height(l.x, l.z), l.z);
+      if (!p) continue;
+      ctx.beginPath(); ctx.arc(p[0], p[1], Math.max(8, l.r / view.mpp), 0, Math.PI * 2); ctx.stroke();
+      ctx.fillText('ORE', p[0], p[1]);
+    }
+    ctx.restore();
   }
 
   // Defend from above (docs/specs/32-base-loop.md § Part 2): a raid called and
