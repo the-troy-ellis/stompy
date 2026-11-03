@@ -18,7 +18,9 @@ export function camView(c, aspect) {
   const dir = dirOf(c.yaw, TOP.tilt), eye = sub([c.x, c.y, c.z], mul(dir, c.dist));
   const far = c.dist * 2 + 3000, near = Math.max(1, c.dist * 0.02);
   const VP = M.mul(M.persp(TOP.fov, aspect, near, far), M.lookAt(eye, add(eye, dir)));
-  return { eye, dir, VP, fov: TOP.fov, near, far };
+  // at: the ground it looks at; reach: how far from there the ground can be on
+  // screen, generously (the far ground is kept that far: render/ground.js).
+  return { eye, dir, VP, fov: TOP.fov, near, far, at: [c.x, c.y, c.z], reach: c.dist * 1.6 * Math.max(1, aspect) + 300 };
 }
 
 // The ray under a screen point: from the eye, through that pixel.

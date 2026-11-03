@@ -733,7 +733,7 @@ export function createEditor(app) {
     drawCompass(ctx, 34, freeArea(W, H).y1 - 6, E.cam.yaw, pal);
   }
   // What the renderer asks for in the editor: the overhead camera.
-  app.topView = () => { const { W, H } = size(), v = camView(E.cam, W / H); return { eye: v.eye, dir: v.dir, fov: v.fov, near: v.near, far: v.far }; };
+  app.topView = () => { const { W, H } = size(), v = camView(E.cam, W / H); return { eye: v.eye, dir: v.dir, fov: v.fov, near: v.near, far: v.far, at: v.at, reach: v.reach }; };
 
   const kept = restore();
   if (kept) useDef(kept); else load(E.key);

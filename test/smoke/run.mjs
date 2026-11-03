@@ -322,6 +322,26 @@ try {
   });
   // Blast-off jets (spec 26): on the range, J held charges (crouched, still on the ground), let go blasts off
   // with the ring and the thunk; up there it's flying, and the jets are spent.
+  // The far ground follows what's in view (docs/specs/35-bigger-maps.md part 4):
+  // walked to a corner, the far squares across the map are let go; walked
+  // back, they come back.
+  await run('far-ground', URL_, async page => {
+    await page.click('[data-sel="debug"]'); await page.click('[data-dsec="jump"]');
+    await page.click('[data-dj="base"]');
+    await page.waitForFunction(() => window.__stompy.game.kind === 'base' && window.__stompy.game.state === 'play', null, { timeout: 10000 });
+    const far = () => page.evaluate(() => window.__stompy.app.scene.groundFarHeld());
+    const go = (x, z) => page.evaluate(async ([x, z]) => { const W = await import('/src/sim/walkView.js'), P = window.__stompy.game.player; W.shiftMech(P, x - P.x, z - P.z); }, [x, z]);
+    await page.waitForTimeout(500);
+    const mid = await far();
+    await go(950, 950);
+    await page.waitForFunction(n => window.__stompy.app.scene.groundFarHeld() < n, mid, { timeout: 10000 }).catch(() => {});
+    const corner = await far();
+    await go(0, 0);
+    await page.waitForFunction(n => window.__stompy.app.scene.groundFarHeld() >= n, mid, { timeout: 10000 }).catch(() => {});
+    const back = await far();
+    console.log(`far-ground: far squares held in the middle ${mid}, in a corner ${corner}, back ${back}`);
+    if (!(corner > 0 && corner < mid && back === mid)) { failed = true; console.error('FAIL: the far ground did not follow the eye'); }
+  });
   await run('blastoff', URL_, async page => {
     await page.click('[data-sel="debug"]'); await page.click('[data-dsec="range"]');
     await page.click('[data-a="go"]');

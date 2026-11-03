@@ -16,6 +16,11 @@ import { FS } from '../world/finePatch.js';
 // A group's chunks are let go again past LET_GO, so what's on the GPU stays
 // what's round you; the map (`fetch` false) takes no new ones at all: from
 // above it draws far meshes, and near ones only where they're already up.
+// Far meshes too follow what's in view (docs/specs/35-bigger-maps.md part 4):
+// each is made once its square is within FAR_PAD of the reach (the fog's end
+// in the cockpit; up above, as far as the screen shows) and let go past
+// FAR_SLACK more, so the GPU holds what's round you whatever the map's size.
+const FAR_PAD = 150, FAR_SLACK = 300;
 const LOD_AT = 300, NEAR_NOW = 200, LET_GO = 600, BUDGET_MS = 2, SEND_MAX = 32, G2 = 4, GX = Math.ceil(CX / G2), GZ = Math.ceil(CZ / G2), SIZE = CS * VS * G2;
 const FAR = 1 << 16;   // a job id at or past this is a group's far mesh
 const plain = (p, seed) => ({ low: p.low, mid: p.mid, high: p.high, rock: p.rock, ore: p.ore, iso: p.iso, seed });   // seed: where the seams run (world/seams.js)
@@ -38,7 +43,7 @@ export function createGround(R) {
   let ground = null, pal = null, world = 0, inFlight = 0, queue = [];
   const mesh = new Array(FAR + GX * GZ).fill(null), ver = new Int32Array(FAR + GX * GZ), waiting = new Uint8Array(FAR + GX * GZ);
   const newPart = () => ({ buf: null, count: 0, first: 0, lo: null, hi: null, dirty: false });
-  const groups = Array.from({ length: GX * GZ }, () => ({ near: newPart(), far: newPart(), wanted: false, left: 0 }));
+  const groups = Array.from({ length: GX * GZ }, () => ({ near: newPart(), far: newPart(), wanted: false, farWanted: false, left: 0 }));
   // The far meshes share a buffer per row of groups, so neighbours drawn far are one draw.
   const rows = Array.from({ length: GZ }, () => ({ buf: null, dirty: false }));
 
@@ -93,30 +98,29 @@ export function createGround(R) {
   }
   const byDistance = eye => (a, b) => groupDist(jobGroup(a), eye) - groupDist(jobGroup(b), eye) || (a >= FAR) - (b >= FAR);
 
-  // A new world: far meshes for everything, chunks for what's near `eye`.
-  function load(g, p, eye = [0, 0, 0]) {
+  // A new world: chunks for what's near `eye`, far meshes as far as `reach` (tick).
+  function load(g, p, eye = [0, 0, 0], reach = 1200) {
     ground = g; pal = plain(p, g.seed); world++; inFlight = 0;
     for (const m of patches.values()) if (m.part.buf) gl.deleteBuffer(m.part.buf);
     patches.clear();
     mesh.fill(null); ver.fill(0); waiting.fill(0); queue = [];
-    for (const gr of groups) { gr.wanted = false; gr.left = 0; gr.near.dirty = true; }
+    for (const gr of groups) { gr.wanted = false; gr.farWanted = false; gr.left = 0; gr.near.dirty = true; }
     for (const row of rows) row.dirty = true;
     if (startWorker()) worker.postMessage({ pal });
     for (let gi = 0; gi < groups.length; gi++) {
       const d = groupDist(gi, eye);
       if (d < NEAR_NOW) { groups[gi].wanted = true; for (const id of CHUNKS_OF[gi]) meshHere(id); }
-      want(FAR + gi);
     }
     g.dirty.clear();
-    tick(eye);
+    tick(eye, [], true, eye, reach);
   }
 
   // Each frame, before drawing: what the sim dug, what came near, then send or mesh some, then upload.
-  let lastEye = [0, 0, 0];
-  function tick(eye, falls = [], fetch = true) {
+  let lastEye = [0, 0, 0], lastFrom = [0, 0, 0], lastReach = 1200;
+  function tick(eye, falls = [], fetch = true, from = eye, reach = lastReach) {
     falling = falls;
     if (!ground) return;
-    lastEye = eye;
+    lastEye = eye; lastFrom = from; lastReach = reach;
     let added = false;
     if (ground.dirty.size) {
       for (const id of ground.dirty) {
@@ -128,7 +132,7 @@ export function createGround(R) {
           if (ox < 0 || oz < 0 || ox >= GX || oz >= GZ) continue;
           if (dx && (dx < 0 ? cx % G2 !== 0 : cx % G2 !== G2 - 1)) continue;
           if (dz && (dz < 0 ? cz % G2 !== 0 : cz % G2 !== G2 - 1)) continue;
-          ver[FAR + ox + GX * oz]++; want(FAR + ox + GX * oz);
+          if (groups[ox + GX * oz].farWanted) { ver[FAR + ox + GX * oz]++; want(FAR + ox + GX * oz); }
         }
       }
       ground.dirty.clear();
@@ -138,6 +142,9 @@ export function createGround(R) {
       const gr = groups[gi], d = groupDist(gi, eye);
       if (fetch && !gr.wanted && d < LOD_AT + 64) { gr.wanted = true; for (const id of CHUNKS_OF[gi]) want(id); added = true; }
       else if (fetch && gr.wanted && d > LET_GO) letGo(gi);
+      const df = groupDist(gi, from);
+      if (!gr.farWanted && df < reach + FAR_PAD) { gr.farWanted = true; want(FAR + gi); added = true; }
+      else if (gr.farWanted && df > reach + FAR_PAD + FAR_SLACK) dropFar(gi);
     }
     if (added) queue.sort(byDistance(eye));
     if (queue.length) {
@@ -168,7 +175,15 @@ export function createGround(R) {
     if (gr.near.buf) gl.deleteBuffer(gr.near.buf);
     gr.near = newPart();
   }
+  // A far mesh gone out of reach: off the GPU (its row is sent again without it).
+  function dropFar(gi) {
+    const id = FAR + gi;
+    groups[gi].farWanted = false;
+    if (waiting[id]) { ver[id]++; waiting[id] = 0; queue = queue.filter(q => q !== id); }
+    if (mesh[id]) { mesh[id] = null; rows[(gi / GX) | 0].dirty = true; }
+  }
   const held = () => groups.filter(g => g.wanted).length;   // groups with their chunks up (the perf harness and a test read it)
+  const farHeld = () => groups.filter(g => g.farWanted).length;   // groups with their far mesh wanted
 
   // Fine patches (world/finePatch.js, docs/specs/27-fine-dig.md): each meshed
   // whole at 2 m in the worker (here without one), at most 10 times a second
@@ -302,9 +317,9 @@ export function createGround(R) {
 
   // Resolves when everything wanted is meshed and uploaded (the perf harness and the smoke test wait on it).
   async function ready(eye = lastEye) {
-    tick(eye);
-    while (queue.length || inFlight) { await new Promise(r => setTimeout(r, 5)); tick(eye); }
+    tick(eye, [], true, eye === lastEye ? lastFrom : eye);
+    while (queue.length || inFlight) { await new Promise(r => setTimeout(r, 5)); tick(eye, [], true, eye === lastEye ? lastFrom : eye); }
   }
   const pending = () => queue.length + inFlight;
-  return { load, tick, draw, ready, pending, held };
+  return { load, tick, draw, ready, pending, held, farHeld };
 }

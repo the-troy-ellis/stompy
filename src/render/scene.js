@@ -151,8 +151,10 @@ export function createScene(app) {
   }
   // A chunk is drawn when its box is in view and some of it is nearer than the fog's end.
   const ID = M0.id(), SUNK = M0.T(0, -2, 0);   // the ground is drawn where it is; its far groups a little lower (render/ground.js)
-  function drawWorld(eye) {
-    ground.tick(eye, G.falls, !G.command);   // up in the map view: no new near ground (render/ground.js)
+  function drawWorld(eye, top) {
+    // Up in the map view: no new near ground, and the far ground kept round
+    // what it looks at, as far as the screen reaches (render/ground.js).
+    ground.tick(eye, G.falls, !G.command, top ? top.at : eye, top ? top.reach : FOG[1]);
     ground.draw(eye, FOG[1], PLANES, ID, SUNK);
     if (!world.buf) return;
     RUN.buf = world.buf; RUN.count = 0;
@@ -751,7 +753,7 @@ export function createScene(app) {
     Object.assign(FRAME, { VP, spot: SPOT, light: G.pal.light, shade: ir ? NO_SHADE : SHADE, cam: eye, fog: FOG, fogCol: hor, ir: ir ? 1 : 0 }); R.frame = FRAME;   // the instanced effects shader's copy
 
     R.drawHeat = 0;
-    drawWorld(eye);
+    drawWorld(eye, top);
     falls.draw(G);   // ground coming down (render/falls.js)
     drawScorches();
     // In the missile camera your own mech is out there too.
@@ -796,5 +798,5 @@ export function createScene(app) {
 
 
   const view = { get W() { return W; }, get H() { return H; }, get dpr() { return dpr; } };
-  return { resize, render, uploadWorld, view, poseWire, groundReady: () => ground.ready(), groundPending: ground.pending, groundHeld: ground.held };
+  return { resize, render, uploadWorld, view, poseWire, groundReady: () => ground.ready(), groundPending: ground.pending, groundHeld: ground.held, groundFarHeld: ground.farHeld };
 }

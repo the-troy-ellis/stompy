@@ -259,7 +259,7 @@ export function createCommand(app) {
   function view() {
     if (!C.cam) return null;
     const { W, H } = size(), v = camView(C.cam, W / H);
-    return { eye: v.eye, dir: v.dir, fov: v.fov, near: v.near, far: v.far };
+    return { eye: v.eye, dir: v.dir, fov: v.fov, near: v.near, far: v.far, at: v.at, reach: v.reach };
   }
 
   // A frame's markers over the world from above: the crew (what each is up
