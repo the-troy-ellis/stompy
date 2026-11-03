@@ -252,6 +252,28 @@ mech picks it; foes and buildings can't be picked in this slice. With
   when the context comes back, or on the tap. Nothing is rebuilt in place,
   so the match starts over.
 
+### Fix: the map's zoom running a phone out
+
+- **Seen:** on an iPhone 13 mini the map view lost its 3D view
+  (`THE VIEW WENT OUT.`) after a few zooms.
+- **Why:** each far square past the reach was let go as you zoomed in, and
+  meshed and sent again as you zoomed out. The far squares share a buffer
+  per row, and the row was re-sized (`bufferData`) every time one of its
+  squares came in. A phone meshes slower, so the squares come in one a frame
+  and each row was re-sized again and again on every zoom. iOS frees the old
+  stores late, so they piled up until it took the context away.
+- **Now:**
+  - Up in the map view, far squares are kept once they're up (`fetch`
+    false keeps them, as it already kept near ones). The most it holds is
+    every far square, which spec 35 measured at about 22 MB on the 3 km
+    canyon.
+  - A row's buffer has a quarter to spare and is written in place
+    (`bufferSubData`). It is sized again only when it outgrows that or
+    falls under half of it, so the cockpit still gives memory back as you
+    walk.
+  - `npm run perf` zooms the map in and out three times after its sweep and
+    fails on any new GPU store (`map-zoom`, budget 0; the old code made 36).
+
 ## Code touchpoints
 
 - `src/sim/orders.js` (new): `give`, `obey`, and `ORDER` (arrive and

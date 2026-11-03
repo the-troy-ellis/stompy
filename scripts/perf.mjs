@@ -208,6 +208,7 @@ try {
     P.bindBuffer = function (t, b) { bound.set(t, b); return bindBuffer.call(this, t, b); };
     P.bufferData = function (t, d, ...r) {
       const b = bound.get(t);
+      gpu.allocs = (gpu.allocs || 0) + 1;   // every bufferData, which a phone's GPU may hold until it frees the old store
       if (b) { const n = typeof d === 'number' ? d : d.byteLength; gpu.bytes += n - (held.get(b) || 0); held.set(b, n); }
       return bufferData.call(this, t, d, ...r);
     };
@@ -335,6 +336,19 @@ try {
     window.__each = i => { const c = app.command.C.cam, a = i / 600 * Math.PI * 2; c.x = Math.sin(a) * BX * 0.9; c.z = Math.sin(a * 2) * BZ * 0.9; };
   });
   await scene('map-sweep', 600);
+  // The map's zoom: once its far ground is up, zooming in and out makes no new
+  // GPU stores (an iPhone 13 mini lost its 3D view after a few zooms when each
+  // one dropped the far squares and re-sized their rows again).
+  const zoomAllocs = await page.evaluate(async () => {
+    const app = window.__stompy.app, c = app.command.C.cam;
+    const at = async d => { c.dist = d; for (let i = 0; i < 12; i++) { app.scene.render(); await new Promise(r => setTimeout(r, 40)); } };
+    await at(3200); await at(60); await at(3200);
+    const n0 = window.__gpu.allocs;
+    for (let k = 0; k < 3; k++) { await at(60); await at(3200); }
+    return window.__gpu.allocs - n0;
+  });
+  console.log(`map-zoom: ${zoomAllocs} new GPU stores over three zooms in and out (budget 0)`);
+  if (zoomAllocs > 0) { failed = true; console.error('OVER: the map\'s zoom re-sizes GPU buffers'); }
   await page.evaluate(() => { window.__each = null; window.__settle = 0; window.__stompy.app.command.toggle(); });
   // A big map (spec 35 part 5): the 3 km test canyon (data/maps.js), walked
   // from its south end to its north over 10 s, the ground's worker answering
