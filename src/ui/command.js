@@ -3,7 +3,7 @@ import { hudPalette } from '../data/colors.js';
 import { RADAR_RANGE, radarOf } from '../data/weather.js';
 import { BX, BZ } from '../world/terrain.js';
 import { TOP, createTopCamera, camView, groundToScreen, screenToGround, panBy, zoomAt, rotateAbout, settle, metresPerPixel } from '../render/topCamera.js';
-import { drawMap, drawCompass } from '../render/markers.js';
+import { drawMap, drawCompass, clipTo, seg, poly } from '../render/markers.js';
 import { bindPointer } from '../input/pointer.js';
 import { pickNearest, pickInside } from '../sim/pick.js';
 import { crewOf, canCommand, commandUp, commandDown } from '../sim/crew.js';
@@ -287,6 +287,7 @@ export function createCommand(app) {
     for (const t of G.base?.things || []) if (!t.at && !t.by) things.push({ id: t, kind: 'structure', x: t.x, y: G.ter.height(t.x, t.z), z: t.z, label: t.part === 'core' ? 'CORE' : 'PART' });   // loose on the ground: a wreck's core (spec 33)
     for (const h of G.base?.heaps || []) if (h.alive) things.push({ id: h, kind: 'structure', x: h.x, y: h.y, z: h.z, label: `ORE ${Math.floor(h.ore)}` });   // a fallen silo's spill (spec 33)
     for (const f of G.mechs) if (f.alive && f.team !== 0 && crew.some(m => Math.hypot(f.x - m.x, f.z - m.z) < reach)) things.push({ id: f, kind: 'foe', x: f.x, y: f.y, z: f.z, face: -f.yaw / D2R });
+    clipTo(W, H);   // the long lines and shapes below are cut to the screen (render/markers.js)
     drawLand(ctx, view, pal);
     drawMap(ctx, view, { map: { bound: [BX, BZ], height: G.ter.height, grid: 100 }, things, sel: C.picked, box: C.box, pal });
     drawExposed(ctx, view, pal);
@@ -316,8 +317,7 @@ export function createCommand(app) {
       const s = nearestSilo(G, m.x, m.z);
       if (!s) continue;
       const [px, pz] = padOf(s), a = view.toScreen(m.x, m.y, m.z), b = view.toScreen(px, G.ter.height(px, pz), pz);
-      if (!a || !b) continue;
-      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+      ctx.beginPath(); seg(ctx, a, b); ctx.stroke();
     }
     ctx.setLineDash([]); ctx.lineWidth = 2;
     ctx.font = 'bold 11px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -384,8 +384,8 @@ export function createCommand(app) {
     if (!land) return;
     const S = n => view.toScreen(n.x, G.ter.height(n.x, n.z), n.z);
     ctx.save();
-    const tri = (a, b, c) => { const p = [S(a), S(b), S(c)]; if (p.some(q => !q)) return; ctx.beginPath(); ctx.moveTo(p[0][0], p[0][1]); ctx.lineTo(p[1][0], p[1][1]); ctx.lineTo(p[2][0], p[2][1]); ctx.closePath(); ctx.fill(); };
-    const line = (a, b) => { const p = S(a), q = S(b); if (!p || !q) return; ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); };
+    const tri = (a, b, c) => { const p = [S(a), S(b), S(c)]; if (p.some(q => !q)) return; ctx.beginPath(); poly(ctx, p); ctx.fill(); };
+    const line = (a, b) => { ctx.beginPath(); seg(ctx, S(a), S(b)); ctx.stroke(); };
     ctx.fillStyle = dotsOf(ctx, pal.good); ctx.strokeStyle = pal.good; ctx.lineWidth = 1;
     for (const [i, j, k] of land.tris) tri(land.nodes[i], land.nodes[j], land.nodes[k]);
     for (const [i, j] of land.links) line(land.nodes[i], land.nodes[j]);
@@ -503,12 +503,12 @@ export function createCommand(app) {
       if (!b) continue;
       ctx.strokeStyle = ctx.fillStyle = o.kind === 'attack' ? pal.bad : pal.good;   // ATTACK in the foes' red
       ctx.setLineDash(o.kind === 'follow' || o.kind === 'guard' ? [4, 5] : []);
-      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+      ctx.beginPath(); seg(ctx, a, b); ctx.stroke();
       ctx.setLineDash([]);
       if (o.kind === 'go') { ctx.beginPath(); ctx.moveTo(b[0], b[1]); ctx.lineTo(b[0], b[1] - 16); ctx.stroke(); ctx.fillRect(b[0], b[1] - 16, 9, 6); }
       else if (o.kind === 'dig') {
         const f = S({ x: o.x + Math.sin(o.yaw) * 8, z: o.z + Math.cos(o.yaw) * 8 });
-        if (f) { ctx.beginPath(); ctx.arc(b[0], b[1], 4, 0, 7); ctx.moveTo(b[0], b[1]); ctx.lineTo(f[0], f[1]); ctx.stroke(); }
+        if (f) { ctx.beginPath(); ctx.arc(b[0], b[1], 4, 0, 7); seg(ctx, b, f); ctx.stroke(); }
       } else if (o.kind === 'attack') { ctx.beginPath(); ctx.arc(b[0], b[1], 13, 0, 7); ctx.stroke(); }   // crosshairs on it
       else if (o.kind === 'guard') { ctx.beginPath(); ctx.arc(b[0], b[1], 16, 0, 7); ctx.stroke(); }
     }
@@ -523,7 +523,7 @@ export function createCommand(app) {
     if (pts.some(p => !p)) return;
     const col = f.why ? pal.bad : C.lift && !f.inside ? '#fc3' : pal.good, mid = view.toScreen(f.x, G.ter.height(f.x, f.z), f.z);
     ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
-    ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.stroke();
+    ctx.beginPath(); poly(ctx, pts); ctx.stroke();
     ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.font = 'bold 11px "Lucida Console", monospace';
     if (mid) ctx.fillText(f.why === 'room' ? 'NO ROOM' : f.why === 'built' ? 'BUILT' : C.lift ? (f.inside ? `${NAMES.buildings[f.kind]} · YOURS HERE` : 'OUTSIDE YOUR BORDER') : `${NAMES.buildings[f.kind]} · ${PLACE[f.kind].ore} ORE`, mid[0], mid[1]);
     ctx.restore();

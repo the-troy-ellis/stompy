@@ -13,8 +13,65 @@
 const FONT = 'bold 11px "Lucida Console", monospace';
 const D2R = Math.PI / 180;
 
+// Lines and shapes clipped to the screen (and PAD round it) before they're
+// drawn. A point just in front of the camera's plane lands millions of
+// pixels away, and an iPhone's canvas dashes a dashed line all the way out
+// there: the map's dashed edge, panned and zoomed, ran it out of memory
+// (`THE VIEW WENT OUT`). Chrome's canvas clips first; WebKit's doesn't.
+const PAD = 64;
+let CW = 1e4, CH = 1e4;   // the screen the next lines are clipped to (drawMap, clipTo)
+export function clipTo(W, H) { CW = W; CH = H; }
+// A point well off the screen: a marker there isn't drawn at all.
+export const offScreen = p => !p || p[0] < -4 * PAD || p[1] < -4 * PAD || p[0] > CW + 4 * PAD || p[1] > CH + 4 * PAD;
+// The part of the segment a–b inside the screen (Liang–Barsky): t0 and t1
+// along it, or null if it misses. Written into T (no garbage).
+const T = [0, 1];
+function clipT(ax, ay, bx, by) {
+  let t0 = 0, t1 = 1;
+  const dx = bx - ax, dy = by - ay;
+  for (let i = 0; i < 4; i++) {
+    const p = i === 0 ? -dx : i === 1 ? dx : i === 2 ? -dy : dy;
+    const q = i === 0 ? ax + PAD : i === 1 ? CW + PAD - ax : i === 2 ? ay + PAD : CH + PAD - ay;
+    if (p === 0) { if (q < 0) return null; continue; }
+    const r = q / p;
+    if (p < 0) { if (r > t1) return null; if (r > t0) t0 = r; } else { if (r < t0) return null; if (r < t1) t1 = r; }
+  }
+  T[0] = t0; T[1] = t1;
+  return T;
+}
+// A straight line a–b on screen, the part that shows.
+export function seg(ctx, a, b) {
+  if (!a || !b || !clipT(a[0], a[1], b[0], b[1])) return;
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  ctx.moveTo(a[0] + T[0] * dx, a[1] + T[0] * dy); ctx.lineTo(a[0] + T[1] * dx, a[1] + T[1] * dy);
+}
+// A polygon on screen (points [x, y]), cut to the screen (Sutherland–Hodgman),
+// as a closed sub-path; nothing if none of it shows.
+export function poly(ctx, pts) {
+  let out = pts;
+  for (let e = 0; e < 4 && out.length; e++) {
+    const inside = q => (e === 0 ? q[0] >= -PAD : e === 1 ? q[0] <= CW + PAD : e === 2 ? q[1] >= -PAD : q[1] <= CH + PAD);
+    const cut = (a, b) => {
+      const k = e === 0 ? (-PAD - a[0]) / (b[0] - a[0]) : e === 1 ? (CW + PAD - a[0]) / (b[0] - a[0]) : e === 2 ? (-PAD - a[1]) / (b[1] - a[1]) : (CH + PAD - a[1]) / (b[1] - a[1]);
+      return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+    };
+    const next = [];
+    for (let i = 0; i < out.length; i++) {
+      const a = out[i], b = out[(i + 1) % out.length], ia = inside(a), ib = inside(b);
+      if (ia) next.push(a);
+      if (ia !== ib) next.push(cut(a, b));
+    }
+    out = next;
+  }
+  if (out.length < 3) return;
+  ctx.moveTo(out[0][0], out[0][1]);
+  for (let i = 1; i < out.length; i++) ctx.lineTo(out[i][0], out[i][1]);
+  ctx.closePath();
+}
+
 export function drawMap(ctx, view, { map, things = [], routes = [], waves = [], sel = new Set(), box = null, pal, centre = { x: 0, z: 0 }, sight = null }) {
   const S = (x, z, y = map.height(x, z)) => view.toScreen(x, y, z);
+  clipTo(view.W, view.H);
   ctx.save();
   ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.font = FONT; ctx.textBaseline = 'middle';
 
@@ -32,7 +89,7 @@ export function drawMap(ctx, view, { map, things = [], routes = [], waves = [], 
   ctx.setLineDash([]);
   // The map's centre, where every `at` is measured from.
   const c = S(centre.x, centre.z);
-  if (c) { ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(c[0] - 7, c[1]); ctx.lineTo(c[0] + 7, c[1]); ctx.moveTo(c[0], c[1] - 7); ctx.lineTo(c[0], c[1] + 7); ctx.stroke(); }
+  if (!offScreen(c)) { ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(c[0] - 7, c[1]); ctx.lineTo(c[0] + 7, c[1]); ctx.moveTo(c[0], c[1] - 7); ctx.lineTo(c[0], c[1] + 7); ctx.stroke(); }
 
   // What one thing can see: a tint on each cell it sees, the rest darkened,
   // and its range. `sight`: { from: {x, z}, range, cell, cells: [{ x, z, seen }] }.
@@ -42,10 +99,11 @@ export function drawMap(ctx, view, { map, things = [], routes = [], waves = [], 
       const q = [S(cl.x - half, cl.z - half), S(cl.x + half, cl.z - half), S(cl.x + half, cl.z + half), S(cl.x - half, cl.z + half)];
       if (q.some(v => !v)) continue;
       ctx.fillStyle = cl.seen ? 'rgba(255,90,70,0.22)' : 'rgba(0,0,0,0.3)';
-      ctx.beginPath(); ctx.moveTo(q[0][0], q[0][1]); for (let i = 1; i < 4; i++) ctx.lineTo(q[i][0], q[i][1]); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); poly(ctx, q); ctx.fill();
     }
     ctx.strokeStyle = pal.bad; ctx.lineWidth = 1.5; ctx.setLineDash([6, 6]); ctx.beginPath();
-    for (let a = 0; a <= 360; a += 6) { const p = S(sight.from.x - Math.sin(a * D2R) * sight.range, sight.from.z + Math.cos(a * D2R) * sight.range); if (p) (a ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); }
+    let prev = null;
+    for (let a = 0; a <= 360; a += 6) { const p = S(sight.from.x - Math.sin(a * D2R) * sight.range, sight.from.z + Math.cos(a * D2R) * sight.range); seg(ctx, prev, p); prev = p; }
     ctx.stroke(); ctx.setLineDash([]);
   }
 
@@ -54,7 +112,7 @@ export function drawMap(ctx, view, { map, things = [], routes = [], waves = [], 
     const pts = r.pts.map(p => S(p.x, p.z, p.y));
     ctx.strokeStyle = sel.has(r.id) ? '#fff' : pal.good; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
     ctx.beginPath();
-    pts.forEach((p, i) => p && (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+    for (let i = 1; i < pts.length; i++) seg(ctx, pts[i - 1], pts[i]);
     ctx.stroke(); ctx.setLineDash([]);
     pts.forEach((p, i) => {
       if (!p) return;
@@ -84,7 +142,7 @@ export function drawMap(ctx, view, { map, things = [], routes = [], waves = [], 
   // Things.
   for (const t of things) {
     const p = S(t.x, t.z, t.y);
-    if (!p) continue;
+    if (offScreen(p)) continue;
     const [x, y] = p, on = sel.has(t.id);
     const facing = t.face == null ? null : facingOnScreen(S, t);
     if (t.kind === 'nav' || t.kind === 'pad') {
@@ -139,14 +197,21 @@ function facingOnScreen(S, t) {
   return a && q ? Math.atan2(q[1] - a[1], q[0] - a[0]) : null;
 }
 // A ground line from (x0, z0) to (x1, z1), bent to the terrain every `step` m.
+// Each piece is clipped to the screen; one that runs on from the last piece
+// carries on the same sub-path, so a dash pattern runs on unbroken.
 function line(ctx, S, x0, z0, x1, z1, step) {
   const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / step));
-  let pen = false;
+  let have = false, pen = false, px = 0, py = 0;   // have: the last point projected; pen: the path is at it
   for (let i = 0; i <= n; i++) {
     const p = S(x0 + (x1 - x0) * i / n, z0 + (z1 - z0) * i / n);
-    if (!p) { pen = false; continue; }
-    if (pen) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]);
-    pen = true;
+    if (!p) { have = pen = false; continue; }
+    if (have && clipT(px, py, p[0], p[1])) {
+      const dx = p[0] - px, dy = p[1] - py;
+      if (!(pen && T[0] === 0)) ctx.moveTo(px + T[0] * dx, py + T[0] * dy);
+      ctx.lineTo(px + T[1] * dx, py + T[1] * dy);
+      pen = T[1] === 1;
+    } else pen = false;
+    px = p[0]; py = p[1]; have = true;
   }
 }
 function arrow(ctx, a, b) {
