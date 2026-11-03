@@ -7,10 +7,10 @@
 // data/settings.js PIXEL_LINES); ?debug=1's LOOK row can still set any count
 // by hand, so the owner can settle the final number by eye.
 import { PIXEL_LINES } from '../data/settings.js';
-export const LOOK_DEFAULT = { lines: PIXEL_LINES[0], aa: false };
+export const LOOK_DEFAULT = { lines: PIXEL_LINES[2], aa: true };   // CRISP (data/settings.js PIXELS default)
 // The look for a PIXELS step: hard pixels have no antialiasing; CRISP has it
 // (from the next load, as the context is made once).
-export const lookOf = pixels => { const lines = PIXEL_LINES[pixels] ?? PIXEL_LINES[0]; return { lines, aa: lines === 0 }; };
+export const lookOf = pixels => { const lines = PIXEL_LINES[pixels] ?? PIXEL_LINES[2]; return { lines, aa: lines === 0 }; };
 export const LOOK_PRESETS = [0, 480, 360, 300, 240, 200, 160, 120];
 export const LOOK_KEY = 'dev.look';
 
