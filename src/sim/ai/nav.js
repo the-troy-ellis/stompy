@@ -1,5 +1,5 @@
 import { HALF, BOUND } from '../../world/terrain.js';
-import { VS, Y0, NY, cornerIndex } from '../../world/voxels.js';
+import { VS, Y0, NY } from '../../world/voxels.js';
 
 const { abs, floor, hypot, max, min } = Math;
 
@@ -26,10 +26,10 @@ export function makeNav(ter) {
     for (let a = 0; a < PER; a++) for (let b = 0; b < PER; b++) {
       const i = sx * PER + a + 1, k = sz * PER + b + 1, x = -HALF + i * VS, z = -HALF + k * VS, off = abs(a - PER / 2 + 0.5) + abs(b - PER / 2 + 0.5);
       for (let j = 1; j < NY - 1; j++) {
-        const lo = D[cornerIndex(i, j, k)], hi = D[cornerIndex(i, j + 1, k)];
+        const lo = D.at(i, j, k), hi = D.at(i, j + 1, k);
         if (lo <= 128 || hi > 128) continue;
         let top = j + 2;
-        while (top < NY && D[cornerIndex(i, top, k)] <= 128) top++;
+        while (top < NY && D.at(i, top, k) <= 128) top++;
         const y = Y0 + (j + (lo - 128) / (lo - hi)) * VS;
         if (Y0 + top * VS - y >= HEADROOM) ys.push({ y, x, z, off });
       }

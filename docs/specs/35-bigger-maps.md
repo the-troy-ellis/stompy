@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft |
+| Status | in progress (parts 2–3) |
 | Milestone | M14 |
 | Size | L (in five parts) |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md), [29-ground-4m.md](29-ground-4m.md), [34-big-fights.md](34-big-fights.md) |
@@ -77,24 +77,37 @@ first and change nothing a player sees. Only part 5 makes a map bigger.
 
 This halves the ground's memory today, with nothing else changed.
 
-### Part 3: the ground in chunks, stored only where it was changed
+### Part 3: the ground in chunks, shared where all rock or all air
 
-- `D` becomes chunks of 16³ cells (`CS`, as the meshes already use). A chunk
-  is held as bytes only once something changes it: a landmark, a pocket, a
-  stroke, a dig, a fall, or a heap landing.
-- A chunk never changed is answered from the heights. Each column keeps its
-  rock top and air bottom (`jr`, `ja`) and the ramp between, a few bytes a
-  column, as `makeGround` computes them today.
-- `sample`, `csample`, `ray`, `groundBelow` and the mesher read through one
-  lookup: the chunk's bytes if it has them, or the column's ramp if not.
-  These are the hottest paths in the sim. The lookup must cost no more than
-  about 5% in the crowd scene (spec 34) and the dig scenes, or the part
-  isn't done.
-- `ground.hash` (the arena's check that every client holds the same ground)
-  hashes the same bytes as today, from either form.
-- Memory: the chunks a mission's landmarks touch, plus the chunks dug. A
-  fresh 2.3 km map holds a few MB instead of 25.6, and a 9.2 km map about
-  the same.
+Built (`world/grid.js`). It's simpler than first planned, and close enough
+in memory:
+
+- The corners are held 16 × 8 × 16 at a time. A chunk that is all rock or
+  all air is one shared array, so it costs nothing. It is copied the first
+  time anything writes a different byte to it: a landmark, a pocket, a
+  stroke, a dig, a fall or a heap.
+- The ground is built chunk by chunk from each column's height, rock top and
+  air bottom. A chunk wholly under every column's rock, or over every
+  column's ramp, is known without working out its bytes. So the whole box is
+  never held, and the build takes as long as before.
+- `voxels.js` reads and writes through `at`/`put` (corner i, j, k: the hot
+  paths, such as `csample`, column tops and blocks for the mesher) and
+  `get`/`set` (corner indices: the fall checks, shaping and digging).
+- The first plan, answering untouched chunks from the heights on every read,
+  would have held only the changed chunks. Measured, the shared chunks get
+  most of the way with no branch on the hot path: the chunks that cross the
+  surface take 5 MB at today's size. That grows with the map's area (about
+  20 MB at 4.6 km), which fits S, M and L.
+
+Measured on today's map:
+- A ground holds **8 MB instead of 27 MB**. The perf scenes hold 37–43 MB
+  of heap instead of 55–62.
+- A million samples near the surface cost the same either way (about 90–110
+  ns each, the noise between runs larger than any difference).
+- The crowd and dig scenes don't move.
+- Fourteen grounds (two seeds and twelve missions), each dug 40 times with
+  its falls, hash the same as before, corner for corner. So does the smoke
+  test's arena ground across clients.
 
 ### Part 4: the far ground by distance
 
@@ -154,7 +167,8 @@ This halves the ground's memory today, with nothing else changed.
    scratch is ever allocated.
 3. After part 3, a fresh 2.3 km map holds under 8 MB of ground bytes, the
    arena's ground hash matches today's for the same digs, and the crowd and
-   dig scenes cost no more than 5% more.
+   dig scenes cost no more than 5% more. (Done: 8 MB, the same hashes, no
+   measurable change in either scene.)
 4. After part 4, GPU memory in `big-map` stays within 25% of today's
    `map-sweep` while crossing the map.
 5. After part 5, a 4.6 km mission plays on the reference phone without the

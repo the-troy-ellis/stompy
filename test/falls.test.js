@@ -30,8 +30,8 @@ test('a ball whose stem is blown out falls to the ground and lands as a heap', (
   assert.ok(f.n >= SHATTER && f.heap, `a heap: ${f.n} corners`);
   assert.equal(f.drop * VS, 12, 'whole cells: as far as it can without going into the ground');
   assert.ok(!G.ter.solid(0, 44, 0), 'the grid has it gone from up there at once');
-  assert.ok(G.ter.D[ci(0, 4, 0)] > 128 && G.ter.D[ci(0, 12, 0)] > 128, 'and in its heap, 12 m down: the stem\'s top where its foot was');
-  assert.ok(G.ter.D[ci(0, 52, 0)] <= 128, 'the ball\'s crown is lower too');
+  assert.ok(G.ter.D.get(ci(0, 4, 0)) > 128 && G.ter.D.get(ci(0, 12, 0)) > 128, 'and in its heap, 12 m down: the stem\'s top where its foot was');
+  assert.ok(G.ter.D.get(ci(0, 52, 0)) <= 128, 'the ball\'s crown is lower too');
   stepFor(G, 2);
   assert.equal(G.falls.length, 0, 'drawn falling, then landed');
 });
@@ -44,7 +44,7 @@ test('ground the land holds up does not fall; a dig in a hillside drops nothing'
 
 test('an unheld island past ISLAND_MAX corners counts as land; a small one shatters', () => {
   const G = game(), D = G.ter.D, j = 20;
-  const slab = (n, i0) => { for (let k = 100; k < 100 + n; k++) for (let i = i0; i < i0 + n; i++) D[cornerIndex(i, j, k)] = 200; };
+  const slab = (n, i0) => { for (let k = 100; k < 100 + n; k++) for (let i = i0; i < i0 + n; i++) D.set(cornerIndex(i, j, k), 200); };
   slab(190, 20);   // 36,100 corners floating
   assert.ok(190 * 190 > ISLAND_MAX);
   assert.deepEqual(G.ter.islands([20, 30, j, j, 100, 110]), [], 'too big to be anything but land');
@@ -52,10 +52,10 @@ test('an unheld island past ISLAND_MAX corners counts as land; a small one shatt
   const isl = G.ter.islands([220, 225, j, j, 100, 105]);
   assert.equal(isl.length, 1);
   assert.equal(isl[0].length, 1600);
-  for (let i = 400; i < 402; i++) for (let k = 400; k < 402; k++) D[cornerIndex(i, j, k)] = 200;   // four corners
+  for (let i = 400; i < 402; i++) for (let k = 400; k < 402; k++) D.set(cornerIndex(i, j, k), 200);   // four corners
   const tiny = G.ter.fall(G.ter.islands([400, 401, j, j, 400, 401])[0]);
   assert.equal(tiny.heap, false, 'under SHATTER corners: it shatters');
-  assert.ok(D[cornerIndex(400, j, 400)] <= 128 && D[cornerIndex(400, j - tiny.drop, 400)] <= 128 || tiny.drop === 0, 'and leaves nothing behind');
+  assert.ok(D.get(cornerIndex(400, j, 400)) <= 128 && D.get(cornerIndex(400, j - tiny.drop, 400)) <= 128 || tiny.drop === 0, 'and leaves nothing behind');
   assert.ok(NX > 402 && NZ > 402);
 });
 
