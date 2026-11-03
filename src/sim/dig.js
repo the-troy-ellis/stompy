@@ -9,7 +9,7 @@ import { sceneryNear, destroyEntity } from './entities.js';
 import { particle, msg } from './effects.js';
 import { viewYaw } from './geom.js';
 import { cloneGround, VS, Y0, PX, PY } from '../world/voxels.js';
-import { HALF } from '../world/terrain.js';
+import { HX, HZ } from '../world/terrain.js';
 import { feel } from './feel.js';
 import { damage } from './combat.js';
 import { geoOf } from '../data/geo.js';
@@ -180,7 +180,7 @@ function confirmDig(G, e, seen, rock = DIG.rock, tally = null, fl = -Infinity, s
   if (G.digLog) {
     logDig(G, { kind: 'dig', box: [x - r, y - r, z - r, x + r, y + r, z + r] });
     for (const w of weighed) logDig(G, { kind: 'weigh', ...w });
-    for (const f of falls) { const [i0, i1, j0, j1, k0, k1] = f.box; logDig(G, { kind: 'fall', box: [-HALF + i0 * VS, Y0 + j0 * VS, -HALF + k0 * VS, -HALF + i1 * VS, Y0 + j1 * VS, -HALF + k1 * VS] }); }
+    for (const f of falls) { const [i0, i1, j0, j1, k0, k1] = f.box; logDig(G, { kind: 'fall', box: [-HX + i0 * VS, Y0 + j0 * VS, -HZ + k0 * VS, -HX + i1 * VS, Y0 + j1 * VS, -HZ + k1 * VS] }); }
   }
   if (C !== G.ter) {
     const k = G.unechoed.findIndex(u => u[1] === x && u[2] === y && u[3] === z && u[4] === r);
@@ -198,7 +198,7 @@ function confirmDig(G, e, seen, rock = DIG.rock, tally = null, fl = -Infinity, s
   for (const f of falls) startFall(G, f, seen);
   if (G.nav) {   // the AI's map looks at the ground here again (ai/nav.js)
     G.nav.mark(x, z, r);
-    for (const f of falls) { const [i0, i1, , , k0, k1] = f.box; G.nav.mark(-HALF + (i0 + i1) / 2 * VS, -HALF + (k0 + k1) / 2 * VS, Math.max(i1 - i0, k1 - k0) * VS / 2 + VS); }
+    for (const f of falls) { const [i0, i1, , , k0, k1] = f.box; G.nav.mark(-HX + (i0 + i1) / 2 * VS, -HZ + (k0 + k1) / 2 * VS, Math.max(i1 - i0, k1 - k0) * VS / 2 + VS); }
   }
 }
 
@@ -212,7 +212,7 @@ function startFall(G, f, seen) {
     const i = o % PX, j = ((o / PX) | 0) % PY, k = (o / (PX * PY)) | 0;
     sx += i; sz += k; lo = min(lo, j); hi = max(hi, j); cols.add(i + PX * k);
   }
-  const n = f.cells.length, at = [-HALF + (sx / n) * VS, Y0 + lo * VS, -HALF + (sz / n) * VS];
+  const n = f.cells.length, at = [-HX + (sx / n) * VS, Y0 + lo * VS, -HZ + (sz / n) * VS];
   const [i0, i1, , , k0, k1] = f.box, reach = hypot(i1 - i0 + 1, k1 - k0 + 1) * VS / 2;
   settle(G, at[0], at[2], reach);   // what stood on it: props break, scorches and wrecks drop
   const fall = { ...f, n, cols, at, top: Y0 + hi * VS, dropM: f.drop * VS, off: 0, vy: 0, reach };
@@ -235,7 +235,7 @@ export function stepFalls(G, dt) {
 // A fall lands: the mechs under it take the crush (on the client that owns
 // each), props and structures under it break, and the landing thunks.
 function land(G, f, seen) {
-  const under = (x, z) => f.cols.has(round((x + HALF) / VS) + PX * round((z + HALF) / VS));
+  const under = (x, z) => f.cols.has(round((x + HX) / VS) + PX * round((z + HZ) / VS));
   const bottom = f.at[1] - f.dropM, top = f.top - f.dropM;
   if (seen) {
     for (const m of G.mechs) {

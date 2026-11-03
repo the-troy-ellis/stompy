@@ -1,4 +1,4 @@
-import { HALF, BOUND } from '../../world/terrain.js';
+import { HX, HZ, BX, BZ } from '../../world/terrain.js';
 import { VS, Y0, NY } from '../../world/voxels.js';
 
 const { abs, floor, hypot, max, min } = Math;
@@ -10,21 +10,22 @@ const { abs, floor, hypot, max, min } = Math;
 // is one a mech walks (CLIFF) and there is headroom; A* runs on the links for
 // moves past the feelers' reach. Digs and falls mark squares to look at again
 // (sim/dig.js). Built per ground, at first use, in a few ms.
-export const SQ = 32, N = (2 * HALF) / SQ, CLIFF = 1.6, HEADROOM = 9, MAX_FLOORS = 4;
+export const SQ = 32, CLIFF = 1.6, HEADROOM = 9, MAX_FLOORS = 4;
 const PER = SQ / VS, STEP_M = 2, SLACK = STEP_M / 4;   // corner columns a square spans; the walk between squares, in metres: half a 4 m cell, so a wall that rises inside one cell is seen (docs/specs/29-ground-4m.md)
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
 export function makeNav(ter) {
-  const floors = new Array(N * N), links = new Map();
+  const NQ = (2 * HX) / SQ, NW = (2 * HZ) / SQ;   // squares across and along, for this map's size
+  const floors = new Array(NQ * NW), links = new Map();
   // The floors in one square: in each of its corner columns, every rise from
   // rock to air with headroom over it; floors within a cell of each other are one.
   // Each floor is { y, x, z }: where it was found nearest the square's middle,
   // so a tunnel narrower than a square is walked through its own middle.
   function floorsOf(s) {
-    const sx = s % N, sz = (s / N) | 0, D = ter.D, ys = [];
-    if (Math.abs(-HALF + (sx + 0.5) * SQ) > BOUND || Math.abs(-HALF + (sz + 0.5) * SQ) > BOUND) return ys;   // past where anyone can walk
+    const sx = s % NQ, sz = (s / NQ) | 0, D = ter.D, ys = [];
+    if (Math.abs(-HX + (sx + 0.5) * SQ) > BX || Math.abs(-HZ + (sz + 0.5) * SQ) > BZ) return ys;   // past where anyone can walk
     for (let a = 0; a < PER; a++) for (let b = 0; b < PER; b++) {
-      const i = sx * PER + a + 1, k = sz * PER + b + 1, x = -HALF + i * VS, z = -HALF + k * VS, off = abs(a - PER / 2 + 0.5) + abs(b - PER / 2 + 0.5);
+      const i = sx * PER + a + 1, k = sz * PER + b + 1, x = -HX + i * VS, z = -HZ + k * VS, off = abs(a - PER / 2 + 0.5) + abs(b - PER / 2 + 0.5);
       for (let j = 1; j < NY - 1; j++) {
         const lo = D.at(i, j, k), hi = D.at(i, j + 1, k);
         if (lo <= 128 || hi > 128) continue;
@@ -61,7 +62,7 @@ export function makeNav(ter) {
     links.set(key, ok);
     return ok;
   }
-  const square = (x, z) => min(N - 1, max(0, floor((x + HALF) / SQ))) + N * min(N - 1, max(0, floor((z + HALF) / SQ)));
+  const square = (x, z) => min(NQ - 1, max(0, floor((x + HX) / SQ))) + NQ * min(NW - 1, max(0, floor((z + HZ) / SQ)));
   const nearestFloor = (s, y) => { const f = fl(s); let best = 0; for (let i = 1; i < f.length; i++) if (abs(f[i].y - y) < abs(f[best].y - y)) best = i; return f.length ? best : -1; };
 
   // A path from (x0, y0, z0) to (x1, y1, z1): [[x, y, z], ...] square by
@@ -81,11 +82,11 @@ export function makeNav(ter) {
       open[bi] = open[open.length - 1]; open.pop();
       if (cur === goal) break;
       if (++n > budget) return null;
-      const s = (cur / MAX_FLOORS) | 0, f = cur % MAX_FLOORS, sx = s % N, sz = (s / N) | 0, gc = g.get(cur);
+      const s = (cur / MAX_FLOORS) | 0, f = cur % MAX_FLOORS, sx = s % NQ, sz = (s / NQ) | 0, gc = g.get(cur);
       for (const [dx, dz] of DIRS) {
         const nx = sx + dx, nz = sz + dz;
-        if (nx < 0 || nz < 0 || nx >= N || nz >= N) continue;
-        const t = nx + N * nz, tf = fl(t);
+        if (nx < 0 || nz < 0 || nx >= NQ || nz >= NW) continue;
+        const t = nx + NQ * nz, tf = fl(t);
         for (let k = 0; k < tf.length; k++) {
           if (!linked(s, f, t, k)) continue;
           const nid = id(t, k), cost = gc + SQ * (dx && dz ? 1.414 : 1) + abs(tf[k].y - fl(s)[f].y) * 0.5;
@@ -103,9 +104,9 @@ export function makeNav(ter) {
   // Ground changed within r of (x, z): those squares, and their links, are looked at again.
   function mark(x, z, r) {
     const s0 = square(x - r - SQ, z - r - SQ), s1 = square(x + r + SQ, z + r + SQ);
-    for (let sz = (s0 / N) | 0; sz <= ((s1 / N) | 0); sz++) for (let sx = s0 % N; sx <= s1 % N; sx++) floors[sx + N * sz] = undefined;
+    for (let sz = (s0 / NQ) | 0; sz <= ((s1 / NQ) | 0); sz++) for (let sx = s0 % NQ; sx <= s1 % NQ; sx++) floors[sx + NQ * sz] = undefined;
     for (const k of links.keys()) {
-      const [a, , b] = k.split('.').map(Number), hit = s => { const sx = s % N, sz = (s / N) | 0; return sx >= s0 % N && sx <= s1 % N && sz >= ((s0 / N) | 0) && sz <= ((s1 / N) | 0); };
+      const [a, , b] = k.split('.').map(Number), hit = s => { const sx = s % NQ, sz = (s / NQ) | 0; return sx >= s0 % NQ && sx <= s1 % NQ && sz >= ((s0 / NQ) | 0) && sz <= ((s1 / NQ) | 0); };
       if (hit(a) || hit(b)) links.delete(k);
     }
   }

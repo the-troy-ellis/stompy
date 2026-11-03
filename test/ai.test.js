@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestGame, stepFor, foes } from './helpers.js';
-import { BOUND } from '../src/world/terrain.js';
+import { BX as BOUND } from '../src/world/terrain.js';
 import { initFeet } from '../src/sim/gait.js';
 
 test('an unaware enemy patrols inside the map and never fires', () => {

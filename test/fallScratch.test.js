@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeGround, scratchBytes, PX, PY, PZ, VS, Y0 } from '../src/world/voxels.js';
-import { HALF } from '../src/world/terrain.js';
+import { HX as HALF } from '../src/world/terrain.js';
 import { makeRng } from '../src/sim/rng.js';
 
 test('after a run of digs and their checks, the scratch is a sliver of the map', () => {

@@ -1,5 +1,5 @@
 import { makeRng } from '../sim/rng.js';
-import { BOUND } from './terrain.js';
+import { BX, BZ } from './terrain.js';
 
 const { sin, cos, hypot, max, min, PI } = Math;
 
@@ -53,12 +53,12 @@ const segDist = (x, z, [ax, az], [bx, bz]) => {
 };
 
 export function scatterProps(seed, biome, ter, { avoid: given = [], paths = [] } = {}) {
-  const r = makeRng(seed * 17 + 3), out = [], avoid = [...given];
+  const r = makeRng(seed * 17 + 3), out = [], avoid = [...given], BL = Math.max(BX, BZ);   // the longer half: lines and singles reach both ends (free() keeps them in)
   const size = key => { const [[r0, r1], [h0, h1]] = SIZE[key]; return { radius: r.range(r0, r1), height: r.range(h0, h1) }; };
   // Free ground for a footprint: in bounds, clear of the avoid list, the
   // paths and every prop already down, and not too steep across it.
   const free = (x, z, rad) => {
-    if (Math.abs(x) > BOUND - rad || Math.abs(z) > BOUND - rad) return false;
+    if (Math.abs(x) > BX - rad || Math.abs(z) > BZ - rad) return false;
     for (const [ax, az, ar] of avoid) if (hypot(x - ax, z - az) < ar + rad) return false;
     for (const p of paths) for (let i = 1; i < p.length; i++) if (segDist(x, z, p[i - 1], p[i]) < PATH_CLEAR + rad) return false;
     for (const o of out) if (hypot(x - o.x, z - o.z) < o.radius + rad + 4) return false;
@@ -102,13 +102,13 @@ export function scatterProps(seed, biome, ter, { avoid: given = [], paths = [] }
   }
   for (let l = 0; l < PYLON_LINES; l++) {
     // A straight line across the map: a heading and an offset from the centre.
-    const a = r.range(0, PI), off = r.range(-BOUND * 0.6, BOUND * 0.6), fx = sin(a), fz = cos(a), s = size('mast');
-    for (let t = -BOUND; t <= BOUND; t += PYLON_GAP) {
+    const a = r.range(0, PI), off = r.range(-BL * 0.6, BL * 0.6), fx = sin(a), fz = cos(a), s = size('mast');
+    for (let t = -BL; t <= BL; t += PYLON_GAP) {
       const x = fz * off + fx * t, z = -fx * off + fz * t;
       if (free(x, z, s.radius)) put('mast', x, z, a + PI / 2, s);   // the dishes face along the line
     }
   }
-  for (const [key, n] of SINGLES[biome] || []) for (let i = 0; i < n; i++) near(key, 0, 0, BOUND);
+  for (const [key, n] of SINGLES[biome] || []) for (let i = 0; i < n; i++) near(key, 0, 0, BL);
   return out;
 }
 

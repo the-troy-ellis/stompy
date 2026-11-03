@@ -1,7 +1,7 @@
 import { cheat } from './cheats.js';
 import { WEATHER } from '../data/weather.js';
 import { clampN, mul } from '../util/math.js';
-import { BOUND } from '../world/terrain.js';
+import { BX, BZ } from '../world/terrain.js';
 import { particle } from './effects.js';
 import { gait } from './gait.js';
 import { feel, stepFeel } from './feel.js';
@@ -86,7 +86,7 @@ export function stepMech(G, m, dt) {
   // along a wall it meets at an angle. One already in rock (a roof dug lower,
   // a step up under a low ceiling) may only move to where it is less so.
   const fly = m.air && m.jet?.blasted ? m.jet.fly : NO_FLY;   // a blast-off's speed along (sim/jets.js): it carries the flight, undying, until it lands
-  const x0 = m.x, z0 = m.z, nx = clampN(m.x + (sin(m.yaw) * m.speed + push[0] + fly[0]) * dt, -BOUND, BOUND), nz = clampN(m.z + (cos(m.yaw) * m.speed + push[1] + fly[1]) * dt, -BOUND, BOUND);
+  const x0 = m.x, z0 = m.z, nx = clampN(m.x + (sin(m.yaw) * m.speed + push[0] + fly[0]) * dt, -BX, BX), nz = clampN(m.z + (cos(m.yaw) * m.speed + push[1] + fly[1]) * dt, -BZ, BZ);
   const here = rockAt(G, m, x0, z0, 0, 0), fits = r => r <= 0 || r < here;
   let walled = false;
   if (nx !== x0 && !fits(rockAt(G, m, nx, z0, Math.sign(nx - x0), 0))) { walled = true; push[0] = 0; if (fly !== NO_FLY) fly[0] = 0; } else m.x = nx;

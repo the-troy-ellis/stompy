@@ -948,7 +948,8 @@ try {
     const ends = [];
     for (const p of pages) {   // a tab in the background doesn't run its frames: each to the front in turn
       await p.bringToFront();
-      ends.push(await p.waitForFunction(() => window.__stompy.game.state === 'debrief', null, { timeout: 10000 })
+      // 3.5 s of game time after the end, and the dying before it: on a slow runner that's well past 10 s of wall clock (as in the desktop run's debrief)
+      ends.push(await p.waitForFunction(() => window.__stompy.game.state === 'debrief', null, { timeout: 30000 })
         .then(() => p.evaluate(() => ({ won: window.__stompy.game.won, saved: localStorage.getItem('stompy.camp.mission'), crew: document.querySelectorAll('.coop-crew tr').length - 1 })))
         .catch(() => null));
     }

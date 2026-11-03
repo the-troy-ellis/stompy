@@ -90,8 +90,9 @@ export function rotateAbout(c, a, p = null) {
   return c;
 }
 // Kept over the map: the focus inside `bound`, and resting on the ground.
-export function settle(c, bound, height) {
-  c.x = clampN(c.x, -bound, bound); c.z = clampN(c.z, -bound, bound);
+export function settle(c, bound, height) {   // bound: [across, along], or one number for both
+  const bx = Array.isArray(bound) ? bound[0] : bound, bz = Array.isArray(bound) ? bound[1] : bound;
+  c.x = clampN(c.x, -bx, bx); c.z = clampN(c.z, -bz, bz);
   if (height) c.y = height(c.x, c.z);
   return c;
 }

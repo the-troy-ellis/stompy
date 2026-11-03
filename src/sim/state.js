@@ -1,7 +1,8 @@
 import { CHASSIS } from '../data/chassis.js';
 import { palAt } from '../data/palettes.js';
 import { makeWeather } from '../data/weather.js';
-import { BOUND } from '../world/terrain.js';
+import { BX, BZ, setMapSize, canyonMid } from '../world/terrain.js';
+import { sizeOf } from '../data/maps.js';
 import { makeGround } from '../world/voxels.js';
 import { makeRng } from './rng.js';
 import { Particles } from './particles.js';
@@ -63,6 +64,7 @@ export function resetMatch(G, { def, seed, pal, terrainOpts }) {
   G.pal = palAt(biome, r ? r[0] : def.time);
   G.palRamp = r ? { from: palAt(biome, r[0]), to: palAt(biome, r[1]), secs: r[2] } : null;
   G.weather = makeWeather(def.weather, seed);   // fog, radar and wind (data/weather.js)
+  setMapSize(sizeOf(def));   // the mission's size, or today's (data/maps.js, docs/specs/35-bigger-maps.md part 5)
   G.ter = makeGround(seed, { ...terrainOpts, zones: flatZones(def) }, def);   // the voxel ground (world/voxels.js)
   G.ter.fineOn();   // edits in play dig fine patches from now on (world/finePatch.js)
   G.worldKind = 'match';
@@ -83,7 +85,9 @@ export function startMatch(G, def, seed, gentle, chassis, { partsKey, terrainOpt
   resetMatch(G, { def, seed, terrainOpts });
   // `start: [bearing°, dist, face°]` moves the player off the map's centre
   // (mission 11's long run); every other position stays measured from the centre.
-  const st = def.start ? polar(def.start) : { x: 0, z: 0 }, face = def.start?.[2] ? -def.start[2] * Math.PI / 180 : 0;
+  // In a canyon (data/maps.js), every placement slides across onto the floor's middle line.
+  const canyon = def.ground?.shape?.canyon, onFloor = p => (canyon ? { x: p.x + canyonMid(canyon, seed, p.z), z: p.z } : p);
+  const st = onFloor(def.start ? polar(def.start) : { x: 0, z: 0 }), face = def.start?.[2] ? -def.start[2] * Math.PI / 180 : 0;
   G.player = newMech(G, chassis, 0, st.x, st.z, face, { partsKey, loadout });
   G.startAt = { x: st.x, z: st.z, yaw: face };   // where a co-op pilot comes back (sim/coopRules.js)
   G.mechs.push(G.player);
@@ -92,9 +96,9 @@ export function startMatch(G, def, seed, gentle, chassis, { partsKey, terrainOpt
   def.foes.forEach((f, i) => {
     const s = typeof f === 'string' ? { type: f } : f;
     let x, z;
-    if (s.at) ({ x, z } = polar(s.at));
+    if (s.at) ({ x, z } = onFloor(polar(s.at)));
     else { const a = (i / def.foes.length) * TAU + rng.range(-0.4, 0.4) + Math.PI * 0.6, d = rng.range(520, 760); x = sin(a) * d; z = cos(a) * d; }
-    x = Math.max(-BOUND, Math.min(BOUND, x)); z = Math.max(-BOUND, Math.min(BOUND, z));
+    x = Math.max(-BX, Math.min(BX, x)); z = Math.max(-BZ, Math.min(BZ, z));
     const e = newMech(G, s.type, 1, x, z, s.face != null ? -s.face * Math.PI / 180 : atan2(-x, -z) + rng.range(-1, 1));
     e.ai.aware = s.aware ?? (i === 0 && gentle ? false : rng.chance(0.3));
     if (s.profile) { e.ai.plan = PROFILES[s.profile](e); e.ai.profile = s.profile; }

@@ -1,5 +1,5 @@
 import { clampN, wrapA } from '../../util/math.js';
-import { BOUND } from '../../world/terrain.js';
+import { BX, BZ } from '../../world/terrain.js';
 import { geoOf } from '../../data/geo.js';
 import { center } from '../geom.js';
 import { eyeAt, blocked } from '../sight.js';
@@ -20,7 +20,7 @@ const { sin, cos, atan2, abs, hypot, min, PI } = Math;
 // position and the bearing and distance to it.
 
 const towards = (e, x, z) => atan2(x - e.x, z - e.z);
-const inMap = v => clampN(v, -BOUND + 40, BOUND - 40);
+const inMapX = v => clampN(v, -BX + 40, BX - 40), inMapZ = v => clampN(v, -BZ + 40, BZ - 40);
 // How far away a spot is, in flat metres' worth of walking: a climb costs a
 // walker its slope penalty; a crawler doesn't care (spec 16). Infinity if a
 // cliff on the straight line there is too steep to walk up (spec 18: real
@@ -86,7 +86,7 @@ export function findCover(G, e, target) {
   const tc = center(target);
   let best = null;
   for (const d of B.coverDists) for (let k = 0; k < 8; k++) {
-    const a = k * PI / 4, x = inMap(e.x + sin(a) * d), z = inMap(e.z + cos(a) * d);
+    const a = k * PI / 4, x = inMapX(e.x + sin(a) * d), z = inMapZ(e.z + cos(a) * d);
     if (!blocked(G, eyeAt(G, e, x, z), tc)) continue;
     const t = travel(G, e, x, z);
     if (t === Infinity) continue;
@@ -122,7 +122,7 @@ export function findRidge(G, e, target, avoid = null) {
   const tc = center(target), base = G.ter.height(target.x, target.z);
   let best = null;
   for (const r of B.ridgeRadii) for (let k = 0; k < 16; k++) {
-    const a = k * PI / 8, x = inMap(target.x + sin(a) * r), z = inMap(target.z + cos(a) * r);
+    const a = k * PI / 8, x = inMapX(target.x + sin(a) * r), z = inMapZ(target.z + cos(a) * r);
     const h = G.ter.height(x, z);
     if (h < base + B.ridgeAbove) continue;
     if (avoid && hypot(x - avoid.x, z - avoid.z) < B.relocateAway) continue;   // somewhere it has not just been shooting from
@@ -174,7 +174,7 @@ export const holdLine = (G, e, ctx, out) => {
 };
 
 // Turn for home well before the fence.
-export const avoidEdge = (G, e, ctx, out) => { if (abs(e.x) > BOUND - 60 || abs(e.z) > BOUND - 60) out.moveYaw = atan2(-e.x, -e.z); return out; };
+export const avoidEdge = (G, e, ctx, out) => { if (abs(e.x) > BX - 60 || abs(e.z) > BZ - 60) out.moveYaw = atan2(-e.x, -e.z); return out; };
 
 // Steer around an ally that is close and ahead; the collision pass only
 // separates once they touch.

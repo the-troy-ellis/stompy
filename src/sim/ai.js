@@ -1,5 +1,5 @@
 import { clampN, wrapA } from '../util/math.js';
-import { BOUND } from '../world/terrain.js';
+import { BX, BZ } from '../world/terrain.js';
 import { center } from './geom.js';
 import { geoOf } from '../data/geo.js';
 import { AI_PUNCH, meleeOf } from '../data/melee.js';
@@ -67,14 +67,14 @@ export function think(G, e, dt, prey = null) {
   const toYaw = atan2(dx, dz);
   let moveYaw, thr = 1;
   if (!e.ai.aware) {
-    if (!e.ai.wp || hypot(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z) < 30) e.ai.wp = [clampN(e.x + r.range(-250, 250), -BOUND, BOUND), clampN(e.z + r.range(-250, 250), -BOUND, BOUND)];
+    if (!e.ai.wp || hypot(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z) < 30) e.ai.wp = [clampN(e.x + r.range(-250, 250), -BX, BX), clampN(e.z + r.range(-250, 250), -BZ, BZ)];
     moveYaw = routeYaw(G, e, e.ai.wp[0], G.ter.height(e.ai.wp[0], e.ai.wp[1]), e.ai.wp[1]) ?? atan2(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z); thr = 0.5;
   } else if (e.ai.state === 'search') {
     // Lost contact: go to where they were last seen, then poke around it.
     const b = e.ai.belief;
     if (!e.ai.wp || hypot(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z) < 25) {
       const first = !e.ai.wp && hypot(b.x - e.x, b.z - e.z) > 25;
-      e.ai.wp = first ? [b.x, b.z] : [clampN(b.x + r.range(-K.searchRadius, K.searchRadius), -BOUND, BOUND), clampN(b.z + r.range(-K.searchRadius, K.searchRadius), -BOUND, BOUND)];
+      e.ai.wp = first ? [b.x, b.z] : [clampN(b.x + r.range(-K.searchRadius, K.searchRadius), -BX, BX), clampN(b.z + r.range(-K.searchRadius, K.searchRadius), -BZ, BZ)];
     }
     moveYaw = routeYaw(G, e, e.ai.wp[0], b.y ?? G.ter.height(e.ai.wp[0], e.ai.wp[1]), e.ai.wp[1]) ?? atan2(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z); thr = 0.7;
   } else {

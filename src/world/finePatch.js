@@ -1,4 +1,4 @@
-import { HALF } from './terrain.js';
+import { HX, HZ } from './terrain.js';
 
 const { max, min } = Math;
 
@@ -27,7 +27,7 @@ export function makePatch(g, b, old = null) {
   const nx = (i1 - i0) * R + 1, ny = (j1 - j0) * R + 1, nz = (k1 - k0) * R + 1;
   const p = {
     id: old ? old.id : ++SEQ, i0, i1, j0, j1, k0, k1, nx, ny, nz, D: new Uint8Array(nx * ny * nz), top: new Float32Array(nx * nz),
-    x0: -HALF + i0 * g.VS, y0: g.Y0 + j0 * g.VS, z0: -HALF + k0 * g.VS, x1: -HALF + i1 * g.VS, y1: g.Y0 + j1 * g.VS, z1: -HALF + k1 * g.VS,
+    x0: -HX + i0 * g.VS, y0: g.Y0 + j0 * g.VS, z0: -HZ + k0 * g.VS, x1: -HX + i1 * g.VS, y1: g.Y0 + j1 * g.VS, z1: -HZ + k1 * g.VS,
     blend: 0, edits: old ? old.edits : 0, rev: old ? old.rev + 1 : 0, at: old ? old.at : null, keep: null,
   };
   if (old) {

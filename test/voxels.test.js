@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeGround, cornerIndex, VS, Y0, NX, NY, NZ, CX, CY } from '../src/world/voxels.js';
-import { makeTerrain, HALF } from '../src/world/terrain.js';
+import { makeTerrain, HX as HALF } from '../src/world/terrain.js';
 import { MISSIONS } from '../src/data/missions.js';
 import { flatZones, polar } from '../src/sim/placement.js';
 

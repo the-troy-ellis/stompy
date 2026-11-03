@@ -27,7 +27,7 @@ import { eyeOf } from '../sim/geom.js';
 import { PROFILES } from '../sim/ai/profiles.js';
 import { pickNearest, pickInside } from '../sim/pick.js';
 import { sightGrid } from '../sim/sight.js';
-import { BOUND } from '../world/terrain.js';
+import { BX, BZ } from '../world/terrain.js';
 import { createTopCamera, camView, groundToScreen, screenToGround, panBy, zoomAt, rotateAbout, settle, metresPerPixel } from '../render/topCamera.js';
 import { drawMap, drawCompass } from '../render/markers.js';
 import { bindPointer } from '../input/pointer.js';
@@ -295,7 +295,7 @@ export function createEditor(app) {
     const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2;
     const at = d => {   // the middle of the mission in the middle of the free part
       Object.assign(E.cam, { x: cx, z: cz, yaw: 0, dist: d });
-      settle(E.cam, BOUND, G.ter.height);
+      settle(E.cam, [BX, BZ], G.ter.height);
       panBy(E.cam, (free.x0 + free.x1) / 2 - W / 2, (free.y0 + free.y1) / 2 - H / 2, H);
     };
     const fits = () => {
@@ -320,7 +320,7 @@ export function createEditor(app) {
   const toScreen = t => { const { W, H } = size(); return groundToScreen(E.cam, { x: t.x, y: t.y ?? G.ter.height(t.x, t.z), z: t.z }, W, H); };
   const pickables = () => E.map.things.map(t => ({ id: t.id, x: t.x, z: t.z, r: t.r }));
   const thingAt = (x, y) => { const g = ground(x, y); return g && pickNearest(pickables(), g.x, g.z, FINGER * mpp()); };
-  const after = () => { settle(E.cam, BOUND, G.ter.height); };
+  const after = () => { settle(E.cam, [BX, BZ], G.ter.height); };
   const one = () => (E.sel.size === 1 ? E.map.things.find(t => t.id === [...E.sel][0]) : null);
   // The selected vehicle's route on the map, if a vehicle is selected.
   function selectedRoute() {
@@ -723,7 +723,7 @@ export function createEditor(app) {
     const view = { W, H, mpp: mpp(), toScreen: (x, y, z) => groundToScreen(E.cam, { x, y, z }, W, H, VP) };
     const sel = new Set(E.sel), r = E.tool === 'ROUTE' && selectedRoute();
     if (r) sel.add(r.id);
-    drawMap(ctx, view, { map: { bound: BOUND, height: G.ter.height, grid: 100 }, ...E.map, sel, box: E.box, pal, sight: E.sight });
+    drawMap(ctx, view, { map: { bound: [BX, BZ], height: G.ter.height, grid: 100 }, ...E.map, sel, box: E.box, pal, sight: E.sight });
     const hd = handle();
     if (hd) {
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);

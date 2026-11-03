@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeTerrain, N, CELL, HALF, BOUND } from '../src/world/terrain.js';
-import { buildGroundExtras, CHUNKS, CHUNK_CELLS } from '../src/world/terrainMesh.js';
+import { makeTerrain, NXC as N, CELL, HX as HALF, BX as BOUND } from '../src/world/terrain.js';
+import { buildGroundExtras, CHUNKS } from '../src/world/terrainMesh.js';
 import { PALS } from '../src/data/palettes.js';
 
 test('terrain is deterministic for a seed and differs between seeds', () => {
@@ -27,7 +27,7 @@ test('what stands on the ground is 16 chunks over the map, each inside its bound
   for (const ch of chunks) {
     const d = ch.b.d;
     for (let o = 0; o < d.length; o += 9) assert.ok(Math.hypot(d[o] - ch.c[0], d[o + 1] - ch.c[1], d[o + 2] - ch.c[2]) <= ch.r + 1e-6);
-    const size = CHUNK_CELLS * CELL;
+    const size = (N * CELL) / CHUNKS;
     if (d.length) assert.ok(ch.c[0] > -HALF - size && ch.c[0] < HALF + size);
   }
 });
