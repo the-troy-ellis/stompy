@@ -1,3 +1,4 @@
+import { noteHit } from './hits.js';
 import { norm, sub, wrapA, clampN } from '../util/math.js';
 import { explode, particle } from './effects.js';
 import { feel } from './feel.js';
@@ -131,6 +132,7 @@ export function damageEntity(G, e, amt, src, p, how = {}) {
   const r = G.rng;
   for (let i = 0; i < 3; i++) particle(G, p || [e.x, e.y + e.height / 2, e.z], [r.range(-4, 4), r.range(1, 6), r.range(-4, 4)], 0.3, 0.3, [1, 0.8, 0.4], 'fire');
   if (!Number.isFinite(e.hp)) return;   // decorative: it sparks, nothing more
+  noteHit(G, e, src);   // a building of the base's under fire: a ring on the map (sim/hits.js)
   if (G.role === 'guest') {
     // Co-op: the host owns the mission's entities; it applies this and says so (docs/specs/09-coop.md).
     const q = entQueue(G, e, p || [e.x, e.y + e.height / 2, e.z]);

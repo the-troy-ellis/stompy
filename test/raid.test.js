@@ -2,6 +2,7 @@
 // raid, § Raids go for buildings): a raid is called with where it comes from
 // and what is in it, and goes for the base; a foe's wreck gives salvage when
 // a crew mech walks over it; `keep` fails when the silo falls.
+import { raidsDue } from '../src/sim/objectives.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, startMatch } from '../src/sim/state.js';
@@ -33,14 +34,18 @@ test('a raid is called with where it comes from and what is in it', () => {
   assert.equal(raidLine({ from: 'ring' }, ['jackal']), `Raid inbound. One ${J}.`);
 });
 
-test('a mission\'s raid wave is called a few seconds early, then walks on as raiders', () => {
-  const G = game(mission({ waves: [{ at: 5, from: 270, foes: ['jackal', 'jackal'], raid: true }] }));
-  stepFor(G, 1.5);
+test('a mission\'s raid wave is called RAID_WARN (20 s) early, shows as due, then walks on as raiders', () => {
+  const G = game(mission({ waves: [{ at: 30, from: 270, foes: ['jackal', 'jackal'], raid: true }] }));
+  stepFor(G, 9.5);
   assert.ok(!said(G).some(l => l.startsWith('Raid')), 'not yet');
+  assert.deepEqual(raidsDue(G), []);
   stepFor(G, 1);
   assert.ok(said(G).includes(`Raid west. Two ${J}s.`));
   assert.equal(G.mechs.filter(m => m.team === 1).length, 0, 'called before it comes');
-  stepFor(G, 2.7);
+  const [due] = raidsDue(G);
+  assert.ok(due && due.from === 270 && due.n === 2 && due.left > 19 && due.left <= 20, `due: ${JSON.stringify(due)}`);
+  stepFor(G, 20);
+  assert.deepEqual(raidsDue(G), [], 'landed');
   const raiders = G.mechs.filter(m => m.team === 1);
   assert.equal(raiders.length, 2);
   assert.ok(raiders.every(m => m.ai.raid && m.ai.aware));
@@ -129,4 +134,18 @@ test('a mission with a base can keep its silo without tagging anything; the rang
   assert.deepEqual(check(mission()).filter(p => p.id.startsWith('objectives')), []);
   const def = rangeDef({ base: 'raid' });
   assert.ok(def.base && def.waves[0].raid);
+});
+
+test('a foe\'s hit on a building of the base rings it on the map; hits close together share a ring; it fades after HITS.keep', async () => {
+  const { liveHits, HITS } = await import('../src/sim/hits.js');
+  const { damageEntity } = await import('../src/sim/entities.js');
+  const G = game(), s = G.base.silo, [e] = spawnWave(G, ['jackal'], { from: 90, raid: true });
+  damageEntity(G, s, 5, G.player, null);
+  assert.equal(liveHits(G).length, 0, 'your own hits ring nothing');
+  damageEntity(G, s, 5, e, null);
+  damageEntity(G, s, 5, e, null);
+  assert.equal(liveHits(G).length, 1);
+  assert.ok(Math.hypot(liveHits(G)[0].x - s.x, liveHits(G)[0].z - s.z) < 1);
+  stepFor(G, HITS.keep + 0.5);
+  assert.equal(liveHits(G).length, 0, 'faded');
 });

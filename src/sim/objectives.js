@@ -1,7 +1,7 @@
 import { addEntity } from './entities.js';
 import { voice } from './voice.js';
 import { polar } from './placement.js';
-import { spawnWave, waveFoes, WAVE_WARN } from './waves.js';
+import { spawnWave, waveFoes, WAVE_WARN, warnOf } from './waves.js';
 import { allDown, coopLives } from './coopRules.js';
 import { pilotsOf } from './hitqueue.js';
 import { raidLine } from './raid.js';
@@ -95,14 +95,15 @@ const TYPES = {
       if (o.targets.some(e => e.lastHitAt > o.warned + KEEP_WARN_EVERY)) { o.warned = G.time; voice(G, 'keepHit'); }
     },
   },
-  // The clock runs from the mission start; each wave is called in WAVE_WARN
-  // seconds before it arrives (waves at the very start just arrive).
+  // The clock runs from the mission start; each wave is called in its warning
+  // (warnOf: WAVE_WARN, a raid RAID_WARN) before it arrives (waves at the very start just arrive).
   survive: {
     init: (G, d) => ({ start: G.time, waves: (d.waves || []).map(w => ({ ...w, warned: w.at < WAVE_WARN, spawned: false })) }),
     tick(G, o) {
       const t = G.time - o.start;
       for (const w of o.waves) {
-        if (!w.warned && t >= w.at - WAVE_WARN) { w.warned = true; callWave(G, w); }
+        if (!w.warned && t >= w.at - warnOf(w)) { w.warned = true; callWave(G, w); }
+        w.due = o.start + w.at;   // for raidsDue
         if (!w.spawned && t >= w.at) { w.spawned = true; spawnWave(G, waveFoes(G, w.foes), w); }
       }
       o.left = Math.max(0, o.def.seconds - t);
@@ -144,16 +145,23 @@ export function initObjectives(G, def) {
 // The mission's own waves (a SURVIVE has its own on its clock):
 //   { at: 40, foes, from, dist }                 on the mission clock
 //   { when: { obj: 0, done: 2 }, foes, from }    once objective 0's count reaches 2
-// A wave is called in WAVE_WARN seconds before it arrives; a triggered one
-// arrives WAVE_WARN after its trigger, so the call always comes first.
+// A wave is called in its warning (warnOf) before it arrives; a triggered one
+// arrives that long after its trigger, so the call always comes first.
 function tickWaves(G) {
   for (const w of G.waves || []) {
     if (w.spawned) continue;
-    if (w.due == null && w.when && (G.objectives[w.when.obj]?.done ?? 0) >= w.when.done) w.due = G.time + WAVE_WARN;
+    if (w.due == null && w.when && (G.objectives[w.when.obj]?.done ?? 0) >= w.when.done) w.due = G.time + warnOf(w);
     if (w.due == null) continue;
-    if (!w.warned && G.time >= w.due - WAVE_WARN) { w.warned = true; callWave(G, w); }
+    if (!w.warned && G.time >= w.due - warnOf(w)) { w.warned = true; callWave(G, w); }
     if (G.time >= w.due) { w.spawned = true; spawnWave(G, waveFoes(G, w.foes), w); }
   }
+}
+// The raids called and not yet landed (docs/specs/32-base-loop.md § Part 2),
+// for the map's edge arrows: where from (a bearing), how many, seconds left.
+export function raidsDue(G) {
+  const out = [], all = [...(G.waves || []), ...(G.objectives || []).flatMap(o => (o.def?.type === 'survive' && o.waves) || [])];
+  for (const w of all) if (w.raid && w.warned && !w.spawned && w.due != null && typeof w.from === 'number') out.push({ from: w.from, n: w.foes.length, left: Math.max(0, w.due - G.time) });
+  return out;
 }
 // A wave that is coming for certain: timed, or triggered and on its way.
 const wavesPending = G => (G.waves || []).some(w => !w.spawned && w.due != null);
