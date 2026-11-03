@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (parts 2–3) |
+| Status | built (parts 1–5); the owner's phone checks to come |
 | Milestone | M14 |
 | Size | L (in five parts) |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md), [29-ground-4m.md](29-ground-4m.md), [34-big-fights.md](34-big-fights.md) |
