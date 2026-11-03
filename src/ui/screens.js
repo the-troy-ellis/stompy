@@ -402,6 +402,7 @@ export function createUi(app) {
       const k = dial.dataset.set;
       prefs[k] = stepSetting(k, prefs[k], +dial.dataset.d); store.set(SETTINGS[k].key, prefs[k]);
       if (k === 'particles') app.applyParticles();
+      if (k === 'pixels') app.applyPixels();
       dial.parentElement.querySelector('b').textContent = dialText(k);
       return;
     }

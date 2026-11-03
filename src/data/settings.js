@@ -11,6 +11,8 @@ export const SETTINGS = {
   fov: { group: 'display', label: 'FOV', key: 'view.fov', min: 50, max: 95, step: 5, def: 62, fmt: (v, aspect = 16 / 9) => `${hfov(v, aspect)}\u00b0` },
   voiceRate: { group: 'sound', label: 'VOICE RATE', key: 'voice.rate', min: 0.7, max: 1.5, step: 0.1, def: 1, fmt: v => `${v.toFixed(1)}x` },   // times the voice's own 1.05
   voiceVol: { group: 'sound', label: 'VOICE VOL', key: 'voice.vol', min: 0, max: 1, step: 0.1, def: 0.9, fmt: v => `${Math.round(v * 100)}%` },
+  // How chunky the 3D view's pixels are (docs/specs/14-look-and-performance.md P5): CHUNKIER / CHUNKY / CRISP.
+  pixels: { group: 'display', label: 'PIXELS', key: 'view.pixels', min: 0, max: 2, step: 1, def: 0, fmt: v => PIXEL_NAMES[v] },
   // How many particles (spec 07): LOW / MED / HIGH. Unset, MED on touch and HIGH on a desktop (main.js).
   particles: { group: 'display', label: 'PARTICLES', key: 'fx.particles', min: 0, max: 2, step: 1, def: 2, fmt: v => PARTICLE_NAMES[v] },
   // The HUD's size (HUD_SCALES) and its colour set (data/colors.js HUD_PALETTES), spec 11 § Accessibility.
@@ -18,6 +20,10 @@ export const SETTINGS = {
   colourMode: { group: 'display', label: 'COLOURS', key: 'hud.colours', min: 0, max: 3, step: 1, def: 0, fmt: v => COLOUR_NAMES[v] },
 };
 export const PARTICLE_NAMES = ['LOW', 'MED', 'HIGH'];
+// PIXELS: how many lines tall the 3D view renders at each step (0: the screen's own).
+// CHUNKIER is the look (the owner, 2026-10-05); the HUD stays sharp at all three.
+export const PIXEL_NAMES = ['CHUNKIER', 'CHUNKY', 'CRISP'];
+export const PIXEL_LINES = [240, 360, 0];
 // The SETTINGS screen's sections, in order (ui/screens.js adds the toggles to them).
 export const SETTING_GROUPS = [['sound', 'SOUND'], ['controls', 'CONTROLS'], ['display', 'DISPLAY'], ['game', 'GAME']];
 // A vertical field of view in degrees as the horizontal one on a screen this wide over high.

@@ -27,10 +27,11 @@ import { createUi } from './ui/screens.js';
 import { createNet } from './net/client.js';
 import { createBench } from './ui/bench.js';
 import { createWalkView } from './ui/walkView.js';
-import { readLook, LOOK_DEFAULT, LOOK_KEY } from './render/look.js';
+import { readLook, lookOf, LOOK_KEY, slowWatch } from './render/look.js';
 import { loadCampaign, saveCampaign } from './ui/campaign.js';
 import { DIFF } from './data/ai.js';
-import { SETTINGS, SETTING_KEYS, readSetting, particleScales } from './data/settings.js';
+import { SETTINGS, SETTING_KEYS, readSetting, particleScales, PARTICLE_NAMES } from './data/settings.js';
+import { msg } from './sim/effects.js';
 import { createMechlab } from './ui/mechlab.js';
 import { normalRelay, resolveRelay } from './net/relay.js';
 import { registerServiceWorker } from './ui/pwa.js';
@@ -84,8 +85,9 @@ function start(root) {
     </div>`;
   const wrap = $('.mech-wrap', root), cv = $('.mech-gl', root), hud = $('.mech-hud', root), ov = $('.mech-overlay', root);
   const params = new URLSearchParams(location.search);
-  // ?debug=1 can render the 3D view at a tunable resolution to settle the look (render/look.js).
-  const look = params.has('debug') ? readLook(params, store.get(LOOK_KEY, null)) : { ...LOOK_DEFAULT };
+  // PIXELS in Settings picks the look (render/look.js); ?debug=1 can set any line count by hand to settle it.
+  const prefs = loadPrefs(), pixLook = lookOf(prefs.pixels);
+  const look = params.has('debug') ? readLook(params, store.get(LOOK_KEY, null), pixLook) : pixLook;
   const R = createRenderer(cv, { antialias: look.aa });
   if (!R) {
     ov.innerHTML = '<div class="panel">Stompy needs WebGL, which this browser has turned off or does not support.</div>';
@@ -103,7 +105,6 @@ function start(root) {
     wrap.appendChild(d);
   });
   cv.addEventListener('webglcontextrestored', () => location.reload());
-  const prefs = loadPrefs();
   // ?relay=host[:port] or a ws[s]:// address: saved as the RELAY field (net/relay.js).
   const qRelay = normalRelay(params.get('relay'), location.protocol === 'https:');
   if (qRelay) { prefs.relay = qRelay; store.set('net.relay', qRelay); }
@@ -120,6 +121,16 @@ function start(root) {
   if (store.get(SETTINGS.particles.key) == null) prefs.particles = G.touchUI ? 1 : 2;   // MED on a phone, HIGH on a desktop, until chosen
   app.applyParticles = () => Object.assign(G, particleScales(prefs.particles, prefs.reducedMotion));
   app.applyParticles();
+  // PIXELS changed in Settings: the lines at once; CRISP's antialiasing from the next load.
+  app.applyPixels = () => { R.look = { ...lookOf(prefs.pixels), aa: R.look.aa }; };
+  // A phone that can't hold its frame steps PARTICLES down a notch, once, and
+  // says so (spec 14 P5); not saved, so the setting stays the player's.
+  const slow = slowWatch();
+  app.slowFrame = dt => {
+    if (!G.touchUI || G.bench || navigator.webdriver || prefs.particles <= 0 || !slow(dt)) return;
+    prefs.particles--; app.applyParticles();
+    msg(G, `PARTICLES: ${PARTICLE_NAMES[prefs.particles]}.`, '#fc3');
+  };
   app.audio = createAudio(app);
   app.scene = createScene(app);
   app.hud = createHud(app);
@@ -156,6 +167,7 @@ function start(root) {
     if ((G.state === 'play' && (!G.paused || app.net.mp())) || G.state === 'over') {
       if (G.bench) app.bench.tick(dt);   // ?debug=1's scripted scene, at a fixed step (ui/bench.js)
       else update(G, app.input.snapshot(), dt);
+      if (G.state === 'play' && !G.paused) app.slowFrame(dt);
       app.net.tick(dt);
       app.audio.tick();
     } else if (G.state === 'walk') { app.walk.tick(dt); app.audio.tick(); }   // ?debug=1's walk viewer (ui/walkView.js)

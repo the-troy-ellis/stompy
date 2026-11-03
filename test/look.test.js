@@ -19,3 +19,29 @@ test('the look comes from the saved setting, and the URL overrides it', () => {
   assert.deepEqual(readLook(p('lines=240&aa=0'), { lines: 200, aa: true }), { lines: 240, aa: false });
   assert.equal(readLook(p('lines=junk'), null).lines, 0);
 });
+
+test('PIXELS: CHUNKIER (240 lines, no antialias) is the default; CHUNKY is 360; CRISP is the screen, antialiased', async () => {
+  const { lookOf } = await import('../src/render/look.js');
+  const { SETTINGS, PIXEL_NAMES, readSetting } = await import('../src/data/settings.js');
+  assert.equal(SETTINGS.pixels.def, 0);
+  assert.equal(PIXEL_NAMES[readSetting('pixels', undefined)], 'CHUNKIER');
+  assert.deepEqual(LOOK_DEFAULT, { lines: 240, aa: false });
+  assert.deepEqual(lookOf(0), { lines: 240, aa: false });
+  assert.deepEqual(lookOf(1), { lines: 360, aa: false });
+  assert.deepEqual(lookOf(2), { lines: 0, aa: true });
+  assert.deepEqual(readLook(new URLSearchParams(''), null, lookOf(1)), lookOf(1), '?debug=1 starts from the setting');
+});
+
+test('a slow phone: five seconds averaging over 40 ms a frame trips the step-down once, and never again', async () => {
+  const { slowWatch, SLOW } = await import('../src/render/look.js');
+  const fast = slowWatch();
+  for (let i = 0; i < 60 * 30; i++) assert.equal(fast(1 / 60), false, 'holding 60 fps');
+  const w = slowWatch();
+  let trips = 0;
+  for (let i = 0; i < 20 * 60; i++) if (w(0.05)) trips++;
+  assert.equal(trips, 1);
+  const edge = slowWatch();
+  let t = 0, hit = false;
+  while (t < SLOW.secs + 0.1 && !hit) { hit = edge(0.03); t += 0.03; }
+  assert.equal(hit, false, '33 fps is inside the budget');
+});
