@@ -273,6 +273,17 @@ mech picks it; foes and buildings can't be picked in this slice. With
     walk.
   - `npm run perf` zooms the map in and out three times after its sweep and
     fails on any new GPU store (`map-zoom`, budget 0; the old code made 36).
+- **It still went out** after about 10 s of zooming and panning. That was
+  the map's own 2D lines, not the GPU's ground: a point just in front of
+  the camera's plane projects millions of pixels off the screen. The map's
+  dashed edge then ran 35 million pixels long, and an iPhone's canvas
+  (WebKit) makes every dash of a dashed line, where Chrome's cuts the line
+  to the screen first. Now (`render/markers.js`):
+  - `seg`, `poly` and the grid's `line` cut every line and shape to the
+    screen (and 64 px round it) before drawing.
+  - `offScreen` skips markers well off it.
+  - Panned and zoomed for 20 s, nothing lands more than about 1,100 px
+    away and no dashed line is longer than the screen (it was 35 million).
 
 ## Code touchpoints
 
