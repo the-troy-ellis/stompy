@@ -1,7 +1,9 @@
 import { addEntity } from './entities.js';
 import { voice } from './voice.js';
 import { polar } from './placement.js';
-import { spawnWave, waveFoes, WAVE_WARN, warnOf } from './waves.js';
+import { spawnWave, waveFoes, WAVE_WARN, warnOf, RAID_WARN } from './waves.js';
+import { ENDLESS } from '../data/construct.js';
+import { FP_MIXES, pickFoes } from '../data/missions.js';
 import { allDown, coopLives } from './coopRules.js';
 import { pilotsOf } from './hitqueue.js';
 import { raidLine } from './raid.js';
@@ -95,6 +97,19 @@ const TYPES = {
       if (o.targets.some(e => e.lastHitAt > o.warned + KEEP_WARN_EVERY)) { o.warned = G.time; voice(G, 'keepHit'); }
     },
   },
+  // ENDLESS (docs/specs/32-base-loop.md § Part 2): never done. Raids come on
+  // a clock, ENDLESS.every apart from a random side, each a little bigger;
+  // each is a wave of the mission's own, so it's called, shown and landed as
+  // any raid is. What ends it is the silo (the mission's keep).
+  endless: {
+    init: G => ({ start: G.time, n: 0, next: ENDLESS.first }),
+    tick(G, o) {
+      if (G.time - o.start < o.next - RAID_WARN) return;
+      o.n++;
+      G.waves.push(endlessWave(G, o.n, o.start + o.next));
+      o.next += ENDLESS.every;
+    },
+  },
   // The clock runs from the mission start; each wave is called in its warning
   // (warnOf: WAVE_WARN, a raid RAID_WARN) before it arrives (waves at the very start just arrive).
   survive: {
@@ -155,6 +170,13 @@ function tickWaves(G) {
     if (!w.warned && G.time >= w.due - warnOf(w)) { w.warned = true; callWave(G, w); }
     if (G.time >= w.due) { w.spawned = true; spawnWave(G, waveFoes(G, w.foes), w); }
   }
+}
+// ENDLESS's raid n, landing at `due`: from one of the four sides, its foes
+// drawn from a mix that gets heavier as the raids go on.
+export function endlessWave(G, n, due) {
+  const mix = FP_MIXES.find(m => m.key === (n >= ENDLESS.heavy ? 'heavy' : n >= ENDLESS.mixed ? 'mixed' : 'light'));
+  const foes = pickFoes(mix, Math.min(ENDLESS.most, ENDLESS.base + Math.floor(n / 2)), () => G.rng.next());
+  return { from: G.rng.int(4) * 90, foes, raid: true, due, warned: false, spawned: false };
 }
 // The raids called and not yet landed (docs/specs/32-base-loop.md § Part 2),
 // for the map's edge arrows: where from (a bearing), how many, seconds left.

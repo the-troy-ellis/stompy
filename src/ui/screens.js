@@ -9,7 +9,7 @@ import { CATS, CAT_OF } from '../data/weapons.js';
 import { CHASSIS, MECH_ORDER, MECH_INFO, PILOTABLE } from '../data/chassis.js';
 import { NAMES } from '../data/names.js';
 import { PALS, palAt } from '../data/palettes.js';
-import { missionDef, missionFoes, BASE_MISSION, FP_MAPS, FP_MIXES, FP_WEATHER, FP_TIMES, fpWeather, pickFoes } from '../data/missions.js';
+import { missionDef, missionFoes, BASE_MISSION, ENDLESS_MISSION, FP_MAPS, FP_MIXES, FP_WEATHER, FP_TIMES, fpWeather, pickFoes } from '../data/missions.js';
 import { MP_COLORS } from '../data/colors.js';
 import { MODE_NAMES } from './lobby.js';
 import { makeGround } from '../world/voxels.js';
@@ -31,6 +31,16 @@ const { sin, max, random, floor } = Math;
 
 // The overlay screens: the main menu with its live mech, the briefing
 // detail, settings, pause, debrief, and the click routing for all of them.
+// ENDLESS (docs/specs/32-base-loop.md § Part 2): the best time lasted, kept
+// as Free Play's other bests are; its end line, in words up to nine.
+const ENDLESS_BEST = 'endless.best';
+const clock = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+const WORDS = ['NO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'];
+const many = (n, one, more) => `${WORDS[n] ?? n} ${n === 1 ? one : more}`;
+export function endlessLine(G) {
+  const raids = G.objectives?.find(o => o.def.type === 'endless')?.n ?? 0, made = G.base?.made ?? 0;
+  return `YOU LASTED ${clock(G.time)}. ${many(made, 'MECH', 'MECHS')} MADE. ${many(raids, 'RAID', 'RAIDS')}.`;
+}
 export function createUi(app) {
   const G = app.G, prefs = app.prefs, ov = app.ov, wrap = app.wrap;
   void CATS; void CAT_OF; void clampN;
@@ -46,6 +56,7 @@ export function createUi(app) {
   // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
   function startSkirmish() {
     if (FP_MAPS[prefs.fpMap] === 'base') { startBase(); return; }
+    if (FP_MAPS[prefs.fpMap] === 'endless') { startBase(ENDLESS_MISSION); return; }   // spec 32: raids until the silo falls
     const map = FP_MAPS[prefs.fpMap], canyon = map === 'canyon';
     const pk = map === 'random' || canyon ? ['dusk', 'ice', 'volcanic'][floor(random() * 3)] : map;
     const foes = pickFoes(FP_MIXES[prefs.fpMix] || FP_MIXES[0], prefs.fpFoes, random, k => !locked(k));
@@ -194,10 +205,11 @@ export function createUi(app) {
         ${camp.mission > 0 ? `<button class="opt${really ? ' really' : ''}" data-a="restart">${really ? 'REALLY?' : 'RESTART CAMPAIGN'}</button>` : ''}`;
     }
     if (prefs.menuSel === 'free') {
-      const map = FP_MAPS[prefs.fpMap], mapName = map === 'random' ? 'RANDOM' : map === 'base' ? 'BASE' : map === 'canyon' ? 'CANYON' : PALS[map].name.toUpperCase();
+      const map = FP_MAPS[prefs.fpMap], mapName = map === 'random' ? 'RANDOM' : map === 'base' ? 'BASE' : map === 'canyon' ? 'CANYON' : map === 'endless' ? 'BASE · ENDLESS' : PALS[map].name.toUpperCase();
       const mapPick = `<div class="mm-pick"><span>MAP</span><button data-fp="map" data-d="-1">◀</button><b>${mapName}</b><button data-fp="map" data-d="1">▶</button></div>`;
       const diffPick = `<div class="mm-pick"><span>DIFFICULTY</span><button data-fp="diff" data-d="-1">◀</button><b>${DIFF[prefs.diff].label}</b><button data-fp="diff" data-d="1">▶</button></div>`;
-      if (map === 'base') return `<p>${esc(BASE_MISSION.name)}. ${esc(BASE_MISSION.intel)}</p><div class="fp-picks">${mapPick}${diffPick}</div>`;   // spec 20: its own mission, its own mechs
+      if (map === 'base') return `<p>${esc(BASE_MISSION.name)}. ${esc(BASE_MISSION.intel)}</p><div class="fp-picks">${mapPick}${diffPick}</div>`;
+      if (map === 'endless') { const best = store.get(ENDLESS_BEST, 0); return `<p>${esc(ENDLESS_MISSION.intel)}${best ? ` Best: ${clock(best)}.` : ''}</p><div class="fp-picks">${mapPick}${diffPick}</div>`; }   // spec 20: its own mission, its own mechs
       return `<p>One fight. You pick.</p>
         <div class="fp-picks">${mapPick}
         <div class="mm-pick"><span>HOSTILES</span><button data-fp="foes" data-d="-1">◀</button><b>${prefs.fpFoes}</b><button data-fp="foes" data-d="1">▶</button></div>
@@ -320,6 +332,9 @@ export function createUi(app) {
     const s = G.stats, acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
     const tm = `${floor(G.time / 60)}:${String(floor(G.time % 60)).padStart(2, '0')}`;
     const isCamp = G.kind === 'campaign', coop = G.mode === 'coop';
+    // ENDLESS: how long, how many mechs, how many raids; the best time kept.
+    const endless = G.def?.key === ENDLESS_MISSION.key, was = endless ? store.get(ENDLESS_BEST, 0) : 0, newBest = endless && G.time > was, best = newBest ? G.time : was;
+    if (newBest) store.set(ENDLESS_BEST, Math.floor(G.time));
     // A campaign result goes in the save; a win may open a chassis, which the voice announces once.
     // Co-op: every pilot saves a win as their own (and nothing for a loss).
     frontierWin = isCamp && G.won && prefs.mission + 1 >= app.campaign.mission;   // the furthest one: the menu moves on to the next
@@ -332,12 +347,12 @@ export function createUi(app) {
     if (fresh.length) app.audio.say(VOICE[fresh.includes('puncher') ? 'unlockPurple' : 'unlock'][0], false, 900);
     const rows = objectiveRows(G).map(r => `<div class="obj ${r.ok ? 'ok' : 'no'}${r.secondary ? ' sec' : ''}"><b>${r.ok ? '&#10003;' : '&#10007;'}</b> ${esc(r.text)}${r.secondary ? ' <i>OPTIONAL</i>' : ''}</div>`).join('');
     showOverlay(`
-      <h1 style="color:${G.won ? '#5f5' : '#f44'}">${debriefTitle(G)}</h1>
+      <h1 style="color:${G.won ? '#5f5' : '#f44'}">${endless ? 'THE SILO FELL.' : debriefTitle(G)}</h1>
       <div class="panel">
         <div class="k">${isCamp ? esc(missionTitle(prefs.mission + 1, G.def.name)) : G.kind === 'edit' ? `EDITOR · ${esc(G.def.name)}` : G.kind === 'base' ? esc(G.def.name) : 'FREE PLAY'}</div>
         ${rows ? `<div class="objs">${rows}</div>` : ''}
         ${fresh.length ? `<div class="unlock">NEW MECH: ${fresh.map(k => esc(CHASSIS[k].name)).join(', ')}</div>` : ''}
-        <div class="verdict ${G.won ? 'ok' : 'no'}">${esc(verdict(G))}</div>
+        ${endless ? `<div class="verdict no">${esc(endlessLine(G))}</div><p>${newBest ? 'NEW BEST.' : `BEST ${clock(best)}`}</p>` : `<div class="verdict ${G.won ? 'ok' : 'no'}">${esc(verdict(G))}</div>`}
         <p>TIME ${tm}<br>KILLS ${coop ? G.coopKills?.[app.net.Net.id] || 0 : s.kills} / ${G.mechs.filter(m => m.team !== 0 && (!m.remote || m.eid)).length}<br>
            ACCURACY ${acc}% (${Math.round(s.hits)} of ${Math.round(s.shots)})<br>
            DAMAGE DEALT ${Math.round(s.dealt)} &nbsp; TAKEN ${Math.round(s.taken)}</p>
