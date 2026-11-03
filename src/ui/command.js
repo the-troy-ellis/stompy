@@ -15,6 +15,10 @@ import { isDown, works } from '../sim/down.js';
 import { territory } from '../sim/territory.js';
 import { queueMake, bayAt, bayParts, thingsAt, studyable, startStudy } from '../sim/production.js';
 import { WEAPONS } from '../data/weapons.js';
+import { raidsDue } from '../sim/objectives.js';
+import { liveHits } from '../sim/hits.js';
+import { WAVE_DIST } from '../sim/waves.js';
+import { polar } from '../sim/placement.js';
 
 // The command view (docs/specs/22-command-view.md): the match from above
 // while the world runs on. MAP (Tab) goes up, BACK comes down into the mech
@@ -47,7 +51,7 @@ const siteLabel = (G, e) => {
   const st = BUILDINGS.wall.radius * 1.9, px = e.x + Math.cos(e.yaw || 0) * st, pz = e.z - Math.sin(e.yaw || 0) * st;
   return G.base?.walls.some(o => o.alive && !o.site && Math.hypot(o.x - px, o.z - pz) < st * 0.6) ? '' : n;
 };
-export const BAR = ['go', 'dig', 'follow', 'stay', 'work', 'drive', 'build', 'attack', 'guard', 'carry'];   // the order bar, in order (keys 1–9; CARRY, the tenth, by tap or pad)
+export const BAR = ['go', 'dig', 'follow', 'stay', 'work', 'drive', 'build', 'attack', 'guard', 'carry', 'fighters'];   // the order bar, in order (keys 1–9; CARRY and FIGHTERS, the last, by tap or pad)
 export const MAKE = Object.keys(RECIPES);   // with an assembly line tapped, the bar is these instead (docs/specs/33-production.md), keys 1–4
 export const STUDY = Object.keys(WEAPONS).filter(w => w !== 'fusion');   // with a weapon lab tapped, the weapons it could work out
 
@@ -103,7 +107,7 @@ export function createCommand(app) {
       if (b.textContent !== label) b.textContent = label;
     }
     for (const k of BAR) {
-      const b = btn[k], show = C.make || C.lab ? false : k === 'drive' ? p.length === 1 : k === 'build' && !p.length ? !!G.base : p.some(m => can(m, k));
+      const b = btn[k], show = C.make || C.lab ? false : k === 'drive' ? p.length === 1 : k === 'build' && !p.length ? !!G.base : k === 'fighters' ? !p.length && fighters().length > 0 : p.some(m => can(m, k));
       if (b.hidden !== !show) b.hidden = !show;
       b.classList.toggle('on', C.order === k || (k === 'build' && !!C.place));
     }
@@ -123,6 +127,8 @@ export function createCommand(app) {
     return w ? footprintAt(G, w.x, w.z, w.yaw, 'wall') : footprintAt(G, g.x, g.z, yaw, C.place);
   };
   const order = o => { give(G, [...C.picked], o); C.order = null; sync(); };
+  // FIGHTERS (docs/specs/32-base-loop.md § Part 2): every crew mech that fights, so a rally is two taps.
+  const fighters = () => crewOf(G).filter(m => m.alive && can(m, 'attack'));
   // The bar's buttons (and keys 1–6, in the bar's order).
   function press(k) {
     if (btn[k].hidden) return;
@@ -134,6 +140,7 @@ export function createCommand(app) {
       return;
     }
     if (k === 'drive') { if (C.picked.size === 1) close([...C.picked][0]); return; }
+    if (k === 'fighters') { C.picked = new Set(fighters()); C.order = null; sync(); return; }
     if (k === 'stay' || k === 'work') return order({ kind: k });
     C.order = C.order === k ? null : k;   // GO, DIG, FOLLOW: now tap where (or whom)
     sync();
@@ -285,6 +292,7 @@ export function createCommand(app) {
     drawExposed(ctx, view, pal);
     drawProduction(ctx, view, pal);
     drawOrders(ctx, view, crew, pal);
+    drawRaids(ctx, view, pal);
     if ((C.place || C.lift) && C.ghost) drawGhost(ctx, view, pal);
     drawLiftable(ctx, view);
     // The base, as the cockpit's panel has it.
@@ -292,6 +300,41 @@ export function createCommand(app) {
     if (G.base) { ctx.fillStyle = pal.good; ctx.fillText(`ORE ${Math.floor(G.base.ore)}/${oreRoom(G)}${G.base.iso || G.base.plants.length ? `  ISO ${G.base.iso}/${isoRoom(G)}` : ''}  SALVAGE ${G.base.salvage}`, 14, 22); }
     drawCompass(ctx, 34, H - 34, C.cam.yaw, pal);
     if (G.padActive) drawPadAim(ctx, W, H, pal);
+  }
+
+  // Defend from above (docs/specs/32-base-loop.md § Part 2): a raid called and
+  // on its way is a red arrow toward where it comes from, on the screen's
+  // edge if that's off it, with the seconds left (`RAID · 18`); where a foe
+  // last hit the base, a red ring pulses.
+  function drawRaids(ctx, view, pal) {
+    const { W, H } = view, cx = W / 2, cy = H / 2, P = G.player;
+    ctx.save();
+    ctx.font = 'bold 12px "Lucida Console", monospace'; ctx.textBaseline = 'middle';
+    for (const r of raidsDue(G)) {
+      const q = polar([r.from, WAVE_DIST]), x = P.x + q.x, z = P.z + q.z, p = view.toScreen(x, G.ter.height(x, z), z);
+      if (!p) continue;
+      let [sx, sy] = p;
+      const m = 40, low = 110, inside = sx > m && sx < W - m && sy > m && sy < H - low;   // low: clear of the bar along the bottom
+      if (!inside) {   // along the line from the middle to it, stopped at the edge
+        const dx = sx - cx, dy = sy - cy, k = Math.min(Math.abs((W / 2 - m) / (dx || 1e-6)), Math.abs(((dy > 0 ? H / 2 - low : H / 2 - m)) / (dy || 1e-6)));
+        sx = cx + dx * k; sy = cy + dy * k;
+      }
+      const a = Math.atan2(sy - cy, sx - cx);
+      ctx.fillStyle = pal.bad; ctx.strokeStyle = pal.bad; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(sx + Math.cos(a) * 14, sy + Math.sin(a) * 14);
+      ctx.lineTo(sx + Math.cos(a + 2.5) * 12, sy + Math.sin(a + 2.5) * 12); ctx.lineTo(sx + Math.cos(a - 2.5) * 12, sy + Math.sin(a - 2.5) * 12); ctx.closePath(); ctx.fill();
+      const label = `RAID · ${Math.ceil(r.left)}`, tw = ctx.measureText(label).width;
+      ctx.textAlign = 'left';
+      ctx.fillText(label, Math.min(W - tw - 8, Math.max(8, sx - Math.cos(a) * 26 - tw / 2)), Math.min(H - 12, Math.max(12, sy - Math.sin(a) * 26)));
+    }
+    const pulse = 0.5 + 0.5 * Math.sin(G.time * 8);
+    for (const h of liveHits(G)) {
+      const p = view.toScreen(h.x, G.ter.height(h.x, h.z), h.z);
+      if (!p) continue;
+      ctx.strokeStyle = pal.bad; ctx.lineWidth = 2 + pulse * 2;
+      ctx.beginPath(); ctx.arc(p[0], p[1], 16 + pulse * 8, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // Territory (docs/specs/33-production.md § Beacons and territory): each

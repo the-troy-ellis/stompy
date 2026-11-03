@@ -10,6 +10,10 @@ const { atan2, sin, cos, max, min, PI } = Math;
 // awake and already looking for you. A voice line calls each one WAVE_WARN
 // seconds ahead. Difficulty changes a wave's size by one mech, never anyone's HP.
 export const WAVE_WARN = 3;
+// A raid is called RAID_WARN seconds ahead instead (docs/specs/32-base-loop.md
+// § Part 2): enough to go up, look, rally and drop in. A wave's own `warn` wins.
+export const RAID_WARN = 20;
+export const warnOf = w => w.warn ?? (w.raid ? RAID_WARN : WAVE_WARN);
 export const WAVE_DIST = 520;   // m from the player for a ring or bearing entry
 
 export function waveFoes(G, foes) {

@@ -1,3 +1,4 @@
+import { noteHit } from './hits.js';
 import { cheat } from './cheats.js';
 import { nextCrew, HANDOVER } from './crew.js';
 import { salvageOf } from './raid.js';
@@ -60,6 +61,7 @@ export const BEAM_CONTACT_GAP = 0.6;
 
 export function damage(G, m, p, amt, src, beam = false, melee = false) {
   if (!m.alive) return;
+  noteHit(G, m, src);   // a crew mech of the base's under fire: a ring on the map (sim/hits.js)
   if (!melee) m.lastHitMelee = false;
   if (m.remote) {
     // Another pilot: what the shooter sees counts, and the victim's own
