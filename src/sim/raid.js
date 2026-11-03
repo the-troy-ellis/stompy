@@ -11,6 +11,7 @@ import { msg } from './effects.js';
 // with where it comes from and what is in it, and its foes go for the base.
 const { hypot, round } = Math;
 export const RAID_NEAR = 120;   // m: a crew mech this close gets the raider's attention instead
+export const RAID_WALL = 30;   // m: a wall slab across its way this close is shot down first (docs/specs/32-base-loop.md § Raids from above)
 
 const NUMBER = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 const SIDE = ['north', 'east', 'south', 'west'];
@@ -38,11 +39,29 @@ export function raidTarget(G, e) {
     const d = hypot(b.x - e.x, b.z - e.z);
     if (d < bestD) { best = b; bestD = d; }
   }
-  if (best) return best;
+  if (best) return wallInWay(G, e, best) || best;
   for (const b of list) {   // not walls (docs/specs/21-mining.md): raiders go round or through; beacons, so a raid opens the border (spec 33)
     if (!b || !b.alive || (knock && isDown(b))) continue;
     const d = hypot(b.x - e.x, b.z - e.z);
     if (d < bestD) { best = b; bestD = d; }
+  }
+  return best && (wallInWay(G, e, best) || best);
+}
+
+// Walls matter (spec 32 part 2): a wall slab standing across the straight line
+// from the raider to its target, within RAID_WALL of the raider, is what it
+// shoots, rather than walking a long way round. The nearest such slab.
+export function wallInWay(G, e, t) {
+  const dx = t.x - e.x, dz = t.z - e.z, L = hypot(dx, dz);
+  if (L < 1) return null;
+  const ux = dx / L, uz = dz / L, reach = Math.min(RAID_WALL, L);
+  let best = null, bestT = Infinity;
+  for (const w of G.base.walls || []) {
+    if (!w.alive || isDown(w)) continue;
+    const ax = w.x - e.x, az = w.z - e.z, along = ax * ux + az * uz;
+    if (along < 0 || along > reach || along >= bestT) continue;
+    if (Math.abs(ax * uz - az * ux) > w.radius + 1.5) continue;   // off to the side of the line
+    best = w; bestT = along;
   }
   return best;
 }

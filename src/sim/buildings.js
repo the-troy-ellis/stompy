@@ -19,12 +19,13 @@ export const KINDS = {
   wall: { list: 'walls' },
   bay: { list: 'bays' },
   factory: { one: 'factory', fresh: e => { e.job = null; } },
+  tower: { list: 'towers', fresh: e => { e.cd = 0; e.headYaw = e.headYaw || 0; } },   // a gun on a post (sim/towers.js, spec 32 part 2)
 };
 
 // What a raid goes for, in this order (sim/raid.js). Not walls: raiders go
 // round or through (spec 21). Labs and weapon shops aren't on it either, as
 // before this table; whether they should be is the owner's call (spec 36).
-export const RAID_KINDS = ['silo', 'factory', 'bay', 'beacon', 'shop', 'plant', 'line'];
+export const RAID_KINDS = ['silo', 'factory', 'bay', 'beacon', 'shop', 'plant', 'line', 'tower'];   // the tower last: one that shoots back is fair game
 
 // Into the base: its working state, and its list (or slot). A taken factory
 // only fills the slot when the base's own is gone.

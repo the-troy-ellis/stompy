@@ -75,8 +75,13 @@ export const PLACE = {
   plant: { ore: 80, swings: 12, hp: 500, w: 14, d: 14, flat: 2 },   // the isotope plant: cores from isotopes (spec 33)
   lab: { ore: 60, swings: 10, hp: 400, w: 12, d: 20, flat: 2 },   // the weapon lab: works out a weapon, this mission (spec 33)
   armory: { ore: 60, swings: 10, hp: 500, w: 12, d: 12, flat: 2 },   // the weapon shop: guns that are worked out (spec 33)
+  tower: { ore: 40, swings: 8, hp: 400, w: 6, d: 6, flat: 2 },   // a gun on a post that shoots raiders by itself (docs/specs/32-base-loop.md § Part 2)
 };
-export const PLACE_ORDER = ['factory', 'bay', 'wall', 'silo', 'beacon', 'shop', 'line', 'plant', 'lab', 'armory'];
+// The TOWER's gun (spec 32 part 2): an autocannon round at the nearest foe in
+// range it can see, every `cd` s, its head turning `turn` rad/s; it fires
+// once it's within `aim` rad of on target.
+export const TOWER = { range: 120, cd: 1.6, turn: 2.2, aim: 0.12, weapon: 'ac', muzzle: 0.92 };
+export const PLACE_ORDER = ['factory', 'bay', 'wall', 'tower', 'silo', 'beacon', 'shop', 'line', 'plant', 'lab', 'armory'];
 // The buildings, as mission entities (sim/entities.js): unit meshes in mesh/props.js.
 // A bay is a gantry with a pad in front, like the silo; a wall slab is 4.2 m wide.
 const B = NAMES.buildings;
@@ -91,6 +96,7 @@ export const BUILDINGS = {
   plant: { kind: 'structure', mesh: 'plant', radius: 7, height: 16, team: 0, tags: ['plant'], label: B.plant },
   lab: { kind: 'structure', mesh: 'lab', radius: 10, height: 9, team: 0, tags: ['lab'], label: B.lab },   // a shed and its test range, 20 m along
   armory: { kind: 'structure', mesh: 'armory', radius: 6, height: 9, team: 0, tags: ['armory'], label: B.armory },
+  tower: { kind: 'structure', mesh: 'tower', radius: 2.5, height: 9, team: 0, tags: ['tower'], label: B.tower },   // its head turns (mesh towerHead, e.headYaw)
 };
 // Production (docs/specs/33-production.md § The machine shop, § The assembly
 // line): parts by size, not by mech, each with its price in ore and the mech
@@ -143,5 +149,5 @@ export const HEAP = { kind: 'nav', mesh: 'heap', team: 0, tags: ['heap'], trigge
 // are nobody's: abandoned, down from the start.
 export const STEAL = {
   down: 0.25, speed: 0.5, faster: 1.3, neutral: 2,
-  lift: { beacon: 1, wall: 1, silo: 2, shop: 2, bay: 2, lab: 2, armory: 2, plant: 3, factory: 3, line: 4 },
+  lift: { beacon: 1, wall: 1, tower: 1, silo: 2, shop: 2, bay: 2, lab: 2, armory: 2, plant: 3, factory: 3, line: 4 },
 };
