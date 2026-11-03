@@ -142,6 +142,8 @@ export const BUDGETS = {
   snow:           { meanDraws: 19, peakDraws: 19, tris: 87000, allocKB: 95, gpuMB: 25, heapMB: 50 },   // and in snow
   dust:           { meanDraws: 14, peakDraws: 14, tris: 81000, allocKB: 90, gpuMB: 25, heapMB: 50 },   // and in a dust storm (2,500 grains)
   'map-sweep':    { meanDraws: 7, peakDraws: 29, tris: 78500, allocKB: 90, gpuMB: 24, heapMB: 50 },   // the map view carried over the whole map (spec 34): with #392 undone it holds 27.5 MB on the GPU (and, before spec 35 part 2, 123 MB of heap)
+  'big-map':      { meanDraws: 11, peakDraws: 20, tris: 105000, allocKB: 85, gpuMB: 9, heapMB: 34 },   // the 3 km test canyon walked end to end (spec 35 part 5): 7.5 MB on the GPU, against ~21 MB on today's map
+  'big-map-view': { meanDraws: 7, peakDraws: 9, tris: 64500, allocKB: 60, gpuMB: 26, heapMB: 50 },   // and swept from above, zoomed out along it: every far square, ~22 MB
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;
