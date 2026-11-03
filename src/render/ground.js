@@ -52,14 +52,14 @@ export function createGround(R) {
   // Jobs by id: chunks from 0, far meshes from FAR (sized with the groups, in regroup).
   let mesh = [], ver = null, waiting = null;
   const newPart = () => ({ buf: null, count: 0, first: 0, lo: null, hi: null, dirty: false });
-  let groups = [], rows = [];
+  let groups = [], rows = [], rowScratch = new Float32Array(0);   // rowScratch: a row's far meshes end to end, reused
   // The groups and rows for the map's size (and their buffers off the GPU when it changes).
   function regroup() {
     for (const gr of groups) { if (gr.near.buf) gl.deleteBuffer(gr.near.buf); }
     for (const row of rows) if (row.buf) gl.deleteBuffer(row.buf);
     groups = Array.from({ length: GX * GZ }, () => ({ near: newPart(), far: newPart(), wanted: false, farWanted: false, left: 0 }));
     // The far meshes share a buffer per row of groups, so neighbours drawn far are one draw.
-    rows = Array.from({ length: GZ }, () => ({ buf: null, dirty: false }));
+    rows = Array.from({ length: GZ }, () => ({ buf: null, dirty: false, cap: 0 }));
     mesh = new Array(FAR + GX * GZ).fill(null); ver = new Int32Array(FAR + GX * GZ); waiting = new Uint8Array(FAR + GX * GZ);
   }
   sizeGroups(); regroup();
@@ -163,7 +163,7 @@ export function createGround(R) {
       else if (fetch && gr.wanted && d > LET_GO) letGo(gi);
       const df = groupDist(gi, from);
       if (!gr.farWanted && df < reach + FAR_PAD) { gr.farWanted = true; want(FAR + gi); added = true; }
-      else if (gr.farWanted && df > reach + FAR_PAD + FAR_SLACK) dropFar(gi);
+      else if (fetch && gr.farWanted && df > reach + FAR_PAD + FAR_SLACK) dropFar(gi);   // up above, kept: zooming in and out would mesh and send them again each time
     }
     if (added) queue.sort(byDistance(eye));
     if (queue.length) {
@@ -282,7 +282,8 @@ export function createGround(R) {
     row.dirty = false;
     let len = 0;
     for (let gx = 0; gx < GX; gx++) { const m = mesh[FAR + gx + GX * gz]; if (m) len += m.f.length; }
-    const all = new Float32Array(len);
+    if (rowScratch.length < len) rowScratch = new Float32Array(Math.ceil(len * 1.25));
+    const all = rowScratch;
     let o = 0;
     for (let gx = 0; gx < GX; gx++) {
       const m = mesh[FAR + gx + GX * gz], part = groups[gx + GX * gz].far;
@@ -292,7 +293,12 @@ export function createGround(R) {
     if (!row.buf) row.buf = gl.createBuffer();
     for (let gx = 0; gx < GX; gx++) groups[gx + GX * gz].far.buf = row.buf;
     gl.bindBuffer(gl.ARRAY_BUFFER, row.buf);
-    gl.bufferData(gl.ARRAY_BUFFER, all, gl.STATIC_DRAW);
+    // The row's buffer is written in place, with a quarter to spare, and sized
+    // again only when it outgrows that or falls under half of it: re-sized on
+    // every far square that came in, a phone's GPU kept the old ones until it
+    // ran out (the map's zoom, on an iPhone 13 mini).
+    if (len * 4 > row.cap || len * 4 < row.cap / 2) { row.cap = Math.max(4, Math.ceil(len * 1.25) * 4); gl.bufferData(gl.ARRAY_BUFFER, row.cap, gl.DYNAMIC_DRAW); }
+    if (len) gl.bufferSubData(gl.ARRAY_BUFFER, 0, all.subarray(0, len));   // WebGL 1: no offset and length
     R.curMesh = null;
   }
   function upload() {
