@@ -1,3 +1,4 @@
+import { buildingsOf, RAID_KINDS } from './buildings.js';
 import { CHASSIS } from '../data/chassis.js';
 import { CONSTRUCT } from '../data/construct.js';
 import { crewOf } from './crew.js';
@@ -31,7 +32,7 @@ export function raidTarget(G, e) {
   let best = null, bestD = Infinity;
   // On HARD (stealRow knock) a raid knocks an exposed building down for its
   // thieves and leaves it at that: the exposed ones first, never one down.
-  const knock = stealRow(G).knock, list = [...G.base.silos, G.base.factory, ...(G.base.bays || []), ...G.base.beacons, ...(G.base.shops || []), ...(G.base.plants || []), ...(G.base.lines || [])];
+  const knock = stealRow(G).knock, list = buildingsOf(G, RAID_KINDS);   // what a raid goes for (sim/buildings.js)
   if (knock) for (const b of list) {
     if (!b?.alive || !b.exposed || isDown(b)) continue;
     const d = hypot(b.x - e.x, b.z - e.z);
