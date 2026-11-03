@@ -492,15 +492,20 @@ try {
       if (hold) await page.waitForTimeout(hold);
       await touch('touchEnd');
     };
-    const P = () => page.evaluate(() => { const p = window.__stompy.game.player; return { yaw: p.yaw, twist: p.twist, pitch: p.pitch, thr: p.throttle }; });
+    const P = () => page.evaluate(() => { const g = window.__stompy.game, p = g.player; return { yaw: p.yaw, twist: p.twist, pitch: p.pitch, thr: p.throttle, frame: g.frame }; });
     await page.evaluate(() => { const g = window.__stompy.game; for (const k in g.player.hp) g.player.hp[k] = 1e6; for (const m of g.mechs) if (m.team) m.ai.aware = false; });
     let a0 = await P();
     await drag(200, 560, 140, 530, 300);
-    const short = (await P()).yaw - a0.yaw;
-    a0 = await P();
-    await drag(200, 560, 140, 530, 1500);   // held out five times as long: it keeps turning
     let a1 = await P();
-    const aimOk = a1.yaw - a0.yaw > 2 * short && a1.yaw - a0.yaw > 0.3 && Math.abs(a1.twist - a0.twist) < 0.05 && a1.pitch !== a0.pitch;
+    const short = { yaw: a1.yaw - a0.yaw, frames: a1.frame - a0.frame };
+    a0 = a1;
+    await drag(200, 560, 140, 530, 1500);   // held out five times as long: it keeps turning
+    a1 = await P();
+    // By frames, not the wall clock (a slow runner draws fewer of them): held
+    // longer, it turned on through more frames, at no less than half the rate.
+    const long = { yaw: a1.yaw - a0.yaw, frames: a1.frame - a0.frame }, rate = o => o.yaw / Math.max(1, o.frames);
+    const aimOk = long.yaw > 0.3 && long.frames > short.frames && rate(long) > 0.5 * rate(short) && Math.abs(a1.twist - a0.twist) < 0.05 && a1.pitch !== a0.pitch;
+    if (!aimOk) console.log(`touch: the lower stick held 300 ms turned ${short.yaw.toFixed(2)} in ${short.frames} frames, 1500 ms ${long.yaw.toFixed(2)} in ${long.frames}; twist moved ${(a1.twist - a0.twist).toFixed(3)}, pitch moved ${a1.pitch !== a0.pitch}`);
     a0 = a1;
     await drag(200, 300, 160, 240, 500);
     a1 = await P();

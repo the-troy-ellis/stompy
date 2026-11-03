@@ -59,11 +59,11 @@ first and change nothing a player sees. Only part 5 makes a map bigger.
 
 ### Part 1: measure a big map
 
-- A `big-map` perf scene: a 4.6 km map with a mission's landmarks, walked
-  across and swept in the map view. It reports `gpuMB` and `heapMB` with
+- A `big-map` perf scene: the 3 km test canyon (part 5), walked along its
+  length and swept in the map view. It reports `gpuMB` and `heapMB` with
   budgets, like `map-sweep`.
-- Until part 5, the scene builds its map through a test-only override of
-  the size, so the number is there to beat before anything else lands.
+- The map's size is a module constant until part 5, so this scene lands
+  with part 5. Parts 2–4 were measured on today's map instead.
 
 ### Part 2: the falling-ground check without a map-sized scratch
 
@@ -122,20 +122,37 @@ Measured on today's map:
 - GPU memory then follows what is near you, not the map's size. At today's
   size it barely changes, because the fog reaches most of the map.
 
-### Part 5: a size per map
+### Part 5: a size per map, any width and length
 
-- `G.map = { half, n }` replaces the module constants. `terrain.js`,
-  `voxels.js`, `nav.js`, `near.js`, `render/ground.js`, `render/falls.js`,
-  `dig.js` and the other importers read the size from the game.
-- A mission or Free Play picks a size: `def.size`, one of `SIZES` in
-  `data/maps.js`. **S** is 2.3 km (today, and the default). **M** is 3.5 km.
-  **L** is 4.6 km.
-- The editor shows the size and keeps placements inside it. Polar placements
-  (`[bearing°, dist]`) need no change.
-- The arena and co-op carry the size in the room's settings, so every
-  client builds the same map. This is a network message change:
+Maps needn't be square. A combat mission can be a long canyon you fight
+your way through; a base mission wants room all round. Memory follows area
+(parts 2–4), so a 1 km × 3 km canyon costs about what today's square does.
+
+- **The size is width × length.** `def.size: [w, l]` in metres (x across, z
+  along), or one of the square presets in `SIZES` (`data/maps.js`): **S**
+  2.3 km (today, and the default), **M** 3.5 km, **L** 4.6 km.
+- **Two half-sizes, not one.** `G.map = { hx, hz, ... }` replaces the module
+  constants `HALF`, `BOUND`, `N`, `NX`, `NZ`, `PX`, `PZ` that 18 files
+  import. `terrain.js`, `voxels.js` and its grid, `nav.js`, `near.js`,
+  `render/ground.js`, `render/falls.js`, `dig.js`, the map view's camera and
+  the other importers read them from the game. Each axis keeps today's
+  cells, so a size is rounded to whole 24 m cells and 4 m corners.
+- **A canyon is ground, not a fence.** The heights already come from a
+  function, so a mission can ask for a shape: `def.ground.shape: { canyon:
+  { width, walls, wind } }`. It gives a floor about `width` m across that
+  winds along the length, rising to walls `walls` m high on both sides, with
+  the usual hills folded in. The map's edge, beyond the walls, still stops
+  you. Landmarks (mesas, arches) sit on top as today.
+- **Placements need no change.** Polar `[bearing°, dist]` from the centre
+  reach either end of a long map. The editor keeps them inside the
+  rectangle and shows its outline.
+- **The test canyon** is 3 km long and 900 m across (`data/maps.js`
+  `CANYON`): a floor about 200 m wide winding along it, with walls 80 m
+  high. It is the `big-map` perf scene (part 1, which waited for this), a
+  range in the debug menu, and a Free Play map to try.
+- The arena and co-op carry the size and shape in the room's settings, so
+  every client builds the same map. This is a network message change:
   `PROTOCOL` 23, and `docs/architecture.md` is updated.
-- Which missions get which size is the owner's call (open questions).
 
 ### Not in this spec
 
@@ -156,7 +173,8 @@ Measured on today's map:
 - `src/world/terrain.js`, `src/sim/ai/nav.js`, `src/sim/near.js`,
   `src/render/falls.js`, `src/sim/dig.js` and the other importers of `HALF`
   and `BOUND`: the size from the game (part 5).
-- `src/data/maps.js` (new): `SIZES`. `src/ui/editor.js`: the size.
+- `src/data/maps.js` (new): `SIZES`, `CANYON`. `src/world/terrain.js`:
+  the canyon shape. `src/ui/editor.js`: the size and its outline.
 - `src/net/protocol.js`, `server/server.py`: the room's size, `PROTOCOL` 23
   (part 5).
 
@@ -171,9 +189,10 @@ Measured on today's map:
    measurable change in either scene.)
 4. After part 4, GPU memory in `big-map` stays within 25% of today's
    `map-sweep` while crossing the map.
-5. After part 5, a 4.6 km mission plays on the reference phone without the
-   view going out, with its median and 95th percentile frame time reported.
-   Today's maps play exactly as before.
+5. After part 5, the 3 km canyon and a 4.6 km square both play on the
+   reference phone without the view going out, with median and 95th
+   percentile frame times reported. Today's maps play exactly as before
+   (their grounds hash the same).
 
 ## Tests
 
@@ -194,9 +213,16 @@ near, as near meshes are today.
 
 ## Open questions
 
-- **How big.** Default: S, M and L (2.3, 3.5 and 4.6 km). 9.2 km would fit
-  after parts 2–4, but walking it takes minutes. Revisit after playing L.
-- **Which missions get which size.** Default: today's missions stay S. New
-  base-building missions (spec 32, 33) and Free Play's BASE get a size
-  picker, defaulting to M.
-- **The arena.** Default: stays S. A bigger arena can come later as a vote.
+Settled by the owner:
+- **Shapes, not just sizes.** Combat missions aren't limited to squares: a
+  long canyon to fight through is the first case. Any width × length a
+  mission sets, plus square presets S, M and L.
+- **The test canyon is 3 km long.**
+
+Still open, with defaults:
+- **Which missions get which size.** Default: today's missions stay as they
+  are. Base missions (spec 32, 33) and Free Play's BASE get a size picker,
+  defaulting to M. Combat missions set their own shape.
+- **The arena.** Default: stays square at S.
+- **9.2 km.** It would fit after parts 2–4, but walking it takes minutes.
+  Revisit after playing L.
