@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress: part 1 built; part 2 built (raid warning, FIGHTERS, hit rings; walls in the way and the TOWER; ENDLESS); part 3 built (ore thin near the silo, lodes, haul lines; the outpost is spec 33's second silo). Phone check open. Draft (the owner, 2026-11-01: "I want to work on command view game loop"; picked all three loops in parts, and both missions and an endless mode) |
+| Status | built: part 1 (grow the crew), part 2 (#405 raid warning, FIGHTERS, hit rings; #406 walls in the way and the TOWER; #407 ENDLESS), part 3 (#408 ore thin near the silo, lodes, haul lines; the outpost is spec 33's second silo). Phone check open. Draft (the owner, 2026-11-01: "I want to work on command view game loop"; picked all three loops in parts, and both missions and an endless mode) |
 | Milestone | M14 (proposed) |
 | Size | L, split in three: grow the crew; defend from above (and ENDLESS); spread out |
 | Depends on | [20-build-and-fight.md](20-build-and-fight.md) (silo, factory, raids, salvage); [21-mining.md](21-mining.md) (seams, haulers); [22-command-view.md](22-command-view.md) (the map and its orders); [23-construction-sites.md](23-construction-sites.md) and [31-builder.md](31-builder.md) (sites, builders) |

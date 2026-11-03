@@ -357,7 +357,7 @@ and blast-off; the flight; targeting and the insta-stomp; the AI and online.
 - **Part 2, the flight:** built.
 - **Part 3, targeting and the insta-stomp:** built (single player).
 
-## M14 — The base loop from above (proposed)
+## M14 — The base loop from above
 
 Goal: a loop for the map. Spend ore on the mechs you want from the factory
 (more diggers, more ore), see a raid coming 20 s out and rally from above
@@ -365,6 +365,8 @@ before dropping in, and spread out to richer ground with outposts. Missions
 get objectives about building; Free Play gets BASE · ENDLESS. Spec:
 [specs/32-base-loop.md](specs/32-base-loop.md). In three parts: grow the
 crew; defend from above (and ENDLESS); spread out.
+
+- **Built:** all three parts of spec 32 (#405–#408 for parts 2 and 3).
 
 Then production ([specs/33-production.md](specs/33-production.md)): a machine
 shop, an isotope plant, a weapon lab and shop, and an open assembly line you
@@ -381,11 +383,15 @@ sim's cost grows in step with the mechs, not faster, so a phone holds its
 frame in a big battle. Measured in a crowd scene first, then a grid of the
 mechs, far foes thinking less often, and no garbage in the sim's hot loops. In four parts.
 
+- **Built:** all four parts of spec 34.
+
 Then bigger maps ([specs/35-bigger-maps.md](specs/35-bigger-maps.md)): memory
 that follows what's been dug and what's near you, not the map's size, so a
 phone holds a map twice as wide; then a size per mission (S, M, L: 2.3, 3.5
 and 4.6 km). In five parts: measure, the fall check's scratch, the ground in
 chunks, far ground by distance, a size per map.
+
+- **Built:** all five parts of spec 35, with a 3 km test canyon in Free Play.
 
 ## Parked
 
