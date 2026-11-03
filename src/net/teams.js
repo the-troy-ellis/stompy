@@ -1,5 +1,5 @@
 import { TAU } from '../util/math.js';
-import { BOUND } from '../world/terrain.js';
+import { BX, BZ } from '../world/terrain.js';
 import { MP_COLORS } from '../data/colors.js';
 
 const { sin, cos, min, hypot } = Math;
@@ -23,7 +23,7 @@ export function spawnPoint(G, side = 0, rand = Math.random) {
   const rnd = (a, b) => a + rand() * (b - a);
   let best = [0, 0], bestD = -1;
   for (let k = 0; k < 20; k++) {
-    const a = side ? rnd(-SIDE_ARC, SIDE_ARC) : rand() * TAU, d = rnd(80, BOUND - 80);
+    const a = side ? rnd(-SIDE_ARC, SIDE_ARC) : rand() * TAU, d = rnd(80, Math.min(BX, BZ) - 80);
     const x = sin(a) * d, z = (side ? side * cos(a) : cos(a)) * d;
     let near = 1e9;
     for (const m of G.mechs) if (m.alive && m !== G.player && m.team !== 0) near = min(near, hypot(m.x - x, m.z - z));

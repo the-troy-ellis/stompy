@@ -19,13 +19,16 @@ export function drawMap(ctx, view, { map, things = [], routes = [], waves = [], 
   ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.font = FONT; ctx.textBaseline = 'middle';
 
   // The grid, following the ground, and the map's edge.
-  const g = (map.grid || 100) * (view.mpp > 3 ? 2 : 1), B = map.bound, step = Math.max(25, g / 2);   // zoomed far out: every other line
+  // map.bound: [across, along] (a map needn't be square: docs/specs/35-bigger-maps.md), or one number.
+  const g = (map.grid || 100) * (view.mpp > 3 ? 2 : 1), step = Math.max(25, g / 2);   // zoomed far out: every other line
+  const BX = Array.isArray(map.bound) ? map.bound[0] : map.bound, BZ = Array.isArray(map.bound) ? map.bound[1] : map.bound;
   ctx.strokeStyle = 'rgba(255,255,255,0.09)'; ctx.lineWidth = 1;
   ctx.beginPath();
-  for (let v = -Math.floor(B / g) * g; v <= B; v += g) { line(ctx, S, -B, v, B, v, step); line(ctx, S, v, -B, v, B, step); }
+  for (let v = -Math.floor(BZ / g) * g; v <= BZ; v += g) line(ctx, S, -BX, v, BX, v, step);
+  for (let v = -Math.floor(BX / g) * g; v <= BX; v += g) line(ctx, S, v, -BZ, v, BZ, step);
   ctx.stroke();
   ctx.strokeStyle = pal.warn; ctx.lineWidth = 2; ctx.setLineDash([8, 6]);
-  ctx.beginPath(); line(ctx, S, -B, -B, B, -B, step); line(ctx, S, B, -B, B, B, step); line(ctx, S, B, B, -B, B, step); line(ctx, S, -B, B, -B, -B, step); ctx.stroke();
+  ctx.beginPath(); line(ctx, S, -BX, -BZ, BX, -BZ, step); line(ctx, S, BX, -BZ, BX, BZ, step); line(ctx, S, BX, BZ, -BX, BZ, step); line(ctx, S, -BX, BZ, -BX, -BZ, step); ctx.stroke();
   ctx.setLineDash([]);
   // The map's centre, where every `at` is measured from.
   const c = S(centre.x, centre.z);

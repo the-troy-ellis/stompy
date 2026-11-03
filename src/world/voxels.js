@@ -1,5 +1,5 @@
 import { Grid } from './grid.js';
-import { makeTerrain, HALF } from './terrain.js';
+import { makeTerrain, HX, HZ, onResize } from './terrain.js';
 import { clampN } from '../util/math.js';
 import { polar } from '../sim/placement.js';
 import { FS, PATCH, makePatch, inPatch, overXZ, contains, overlaps, union, fits, patchSample, patchHeight } from './finePatch.js';
@@ -11,10 +11,17 @@ const { floor, ceil, hypot, max, min } = Math;
 // hills are its base (makeTerrain's heights, so every mission keeps its shape);
 // a mission's landmarks and the editor's strokes are laid on top, in order.
 // Bedrock (the bottom two layers) never changes; outside the map is air.
-export const VS = 4, Y0 = -44, NX = (2 * HALF) / VS, NY = 76, NZ = NX;   // 4 m cells (docs/specs/29-ground-4m.md; 8 m and 38 layers before)
-export const CS = 16, CX = ceil(NX / CS), CY = ceil(NY / CS), CZ = ceil(NZ / CS);
-export const PX = NX + 1, PY = NY + 1, PZ = NZ + 1;
-const STEPS = new Int32Array([1, -1, PX * PY, -PX * PY, PX, -PX]);   // the six face neighbours; down last, so it is tried first
+export const VS = 4, Y0 = -44, NY = 76, CS = 16, CY = ceil(NY / CS), PY = NY + 1;   // 4 m cells (docs/specs/29-ground-4m.md; 8 m and 38 layers before)
+// Across (x) and along (z), from the map's size (world/terrain.js, docs/specs/35-bigger-maps.md
+// part 5): live bindings, set again whenever the size is.
+export let NX = 0, NZ = 0, CX = 0, CZ = 0, PX = 0, PZ = 0;
+let STEPS = null;   // the six face neighbours' offsets; down last, so it is tried first
+function sized() {
+  NX = (2 * HX) / VS; NZ = (2 * HZ) / VS; CX = ceil(NX / CS); CZ = ceil(NZ / CS); PX = NX + 1; PZ = NZ + 1;
+  STEPS = new Int32Array([1, -1, PX * PY, -PX * PY, PX, -PX]);
+}
+sized();
+onResize(sized);
 export const cornerIndex = (i, j, k) => i + PX * (j + PY * k);
 // Density is metres from the surface over DS, so slopes up to ~60° keep their shape between corners.
 export const DS = 2 * VS;
@@ -69,7 +76,7 @@ export const scratchBytes = () => (LIST ? LIST.byteLength + STACK.byteLength + H
 // optional): { landmarks: [...], strokes: [[op, x, y, z, r], ...], pockets }.
 // `opts.height(x, z)` replaces the hills (tests: a ramp, a ridge).
 export function makeGround(seed, opts = {}, def = {}) {
-  const base = opts.height ? { height: opts.height } : makeTerrain(seed, opts), top = new Float32Array(PX * PZ);
+  const base = opts.height ? { height: opts.height } : makeTerrain(seed, { ...opts, canyon: def.ground?.shape?.canyon || null }), top = new Float32Array(PX * PZ);
   const g = def.ground || {};
   // The base: "height minus y" in cells, so a flat pad's top lands exactly on its height.
   // Rock up to a DS under the surface, air from a DS over it, a ramp between.
@@ -79,7 +86,7 @@ export function makeGround(seed, opts = {}, def = {}) {
   // gave before, to the last ramp byte), the top of its rock and the bottom of its air.
   const H = new Float64Array(PX * PZ), JR = new Int16Array(PX * PZ), JA = new Int16Array(PX * PZ);
   for (let k = 0; k < PZ; k++) for (let i = 0; i < PX; i++) {
-    const c = i + PX * k, edge = i === 0 || k === 0 || i === NX || k === NZ, h = H[c] = base.height(-HALF + i * VS, -HALF + k * VS);
+    const c = i + PX * k, edge = i === 0 || k === 0 || i === NX || k === NZ, h = H[c] = base.height(-HX + i * VS, -HZ + k * VS);
     JR[c] = edge ? BEDROCK : Math.min(NY - 1, Math.max(BEDROCK, floor((h - DS - Y0) / VS)));
     JA[c] = edge ? BEDROCK + 1 : Math.min(NY, ceil((h + DS - Y0) / VS));
   }
@@ -123,7 +130,7 @@ function groundApi(G) {
   }
   // Density on the 8 m grid by trilinear blend: below the grid is rock, beside or above it air.
   function csample(x, y, z) {
-    const fx = (x + HALF) / VS, fy = (y - Y0) / VS, fz = (z + HALF) / VS;
+    const fx = (x + HX) / VS, fy = (y - Y0) / VS, fz = (z + HZ) / VS;
     if (fy <= 0) return 1;
     if (fx < 0 || fz < 0 || fx >= NX || fz >= NZ || fy >= NY) return -1;
     const i = fx | 0, j = fy | 0, k = fz | 0, u = fx - i, v = fy - j, w = fz - k;
@@ -145,7 +152,7 @@ function groundApi(G) {
   // The mesh (mesher.js) is the same surface, smoothed: the two agree within
   // 0.6 m over nearly all of a map (test/mesher.test.js).
   function cheight(x, z) {
-    const gx = clampN((x + HALF) / VS, 0, NX - 1e-4), gz = clampN((z + HALF) / VS, 0, NZ - 1e-4);
+    const gx = clampN((x + HX) / VS, 0, NX - 1e-4), gz = clampN((z + HZ) / VS, 0, NZ - 1e-4);
     const i = gx | 0, k = gz | 0, u = gx - i, w = gz - k, o = i + PX * k;
     return (top[o] * (1 - u) + top[o + 1] * u) * (1 - w) + (top[o + PX] * (1 - u) + top[o + PX + 1] * u) * w;
   }
@@ -223,9 +230,9 @@ function groundApi(G) {
   const retop = (i0, i1, k0, k1) => { for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) top[i + PX * k] = topOf(i, k); };
   // The corners a sphere of radius r at p can change, clamped to what may change.
   const box = (p, r) => [
-    clampN(floor((p[0] + HALF - r) / VS) - 1, 1, NX - 1), clampN(ceil((p[0] + HALF + r) / VS) + 1, 1, NX - 1),
+    clampN(floor((p[0] + HX - r) / VS) - 1, 1, NX - 1), clampN(ceil((p[0] + HX + r) / VS) + 1, 1, NX - 1),
     clampN(floor((p[1] - Y0 - r) / VS) - 1, BEDROCK + 1, NY - 1), clampN(ceil((p[1] - Y0 + r) / VS) + 1, BEDROCK + 1, NY - 1),
-    clampN(floor((p[2] + HALF - r) / VS) - 1, 1, NZ - 1), clampN(ceil((p[2] + HALF + r) / VS) + 1, 1, NZ - 1)];
+    clampN(floor((p[2] + HZ - r) / VS) - 1, 1, NZ - 1), clampN(ceil((p[2] + HZ + r) / VS) + 1, 1, NZ - 1)];
   function touched(i0, i1, j0, j1, k0, k1) {
     retop(i0, i1, k0, k1);
     chunks(i0, i1, j0, j1, k0, k1);
@@ -246,7 +253,7 @@ function groundApi(G) {
     const [i0, i1, j0, j1, k0, k1] = box(p, r);
     if (i0 > i1 || j0 > j1 || k0 > k1) return;
     for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-      const o = cornerIndex(i, j, k), dist = hypot(-HALF + i * VS - p[0], Y0 + j * VS - p[1], -HALF + k * VS - p[2]);
+      const o = cornerIndex(i, j, k), dist = hypot(-HX + i * VS - p[0], Y0 + j * VS - p[1], -HZ + k * VS - p[2]);
       D.set(o, Q(f((D.get(o) - 128) / 127, dist)));
     }
     touched(i0, i1, j0, j1, k0, k1);
@@ -274,13 +281,13 @@ function groundApi(G) {
     const base = G.base;
     fine(p, r, DIG, rock, fl, sl);
     for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
-      const soft = base[i + PX * k] - SOFT, x = -HALF + i * VS, z = -HALF + k * VS, dx = x - p[0], dz = z - p[2], f = sl ? fl + max(0, sl[0] * (x - sl[2]) + sl[1] * (z - sl[3])) : fl;
+      const soft = base[i + PX * k] - SOFT, x = -HX + i * VS, z = -HZ + k * VS, dx = x - p[0], dz = z - p[2], f = sl ? fl + max(0, sl[0] * (x - sl[2]) + sl[1] * (z - sl[3])) : fl;
       for (let j = j0; j <= j1; j++) {
         const y = Y0 + j * VS, dist = benchDist(dx, y - p[1], dz, fl - y), was = D.at(i, j, k), now = Q(min((was - 128) / 127, max(dist - (y >= soft ? r : r * rock), f - y) / DS));
         D.put(i, j, k, now);
         if (tally && was > 128 && now <= 128) {
           if (y >= soft) tally.soft = (tally.soft || 0) + 1;
-          else { tally.rock++; if (tally.corner) tally.corner(-HALF + i * VS, y, -HALF + k * VS, soft + SOFT - y); }
+          else { tally.rock++; if (tally.corner) tally.corner(-HX + i * VS, y, -HZ + k * VS, soft + SOFT - y); }
         }
       }
     }
@@ -382,7 +389,7 @@ function groundApi(G) {
         let sx = 0, sy = 0, sz = 0;
         for (let q = start; q < nl; q++) { const o = LIST[q]; sx += o % PX; sy += ((o / PX) | 0) % PY; sz += (o / (PX * PY)) | 0; }
         const n = nl - start;
-        weighed.push({ load, section: cols.size, broke: load > k * cols.size, x: -HALF + sx / n * VS, y: Y0 + sy / n * VS, z: -HALF + sz / n * VS });
+        weighed.push({ load, section: cols.size, broke: load > k * cols.size, x: -HX + sx / n * VS, y: Y0 + sy / n * VS, z: -HZ + sz / n * VS });
       }
       if (load > k * cols.size) out.push(LIST.slice(start, nl).sort());
     }
@@ -440,11 +447,11 @@ function groundApi(G) {
   function pile(x, z, h, r) {
     const t0 = height(x, z);
     fine([x, t0 + h / 2, z], max(r, h), PILE, h, r);
-    const i0 = clampN(floor((x + HALF - r) / VS), 1, NX - 1), i1 = clampN(ceil((x + HALF + r) / VS), 1, NX - 1);
-    const k0 = clampN(floor((z + HALF - r) / VS), 1, NZ - 1), k1 = clampN(ceil((z + HALF + r) / VS), 1, NZ - 1);
+    const i0 = clampN(floor((x + HX - r) / VS), 1, NX - 1), i1 = clampN(ceil((x + HX + r) / VS), 1, NX - 1);
+    const k0 = clampN(floor((z + HZ - r) / VS), 1, NZ - 1), k1 = clampN(ceil((z + HZ + r) / VS), 1, NZ - 1);
     let j0 = NY, j1 = 0;
     for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
-      const d = hypot(-HALF + i * VS - x, -HALF + k * VS - z);
+      const d = hypot(-HX + i * VS - x, -HZ + k * VS - z);
       if (d >= r) continue;
       const t = top[i + PX * k], want = t + h * (1 - d / r);
       // Each corner up the column takes the larger of the ground and the cone's surface.
@@ -464,7 +471,7 @@ function groundApi(G) {
     for (let k = k0 - 1; k <= k1 + 1; k++) for (let j = j0 - 1; j <= j1 + 1; j++) for (let i = i0 - 1; i <= i1 + 1; i++)
       copy[(i - i0 + 1) + w * ((j - j0 + 1) + h * (k - k0 + 1))] = val(clampN(i, 0, NX), clampN(j, 0, NY), clampN(k, 0, NZ));
     for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-      const dist = hypot(-HALF + i * VS - p[0], Y0 + j * VS - p[1], -HALF + k * VS - p[2]);
+      const dist = hypot(-HX + i * VS - p[0], Y0 + j * VS - p[1], -HZ + k * VS - p[2]);
       if (dist >= r) continue;
       const mean = (at(i - 1, j, k) + at(i + 1, j, k) + at(i, j - 1, k) + at(i, j + 1, k) + at(i, j, k - 1) + at(i, j, k + 1)) / 6;
       const d = at(i, j, k);
@@ -476,12 +483,12 @@ function groundApi(G) {
   // its sides sheer or, with `grade`, sloping in at that rise over run (tests'
   // walls, ridges and plateaus).
   function block(x0, x1, z0, z1, top, grade = Infinity) {
-    const i0 = clampN(floor((x0 + HALF) / VS) - 1, 1, NX - 1), i1 = clampN(ceil((x1 + HALF) / VS) + 1, 1, NX - 1);
-    const k0 = clampN(floor((z0 + HALF) / VS) - 1, 1, NZ - 1), k1 = clampN(ceil((z1 + HALF) / VS) + 1, 1, NZ - 1);
+    const i0 = clampN(floor((x0 + HX) / VS) - 1, 1, NX - 1), i1 = clampN(ceil((x1 + HX) / VS) + 1, 1, NX - 1);
+    const k0 = clampN(floor((z0 + HZ) / VS) - 1, 1, NZ - 1), k1 = clampN(ceil((z1 + HZ) / VS) + 1, 1, NZ - 1);
     const j1 = clampN(ceil((top - Y0) / VS) + 2, BEDROCK + 1, NY - 1);
     dropIn([i0, i1, 0, j1, k0, k1]);
     for (let k = k0; k <= k1; k++) for (let j = BEDROCK + 1; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-      const x = -HALF + i * VS, y = Y0 + j * VS, z = -HALF + k * VS, o = cornerIndex(i, j, k);
+      const x = -HX + i * VS, y = Y0 + j * VS, z = -HZ + k * VS, o = cornerIndex(i, j, k);
       const side = min(x - x0, x1 - x, z - z0, z1 - z), d = grade === Infinity ? min(top - y, side) : min(top - y, side * grade - y) / Math.hypot(1, grade);
       D.set(o, Q(max((D.get(o) - 128) / 127, d / DS)));
     }
@@ -497,16 +504,16 @@ function groundApi(G) {
   // them oldest first; sample and height read the newest a point is in.
   const GRID = { VS, Y0 };
   const baseAt = (x, z) => {   // the ground as built, between its corner columns (where the soft band ends)
-    const B = G.base || top, gx = clampN((x + HALF) / VS, 0, NX - 1e-4), gz = clampN((z + HALF) / VS, 0, NZ - 1e-4), i = gx | 0, k = gz | 0, u = gx - i, w = gz - k, o = i + PX * k;
+    const B = G.base || top, gx = clampN((x + HX) / VS, 0, NX - 1e-4), gz = clampN((z + HZ) / VS, 0, NZ - 1e-4), i = gx | 0, k = gz | 0, u = gx - i, w = gz - k, o = i + PX * k;
     return (B[o] * (1 - u) + B[o + 1] * u) * (1 - w) + (B[o + PX] * (1 - u) + B[o + PX + 1] * u) * w;
   };
   const inRock = (x, y, z) => y < baseAt(x, z) - SOFT;   // below the soft band: what a bucket clunks on (sim/tools.js)
   // The coarse corners a patch needs to hold an edit reaching `reach` m from c: its box, the margin round it.
   const fineBox = (c, reach, low = 0) => {   // low: how much further down it goes (a flat-bottomed bite's floor), as a negative
     const m = PATCH.margin;
-    return [clampN(floor((c[0] + HALF - reach) / VS) - m, 0, NX), clampN(ceil((c[0] + HALF + reach) / VS) + m, 0, NX),
+    return [clampN(floor((c[0] + HX - reach) / VS) - m, 0, NX), clampN(ceil((c[0] + HX + reach) / VS) + m, 0, NX),
       clampN(floor((c[1] - Y0 - reach + low) / VS) - m, 0, NY), clampN(ceil((c[1] - Y0 + reach) / VS) + m, 0, NY),
-      clampN(floor((c[2] + HALF - reach) / VS) - m, 0, NZ), clampN(ceil((c[2] + HALF + reach) / VS) + m, 0, NZ)];
+      clampN(floor((c[2] + HZ - reach) / VS) - m, 0, NZ), clampN(ceil((c[2] + HZ + reach) / VS) + m, 0, NZ)];
   };
   // An edit, before the 8 m grid takes it: a patch to hold it (one that does,
   // one grown to, or a new one read from the ground as it is now), then the
@@ -549,10 +556,10 @@ function groundApi(G) {
     const i0 = max(0, floor((c[0] - reach - p.x0) / FS)), i1 = min(p.nx - 1, ceil((c[0] + reach - p.x0) / FS));
     const j0 = max(0, floor((min(c[1] - reach, op === DIG && b2 > -Infinity ? b2 - FS : Infinity) - p.y0) / FS)), j1 = min(p.ny - 1, ceil((c[1] + reach - p.y0) / FS));   // a flat-bottomed bite reaches down to its floor
     const k0 = max(0, floor((c[2] - reach - p.z0) / FS)), k1 = min(p.nz - 1, ceil((c[2] + reach - p.z0) / FS));
-    const lo = Y0 + BEDROCK * VS, ys = Y0 + (NY - 1) * VS, xs = -HALF + VS, xe = HALF - VS, F = p.D, nx = p.nx, nxy = nx * p.ny;
+    const lo = Y0 + BEDROCK * VS, ys = Y0 + (NY - 1) * VS, xs = -HX + VS, xe = HX - VS, zs = -HZ + VS, ze = HZ - VS, F = p.D, nx = p.nx, nxy = nx * p.ny;
     for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
       const x = p.x0 + i * FS, z = p.z0 + k * FS;
-      if (x < xs || x > xe || z < xs || z > xe) continue;
+      if (x < xs || x > xe || z < zs || z > ze) continue;
       const soft = op === DIG ? baseAt(x, z) - SOFT : 0, dd = hypot(x - c[0], z - c[2]), f = sl ? b2 + max(0, sl[0] * (x - sl[2]) + sl[1] * (z - sl[3])) : b2, want = op === PILE && dd < b2 ? height(x, z) + a * (1 - dd / b2) : 0;
       for (let j = j0; j <= j1; j++) {
         const y = p.y0 + j * FS;
@@ -674,11 +681,11 @@ function landmark(ground, l) {
       return min(d, (hypot(px + fx * t, (y - cy) * 1.2, pz + fz * t) - r * (1 - 0.3 * t / depth)) / DS);
     };
   } else return;
-  const i0 = clampN(floor((bounds[0] + HALF) / VS), 1, NX - 1), i1 = clampN(ceil((bounds[3] + HALF) / VS), 1, NX - 1);
+  const i0 = clampN(floor((bounds[0] + HX) / VS), 1, NX - 1), i1 = clampN(ceil((bounds[3] + HX) / VS), 1, NX - 1);
   const j0 = clampN(floor((bounds[1] - Y0) / VS), BEDROCK + 1, NY - 1), j1 = clampN(ceil((bounds[4] - Y0) / VS), BEDROCK + 1, NY - 1);
-  const k0 = clampN(floor((bounds[2] + HALF) / VS), 1, NZ - 1), k1 = clampN(ceil((bounds[5] + HALF) / VS), 1, NZ - 1);
+  const k0 = clampN(floor((bounds[2] + HZ) / VS), 1, NZ - 1), k1 = clampN(ceil((bounds[5] + HZ) / VS), 1, NZ - 1);
   for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-    D.put(i, j, k, Q(f((D.at(i, j, k) - 128) / 127, -HALF + i * VS, Y0 + j * VS, -HALF + k * VS)));
+    D.put(i, j, k, Q(f((D.at(i, j, k) - 128) / 127, -HX + i * VS, Y0 + j * VS, -HZ + k * VS)));
   }
   ground.retop(i0, i1, k0, k1);
 }
@@ -715,7 +722,7 @@ export function blockCorners(ground, i0, j0, k0, dims, step = 1) {
       D[i + nx * (j + ny * k)] = gj < 0 ? 255 : out || gj > NY ? 1 : G.at(gi, gj, gk);
     }
   }
-  return { D, T, o: [-HALF + i0 * VS, Y0 + j0 * VS, -HALF + k0 * VS], dims, s: VS * step };
+  return { D, T, o: [-HX + i0 * VS, Y0 + j0 * VS, -HZ + k0 * VS], dims, s: VS * step };
 }
 // One chunk: its corners plus one before and after on each axis.
 export const CN = CS + 2, CHUNK_DIMS = [CN, CN, CN];

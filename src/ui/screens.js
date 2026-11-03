@@ -1,3 +1,5 @@
+import { CANYON, CANYON_START, canyonFoes } from '../data/maps.js';
+import { setMapSize } from '../world/terrain.js';
 import { $, esc } from '../util/dom.js';
 import { store } from '../util/store.js';
 import { clampN } from '../util/math.js';
@@ -44,11 +46,14 @@ export function createUi(app) {
   // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
   function startSkirmish() {
     if (FP_MAPS[prefs.fpMap] === 'base') { startBase(); return; }
-    const pk = FP_MAPS[prefs.fpMap] === 'random' ? ['dusk', 'ice', 'volcanic'][floor(random() * 3)] : FP_MAPS[prefs.fpMap];
+    const map = FP_MAPS[prefs.fpMap], canyon = map === 'canyon';
+    const pk = map === 'random' || canyon ? ['dusk', 'ice', 'volcanic'][floor(random() * 3)] : map;
     const foes = pickFoes(FP_MIXES[prefs.fpMix] || FP_MIXES[0], prefs.fpFoes, random, k => !locked(k));
     G.diff = prefs.diff;
     const weather = fpWeather(FP_WEATHER[prefs.fpWeather] || 'clear', pk, random), time = FP_TIMES[prefs.fpTime] || 'day';
-    startMatch(G, { name: 'Free Play', pal: pk, foes, intel: '', weather, time }, 1 + floor(random() * 1e5), false, prefs.chassis, { loadout: fitOf(prefs.chassis) });
+    // The canyon (data/maps.js, docs/specs/35-bigger-maps.md): 3 km long, you at one end, the foes up the floor.
+    const shape = canyon ? { size: CANYON.size, ground: { shape: CANYON.shape }, start: CANYON_START, foes: canyonFoes(foes) } : { foes };
+    startMatch(G, { name: 'Free Play', pal: pk, intel: '', weather, time, ...shape }, 1 + floor(random() * 1e5), false, prefs.chassis, { loadout: fitOf(prefs.chassis) });
     G.kind = 'free';
     app.scene.uploadWorld();
   }
@@ -140,6 +145,7 @@ export function createUi(app) {
     if (G.worldKind !== 'menu') {
       G.worldKind = 'menu';
       G.pal = palAt('dusk'); G.palRamp = null;
+      setMapSize();   // today's size (world/terrain.js): a canyon match may have changed it
       G.ter = makeGround(3);
       app.scene.uploadWorld();
     }
@@ -188,7 +194,7 @@ export function createUi(app) {
         ${camp.mission > 0 ? `<button class="opt${really ? ' really' : ''}" data-a="restart">${really ? 'REALLY?' : 'RESTART CAMPAIGN'}</button>` : ''}`;
     }
     if (prefs.menuSel === 'free') {
-      const map = FP_MAPS[prefs.fpMap], mapName = map === 'random' ? 'RANDOM' : map === 'base' ? 'BASE' : PALS[map].name.toUpperCase();
+      const map = FP_MAPS[prefs.fpMap], mapName = map === 'random' ? 'RANDOM' : map === 'base' ? 'BASE' : map === 'canyon' ? 'CANYON' : PALS[map].name.toUpperCase();
       const mapPick = `<div class="mm-pick"><span>MAP</span><button data-fp="map" data-d="-1">◀</button><b>${mapName}</b><button data-fp="map" data-d="1">▶</button></div>`;
       const diffPick = `<div class="mm-pick"><span>DIFFICULTY</span><button data-fp="diff" data-d="-1">◀</button><b>${DIFF[prefs.diff].label}</b><button data-fp="diff" data-d="1">▶</button></div>`;
       if (map === 'base') return `<p>${esc(BASE_MISSION.name)}. ${esc(BASE_MISSION.intel)}</p><div class="fp-picks">${mapPick}${diffPick}</div>`;   // spec 20: its own mission, its own mechs

@@ -4,7 +4,7 @@ import { createTestGame, stepFor, input, foes, freeze } from './helpers.js';
 import { initFeet } from '../src/sim/gait.js';
 import { damage } from '../src/sim/combat.js';
 import { makeRng } from '../src/sim/rng.js';
-import { BOUND } from '../src/world/terrain.js';
+import { BX as BOUND } from '../src/world/terrain.js';
 import { spawnPoint, sideOf, teamName, TEAM_COLORS } from '../src/net/teams.js';
 import { lobbyHTML, lobbyRows } from '../src/ui/lobby.js';
 import * as P from '../src/net/protocol.js';

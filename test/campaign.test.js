@@ -7,7 +7,7 @@ import { destroy } from '../src/sim/combat.js';
 import { destroyEntity } from '../src/sim/entities.js';
 import { MISSIONS, missionDef } from '../src/data/missions.js';
 import { NAMES } from '../src/data/names.js';
-import { BOUND } from '../src/world/terrain.js';
+import { BX as BOUND } from '../src/world/terrain.js';
 import { WAVE_WARN } from '../src/sim/waves.js';
 
 const play = (n, diff = 'normal') => {

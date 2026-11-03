@@ -1,7 +1,7 @@
 import { thievesFor } from './steal.js';
 import { newMech } from './state.js';
 import { polar } from './placement.js';
-import { BOUND } from '../world/terrain.js';
+import { BX, BZ } from '../world/terrain.js';
 import { waveExtra } from './coopRules.js';
 
 const { atan2, sin, cos, max, min, PI } = Math;
@@ -35,7 +35,7 @@ export function spawnWave(G, foes, { from = 'ring', dist = WAVE_DIST, reveal = 0
     if (nav) { const a = rng.range(0, 2 * PI), r = rng.range(8, 30); x = nav.x + sin(a) * r; z = nav.z + cos(a) * r; }
     else if (typeof from === 'number') { const p = polar([from + rng.range(-20, 20), dist]); x = P.x + p.x; z = P.z + p.z; }
     else { const a = (i / foes.length) * 2 * PI + rng.range(-0.4, 0.4); x = P.x + sin(a) * dist; z = P.z + cos(a) * dist; }
-    x = max(-BOUND, min(BOUND, x)); z = max(-BOUND, min(BOUND, z));
+    x = max(-BX, min(BX, x)); z = max(-BZ, min(BZ, z));
     const m = newMech(G, t, 1, x, z, atan2(P.x - x, P.z - z));
     m.ai.aware = true;
     if (reveal) m.ai.revealUntil = G.time + reveal;

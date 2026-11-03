@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestGame } from './helpers.js';
 import { makeGround, VS, Y0, NX, NY, NZ, CX, CY, CZ, SOFT, chunkCorners } from '../src/world/voxels.js';
-import { HALF } from '../src/world/terrain.js';
+import { HX as HALF } from '../src/world/terrain.js';
 import { seamAt, SEAM_PITCH } from '../src/world/seams.js';
 import { meshChunk } from '../src/world/mesher.js';
 import { bite, seamOre } from '../src/sim/dig.js';

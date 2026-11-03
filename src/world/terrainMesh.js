@@ -1,6 +1,6 @@
 import { Builder } from '../mesh/builder.js';
 import { M, chain, clampN, mul } from '../util/math.js';
-import { N, CELL, HALF, BOUND } from './terrain.js';
+import { HX, HZ, BX, BZ } from './terrain.js';
 import { outposts } from './props.js';
 
 const { hypot } = Math;
@@ -9,21 +9,21 @@ const { hypot } = Math;
 // ground itself is voxels: world/voxels.js, world/mesher.js). Cut into
 // CHUNKS × CHUNKS squares, each its own mesh with a box, so the renderer skips
 // the ones out of view or past the fog (spec 11, the performance pass).
-export const CHUNKS = 4, CHUNK_CELLS = N / CHUNKS;
+export const CHUNKS = 4;
 
-// [{ b, lo, hi (the box), c, r (the sphere round it) }], row by row from -HALF.
+// [{ b, lo, hi (the box), c, r (the sphere round it) }], row by row from the map's -z edge.
 export function buildGroundExtras(ter, pal, seed) {
-  const size = CHUNK_CELLS * CELL;
+  const sx = (2 * HX) / CHUNKS, sz0 = (2 * HZ) / CHUNKS;   // each square's size across and along
   const chunks = [];
   for (let k = 0; k < CHUNKS * CHUNKS; k++) chunks.push({ b: new Builder() });
-  const idx = v => clampN(Math.floor((v + HALF) / size), 0, CHUNKS - 1);
-  const at = (x, z) => chunks[idx(z) * CHUNKS + idx(x)].b;
+  const at = (x, z) => chunks[clampN(Math.floor((z + HZ) / sz0), 0, CHUNKS - 1) * CHUNKS + clampN(Math.floor((x + HX) / sx), 0, CHUNKS - 1)].b;
   let s = seed * 9301 + 49297;
   const r01 = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-  for (let k = 0; k < N * N * 2; k++) r01();   // the old height mesh's colours came off this sequence first: the rocks stay where they were
-  // Rocks.
-  for (let k = 0; k < 150; k++) {
-    const x = (r01() - 0.5) * 2 * BOUND, z = (r01() - 0.5) * 2 * BOUND;
+  for (let k = 0; k < 96 * 96 * 2; k++) r01();   // the old height mesh's colours came off this sequence first: the rocks stay where they were
+  // Rocks: 150 on today's map, as many for the same area on any other.
+  const rocks = Math.round(150 * (BX * BZ) / (1062 * 1062));
+  for (let k = 0; k < rocks; k++) {
+    const x = (r01() - 0.5) * 2 * BX, z = (r01() - 0.5) * 2 * BZ;
     if (hypot(x, z) < 60) continue;
     const sz = 2 + r01() * 7;
     at(x, z).cube(chain(M.T(x, ter.height(x, z) + sz * 0.15, z), M.RY(r01() * 6), M.RX((r01() - 0.5) * 0.6),

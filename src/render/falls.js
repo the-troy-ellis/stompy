@@ -1,6 +1,6 @@
 import { meshChunk } from '../world/mesher.js';
 import { VS, Y0, PX, PY } from '../world/voxels.js';
-import { HALF } from '../world/terrain.js';
+import { HX, HZ } from '../world/terrain.js';
 import { M, chain } from '../util/math.js';
 
 // Ground coming down (sim/dig.js G.falls): each piece meshed once from its
@@ -17,7 +17,7 @@ export function createFalls(R) {
       const i = o % PX - i0 + 2, j = ((o / PX) | 0) % PY - j0 + 2, k = ((o / (PX * PY)) | 0) - k0 + 2;
       D[i + nx * (j + ny * k)] = f.bytes[n];
     });
-    const o = [-HALF + (i0 - 2) * VS, Y0 + (j0 - 2) * VS, -HALF + (k0 - 2) * VS];
+    const o = [-HX + (i0 - 2) * VS, Y0 + (j0 - 2) * VS, -HZ + (k0 - 2) * VS];
     return R.upload({ d: meshChunk(D, T, [nx, ny, nz], o, VS, pal) });
   }
   function draw(G) {

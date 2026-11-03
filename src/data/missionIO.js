@@ -8,7 +8,7 @@
 import { SHAPES, ROUTES } from './missions.js';
 import { NAMES } from './names.js';
 import { polar } from '../sim/placement.js';
-import { BOUND } from '../world/terrain.js';
+import { BX, BZ } from '../world/terrain.js';
 
 // The order fields are written in, so the same mission is always the same
 // text; anything not listed follows in alphabetical order.
@@ -230,7 +230,7 @@ export function check(def, names = NAMES.missions) {
       if (e.path.some(pt => outside(polar(pt)))) add(entId(e, i), `${title.get(i)}'s route leaves the map.`);
     }
   });
-  function outside(p) { return Math.abs(p.x) > BOUND || Math.abs(p.z) > BOUND; }
+  function outside(p) { return Math.abs(p.x) > BX || Math.abs(p.z) > BZ; }
   for (const t of things) if (outside(t)) add(t.id, `${t.what} is outside the map.`);
   // Nav points are there to be walked onto, so only bodies count.
   const bodies = things.filter(t => !t.nav);

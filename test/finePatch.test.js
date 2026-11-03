@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestGame, stepFor, input, foes } from './helpers.js';
 import { makeGround, cornerIndex, VS, Y0 } from '../src/world/voxels.js';
-import { HALF } from '../src/world/terrain.js';
+import { HX as HALF } from '../src/world/terrain.js';
 import { FS, PATCH } from '../src/world/finePatch.js';
 import { FINE_DIG } from '../src/data/fineDig.js';
 import { shiftMech } from '../src/sim/walkView.js';

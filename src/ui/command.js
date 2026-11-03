@@ -1,7 +1,7 @@
 import { NAMES } from '../data/names.js';
 import { hudPalette } from '../data/colors.js';
 import { RADAR_RANGE, radarOf } from '../data/weather.js';
-import { BOUND } from '../world/terrain.js';
+import { BX, BZ } from '../world/terrain.js';
 import { TOP, createTopCamera, camView, groundToScreen, screenToGround, panBy, zoomAt, rotateAbout, settle, metresPerPixel } from '../render/topCamera.js';
 import { drawMap, drawCompass } from '../render/markers.js';
 import { bindPointer } from '../input/pointer.js';
@@ -66,7 +66,7 @@ export function createCommand(app) {
   const size = () => ({ W: Math.max(1, wrap.clientWidth), H: Math.max(1, wrap.clientHeight) });
   const mpp = () => metresPerPixel(C.cam, size().H);
   const ground = (sx, sy) => { const { W, H } = size(); return screenToGround(C.cam, sx, sy, W, H, G.ter.height); };
-  const after = () => settle(C.cam, BOUND, G.ter.height);
+  const after = () => settle(C.cam, [BX, BZ], G.ter.height);
   const live = () => crewOf(G).filter(m => m.alive);
   const crewAt = (sx, sy) => {
     const g = ground(sx, sy);
@@ -281,7 +281,7 @@ export function createCommand(app) {
     for (const h of G.base?.heaps || []) if (h.alive) things.push({ id: h, kind: 'structure', x: h.x, y: h.y, z: h.z, label: `ORE ${Math.floor(h.ore)}` });   // a fallen silo's spill (spec 33)
     for (const f of G.mechs) if (f.alive && f.team !== 0 && crew.some(m => Math.hypot(f.x - m.x, f.z - m.z) < reach)) things.push({ id: f, kind: 'foe', x: f.x, y: f.y, z: f.z, face: -f.yaw / D2R });
     drawLand(ctx, view, pal);
-    drawMap(ctx, view, { map: { bound: BOUND, height: G.ter.height, grid: 100 }, things, sel: C.picked, box: C.box, pal });
+    drawMap(ctx, view, { map: { bound: [BX, BZ], height: G.ter.height, grid: 100 }, things, sel: C.picked, box: C.box, pal });
     drawExposed(ctx, view, pal);
     drawProduction(ctx, view, pal);
     drawOrders(ctx, view, crew, pal);

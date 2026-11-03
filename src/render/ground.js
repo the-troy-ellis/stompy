@@ -1,5 +1,5 @@
 import { chunkCorners, farCorners, CX, CY, CZ, CS, CN, VS, PX, PY } from '../world/voxels.js';
-import { HALF } from '../world/terrain.js';
+import { HX, HZ } from '../world/terrain.js';
 import { meshChunk, boundsOf } from '../world/mesher.js';
 import { boxVisible, M as Mat } from '../util/math.js';
 import { FS } from '../world/finePatch.js';
@@ -21,11 +21,20 @@ import { FS } from '../world/finePatch.js';
 // in the cockpit; up above, as far as the screen shows) and let go past
 // FAR_SLACK more, so the GPU holds what's round you whatever the map's size.
 const FAR_PAD = 150, FAR_SLACK = 300;
-const LOD_AT = 300, NEAR_NOW = 200, LET_GO = 600, BUDGET_MS = 2, SEND_MAX = 32, G2 = 4, GX = Math.ceil(CX / G2), GZ = Math.ceil(CZ / G2), SIZE = CS * VS * G2;
-const FAR = 1 << 16;   // a job id at or past this is a group's far mesh
+const LOD_AT = 300, NEAR_NOW = 200, LET_GO = 600, BUDGET_MS = 2, SEND_MAX = 32, G2 = 4, SIZE = CS * VS * G2;
+const FAR = 1 << 16;   // a job id at or past this is a group's far mesh (a 4.6 km map has under 26,000 chunks)
 const plain = (p, seed) => ({ low: p.low, mid: p.mid, high: p.high, rock: p.rock, ore: p.ore, iso: p.iso, seed });   // seed: where the seams run (world/seams.js)
+// Groups across and along, and each one's chunks: from the map's size
+// (world/terrain.js, docs/specs/35-bigger-maps.md part 5), set again by sizeGroups when a world of another size loads.
+let GX = 0, GZ = 0, CHUNKS_OF = [];
+function sizeGroups() {
+  if (GX === Math.ceil(CX / G2) && GZ === Math.ceil(CZ / G2) && CHUNKS_OF.length) return false;
+  GX = Math.ceil(CX / G2); GZ = Math.ceil(CZ / G2);
+  CHUNKS_OF = Array.from({ length: GX * GZ }, (_, g) => chunksOf(g));
+  return true;
+}
 const groupDist = (g, eye) => {   // from eye to the group's square, flat
-  const x0 = -HALF + (g % GX) * SIZE, z0 = -HALF + ((g / GX) | 0) * SIZE;
+  const x0 = -HX + (g % GX) * SIZE, z0 = -HZ + ((g / GX) | 0) * SIZE;
   return Math.hypot(Math.max(x0 - eye[0], 0, eye[0] - x0 - SIZE), Math.max(z0 - eye[2], 0, eye[2] - z0 - SIZE));
 };
 const chunkGroup = id => { const cx = id % CX, cz = (id / (CX * CY)) | 0; return ((cx / G2) | 0) + GX * ((cz / G2) | 0); };
@@ -35,17 +44,25 @@ const chunksOf = g => {
   for (let cz = gz * G2; cz < Math.min(gz * G2 + G2, CZ); cz++) for (let cy = 0; cy < CY; cy++) for (let cx = gx * G2; cx < Math.min(gx * G2 + G2, CX); cx++) ids.push(cx + CX * (cy + CY * cz));
   return ids;
 };
-const CHUNKS_OF = Array.from({ length: GX * GZ }, (_, g) => chunksOf(g));
 
 export function createGround(R) {
   const gl = R.gl;
   let worker = null, workerOk = typeof Worker !== 'undefined';
   let ground = null, pal = null, world = 0, inFlight = 0, queue = [];
-  const mesh = new Array(FAR + GX * GZ).fill(null), ver = new Int32Array(FAR + GX * GZ), waiting = new Uint8Array(FAR + GX * GZ);
+  // Jobs by id: chunks from 0, far meshes from FAR (sized with the groups, in regroup).
+  let mesh = [], ver = null, waiting = null;
   const newPart = () => ({ buf: null, count: 0, first: 0, lo: null, hi: null, dirty: false });
-  const groups = Array.from({ length: GX * GZ }, () => ({ near: newPart(), far: newPart(), wanted: false, farWanted: false, left: 0 }));
-  // The far meshes share a buffer per row of groups, so neighbours drawn far are one draw.
-  const rows = Array.from({ length: GZ }, () => ({ buf: null, dirty: false }));
+  let groups = [], rows = [];
+  // The groups and rows for the map's size (and their buffers off the GPU when it changes).
+  function regroup() {
+    for (const gr of groups) { if (gr.near.buf) gl.deleteBuffer(gr.near.buf); }
+    for (const row of rows) if (row.buf) gl.deleteBuffer(row.buf);
+    groups = Array.from({ length: GX * GZ }, () => ({ near: newPart(), far: newPart(), wanted: false, farWanted: false, left: 0 }));
+    // The far meshes share a buffer per row of groups, so neighbours drawn far are one draw.
+    rows = Array.from({ length: GZ }, () => ({ buf: null, dirty: false }));
+    mesh = new Array(FAR + GX * GZ).fill(null); ver = new Int32Array(FAR + GX * GZ); waiting = new Uint8Array(FAR + GX * GZ);
+  }
+  sizeGroups(); regroup();
 
   function startWorker() {
     if (worker || !workerOk) return worker;
@@ -103,7 +120,9 @@ export function createGround(R) {
     ground = g; pal = plain(p, g.seed); world++; inFlight = 0;
     for (const m of patches.values()) if (m.part.buf) gl.deleteBuffer(m.part.buf);
     patches.clear();
-    mesh.fill(null); ver.fill(0); waiting.fill(0); queue = [];
+    if (sizeGroups()) regroup();   // a map of another size (world/terrain.js setMapSize)
+    else { mesh.fill(null); ver.fill(0); waiting.fill(0); }
+    queue = [];
     for (const gr of groups) { gr.wanted = false; gr.farWanted = false; gr.left = 0; gr.near.dirty = true; }
     for (const row of rows) row.dirty = true;
     if (startWorker()) worker.postMessage({ pal });
@@ -232,8 +251,8 @@ export function createGround(R) {
     R.curMesh = null;
   }
   const groupsOver = (x0, z0, x1, z1) => {
-    const out = [], g = v => Math.floor((v + HALF) / SIZE);
-    for (let gz = Math.max(0, g(z0)); gz <= Math.min(GZ - 1, g(z1)); gz++) for (let gx = Math.max(0, g(x0)); gx <= Math.min(GX - 1, g(x1)); gx++) out.push(gx + GX * gz);
+    const out = [], gxOf = v => Math.floor((v + HX) / SIZE), gzOf = v => Math.floor((v + HZ) / SIZE);
+    for (let gz = Math.max(0, gzOf(z0)); gz <= Math.min(GZ - 1, gzOf(z1)); gz++) for (let gx = Math.max(0, gxOf(x0)); gx <= Math.min(GX - 1, gxOf(x1)); gx++) out.push(gx + GX * gz);
     return out;
   };
   // A part's buffer is its meshes end to end, re-sent whole when any of them changes.

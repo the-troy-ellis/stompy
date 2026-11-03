@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pickNearest, pickInside, inside } from '../src/sim/pick.js';
-import { BOUND } from '../src/world/terrain.js';
+import { BX as BOUND } from '../src/world/terrain.js';
 
 const things = [
   { id: 'tank', x: 0, z: 0, r: 5 },

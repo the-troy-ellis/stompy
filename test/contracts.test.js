@@ -7,7 +7,7 @@ import { destroyEntity } from '../src/sim/entities.js';
 import { stepFor, freeze, input } from './helpers.js';
 import { MISSIONS, missionDef, missionFoes, CONTRACT_OBJECTIVES } from '../src/data/missions.js';
 import { CHASSIS, MECH_ORDER } from '../src/data/chassis.js';
-import { BOUND } from '../src/world/terrain.js';
+import { BX as BOUND } from '../src/world/terrain.js';
 
 const play = n => {
   const G = createGame({ fx: recordFx(), seed: 1 }), def = missionDef(n);

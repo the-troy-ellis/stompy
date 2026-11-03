@@ -7,7 +7,7 @@ import { recordFx } from '../src/sim/fx.js';
 import { update, noInput } from '../src/sim/update.js';
 import { shiftMech } from '../src/sim/walkView.js';
 import { buildNear, dropNear, mechsNear, mechsAlong, NEAR_PAD } from '../src/sim/near.js';
-import { HALF } from '../src/world/terrain.js';
+import { HX as HALF } from '../src/world/terrain.js';
 import { makeRng } from '../src/sim/rng.js';
 
 const FOES = ['jackal', 'jackal', 'kestrel', 'jackal', 'warden'];
