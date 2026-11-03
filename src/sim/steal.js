@@ -1,3 +1,4 @@
+import { KINDS, enlist, delist } from './buildings.js';
 import { STEAL, BUILDINGS, PLACE, CONSTRUCT, LINE } from '../data/construct.js';
 import { NAMES } from '../data/names.js';
 import { addEntity } from './entities.js';
@@ -100,8 +101,7 @@ function lost(G, e) {
   const b = G.base, kind = kindOf(e);
   e.carry = null; e.alive = false; e.wreck = false;
   for (const t of b.things || []) if (t.at === e) { t.at = null; t.x = e.x; t.z = e.z; }   // its pile stays behind, loose
-  for (const k of ['silos', 'beacons', 'shops', 'plants', 'lines', 'walls', 'bays', 'labs', 'armories']) if (b[k]?.includes(e)) b[k] = b[k].filter(o => o !== e);
-  if (b.factory === e) b.factory = null;
+  delist(G, e);   // out of its list (sim/buildings.js)
   const n = NAMES.buildings[kind] || 'Building';
   G.fx.say(`${n[0]}${n.slice(1).toLowerCase()} lost.`);
 }
@@ -133,19 +133,9 @@ export function setDown(G, e) {
 
 // Into the base's lists, as BUILD would have put it there.
 function take(G, e, kind) {
-  const b = G.base;
   e.team = 0; e.targetable = false; e.place = kind; e.prog = 1; e.counted = false;
   e.ch.name = NAMES.buildings[kind] || e.ch.name;
-  if (kind === 'silo') b.silos.push(e);
-  else if (kind === 'beacon') b.beacons.push(e);
-  else if (kind === 'shop') { e.press = null; b.shops.push(e); }
-  else if (kind === 'plant') { e.brew = null; b.plants.push(e); }
-  else if (kind === 'lab') { e.work = null; b.labs.push(e); }
-  else if (kind === 'armory') { e.press = null; b.armories.push(e); }
-  else if (kind === 'line') { e.bays ||= new Array(LINE.bays).fill(null); e.queue ||= []; b.lines.push(e); }
-  else if (kind === 'wall') b.walls.push(e);
-  else if (kind === 'factory' && !b.factory?.alive) { e.job = null; b.factory = e; }
-  else if (kind === 'bay') b.bays.push(e);
+  if (KINDS[kind]) enlist(G, kind, e, true);   // its list, keeping what it had (sim/buildings.js)
 }
 
 // How much the foes steal at this difficulty, or as the mission says

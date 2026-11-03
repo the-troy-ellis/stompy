@@ -1,4 +1,5 @@
-import { CONSTRUCT, BUILDINGS, PLACE, PLACE_ORDER, HEAP, LINE, STEAL } from '../data/construct.js';
+import { enlist } from './buildings.js';
+import { CONSTRUCT, BUILDINGS, PLACE, PLACE_ORDER, HEAP, STEAL } from '../data/construct.js';
 import { NAMES } from '../data/names.js';
 import { addEntity } from './entities.js';
 import { newMech } from './state.js';
@@ -193,12 +194,11 @@ export function placeSite(G, f) {
     const rx = cos(f.yaw), rz = -sin(f.yaw), step = BUILDINGS.wall.radius * 1.9;
     for (let i = 0; i < P.segs; i++) {
       const o = (i - (P.segs - 1) / 2) * step;
-      b.walls.push(rise(addEntity(G, { ...BUILDINGS.wall, x: f.x + rx * o, z: f.z + rz * o, yaw: f.yaw, hp: P.hp })));
+      enlist(G, 'wall', rise(addEntity(G, { ...BUILDINGS.wall, x: f.x + rx * o, z: f.z + rz * o, yaw: f.yaw, hp: P.hp })));
     }
   } else {
     const e = rise(addEntity(G, { ...BUILDINGS[kind], x: f.x, z: f.z, yaw: f.yaw + Math.PI, hp: P.hp, ...(kind === 'factory' ? { id: 'factory' } : {}) }));   // its door or pad toward the digger
-    if (kind === 'factory') { e.job = null; b.factory = e; } else if (kind === 'silo') b.silos.push(e); else if (kind === 'beacon') b.beacons.push(e);
-    else if (kind === 'shop') { e.press = null; b.shops.push(e); } else if (kind === 'plant') { e.brew = null; b.plants.push(e); } else if (kind === 'lab') { e.work = null; b.labs.push(e); } else if (kind === 'armory') { e.press = null; b.armories.push(e); } else if (kind === 'line') { e.bays = new Array(LINE.bays).fill(null); e.queue = []; b.lines.push(e); } else b.bays.push(e);
+    enlist(G, kind, e);   // its list and working state (sim/buildings.js)
   }
   return site;
 }
