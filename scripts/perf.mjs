@@ -321,7 +321,7 @@ try {
   await page.evaluate(async () => {
     const { startMatch } = await import('/src/sim/state.js');
     const { rangeDef } = await import('/src/data/range.js');
-    const { BOUND } = await import('/src/world/terrain.js');
+    const { BX, BZ } = await import('/src/world/terrain.js');
     const G = window.__stompy.game, app = window.__stompy.app;
     startMatch(G, rangeDef({ base: 'yard' }), 7, false, 'kestrel');
     G.kind = 'range'; G.diff = 'normal';
@@ -330,9 +330,36 @@ try {
     window.requestAnimationFrame = () => 0;
     app.command.toggle();
     window.__settle = 150;
-    window.__each = i => { const c = app.command.C.cam, a = i / 600 * Math.PI * 2; c.x = Math.sin(a) * BOUND * 0.9; c.z = Math.sin(a * 2) * BOUND * 0.9; };
+    window.__each = i => { const c = app.command.C.cam, a = i / 600 * Math.PI * 2; c.x = Math.sin(a) * BX * 0.9; c.z = Math.sin(a * 2) * BZ * 0.9; };
   });
   await scene('map-sweep', 600);
+  await page.evaluate(() => { window.__each = null; window.__settle = 0; window.__stompy.app.command.toggle(); });
+  // A big map (spec 35 part 5): the 3 km test canyon (data/maps.js), walked
+  // from its south end to its north over 10 s, the ground's worker answering
+  // as it goes, then swept from above, zoomed out along its length. What it
+  // holds is budgeted: memory that grows with the map, not with what's near,
+  // fails here.
+  await page.evaluate(async () => {
+    const { startMatch } = await import('/src/sim/state.js');
+    const { CANYON, CANYON_START } = await import('/src/data/maps.js');
+    const { canyonMid } = await import('/src/world/terrain.js');
+    const { shiftMech } = await import('/src/sim/walkView.js');
+    const G = window.__stompy.game, app = window.__stompy.app;
+    startMatch(G, { name: 'Canyon', pal: 'dusk', intel: '', size: CANYON.size, ground: { shape: CANYON.shape }, start: CANYON_START, foes: [], crew: [{ type: 'digger', at: [180, 1100] }] }, 1234, false, 'kestrel');
+    G.kind = 'free'; G.diff = 'normal';
+    app.scene.uploadWorld(); app.ui.launch();
+    await app.scene.groundReady();
+    window.requestAnimationFrame = () => 0;
+    window.__settle = 150;
+    window.__each = i => { const P = G.player, z = -1150 + (i / 600) * 2300; shiftMech(P, canyonMid(CANYON.shape.canyon, 1234, z) - P.x, z - P.z); };
+  });
+  await scene('big-map', 600);
+  await page.evaluate(() => {
+    const app = window.__stompy.app;
+    app.command.toggle();
+    window.__each = i => { const c = app.command.C.cam; c.dist = 2400; c.x = 0; c.z = -1200 + (i / 300) * 2400; };
+  });
+  await scene('big-map-view', 300);
   await page.evaluate(() => { window.__each = null; window.__settle = 0; window.__stompy.app.command.toggle(); });
 
   await browser.close();
