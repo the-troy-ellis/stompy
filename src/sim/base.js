@@ -1,5 +1,7 @@
 import { enlist } from './buildings.js';
-import { CONSTRUCT, BUILDINGS, PLACE, PLACE_ORDER, HEAP, STEAL } from '../data/construct.js';
+import { CONSTRUCT, BUILDINGS, PLACE, PLACE_ORDER, HEAP, STEAL, ORE_LODES } from '../data/construct.js';
+import { lodesFor } from '../world/seams.js';
+import { BX, BZ } from '../world/terrain.js';
 import { NAMES } from '../data/names.js';
 import { addEntity } from './entities.js';
 import { newMech } from './state.js';
@@ -51,6 +53,8 @@ export function initBase(G, def) {
     const at = G.entities.find(e => e.alive && e.team === 0 && e.place === t.at && !e.site);
     if (at) for (let i = 0; i < (t.n || 1); i++) G.base.things.push({ part: t.part, at, by: null, claim: null });
   }
+  // Lodes (docs/specs/32-base-loop.md § Part 3): rich ground out from the silo, found by going near.
+  G.base.lodes = lodesFor(G.ter?.seed ?? 0, x, z, BX, BZ, ORE_LODES);
   survey(G);
 }
 
@@ -254,6 +258,19 @@ export function mend(m, amount) {
   return amount - left;
 }
 
+// A lode is found when any crew mech comes within ORE_LODES.find of it: the
+// map rings it (ui/command.js) and the voice says so.
+function findLodes(G) {
+  for (const l of G.base.lodes || []) {
+    if (l.found) continue;
+    for (const m of G.crew || []) {
+      if (!m.alive || hypot(m.x - l.x, m.z - l.z) > ORE_LODES.find) continue;
+      l.found = true; G.fx.say('Ore found.');
+      break;
+    }
+  }
+}
+
 // Once a frame: diggers tip into a hauler beside them; diggers and haulers
 // unload at any silo; a fallen silo spills; heaps are scooped; territory is
 // looked at; buildings go up; the factory builds; bays mend.
@@ -261,6 +278,7 @@ export function stepBase(G, dt) {
   const b = G.base;
   if (!b) return;
   handover(G);
+  findLodes(G);
   // Any silo standing takes ore into the one pool, as far as there's room.
   for (const silo of b.silos) {
     if (!works(silo)) continue;

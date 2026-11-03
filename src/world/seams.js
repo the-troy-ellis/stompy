@@ -28,3 +28,35 @@ export function isoAt(seed, x, y, z) {
   if (band - floor(band) >= ISO_THICK) return false;
   return sin(x * 0.017 - s * 2.3) + sin(z * 0.021 + s * 1.1) + 0.6 * sin((x + z) * 0.027 + floor(band) * 2.3) > 0.9;
 }
+
+// Spread out (docs/specs/32-base-loop.md § Part 3): the rock near the silo
+// runs thin and the rich ground is out there. `oreSpread` is how much of a
+// plain cut's ore the ground at distance `d` from the silo gives (S:
+// data/construct.js ORE_SPREAD): S.near at the silo, 1 at S.at, S.far by S.out.
+export function oreSpread(d, S) {
+  if (d <= S.at) return S.near + (1 - S.near) * Math.max(0, d) / S.at;
+  return 1 + (S.far - 1) * Math.min(1, (d - S.at) / (S.out - S.at));
+}
+
+// Lodes: L.n rich patches, L.r across their middle, between L.near and L.far
+// from the silo at (sx, sz), spread round it and inside the bounds (bx, bz).
+// From the seed and nothing else.
+function hash(seed, i) {
+  let t = (Math.imul(seed | 0, 2654435761) ^ Math.imul(i + 1, 40503)) >>> 0;
+  t ^= t >>> 15; t = Math.imul(t, 2246822519) >>> 0; t ^= t >>> 13; t = Math.imul(t, 3266489917) >>> 0; t ^= t >>> 16;
+  return (t >>> 0) / 4294967296;
+}
+export function lodesFor(seed, sx, sz, bx, bz, L) {
+  const out = [], a0 = hash(seed, 0) * 2 * Math.PI, edge = L.r + 20;
+  for (let i = 0; i < L.n; i++) {
+    const a = a0 + i * 2 * Math.PI / L.n + (hash(seed, 2 * i + 1) - 0.5) * 1.2;
+    let d = L.near + hash(seed, 2 * i + 2) * (L.far - L.near), x, z;
+    for (;;) {   // pulled in toward the silo if the map's edge is nearer (never under L.near / 2)
+      x = sx + sin(a) * d; z = sz + cos(a) * d;
+      if ((Math.abs(x) < bx - edge && Math.abs(z) < bz - edge) || d <= L.near / 2) break;
+      d -= 10;
+    }
+    out.push({ x, z, r: L.r, found: false });
+  }
+  return out;
+}
