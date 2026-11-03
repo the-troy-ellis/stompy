@@ -217,6 +217,24 @@ const BUILD = {
   // A beacon (docs/specs/33-production.md): a steel post on a concrete foot
   // with hazard bands, a lamp box on top; the lamp itself is beaconGlow,
   // drawn glowing, so the border reads at night.
+  // The TOWER (docs/specs/32-base-loop.md § Part 2): a concrete pad, a steel
+  // post with hazard bands, and a head (towerHead) that turns: a gun box with
+  // a long barrel out along +z.
+  tower: b => {
+    box(b, 0, 0, 0, 1.6, 0.06, 1.6, C.concrete);
+    box(b, 0, 0.06, 0, 0.44, 0.74, 0.44, C.steel);
+    for (const y of [0.22, 0.46]) box(b, 0, y, 0, 0.5, 0.05, 0.5, C.hazard);
+  },
+  towerHead: b => {
+    box(b, 0, 0.8, -0.05, 0.9, 0.16, 0.9, C.olive);
+    box(b, 0, 0.84, 0.55, 0.16, 0.08, 1.1, C.dark);
+    box(b, 0, 0.96, -0.3, 0.3, 0.05, 0.3, C.red);
+  },
+  towerWreck: b => {
+    box(b, 0, 0, 0, 1.6, 0.06, 1.6, C.char);
+    box(b, 0.3, 0.06, 0.2, 0.44, 0.3, 0.44, C.ash, M.RZ(0.6));
+    box(b, -0.4, 0.06, -0.3, 0.9, 0.12, 0.6, C.char, M.RY(0.7));
+  },
   beacon: b => {
     box(b, 0, 0, 0, 1.6, 0.05, 1.6, C.concrete);
     box(b, 0, 0.05, 0, 0.36, 0.83, 0.36, C.steel);

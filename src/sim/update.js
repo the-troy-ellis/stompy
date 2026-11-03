@@ -26,6 +26,7 @@ import { netInterp } from '../net/interp.js';
 import { pushOutOfEntities, stepEntities } from './entities.js';
 import { tickObjectives } from './objectives.js';
 import { stepTurrets } from './turrets.js';
+import { stepTowers } from './towers.js';
 import { tickCoopRespawn } from './coopRules.js';
 import { tickTutorial } from './tutorial.js';
 import { buildNear, dropNear, mechsNear, nearRadius } from './near.js';
@@ -180,7 +181,7 @@ function frame(G, input, dt) {
   stepSalvage(G);
   // A co-op guest doesn't run the world: the host's turrets, objectives and
   // waves arrive over the wire (docs/specs/09-coop.md).
-  if (G.role !== 'guest') { stepTurrets(G, dt); if (!G.bench) tickObjectives(G); }   // the bench has nothing to win
+  if (G.role !== 'guest') { stepTurrets(G, dt); stepTowers(G, dt); if (!G.bench) tickObjectives(G); }   // towers: the base's guns (sim/towers.js)   // the bench has nothing to win
   if (G.role !== 'solo') tickCoopRespawn(G);   // co-op: down is not out (sim/coopRules.js)
   pushOutOfEntities(G, m => geoOf(m).radius * m.ch.scale);
 

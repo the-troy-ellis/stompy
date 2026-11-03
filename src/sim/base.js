@@ -39,7 +39,7 @@ export function initBase(G, def) {
   G.base = null;
   if (!def.base) return;
   const { x, z } = polar(def.base.silo), silo = addEntity(G, { ...BUILDINGS.silo, x, z, yaw: atan2(-x, -z), hp: CONSTRUCT.siloHp, id: 'silo' });
-  G.base = { ore: def.base.ore ?? CONSTRUCT.startOre, iso: def.base.iso ?? 0, salvage: 0, silo, silos: [silo], beacons: [], heaps: [], shops: [], lines: [], plants: [], labs: [], armories: [], things: [], factory: null, bays: [], walls: [], pick: 0, sites: [], land: null, landT: 0 };
+  G.base = { ore: def.base.ore ?? CONSTRUCT.startOre, iso: def.base.iso ?? 0, salvage: 0, silo, silos: [silo], beacons: [], heaps: [], shops: [], lines: [], plants: [], labs: [], armories: [], towers: [], things: [], factory: null, bays: [], walls: [], pick: 0, sites: [], land: null, landT: 0 };
   silo.counted = true;
   if (def.base.known) G.base.known = new Set(def.base.known);   // weapons worked out at the start (spec 33 § The weapon lab)
   // Abandoned buildings out on the map (spec 33 § Stealing): nobody's, down, for the taking.
