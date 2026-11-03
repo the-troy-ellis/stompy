@@ -369,7 +369,9 @@ try {
     });
     await page.waitForTimeout(200);
     await page.keyboard.down('KeyJ');
-    await page.waitForFunction(() => window.__stompy.game.player.jet?.on, null, { timeout: 8000 }).catch(() => {});
+    // Held to a full charge, so the blast is the same however fast the frames come (letting go at the first
+    // frame it reaches made the charge, and so the stomp, depend on the frame rate).
+    await page.waitForFunction(() => { const j = window.__stompy.game.player.jet; return j?.on && j.charge >= 1; }, null, { timeout: 8000 }).catch(() => {});
     const lock = await page.evaluate(() => { const j = window.__stompy.game.player.jet; return [j?.lock?.type, !!j?.on]; });
     await page.keyboard.up('KeyJ');
     await page.waitForFunction(() => { const P = window.__stompy.game.player; return P.jet?.blasted === false && !P.air; }, null, { timeout: 15000 }).catch(() => {});
