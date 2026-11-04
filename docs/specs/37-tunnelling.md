@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress: part 1 built (navigation, #416); part 2 built (tunnels on the map). Approved with the defaults (the owner merged it, then "Go ahead", 2026-11-04); first asked for 2026-11-03: "Tunneling into an enemy base could be a fun mechanic. You would need to be able to navigate while underground" |
+| Status | in progress: part 1 built (navigation, #416); part 2 built (tunnels on the map, #417); part 3 built (undermining). Approved with the defaults (the owner merged it, then "Go ahead", 2026-11-04); first asked for 2026-11-03: "Tunneling into an enemy base could be a fun mechanic. You would need to be able to navigate while underground" |
 | Milestone | M15 (proposed) |
 | Size | M, in four parts (navigation; tunnels on the map; undermining; being heard) |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md), [22-command-view.md](22-command-view.md), [25-hold-to-dig.md](25-hold-to-dig.md), [33-production.md](33-production.md) (foe bases) |
@@ -140,6 +140,28 @@ the route you took and plan the next one.
   is decided where the dig is confirmed (the host in co-op), and sent as
   the building's state like any other knock-down. No new message: if one
   turns out to be needed, `PROTOCOL` goes up with it.
+
+#### As built (part 3)
+
+- Buildings already followed the ground down when it was dug out from
+  under their middle (`dig.js settle`), with no damage. Now structures are
+  left to `sim/under.js undermine`, run in `confirmDig` before `settle`:
+  the five points under the footprint (corners at `UNDER.inset`, 0.7 of
+  the radius), and with fewer than 3 solid it falls to the ground under
+  its middle. A hole under its middle alone no longer sinks it.
+- The damage is `UNDER.dropHp` (40%) of its full hp plus `UNDER.perM` (5%)
+  a metre, through `damageEntity`, credited to the digger whose bite it was
+  (`G.digBy`). A fall that only hurts it leaves it **standing** in its hole
+  (a silo lying on its side but still working would be odd); one that
+  brings it down **topples** it, toward the side whose ground went, as a
+  punch does, and the digger hears `It fell over.` A building left at a
+  quarter or less is DOWN (spec 33) as usual.
+- The thunk: `feel 'land'` by how near you are and the building's size and
+  drop, the settle sound, and a ring of dust.
+- Co-op: every client drops it the same way from the same ground; only the
+  host (or single player) applies the damage.
+- The map: a crew digger whose site is under a building of yours reads
+  ` · UNDER YOUR SILO` (or the building's name) after its job.
 
 ### Part 4: being heard
 

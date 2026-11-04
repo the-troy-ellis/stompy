@@ -1,5 +1,8 @@
 import { UNDER } from '../data/construct.js';
 import { geoOf } from '../data/geo.js';
+import { damageEntity } from './entities.js';
+import { feel } from './feel.js';
+import { particle } from './effects.js';
 
 // Tunnelling in, part 1 (docs/specs/37-tunnelling.md): where you are under
 // the ground, and the mark you follow through it.
@@ -76,5 +79,48 @@ export function stepTunnels(G) {
   while ((G.tunnelPts || 0) > UNDER.points && T.length) {
     T[0].pts.shift(); G.tunnelPts--;
     if (!T[0].pts.length) T.shift();
+  }
+}
+
+// Undermining (part 3): a structure whose footprint lost its ground. After a
+// dig, each structure within its reach has five points tested just under
+// its base (its middle and four corners at UNDER.inset of its radius);
+// with fewer than UNDER.hold solid, it falls to the ground under its middle
+// and loses UNDER.dropHp of its full hp plus UNDER.perM a metre fallen. If
+// that brings it down, it topples toward the side with least under it.
+// One still held up stays where it is (a hole under its middle alone
+// doesn't sink it). `by`: whoever dug, for the kill and the voice.
+const FOOT = [[0, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+export function undermine(G, x, z, r, by = null) {
+  const ter = G.ter;
+  for (const e of G.entities) {
+    if (e.kind !== 'structure' || !e.alive || e.fall || hypot(e.x - x, e.z - z) > r + e.radius) continue;
+    const k = e.radius * UNDER.inset, y0 = e.y - 0.5;
+    let held = 0, ax = 0, az = 0;
+    for (const [u, v] of FOOT) {
+      if (ter.solid(e.x + u * k, y0, e.z + v * k)) held++;
+      else { ax += u; az += v; }   // toward what's gone
+    }
+    if (held >= UNDER.hold) continue;
+    const floor = ter.groundBelow(e.x, y0, e.z), drop = e.y - floor;
+    if (!(drop > 0.25)) continue;
+    e.y = floor;
+    thud(G, e, drop);
+    if (!Number.isFinite(e.hp) || G.role === 'guest') continue;   // scenery doesn't break; in co-op the host decides
+    const yaw = ax || az ? Math.atan2(ax, az) : e.yaw;
+    damageEntity(G, e, e.max * Math.min(1, UNDER.dropHp + UNDER.perM * drop) + 1e-6, by, null, { punch: true, yaw });
+    if (!e.alive && by === G.player) G.fx.say('It fell over.');
+  }
+}
+// The thunk of a building landing in its hole: felt as a landing, by how near
+// you are and how big it is, and its dust.
+function thud(G, e, drop) {
+  const P = G.player, near = P ? Math.max(0, 1 - hypot(P.x - e.x, P.z - e.z) / 120) : 0, at = [e.x, e.y, e.z];
+  if (near > 0) feel(G, 'land', { mech: null, k: near * Math.min(1, 0.4 + e.height / 20 + drop / 20), at });
+  G.fx.sfx.settle?.(at);
+  const n = 10 + Math.round(e.radius * 2);
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2, v = G.rng.range(3, 7);
+    particle(G, [e.x + Math.sin(a) * e.radius, e.y + 0.5, e.z + Math.cos(a) * e.radius], [Math.sin(a) * v, G.rng.range(0.5, 3), Math.cos(a) * v], G.rng.range(1.2, 2.2), G.rng.range(1.5, 3), G.pal.low, 'dust');
   }
 }
