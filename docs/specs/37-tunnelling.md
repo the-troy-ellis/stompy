@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress: part 1 built (navigation). Approved with the defaults (the owner merged it, then "Go ahead", 2026-11-04); first asked for 2026-11-03: "Tunneling into an enemy base could be a fun mechanic. You would need to be able to navigate while underground" |
+| Status | in progress: part 1 built (navigation, #416); part 2 built (tunnels on the map). Approved with the defaults (the owner merged it, then "Go ahead", 2026-11-04); first asked for 2026-11-03: "Tunneling into an enemy base could be a fun mechanic. You would need to be able to navigate while underground" |
 | Milestone | M15 (proposed) |
 | Size | M, in four parts (navigation; tunnels on the map; undermining; being heard) |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md), [22-command-view.md](22-command-view.md), [25-hold-to-dig.md](25-hold-to-dig.md), [33-production.md](33-production.md) (foe bases) |
@@ -105,6 +105,18 @@ the route you took and plan the next one.
   every map line since #412), under the markers; a crew mech underground
   has its chevron drawn hollow.
 - A tunnel dug before a save isn't kept (no save mid-mission today).
+
+#### As built (part 2)
+
+- `sim/under.js` `stepTunnels`, once a frame from `update.js`: a crew
+  mech underground adds a point to its open line every `UNDER.trail` (6 m,
+  counted in three dimensions, so digging down counts too); surfacing
+  closes the line. `G.tunnels` and the count are cleared each match; past
+  `UNDER.points` (4,000) the oldest points go.
+- The map draws each line dashed and thin in the crew's colour, under the
+  markers, on to where an open line's mech is now, each piece cut to the
+  screen. A crew mech underground has a hollow chevron (`hollow`, drawn as
+  the editor's sleeping foes are).
 
 ### Part 3: undermining
 

@@ -158,7 +158,7 @@ export function drawMap(ctx, view, { map, things = [], routes = [], waves = [], 
       else { const f = facing ?? -Math.PI / 2; for (const [r, a] of [[11, 0], [8, 2.4], [3, Math.PI], [8, -2.4]]) ctx.lineTo(x + Math.cos(f + a) * r, y + Math.sin(f + a) * r); }
       ctx.closePath();
       ctx.fillStyle = '#000'; ctx.fill();
-      if (!t.asleep) { ctx.fillStyle = col; ctx.fill(); }
+      if (!t.asleep && !t.hollow) { ctx.fillStyle = col; ctx.fill(); }   // hollow: a crew mech underground (spec 37)
       ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
       if (on) ring(ctx, x, y, 14);
     } else {
