@@ -758,7 +758,8 @@ export function createScene(app) {
     drawScorches();
     // In the missile camera your own mech is out there too.
     R.drawHeat = 1;
-    const shown = m => (m.alive || m.dying) && (m !== P || gd || G.state === 'menu' || G.state === 'edit' || walkCam) && seen(m.x, m.y + 6 * m.ch.scale, m.z, (m.dying ? 16 : 10) * m.ch.scale);
+    // Your own mech is drawn whole from anywhere but its cockpit: from above (the map, the editor) too.
+    const shown = m => (m.alive || m.dying) && (m !== P || gd || top || G.state === 'menu' || G.state === 'edit' || walkCam) && seen(m.x, m.y + 6 * m.ch.scale, m.z, (m.dying ? 16 : 10) * m.ch.scale);
     if (R.skinned) R.beginSkinned();
     for (const m of G.mechs) if (shown(m)) drawMech(m);
     for (const line of G.base?.lines || []) for (const j of line.bays || []) if (j?.shell.show && seen(j.shell.x, j.shell.y + 5, j.shell.z, 12)) drawMech(j.shell);   // mechs being made (sim/production.js)
