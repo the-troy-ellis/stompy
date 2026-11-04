@@ -96,7 +96,9 @@ export const ORE_LODES = { n: 3, r: 12.5, mult: 3, near: 200, far: 400, find: 60
 //   surface  SURFACE shows under this much to go, digging upward
 //   sense    what's above shows as outlines within this (m, flat)
 //   up       the cockpit's pitch (rad) above which it's digging upward
-export const UNDER = { above: 1, surface: 4, sense: 60, up: 0.15 };
+//   trail    a tunnel point every this many metres moved underground
+//   points   tunnel points kept in all (the oldest go first)
+export const UNDER = { above: 1, surface: 4, sense: 60, up: 0.15, trail: 6, points: 4000 };
 export const ENDLESS = { first: 90, every: 120, base: 2, most: 8, mixed: 3, heavy: 6 };
 export const PLACE_ORDER = ['factory', 'bay', 'wall', 'tower', 'silo', 'beacon', 'shop', 'line', 'plant', 'lab', 'armory'];
 // The buildings, as mission entities (sim/entities.js): unit meshes in mesh/props.js.

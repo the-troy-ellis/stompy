@@ -2,6 +2,7 @@ import { cheat } from './cheats.js';
 import { swap } from './crew.js';
 import { stepBase } from './base.js';
 import { stepSalvage } from './raid.js';
+import { stepTunnels } from './under.js';
 import { blendPal } from '../data/palettes.js';
 import { tickWeather } from './weather.js';
 import { add, clampN, dirOf, dot, len, mul, norm, sub, keepIf } from '../util/math.js';
@@ -179,6 +180,7 @@ function frame(G, input, dt) {
   stepEntities(G, dt);
   stepBase(G, dt);
   stepSalvage(G);
+  stepTunnels(G);   // tunnels on the map (sim/under.js, spec 37)
   // A co-op guest doesn't run the world: the host's turrets, objectives and
   // waves arrive over the wire (docs/specs/09-coop.md).
   if (G.role !== 'guest') { stepTurrets(G, dt); stepTowers(G, dt); if (!G.bench) tickObjectives(G); }   // towers: the base's guns (sim/towers.js)   // the bench has nothing to win

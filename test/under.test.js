@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, startMatch } from '../src/sim/state.js';
 import { recordFx } from '../src/sim/fx.js';
-import { cabTop, depthOf, underground, nearSurface, setMark, clearMark, markAt, above } from '../src/sim/under.js';
+import { cabTop, depthOf, underground, nearSurface, setMark, clearMark, markAt, above, stepTunnels } from '../src/sim/under.js';
 import { UNDER } from '../src/data/construct.js';
 
 const game = () => {
@@ -75,4 +75,28 @@ test('a new match starts with no mark', () => {
   setMark(G, { x: 10, z: 10 });
   startMatch(G, { name: 'Again', pal: 'dusk', intel: '', foes: ['jackal'] }, 4, false, 'kestrel', { terrainOpts: { flat: true } });
   assert.equal(markAt(G), null);
+});
+
+test('tunnels: underground, a point every UNDER.trail; surfacing ends the line, going down again starts another', () => {
+  const G = game(), P = G.player;
+  stepTunnels(G);
+  assert.equal(G.tunnels.length, 0, 'on the surface: none');
+  const x0 = P.x;
+  for (let i = 0; i <= 30; i++) { P.x = x0 + i; sink(G, P, 10); stepTunnels(G); }
+  assert.equal(G.tunnels.length, 1);
+  const pts = G.tunnels[0].pts;
+  assert.equal(pts.length, 1 + Math.floor(30 / UNDER.trail), `${pts.length} points over 30 m`);
+  P.y = G.ter.height(P.x, P.z); stepTunnels(G);
+  assert.equal(G.tunnels[0].open, false, 'up: the line ends');
+  sink(G, P, 10); stepTunnels(G);
+  assert.equal(G.tunnels.length, 2, 'down again: a new line');
+});
+
+test('tunnels: at most UNDER.points kept, the oldest dropped first; a new match has none', () => {
+  const G = game(), P = G.player, x0 = P.x, n = UNDER.points + 50;
+  for (let i = 0; i < n; i++) { P.x = x0 + (i % 2 ? UNDER.trail + 1 : 0); sink(G, P, 10); stepTunnels(G); }
+  const all = G.tunnels.reduce((k, t) => k + t.pts.length, 0);
+  assert.equal(all, UNDER.points);
+  startMatch(G, { name: 'Again', pal: 'dusk', intel: '', foes: ['jackal'] }, 4, false, 'kestrel', { terrainOpts: { flat: true } });
+  assert.deepEqual(G.tunnels, []);
 });

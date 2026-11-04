@@ -57,3 +57,24 @@ export function above(G, m, out = []) {
   }
   return out;
 }
+
+// Tunnels on the map (part 2): while a crew mech is underground, a point
+// every UNDER.trail moved, one line per stretch underground
+// (`G.tunnels = [{ m, pts: [[x, y, z], ...], open }]`); surfacing ends it.
+// At most UNDER.points in all, the oldest dropped first. Once a frame.
+export function stepTunnels(G) {
+  if (!G.crew) return;
+  const T = (G.tunnels ||= []);
+  for (const m of G.crew) {
+    let line = null;
+    for (let i = T.length - 1; i >= 0; i--) if (T[i].m === m && T[i].open) { line = T[i]; break; }
+    if (!m.alive || !underground(G, m)) { if (line) line.open = false; continue; }
+    if (!line) { line = { m, pts: [], open: true }; T.push(line); }
+    const last = line.pts[line.pts.length - 1];
+    if (!last || hypot(m.x - last[0], m.z - last[2], m.y - last[1]) >= UNDER.trail) { line.pts.push([m.x, m.y, m.z]); G.tunnelPts = (G.tunnelPts || 0) + 1; }
+  }
+  while ((G.tunnelPts || 0) > UNDER.points && T.length) {
+    T[0].pts.shift(); G.tunnelPts--;
+    if (!T[0].pts.length) T.shift();
+  }
+}

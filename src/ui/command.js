@@ -19,7 +19,7 @@ import { raidsDue } from '../sim/objectives.js';
 import { liveHits } from '../sim/hits.js';
 import { WAVE_DIST } from '../sim/waves.js';
 import { polar } from '../sim/placement.js';
-import { setMark, clearMark, markAt } from '../sim/under.js';
+import { setMark, clearMark, markAt, underground } from '../sim/under.js';
 
 // The command view (docs/specs/22-command-view.md): the match from above
 // while the world runs on. MAP (Tab) goes up, BACK comes down into the mech
@@ -294,7 +294,7 @@ export function createCommand(app) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const view = { W, H, mpp: mpp(), toScreen: (x, y, z) => groundToScreen(C.cam, { x, y, z }, W, H, VP) };
     const crew = live(), reach = RADAR_RANGE * radarOf(G), things = [];
-    for (const m of crew) things.push({ id: m, kind: 'start', x: m.x, y: m.y, z: m.z, face: -m.yaw / D2R, label: `${m === G.command.from ? '▶ ' : ''}${m.ch.name}${m.job ? ` · ${m.job}` : ''}` });
+    for (const m of crew) things.push({ id: m, kind: 'start', x: m.x, y: m.y, z: m.z, face: -m.yaw / D2R, hollow: underground(G, m), label: `${m === G.command.from ? '▶ ' : ''}${m.ch.name}${m.job ? ` · ${m.job}` : ''}` });
     for (const e of G.entities) if (e.alive && e.team === 0 && e.kind !== 'nav') things.push({ id: e, kind: 'structure', x: e.x, y: e.y, z: e.z, label: siteLabel(G, e) });
     for (const e of G.entities) if (e.alive && e.team !== 0 && e.kind === 'structure' && PLACE[kindOf(e)]) things.push({ id: e, kind: 'structure', x: e.x, y: e.y, z: e.z, label: `${NAMES.buildings[kindOf(e)]}${isDown(e) ? ' · DOWN' : ''}` });   // a foe's or nobody's building (spec 33 § Stealing)
     for (const t of G.base?.things || []) if (!t.at && !t.by) things.push({ id: t, kind: 'structure', x: t.x, y: G.ter.height(t.x, t.z), z: t.z, label: t.part === 'core' ? 'CORE' : 'PART' });   // loose on the ground: a wreck's core (spec 33)
@@ -302,6 +302,7 @@ export function createCommand(app) {
     for (const f of G.mechs) if (f.alive && f.team !== 0 && crew.some(m => Math.hypot(f.x - m.x, f.z - m.z) < reach)) things.push({ id: f, kind: 'foe', x: f.x, y: f.y, z: f.z, face: -f.yaw / D2R });
     clipTo(W, H);   // the long lines and shapes below are cut to the screen (render/markers.js)
     drawLand(ctx, view, pal);
+    drawTunnels(ctx, view, pal);
     drawMap(ctx, view, { map: { bound: [BX, BZ], height: G.ter.height, grid: 100 }, things, sel: C.picked, box: C.box, pal });
     drawExposed(ctx, view, pal);
     drawProduction(ctx, view, pal);
@@ -318,6 +319,19 @@ export function createCommand(app) {
     if (G.padActive) drawPadAim(ctx, W, H, pal);
   }
 
+  // Tunnels (docs/specs/37-tunnelling.md part 2): each stretch a crew mech
+  // went underground, a thin dashed line under the markers, cut to the screen.
+  function drawTunnels(ctx, view, pal) {
+    if (!G.tunnels?.length) return;
+    ctx.save(); ctx.strokeStyle = pal.good; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    for (const t of G.tunnels) {
+      let prev = null;
+      for (const p of t.pts) { const q = view.toScreen(p[0], p[1], p[2]); seg(ctx, prev, q); prev = q; }
+      if (t.open) seg(ctx, prev, view.toScreen(t.m.x, t.m.y, t.m.z));   // on to where it digs now
+    }
+    ctx.stroke(); ctx.restore();
+  }
   // The mark (docs/specs/37-tunnelling.md): a white ring and MARK where it is.
   function drawMark(ctx, view) {
     const mk = markAt(G), q = mk && view.toScreen(mk[0], mk[1], mk[2]);
