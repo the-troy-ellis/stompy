@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress (P0 #131 perf harness, P1 #132 instanced effects, P2 #133 particle pool, P3 #134 allocation diet, P4 #137 one draw per mech, P5 #135 the pixels (PIXELS in Settings, CHUNKIER at 240 lines by default; PARTICLES steps down once on a slow phone), P5b #136 dither, P6 #138 culling shipped; the owner's decisions are recorded below) |
+| Status | in progress (P0 #131 perf harness, P1 #132 instanced effects, P2 #133 particle pool, P3 #134 allocation diet, P4 #137 one draw per mech, P5 #135 the pixels (PIXELS in Settings, CHUNKIER at 240 lines by default, then CRISP by default from 2026-11-03; PARTICLES steps down once on a slow phone), P5b #136 dither, P6 #138 culling shipped; the owner's decisions are recorded below) |
 | Milestone | between M3's #106 and Acts II–III (#110, #111); the rest of M4 builds on it |
 | Size | L (split: perf harness; instanced effects + particle pool; allocation diet; one-draw mechs; render scale; culling) |
 | Depends on | [07-atmosphere.md](07-atmosphere.md) (weather and explosions are the big new loads); [13-thunk.md](13-thunk.md) (effects are feedback) |
@@ -262,6 +262,11 @@ enforces the countable ones (draws, triangles, allocations) in CI.
    aesthetic choice; the performance gain is a bonus that buys more on
    screen. CHUNKY and CRISP stay in Settings as preferences. (The owner saw
    CRISP, CHUNKY and CHUNKIER renders of the same frame before choosing.)
+   **Changed (the owner, 2026-11-03), after playing it on a phone:** "I
+   want full resolution for the game, the pixelated look isn't adding
+   anything on an LCD screen. We can reevaluate this later to see if a CRT
+   style filter would help." CRISP is now the default; CHUNKY and CHUNKIER
+   stay in Settings. A CRT-style filter is a later question, not scheduled.
 2. **See-through only by dither.** No alpha blending anywhere.
 3. **One shape per effect kind**, as in the table.
 4. **Order:** after #106, before Acts II–III.

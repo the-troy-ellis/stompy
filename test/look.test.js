@@ -20,12 +20,12 @@ test('the look comes from the saved setting, and the URL overrides it', () => {
   assert.equal(readLook(p('lines=junk'), null).lines, 0);
 });
 
-test('PIXELS: CHUNKIER (240 lines, no antialias) is the default; CHUNKY is 360; CRISP is the screen, antialiased', async () => {
+test('PIXELS: CRISP (the screen, antialiased) is the default (the owner, 2026-11-03); CHUNKY is 360; CHUNKIER 240, no antialias', async () => {
   const { lookOf } = await import('../src/render/look.js');
   const { SETTINGS, PIXEL_NAMES, readSetting } = await import('../src/data/settings.js');
-  assert.equal(SETTINGS.pixels.def, 0);
-  assert.equal(PIXEL_NAMES[readSetting('pixels', undefined)], 'CHUNKIER');
-  assert.deepEqual(LOOK_DEFAULT, { lines: 240, aa: false });
+  assert.equal(SETTINGS.pixels.def, 2);
+  assert.equal(PIXEL_NAMES[readSetting('pixels', undefined)], 'CRISP');
+  assert.deepEqual(LOOK_DEFAULT, { lines: 0, aa: true });
   assert.deepEqual(lookOf(0), { lines: 240, aa: false });
   assert.deepEqual(lookOf(1), { lines: 360, aa: false });
   assert.deepEqual(lookOf(2), { lines: 0, aa: true });
