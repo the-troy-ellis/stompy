@@ -19,6 +19,7 @@ import { raidsDue } from '../sim/objectives.js';
 import { liveHits } from '../sim/hits.js';
 import { WAVE_DIST } from '../sim/waves.js';
 import { polar } from '../sim/placement.js';
+import { setMark, clearMark, markAt } from '../sim/under.js';
 
 // The command view (docs/specs/22-command-view.md): the match from above
 // while the world runs on. MAP (Tab) goes up, BACK comes down into the mech
@@ -51,7 +52,7 @@ const siteLabel = (G, e) => {
   const st = BUILDINGS.wall.radius * 1.9, px = e.x + Math.cos(e.yaw || 0) * st, pz = e.z - Math.sin(e.yaw || 0) * st;
   return G.base?.walls.some(o => o.alive && !o.site && Math.hypot(o.x - px, o.z - pz) < st * 0.6) ? '' : n;
 };
-export const BAR = ['go', 'dig', 'follow', 'stay', 'work', 'drive', 'build', 'attack', 'guard', 'carry', 'fighters'];   // the order bar, in order (keys 1–9; CARRY and FIGHTERS, the last, by tap or pad)
+export const BAR = ['go', 'dig', 'follow', 'stay', 'work', 'drive', 'build', 'attack', 'guard', 'carry', 'fighters', 'mark'];   // the order bar, in order (keys 1–9; CARRY, FIGHTERS and MARK, the last, by tap or pad)
 export const MAKE = Object.keys(RECIPES);   // with an assembly line tapped, the bar is these instead (docs/specs/33-production.md), keys 1–4
 export const STUDY = Object.keys(WEAPONS).filter(w => w !== 'fusion');   // with a weapon lab tapped, the weapons it could work out
 
@@ -83,6 +84,10 @@ export function createCommand(app) {
     const g = ground(sx, sy), ours = G.entities.filter(e => e.alive && e.team === 0 && e.kind === 'structure' && !e.site);
     return g && pickNearest(ours.map(e => ({ id: e, x: e.x, z: e.z, r: e.radius })), g.x, g.z, COMMAND.finger * mpp())?.id;
   };
+  const anyBuildingAt = (sx, sy) => {   // anyone's standing building: MARK's
+    const g = ground(sx, sy), all = G.entities.filter(e => e.alive && e.kind === 'structure');
+    return g && pickNearest(all.map(e => ({ id: e, x: e.x, z: e.z, r: e.radius })), g.x, g.z, COMMAND.finger * mpp())?.id;
+  };
   const liftAt = (sx, sy) => {   // a building CARRY can take: down, not yours, outside its owner's border (sim/steal.js)
     const g = ground(sx, sy), them = G.entities.filter(e => canLift(G, e));
     return g && pickNearest(them.map(e => ({ id: e, x: e.x, z: e.z, r: e.radius })), g.x, g.z, COMMAND.finger * mpp())?.id;
@@ -107,12 +112,14 @@ export function createCommand(app) {
       if (b.textContent !== label) b.textContent = label;
     }
     for (const k of BAR) {
-      const b = btn[k], show = C.make || C.lab ? false : k === 'drive' ? p.length === 1 : k === 'build' && !p.length ? !!G.base : k === 'fighters' ? !p.length && fighters().length > 0 : p.some(m => can(m, k));
+      const b = btn[k], show = C.make || C.lab ? false : k === 'drive' ? p.length === 1 : k === 'build' && !p.length ? !!G.base : k === 'fighters' ? !p.length && fighters().length > 0 : k === 'mark' ? !p.length && !C.place : p.some(m => can(m, k));
       if (b.hidden !== !show) b.hidden = !show;
       b.classList.toggle('on', C.order === k || (k === 'build' && !!C.place));
     }
     const label = C.place ? `BUILD ${NAMES.buildings[C.place]}` : 'BUILD';
     if (btn.build.textContent !== label) btn.build.textContent = label;
+    const markLabel = markAt(G) ? 'UNMARK' : 'MARK';
+    if (btn.mark.textContent !== markLabel) btn.mark.textContent = markLabel;
     if (C.order && btn[C.order].hidden) C.order = null;
     if (C.order !== 'carry') C.lift = null;
     const shown = BAR.filter(k => !btn[k].hidden), lit = G.padActive && shown.length ? shown[C.padAt % shown.length] : null;
@@ -141,6 +148,7 @@ export function createCommand(app) {
     }
     if (k === 'drive') { if (C.picked.size === 1) close([...C.picked][0]); return; }
     if (k === 'fighters') { C.picked = new Set(fighters()); C.order = null; sync(); return; }
+    if (k === 'mark' && markAt(G)) { clearMark(G); C.order = null; sync(); return; }   // UNMARK
     if (k === 'stay' || k === 'work') return order({ kind: k });
     C.order = C.order === k ? null : k;   // GO, DIG, FOLLOW: now tap where (or whom)
     sync();
@@ -178,6 +186,11 @@ export function createCommand(app) {
       return;
     }
     if (C.order === 'attack') { const f = foeAt(x, y); if (f) order({ kind: 'attack', target: f }); return; }
+    if (C.order === 'mark') {   // MARK (docs/specs/37-tunnelling.md): a foe, any building, or the ground there
+      const t = foeAt(x, y) || anyBuildingAt(x, y) || g;
+      if (!t) return;
+      setMark(G, t); G.fx.say('Mark set.'); C.order = null; sync(); return;
+    }
     if (C.order === 'guard') { const b = buildingAt(x, y); if (b) order({ kind: 'guard', target: b }); return; }
     const fighters = [...C.picked].some(p => can(p, 'attack'));
     if (!C.order && !m && e && [...C.picked].some(p => can(p, 'build'))) return order({ kind: 'build', target: e });
@@ -293,6 +306,7 @@ export function createCommand(app) {
     drawExposed(ctx, view, pal);
     drawProduction(ctx, view, pal);
     drawSpread(ctx, view, crew, pal);
+    drawMark(ctx, view);
     drawOrders(ctx, view, crew, pal);
     drawRaids(ctx, view, pal);
     if ((C.place || C.lift) && C.ghost) drawGhost(ctx, view, pal);
@@ -302,6 +316,16 @@ export function createCommand(app) {
     if (G.base) { ctx.fillStyle = pal.good; ctx.fillText(`ORE ${Math.floor(G.base.ore)}/${oreRoom(G)}${G.base.iso || G.base.plants.length ? `  ISO ${G.base.iso}/${isoRoom(G)}` : ''}  SALVAGE ${G.base.salvage}`, 14, 22); }
     drawCompass(ctx, 34, H - 34, C.cam.yaw, pal);
     if (G.padActive) drawPadAim(ctx, W, H, pal);
+  }
+
+  // The mark (docs/specs/37-tunnelling.md): a white ring and MARK where it is.
+  function drawMark(ctx, view) {
+    const mk = markAt(G), q = mk && view.toScreen(mk[0], mk[1], mk[2]);
+    if (!q) return;
+    ctx.save(); ctx.strokeStyle = ctx.fillStyle = '#fff'; ctx.lineWidth = 2;
+    ctx.font = 'bold 11px "Lucida Console", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.beginPath(); ctx.arc(q[0], q[1], 14, 0, Math.PI * 2); ctx.stroke(); ctx.fillText('MARK', q[0], q[1] - 24);
+    ctx.restore();
   }
 
   // Spread out (docs/specs/32-base-loop.md § Part 3): a found lode is a ring

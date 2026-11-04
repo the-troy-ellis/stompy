@@ -91,6 +91,12 @@ export const TOWER = { range: 120, cd: 1.6, turn: 2.2, aim: 0.12, weapon: 'ac', 
 //               near/far: from the silo (m), find: a crew mech this close finds one
 export const ORE_SPREAD = { near: 0.6, at: 150, far: 1.3, out: 450 };
 export const ORE_LODES = { n: 3, r: 12.5, mult: 3, near: 200, far: 400, find: 60 };
+// Tunnelling in (docs/specs/37-tunnelling.md): starting values to tune in play.
+//   above    m of rock over the cab that counts as underground
+//   surface  SURFACE shows under this much to go, digging upward
+//   sense    what's above shows as outlines within this (m, flat)
+//   up       the cockpit's pitch (rad) above which it's digging upward
+export const UNDER = { above: 1, surface: 4, sense: 60, up: 0.15 };
 export const ENDLESS = { first: 90, every: 120, base: 2, most: 8, mixed: 3, heavy: 6 };
 export const PLACE_ORDER = ['factory', 'bay', 'wall', 'tower', 'silo', 'beacon', 'shop', 'line', 'plant', 'lab', 'armory'];
 // The buildings, as mission entities (sim/entities.js): unit meshes in mesh/props.js.

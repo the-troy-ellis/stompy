@@ -20,6 +20,8 @@ import { liveKills, killWords } from '../net/killfeed.js';
 import { teamCss, teamName } from '../net/teams.js';
 import { oreRoom, isoRoom } from '../sim/base.js';
 import { TUT } from '../data/tutorial.js';
+import { depthOf, underground, nearSurface, markAt, above } from '../sim/under.js';
+import { clipTo, seg } from './markers.js';
 
 const LAG_MS = 200;   // a round trip to the relay past this shows LAG (docs/specs/10-internet-play.md § Latency)
 
@@ -207,20 +209,20 @@ export function createHud(app) {
 
   // An objective marker: a diamond with the distance under it; off-screen (or
   // behind), held at the edge of the view with an arrow pointing the way.
-  function drawMarker(L, p, col) {
+  function drawMarker(L, p, col, label = '') {
     const P = G.player, W = V.W, top = 72, bottom = L.viewBottom - 16, m = 18;
     const dist = hypot(p[0] - P.x, p[2] - P.z), s = project(p);
     ctx.strokeStyle = col; ctx.fillStyle = col; ctx.textAlign = 'center';
     if (s && s[0] > m && s[0] < W - m && s[1] > top && s[1] < bottom) {
       ctx.beginPath(); ctx.moveTo(s[0], s[1] - 7); ctx.lineTo(s[0] + 7, s[1]); ctx.lineTo(s[0], s[1] + 7); ctx.lineTo(s[0] - 7, s[1]); ctx.closePath(); ctx.stroke();
-      ctx.fillText(fmtDist(dist), s[0], s[1] + 18);
+      ctx.fillText(`${label}${fmtDist(dist)}`, s[0], s[1] + 18);
       return;
     }
     const e = edgePoint(W, top, bottom, m, viewYaw(P), P, p);
     ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.a);
     ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6, 3); ctx.lineTo(-6, 3); ctx.closePath(); ctx.fill();
     ctx.restore();
-    ctx.fillText(fmtDist(dist), e.x, e.y + (e.y > (top + bottom) / 2 ? -12 : 20));
+    ctx.fillText(`${label}${fmtDist(dist)}`, e.x, e.y + (e.y > (top + bottom) / 2 ? -12 : 20));
   }
   // Where the view edge is crossed going from the centre toward the objective's bearing.
   function edgePoint(W, top, bottom, m, vy, P, p) { return markerEdge(W, top, bottom, m, atan2(p[0] - P.x, p[2] - P.z) - vy); }
@@ -270,6 +272,13 @@ export function createHud(app) {
     ctx.textAlign = 'right'; ctx.fillText('HT', R.x - R.r * 0.72, R.y + R.r * 0.86);
     ctx.textAlign = 'left'; ctx.fillText('JJ', R.x + R.r * 0.72, R.y + R.r * 0.86);
     ctx.textAlign = 'center'; ctx.fillStyle = GREEN; ctx.fillText(`${Math.round(P.speed * 5.4)} KPH`, R.x, R.y + R.r + RING_W + 10);
+    // Underground (docs/specs/37-tunnelling.md): how much ground is over you,
+    // over the ring; digging up near the top, SURFACE in amber.
+    if (underground(G, P)) {
+      const d = Math.round(depthOf(G, P)), up = nearSurface(G, P);
+      ctx.font = 'bold 11px "Lucida Console", monospace'; ctx.fillStyle = up ? AMBER : GREEN;
+      ctx.fillText(`${up ? 'SURFACE' : 'DEPTH'} ${d} M`, R.x, R.y - R.r - RING_W - 8);
+    }
     ctx.textAlign = 'left';
   }
 
@@ -502,6 +511,20 @@ export function createHud(app) {
     if (debugTick-- <= 0 || !lines.length) { debugTick = DEBUG_EVERY; debugLines(full); }
     const dx = G.touchUI ? 140 : 12, dy = V.H * 0.5 + (G.touchUI ? 40 : 0);   // on touch, right of and below the ring's middle (drawRing)
     for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], dx, dy + i * 13);
+  }
+  // Underground: each structure and mech within UNDER.sense as its box's
+  // edges through the rock, foes in red, cut to the screen (render/markers.js).
+  const ABOVE = [];
+  function drawAbove() {
+    clipTo(V.W, V.H);
+    ctx.lineWidth = 1;
+    for (const a of above(G, G.player, ABOVE)) {
+      const b = a.box, c = [];
+      for (let i = 0; i < 8; i++) c.push(project([b[i & 1 ? 3 : 0], b[i & 2 ? 4 : 1], b[i & 4 ? 5 : 2]]));
+      ctx.strokeStyle = a.foe ? RED : GREEN; ctx.beginPath();
+      for (let i = 0; i < 8; i++) for (const bit of [1, 2, 4]) if (!(i & bit)) seg(ctx, c[i], c[i | bit]);
+      ctx.stroke();
+    }
   }
   // ?debug=1's overlays (ui/tuning.js § OVERLAYS), each drawn only while its switch is on.
   // A box's twelve edges, from its corners [x0, y0, z0, x1, y1, z1].
@@ -917,6 +940,11 @@ export function createHud(app) {
       const p = objectivePoint(G, o);
       if (p) drawMarker(L, p, o.def.secondary ? GREEN : AMBER);
     }
+    // The mark (docs/specs/37-tunnelling.md), set from the map: through the
+    // ground like every marker. Underground, what's above you as outlines.
+    const mk = markAt(G);
+    if (mk) drawMarker(L, mk, '#fff', 'MARK ');   // white: apart from the objectives' amber and green, in every colour mode
+    if (underground(G, G.player)) drawAbove();
     // Status lines.
     ctx.textAlign = 'center';
     let my = 64 + objs.length * 13;

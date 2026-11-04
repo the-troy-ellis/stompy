@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (the owner, 2026-11-03: "Tunneling into an enemy base could be a fun mechanic. You would need to be able to navigate while underground") |
+| Status | in progress: part 1 built (navigation). Approved with the defaults (the owner merged it, then "Go ahead", 2026-11-04); first asked for 2026-11-03: "Tunneling into an enemy base could be a fun mechanic. You would need to be able to navigate while underground" |
 | Milestone | M15 (proposed) |
 | Size | M, in four parts (navigation; tunnels on the map; undermining; being heard) |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md), [22-command-view.md](22-command-view.md), [25-hold-to-dig.md](25-hold-to-dig.md), [33-production.md](33-production.md) (foe bases) |
@@ -47,8 +47,8 @@ the route you took and plan the next one.
 
 ### New text (for the tone check)
 
-- HUD: `DEPTH 9 M`, `MARK 410 M`, `SURFACE 3 M` (the last only while digging
-  up, under 4 m to go).
+- HUD: `DEPTH 9 M`, `MARK 410 m` (the distance as every HUD marker writes it),
+  `SURFACE 3 M` (the last only while digging up, under 4 m to go).
 - Map bar: `MARK` (and `UNMARK` on what's marked).
 - Voice (deadpan, once each): `Mark set.` when marking; `It fell over.` when
   a building you undermined comes down (a joke after the fact).
@@ -79,6 +79,21 @@ the route you took and plan the next one.
   you're under the wall, not the silo.
 - Keys and pads: nothing new in the cockpit; MARK is on the map's bar
   (keys 1–9 as every bar button, spec 22).
+
+#### As built (part 1)
+
+- `sim/under.js`: `depthOf` is the top surface (`G.ter.height`) over the
+  cab's top (`cabTop`); `underground` at `UNDER.above` or more;
+  `nearSurface` when the cockpit's pitch is over `UNDER.up` (0.15 rad).
+  `setMark`/`clearMark`/`markAt` (`G.mark`, cleared each match);
+  `above` lists the boxes for the outlines.
+- MARK is on the map's bar with nothing picked: press it, then tap a foe,
+  anyone's building, or the ground (a tap stands in for the long press).
+  With a mark set the button reads `UNMARK`. The map shows the mark as a
+  white ring with `MARK`.
+- On the HUD the mark is white (apart from the objectives' amber and green
+  in every colour mode); DEPTH sits over the ring; outlines are cut to the
+  screen as the map's lines are (#412).
 
 ### Part 2: tunnels on the map
 
