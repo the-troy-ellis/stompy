@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress: part 1 built (navigation, #416); part 2 built (tunnels on the map, #417); part 3 built (undermining). Approved with the defaults (the owner merged it, then "Go ahead", 2026-11-04); first asked for 2026-11-03: "Tunneling into an enemy base could be a fun mechanic. You would need to be able to navigate while underground" |
+| Status | built: part 1 built (navigation, #416); part 2 built (tunnels on the map, #417); part 3 built (undermining, #418); part 4 built (being heard). Phone check open. Approved with the defaults (the owner merged it, then "Go ahead", 2026-11-04); first asked for 2026-11-03: "Tunneling into an enemy base could be a fun mechanic. You would need to be able to navigate while underground" |
 | Milestone | M15 (proposed) |
 | Size | M, in four parts (navigation; tunnels on the map; undermining; being heard) |
 | Depends on | [18-voxel-ground.md](18-voxel-ground.md), [22-command-view.md](22-command-view.md), [25-hold-to-dig.md](25-hold-to-dig.md), [33-production.md](33-production.md) (foe bases) |
@@ -174,6 +174,18 @@ the route you took and plan the next one.
   once per tunnel).
 - Foe diggers tunnelling into *your* base are **not** in this spec (open
   question 4).
+
+#### As built (part 4)
+
+- `sim/under.js heard(G, m, p)`, from each digger's bite (`dig.js bite`):
+  only underground; foes within `UNDER.hear` (120 m) that can't see you
+  hear it, by `DIFF.hear` (`data/ai.js`): EASY `none`; NORMAL `look`, each
+  becomes aware (`alertEnemy`) believing you're within `UNDER.blur` (25 m) of
+  the bite, so it comes looking; HARD `wait`, that, and the nearest goes to
+  the bite's spot itself (`e.ai.waitAt`) and stands over it, facing it,
+  until `UNDER.wait` (20 s) after the last bite it heard (`ai.js`, a branch
+  of the search state). `They heard you.` once a tunnel, HARD only, for
+  your own digging.
 
 ### Numbers (`src/data/construct.js` `UNDER`, starting values to tune in play)
 

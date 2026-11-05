@@ -1,6 +1,6 @@
 import { keepIf } from '../util/math.js';
 import { seamAt, isoAt, oreSpread } from '../world/seams.js';
-import { undermine } from './under.js';
+import { undermine, heard } from './under.js';
 import { cheat } from './cheats.js';
 import { BIG_DIG } from '../data/debug.js';
 import { DIG, CRUSH, TORQUE, WEAPONS } from '../data/weapons.js';
@@ -106,6 +106,7 @@ export function bite(G, m, p, r = CONSTRUCT.bucket, fl = -Infinity, sl = null) {
   G.digBy = m;   // for undermining's kill and its voice (sim/under.js)
   confirmDig(G, [0, x, y, z, r], true, 1, tally, fl, sl);
   G.digBy = null;
+  heard(G, m, [x, y, z]);   // foes near a bite underground hear it (sim/under.js, spec 37 part 4)
   got *= oreHere(G, x, z);
   // Whole ore into the hopper; the fraction rides on to the next bite (a 4 m
   // corner is an eighth of an 8 m one, docs/specs/29-ground-4m.md), so the

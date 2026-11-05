@@ -3,6 +3,9 @@ import { geoOf } from '../data/geo.js';
 import { damageEntity } from './entities.js';
 import { feel } from './feel.js';
 import { particle } from './effects.js';
+import { alertEnemy } from './ai/perception.js';
+import { diffOf } from '../data/ai.js';
+import { mechsNear } from './near.js';
 
 // Tunnelling in, part 1 (docs/specs/37-tunnelling.md): where you are under
 // the ground, and the mark you follow through it.
@@ -123,4 +126,35 @@ function thud(G, e, drop) {
     const a = i / n * Math.PI * 2, v = G.rng.range(3, 7);
     particle(G, [e.x + Math.sin(a) * e.radius, e.y + 0.5, e.z + Math.cos(a) * e.radius], [Math.sin(a) * v, G.rng.range(0.5, 3), Math.cos(a) * v], G.rng.range(1.2, 2.2), G.rng.range(1.5, 3), G.pal.low, 'dust');
   }
+}
+
+// Being heard (part 4): a crew digger's bite underground at `p` is heard by
+// foes within UNDER.hear, as a point up to UNDER.blur off. By difficulty
+// (data/ai.js DIFF.hear): 'none' nothing; 'look' each becomes aware and
+// believes you're there (searching, it comes to look); 'wait' that, and the
+// nearest goes to the spot itself, unblurred, to be there when you come up.
+// A foe that can see you keeps what it sees. The player hears `They heard
+// you.` once a tunnel, on 'wait'.
+const BY = [];
+export function heard(G, m, p) {
+  const how = diffOf(G).hear;
+  if (!how || how === 'none' || !underground(G, m)) return;
+  const n = mechsNear(G, p[0], p[2], UNDER.hear, BY);
+  let near = null, nd = Infinity;
+  for (let i = 0; i < n; i++) {
+    const e = BY[i];
+    if (e.team === m.team || !e.alive || !e.ai || e.ai.seen) continue;
+    const d = hypot(e.x - p[0], e.z - p[2]);
+    if (d > UNDER.hear) continue;
+    const a = G.rng.range(0, Math.PI * 2), r = G.rng.range(0, UNDER.blur), at = [p[0] + Math.sin(a) * r, p[1], p[2] + Math.cos(a) * r];
+    alertEnemy(G, e, m, at);
+    e.ai.belief = { x: at[0], z: at[2], vx: 0, vz: 0, at: G.time };
+    if (d < nd) { near = e; nd = d; }
+  }
+  if (how !== 'wait' || !near) return;
+  near.ai.belief = { x: p[0], z: p[2], vx: 0, vz: 0, at: G.time };
+  near.ai.state = 'search'; near.ai.searchT = 0;
+  near.ai.waitAt = { x: p[0], z: p[2], until: G.time + UNDER.wait };   // off to the spot, to stand over it (sim/ai.js)
+  const line = (G.tunnels || []).find(t => t.m === m && t.open);
+  if (m === G.player && !(line ? line.heard : m.heardSaid)) { G.fx.say('They heard you.'); if (line) line.heard = true; else m.heardSaid = true; }
 }

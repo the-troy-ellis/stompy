@@ -5,10 +5,14 @@
 // do): foe haulers come with every `every`th raid (0: never), `most` of them;
 // `knock`, the raid knocks an exposed building down for them first; `back`,
 // hit, they drop it and come back for it, not run; `warn`, the voice says so.
+// hear (docs/specs/37-tunnelling.md part 4): what a foe does on hearing a
+// digger at work underground: 'none'; 'look' (aware, and it believes you're
+// round where it heard you); 'wait' (that, and the nearest goes to stand
+// over the spot).
 export const DIFF = {
-  easy: { label: 'EASY', sight: 400, heatCap: 60, aimErr: 1.4, sections: false, react: 1.5, steal: { every: 0 } },
-  normal: { label: 'NORMAL', sight: 600, heatCap: 72, aimErr: 1.0, sections: false, react: 0.8, steal: { every: 3, most: 2, knock: false, back: false, warn: true } },
-  hard: { label: 'HARD', sight: 800, heatCap: 85, aimErr: 0.7, sections: true, react: 0.3, steal: { every: 1, most: 4, knock: true, back: true, warn: false } },
+  easy: { label: 'EASY', hear: 'none', sight: 400, heatCap: 60, aimErr: 1.4, sections: false, react: 1.5, steal: { every: 0 } },
+  normal: { label: 'NORMAL', hear: 'look', sight: 600, heatCap: 72, aimErr: 1.0, sections: false, react: 0.8, steal: { every: 3, most: 2, knock: false, back: false, warn: true } },
+  hard: { label: 'HARD', hear: 'wait', sight: 800, heatCap: 85, aimErr: 0.7, sections: true, react: 0.3, steal: { every: 1, most: 4, knock: true, back: true, warn: false } },
 };
 export const DIFF_ORDER = ['easy', 'normal', 'hard'];
 
