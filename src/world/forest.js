@@ -8,8 +8,9 @@ import { TREES, TREE_KINDS } from '../data/forest.js';
 // a jittered grid TREES.gap apart, thinned by a noise field into clearings,
 // cut by a few straight old roads, and kept off steep ground and out of
 // `avoid` (circles [x, z, r]: the start, a mission's zones and structures).
+// `state`: 0 standing, 1 falling (sim/pieces.js), 2 down.
 // Kept sorted by TREES.cell cells (`start[c]..start[c + 1]`), so what's near
-// a point is a few cells' runs. `state`: 0 standing (part 2 fells them).
+// a point is a few cells' runs.
 const { sin, cos, hypot, floor, max, min, PI } = Math;
 
 export function plantTrees(seed, ter, { avoid = [] } = {}) {
@@ -48,7 +49,7 @@ export function plantTrees(seed, ter, { avoid = [] } = {}) {
   }
   start[nx * nz] = n;
   return { n, nx, nz, x: X.subarray(0, n), y: Y.subarray(0, n), z: Z.subarray(0, n), r: R.subarray(0, n), h: H.subarray(0, n),
-    kind: K.subarray(0, n), yaw: YAW.subarray(0, n), tint: TINT.subarray(0, n), state: new Uint8Array(n), start };
+    kind: K.subarray(0, n), yaw: YAW.subarray(0, n), tint: TINT.subarray(0, n), state: new Uint8Array(n), fall: new Uint8Array(n), start };   // fall: the way it fell (a 256th of a turn), once down
 }
 
 // The cells within `rad` of (x, z), as [c0x, c1x, c0z, c1z] into `out`.

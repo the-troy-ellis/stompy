@@ -380,7 +380,8 @@ try {
   await scene('big-map-view', 300);
   await page.evaluate(() => { window.__each = null; window.__settle = 0; window.__stompy.app.command.toggle(); });
   // The forest (spec 39 part 1): its 50,000-odd trees drawn by kind, out to
-  // the mist's end, walked straight through the woods for 10 s; then from
+  // the mist's end, walked straight through the woods for 10 s, felling a
+  // few ahead every 20 frames (part 2); then from
   // above, round the map view's focus (TREES.draw), swept across.
   await page.evaluate(async () => {
     const { startMatch } = await import('/src/sim/state.js');
@@ -391,8 +392,11 @@ try {
     app.scene.uploadWorld(); app.ui.launch();
     await app.scene.groundReady();
     window.__settle = 150;
-    const x0 = G.player.x, z0 = G.player.z;
-    window.__each = i => { const P = G.player; shiftMech(P, x0 + i * 0.8 - P.x, z0 + i * 0.5 - P.z); P.y = G.ter.height(P.x, P.z); };
+    const x0 = G.player.x, z0 = G.player.z, { fellNear } = await import('/src/sim/trees.js');
+    window.__each = i => {
+      const P = G.player; shiftMech(P, x0 + i * 0.8 - P.x, z0 + i * 0.5 - P.z); P.y = G.ter.height(P.x, P.z);
+      if (i % 20 === 0) fellNear(G, [P.x + 24, P.y + 2, P.z + 15], 9, P);   // part 2: trees falling and lying ahead as it goes
+    };
   });
   await scene('forest', 600);
   await page.evaluate(() => {

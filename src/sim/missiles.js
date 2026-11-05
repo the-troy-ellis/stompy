@@ -9,6 +9,8 @@ import { damageEntity, solid } from './entities.js';
 import { FEEL } from '../data/feel.js';
 import { sendsFx } from './hitqueue.js';
 import { dig } from './dig.js';
+import { fellNear } from './trees.js';
+import { TREES } from '../data/forest.js';
 import { mechsNear, nearRadius } from './near.js';
 
 const { atan2, hypot, max } = Math;
@@ -84,6 +86,7 @@ export function endGuide(G, detonate) {
 // the full hit), and never the mech that fired it.
 const BY = [];
 export function blast(G, p, dmg, owner, direct) {
+  fellNear(G, p, TREES.blastR, owner);   // a forest's trees go over, away from it (sim/trees.js)
   const k = mechsNear(G, p[0], p[2], BLAST_R + nearRadius(G), BY);   // spec 34: only the mechs nearby
   for (let j = 0; j < k; j++) {
     const m = BY[j];

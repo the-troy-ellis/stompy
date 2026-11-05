@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress: part 1 built (the tree field). Approved (the owner merged it, then "start the forest", 2026-11-05); first asked for 2026-11-05: "Also what about a forest biome?"; "I think thick woods becomes more interesting. Especially if fog is involved. Very close range" |
+| Status | in progress: part 1 built (the tree field, #422); part 2 built (crushing and toppling). Approved (the owner merged it, then "start the forest", 2026-11-05); first asked for 2026-11-05: "Also what about a forest biome?"; "I think thick woods becomes more interesting. Especially if fog is involved. Very close range" |
 | Milestone | M16 (proposed, with or before spec 38's city) |
 | Size | L, in five parts (the tree field; crushing and toppling; concealment and the mist; fighting up close; the arena) |
 | Depends on | [07-atmosphere.md](07-atmosphere.md) (fog, weather, props), [13-thunk.md](13-thunk.md), [14-look-and-performance.md](14-look-and-performance.md), [35-bigger-maps.md](35-bigger-maps.md), [38-buildings.md](38-buildings.md) (rigid pieces) |
@@ -118,6 +118,33 @@ where every mech has been.
   footprint; feet plant on the ground under them, the invariant holds). A
   fight leaves lanes; the map shows them.
 - Explosions fell trees in their radius, outward.
+
+#### As built (part 2)
+
+- `sim/trees.js pushOutOfTrees`: a sapling a mech walks into folds flat
+  (state 2) the way it's walking, a few leaves flying; a trunk stops a
+  mech under `TREES.push` (60 t: the WARDEN and the PURPLE PUNCHER shove),
+  and one at or over it, on the move, shoves the tree over the way it's
+  going and slows to `TREES.shove` (60%) of its speed.
+- `hurtTree`: punches, shells and beams (dps × dt) add up per tree to
+  `TREES.hp` (8), then it falls away from the hit, credited to whoever hit
+  it; a sapling folds at the first touch. `fellNear`: a missile's blast
+  fells everything within `TREES.blastR` (10 m), outward.
+- Shots find trunks (`geom.js rayHit` gets `tree`, through `rayTrees`:
+  upright cylinders at least `TREES.hitR` across, the 16 m cells the ray
+  crosses); punches find the tree in front (`melee.js meleeTarget`).
+- `sim/pieces.js`: a felled tree is a rigid piece, tipping about its foot
+  (slow, then fast) over `TREES.fall` × √height seconds, then down (state
+  2, its fall direction kept). Landing, the mechs under its length and
+  crown take `TREES.crush` a metre of tree (at most 40), the thunk by its
+  height and how near you are, and dust; `Timber.` when one you felled
+  lands on a foe. At most `TREES.pieces` (4) fall at once; the oldest lands
+  early past that.
+- Drawn: falling trees on their own (`render/scene.js`), tipping about
+  their foot; lying trees in the batches as their own meshes
+  (`<kind>Down`, along their fall), so a fight's lanes stay.
+- Fallen trees have no footprint (feet plant on the ground under them). Foes
+  still slide round standing trunks rather than plan round them.
 
 ### 3. Concealment, and the mist
 

@@ -19,6 +19,28 @@ const C = {
 const part = f => { const b = new Builder(); f(b); return b; };
 const box = (b, x, y, z, w, h, d, col, extra = M.id(), tx = 1, tz = 1) => b.cube(chain(extra, M.T(x, y + h / 2, z), M.S(w, h, d)), col, tx, tz);
 
+// The trees, built through `P` (the identity standing; DOWN lying).
+// A pine: a bare trunk and three stacked cones.
+const PINE = (b, P) => {
+  b.cyl(chain(P, M.T(0, 0.2, 0), M.S(0.2, 0.4, 0.2)), C.bark, 5);
+  for (const [y, h, r] of [[0.3, 0.4, 1], [0.5, 0.35, 0.75], [0.68, 0.32, 0.5]]) b.cyl(chain(P, M.T(0, y + h / 2, 0), M.S(2 * r, h, 2 * r)), C.needle, 6, 0);
+};
+// A broadleaf: a thicker trunk under two lumpy crowns.
+const BROADLEAF = (b, P) => {
+  b.cyl(chain(P, M.T(0, 0.3, 0), M.S(0.2, 0.6, 0.2)), C.bark, 5);
+  b.sphere(chain(P, M.T(0, 0.74, 0), M.S(2, 0.5, 2)), C.leaf, 6, 3);
+  b.sphere(chain(P, M.T(0.3, 0.9, -0.18), M.S(1.1, 0.3, 1.1)), C.leafHi, 5, 3);
+};
+// A sapling: a small bright cone on a stub.
+const SAPLING = (b, P) => {
+  b.cyl(chain(P, M.T(0, 0.06, 0), M.S(0.2, 0.12, 0.2)), C.bark, 4);
+  b.cyl(chain(P, M.T(0, 0.56, 0), M.S(2, 0.88, 2)), C.young, 5, 0);
+};
+// Lying: its crown `k` of its height across (a kind's typical radius over
+// height, as the instance scales both by the height), tipped onto +z and
+// lifted by its crown, which it rests on, as a fallen tree does.
+const DOWN = k => chain(M.T(0, k, 0), M.RX(Math.PI / 2), M.S(k, 1, k));
+
 const BUILD = {
   // Mission 2's radio relay: a hut, a tapering lattice mast with crossbars,
   // a dish and a red tip.
@@ -161,22 +183,14 @@ const BUILD = {
   },
   // The forest's trees (docs/specs/39-forest.md), drawn instanced from the
   // tree field (world/forest.js), not as entities: 1 across the crown's
-  // radius, 1 tall. A pine: a bare trunk and three stacked cones.
-  pine: b => {
-    b.cyl(chain(M.T(0, 0.2, 0), M.S(0.2, 0.4, 0.2)), C.bark, 5);
-    for (const [y, h, r] of [[0.3, 0.4, 1], [0.5, 0.35, 0.75], [0.68, 0.32, 0.5]]) b.cyl(chain(M.T(0, y + h / 2, 0), M.S(2 * r, h, 2 * r)), C.needle, 6, 0);
-  },
-  // A broadleaf: a thicker trunk under two lumpy crowns.
-  broadleaf: b => {
-    b.cyl(chain(M.T(0, 0.3, 0), M.S(0.2, 0.6, 0.2)), C.bark, 5);
-    b.sphere(chain(M.T(0, 0.74, 0), M.S(2, 0.5, 2)), C.leaf, 6, 3);
-    b.sphere(chain(M.T(0.3, 0.9, -0.18), M.S(1.1, 0.3, 1.1)), C.leafHi, 5, 3);
-  },
-  // A sapling: a small bright cone on a stub.
-  sapling: b => {
-    b.cyl(chain(M.T(0, 0.06, 0), M.S(0.2, 0.12, 0.2)), C.bark, 4);
-    b.cyl(chain(M.T(0, 0.56, 0), M.S(2, 0.88, 2)), C.young, 5, 0);
-  },
+  // radius, 1 tall. Each also lying down (`<kind>Down`), along +z, scaled
+  // the same both ways by the tree's height (render/propBatch.js batchTrees).
+  pine: b => PINE(b, M.id()),
+  broadleaf: b => BROADLEAF(b, M.id()),
+  sapling: b => SAPLING(b, M.id()),
+  pineDown: b => PINE(b, DOWN(0.13)),
+  broadleafDown: b => BROADLEAF(b, DOWN(0.25)),
+  saplingDown: b => SAPLING(b, DOWN(0.4)),
   // An ice spire: a tall six-sided shard with two smaller ones leaning off it.
   spire: b => {
     b.cyl(chain(M.T(0, 0.5, 0), M.S(0.7, 1, 0.7)), C.ice, 6, 0);

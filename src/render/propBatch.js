@@ -44,26 +44,28 @@ export function batchEntities(B, entities, eye, far, seen, rest) {
 // (cx, cz), each cell culled whole by `seen`; a standing tree goes in as its
 // crown radius and height, turned and tinted by its own dice.
 export const TREE_CAP = 6000;
-export function makeTreeBatches(kinds) {
-  return Object.fromEntries(kinds.map(k => [k, { key: k, data: new Float32Array(TREE_CAP * PROP_FLOATS), n: 0 }]));
+export function makeTreeBatches(kinds) {   // standing and lying (`<kind>Down`)
+  return Object.fromEntries([...kinds, ...kinds.map(k => `${k}Down`)].map(k => [k, { key: k, data: new Float32Array(TREE_CAP * PROP_FLOATS), n: 0 }]));
 }
 export function batchTrees(B, T, kinds, cx, cz, far, seen, cellsNear, cell) {
   for (const k in B) B[k].n = 0;
   if (!T) return;
-  const [x0, x1, z0, z1] = cellsNear(T, cx, cz, far, NEAR_CELLS), list = kinds.map(k => B[k]), f2 = far * far;
+  const [x0, x1, z0, z1] = cellsNear(T, cx, cz, far, NEAR_CELLS), list = kinds.map(k => B[k]), down = kinds.map(k => B[`${k}Down`]), f2 = far * far;
   for (let j = z0; j <= z1; j++) for (let i = x0; i <= x1; i++) {
     const c = i + T.nx * j, a = T.start[c], b = T.start[c + 1];
     if (a === b) continue;
     if (!seen(T.x[a], T.y[a] + 10, T.z[a], cell + 12)) continue;
     for (let t = a; t < b; t++) {
-      if (T.state[t]) continue;
+      const st = T.state[t];
+      if (st === 1) continue;   // falling: drawn on its own (render/scene.js)
       const dx = T.x[t] - cx, dz = T.z[t] - cz;
       if (dx * dx + dz * dz > f2) continue;
-      const bt = list[T.kind[t]];
+      const bt = st ? down[T.kind[t]] : list[T.kind[t]];
       if (bt.n >= TREE_CAP) continue;
       const d = bt.data, o = bt.n++ * PROP_FLOATS;
-      d[o] = T.x[t]; d[o + 1] = T.y[t]; d[o + 2] = T.z[t]; d[o + 3] = T.yaw[t] * (Math.PI * 2 / 256);
-      d[o + 4] = T.r[t]; d[o + 5] = T.h[t]; d[o + 6] = 0.85 + T.tint[t] * (0.3 / 256); d[o + 7] = 0;
+      d[o] = T.x[t]; d[o + 1] = T.y[t]; d[o + 2] = T.z[t];
+      d[o + 3] = (st ? T.fall[t] : T.yaw[t]) * (Math.PI * 2 / 256);   // down: the way it fell, lying along it
+      d[o + 4] = st ? T.h[t] : T.r[t]; d[o + 5] = T.h[t]; d[o + 6] = 0.85 + T.tint[t] * (0.3 / 256); d[o + 7] = 0;
     }
   }
 }
