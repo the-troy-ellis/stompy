@@ -294,7 +294,7 @@ export function createCommand(app) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const view = { W, H, mpp: mpp(), toScreen: (x, y, z) => groundToScreen(C.cam, { x, y, z }, W, H, VP) };
     const crew = live(), reach = RADAR_RANGE * radarOf(G), things = [];
-    for (const m of crew) things.push({ id: m, kind: 'start', x: m.x, y: m.y, z: m.z, face: -m.yaw / D2R, hollow: underground(G, m), label: `${m === G.command.from ? '▶ ' : ''}${m.ch.name}${m.job ? ` · ${m.job}` : ''}` });
+    for (const m of crew) things.push({ id: m, kind: 'start', x: m.x, y: m.y, z: m.z, face: -m.yaw / D2R, hollow: underground(G, m), label: `${m === G.command.from ? '▶ ' : ''}${m.ch.name}${m.job ? ` · ${m.job}` : ''}${underYours(m)}` });
     for (const e of G.entities) if (e.alive && e.team === 0 && e.kind !== 'nav') things.push({ id: e, kind: 'structure', x: e.x, y: e.y, z: e.z, label: siteLabel(G, e) });
     for (const e of G.entities) if (e.alive && e.team !== 0 && e.kind === 'structure' && PLACE[kindOf(e)]) things.push({ id: e, kind: 'structure', x: e.x, y: e.y, z: e.z, label: `${NAMES.buildings[kindOf(e)]}${isDown(e) ? ' · DOWN' : ''}` });   // a foe's or nobody's building (spec 33 § Stealing)
     for (const t of G.base?.things || []) if (!t.at && !t.by) things.push({ id: t, kind: 'structure', x: t.x, y: G.ter.height(t.x, t.z), z: t.z, label: t.part === 'core' ? 'CORE' : 'PART' });   // loose on the ground: a wreck's core (spec 33)
@@ -331,6 +331,18 @@ export function createCommand(app) {
       if (t.open) seg(ctx, prev, view.toScreen(t.m.x, t.m.y, t.m.z));   // on to where it digs now
     }
     ctx.stroke(); ctx.restore();
+  }
+  // A crew digger whose site is under a building of yours (spec 37 part 3:
+  // your own buildings fall too): ` · UNDER YOUR SILO`, so automation can't
+  // quietly sink the base.
+  function underYours(m) {
+    const st = m.site;
+    if (!st || m.ch.tool !== 'dig') return '';
+    for (const e of G.entities) {
+      if (!e.alive || e.team !== 0 || e.kind !== 'structure' || !PLACE[kindOf(e)] || st.y >= e.y) continue;
+      if (Math.hypot(st.x - e.x, st.z - e.z) < e.radius + CONSTRUCT.bucket) return ` · UNDER YOUR ${NAMES.buildings[kindOf(e)]}`;
+    }
+    return '';
   }
   // The mark (docs/specs/37-tunnelling.md): a white ring and MARK where it is.
   function drawMark(ctx, view) {

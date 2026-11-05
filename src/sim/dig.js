@@ -1,5 +1,6 @@
 import { keepIf } from '../util/math.js';
 import { seamAt, isoAt, oreSpread } from '../world/seams.js';
+import { undermine } from './under.js';
 import { cheat } from './cheats.js';
 import { BIG_DIG } from '../data/debug.js';
 import { DIG, CRUSH, TORQUE, WEAPONS } from '../data/weapons.js';
@@ -102,7 +103,9 @@ export function bite(G, m, p, r = CONSTRUCT.bucket, fl = -Infinity, sl = null) {
   const x = q(p[0], 0.25), y = q(p[1], 0.25), z = q(p[2], 0.25), seed = G.ter.seed;
   let got = 0, seams = 0, iso = 0;
   const tally = { rock: 0, soft: 0, corner: (cx, cy, cz, depth) => { if (isoAt(seed, cx, cy, cz)) iso += CONSTRUCT.isoPerCorner; if (seamAt(seed, cx, cy, cz)) { got += seamOre(depth); seams++; } else got += CONSTRUCT.orePerCorner; } };
+  G.digBy = m;   // for undermining's kill and its voice (sim/under.js)
   confirmDig(G, [0, x, y, z, r], true, 1, tally, fl, sl);
+  G.digBy = null;
   got *= oreHere(G, x, z);
   // Whole ore into the hopper; the fraction rides on to the next bite (a 4 m
   // corner is an eighth of an 8 m one, docs/specs/29-ground-4m.md), so the
@@ -204,6 +207,7 @@ function confirmDig(G, e, seen, rock = DIG.rock, tally = null, fl = -Infinity, s
     }
     C.dirty.clear();
   }
+  undermine(G, x, z, r, G.digBy || null);   // G.digBy: the digger whose bite this is (bite, above)   // a structure that lost what held it falls (sim/under.js, spec 37)
   settle(G, x, z, r);
   for (const f of falls) startFall(G, f, seen);
   if (G.nav) {   // the AI's map looks at the ground here again (ai/nav.js)
@@ -343,8 +347,8 @@ function settle(G, x, z, r) {
   for (const w of G.wrecks) if (hypot(w.x - x, w.z - z) < r + 4 * w.scale) w.y = Math.min(w.y, ter.groundBelow(w.x, w.y + 1, w.z));
   for (const d of G.debris) if (d.landed && hypot(d.p[0] - x, d.p[2] - z) < r + 1) { d.landed = false; d.bounced = true; }   // it drops onto the new ground
   for (const e of G.entities) {
-    if (hypot(e.x - x, e.z - z) > r + e.radius) continue;
-    e.y = Math.min(e.y, ter.groundBelow(e.x, e.y + 1, e.z));   // a mission's own structures settle; the host decides if they break
+    if (e.kind === 'structure' || hypot(e.x - x, e.z - z) > r + e.radius) continue;   // structures: held up or not by their whole footprint (undermine, above)
+    e.y = Math.min(e.y, ter.groundBelow(e.x, e.y + 1, e.z));
   }
   const n = sceneryNear(G, x, z, r + 8, NEAR);
   for (let i = 0; i < n; i++) {

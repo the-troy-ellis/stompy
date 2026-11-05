@@ -98,7 +98,11 @@ export const ORE_LODES = { n: 3, r: 12.5, mult: 3, near: 200, far: 400, find: 60
 //   up       the cockpit's pitch (rad) above which it's digging upward
 //   trail    a tunnel point every this many metres moved underground
 //   points   tunnel points kept in all (the oldest go first)
-export const UNDER = { above: 1, surface: 4, sense: 60, up: 0.15, trail: 6, points: 4000 };
+//   hold     of the five points under a structure's footprint, this many solid hold it up
+//   dropHp   share of its full hp a structure loses when it falls
+//   perM     and this much more for each metre it falls
+//   inset    the footprint's corner points, as a share of its radius
+export const UNDER = { above: 1, surface: 4, sense: 60, up: 0.15, trail: 6, points: 4000, hold: 3, dropHp: 0.4, perM: 0.05, inset: 0.7 };
 export const ENDLESS = { first: 90, every: 120, base: 2, most: 8, mixed: 3, heavy: 6 };
 export const PLACE_ORDER = ['factory', 'bay', 'wall', 'tower', 'silo', 'beacon', 'shop', 'line', 'plant', 'lab', 'armory'];
 // The buildings, as mission entities (sim/entities.js): unit meshes in mesh/props.js.
