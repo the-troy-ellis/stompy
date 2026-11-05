@@ -28,6 +28,7 @@ export const SINGLES = {
   dusk: [['crates', 8], ['bunker', 5], ['tank', 3], ['wall', 4]],
   ice: [['deadTree', 30], ['spire', 14], ['crates', 4]],
   volcanic: [['vent', 12], ['bunker', 5], ['crates', 4]],
+  forest: [['crates', 6], ['bunker', 3]],   // the woods themselves are the trees (world/forest.js)
 };
 const PYLON_LINES = 2;
 

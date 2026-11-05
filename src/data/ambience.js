@@ -20,6 +20,10 @@ export const BEDS = {
     { filter: 'lowpass', freq: 90, q: 1, gain: 0.08, lfo: 0.03, sweep: 30, swell: 0.4 },
     { filter: 'highpass', freq: 3000, q: 0.7, gain: 0.006, lfo: 1.7, sweep: 0, swell: 0.9 },
   ],
+  forest: [   // wind through the canopy far overhead, and the hush under it (spec 39)
+    { filter: 'bandpass', freq: 1400, q: 0.8, gain: 0.025, lfo: 0.09, sweep: 500, swell: 0.6 },
+    { filter: 'lowpass', freq: 160, q: 0.7, gain: 0.03, lfo: 0.05, sweep: 40, swell: 0.3 },
+  ],
 };
 export const WEATHER_LAYERS = {
   clear: [],
@@ -35,6 +39,7 @@ export const WEATHER_LAYERS = {
     { filter: 'bandpass', freq: 2500, q: 0.5, gain: 0.04, lfo: 0.23, sweep: 800, swell: 0.4 },
   ],
   fog: [],   // the muffled bed: no layer of its own
+  mist: [],   // the forest's fog: muffled too
 };
-export const MUFFLE = { fog: 500 };   // Hz: the lowpass over the bed in this weather
+export const MUFFLE = { fog: 500, mist: 700 };   // Hz: the lowpass over the bed in this weather
 export const AMBIENCE_FADE = 1.5;   // s: how long a bed or layer takes to come in or go

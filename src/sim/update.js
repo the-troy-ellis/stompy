@@ -3,6 +3,7 @@ import { swap } from './crew.js';
 import { stepBase } from './base.js';
 import { stepSalvage } from './raid.js';
 import { stepTunnels } from './under.js';
+import { pushOutOfTrees } from './trees.js';
 import { blendPal } from '../data/palettes.js';
 import { tickWeather } from './weather.js';
 import { add, clampN, dirOf, dot, len, mul, norm, sub, keepIf } from '../util/math.js';
@@ -186,6 +187,7 @@ function frame(G, input, dt) {
   if (G.role !== 'guest') { stepTurrets(G, dt); stepTowers(G, dt); if (!G.bench) tickObjectives(G); }   // towers: the base's guns (sim/towers.js)   // the bench has nothing to win
   if (G.role !== 'solo') tickCoopRespawn(G);   // co-op: down is not out (sim/coopRules.js)
   pushOutOfEntities(G, m => geoOf(m).radius * m.ch.scale);
+  pushOutOfTrees(G, m => geoOf(m).radius * m.ch.scale);   // a forest's trunks (sim/trees.js)
 
   stepBursts(G, dt);
   stepShots(G, dt);

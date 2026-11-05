@@ -24,7 +24,9 @@ import { spectateCamera } from '../net/spectate.js';
 import { WRECK_BURN } from '../sim/combat.js';
 import { SCORCH_MAX } from '../sim/effects.js';
 import { propInto } from '../mesh/props.js';
-import { batchEntities, clearProps, makePropBatches } from './propBatch.js';
+import { batchEntities, clearProps, makePropBatches, makeTreeBatches, batchTrees } from './propBatch.js';
+import { TREES, TREE_KINDS } from '../data/forest.js';
+import { cellsNear } from '../world/forest.js';
 import { WEAPONS } from '../data/weapons.js';
 import { PARTS } from '../data/construct.js';
 import { CHASSIS } from '../data/chassis.js';
@@ -513,7 +515,7 @@ export function createScene(app) {
   // World entities: structures and vehicles (a nav point has no body). Props
   // go into one instanced draw per mesh (render/propBatch.js); a toppled one,
   // and anything without a prop mesh, is drawn here on its own.
-  const PROPS = makePropBatches(), ONE = {};
+  const PROPS = makePropBatches(), TREE_B = makeTreeBatches(TREE_KINDS), ONE = {};
   // A construction site's hazard tape round its footprint, with a post at each
   // corner (docs/specs/23-construction-sites.md); a wall's slabs share one, drawn once.
   const TAPE = [0.95, 0.75, 0.1], POST = [0.12, 0.12, 0.13];
@@ -545,11 +547,18 @@ export function createScene(app) {
       R.draw(R.meshes.cube, chain(base, M.RY(e.yaw), M.T(0, h / 2, 0), M.S(w, h, w)), col);
     }
   }
-  function drawEntities(eye) {
+  function drawEntities(eye, top) {
     clearProps(PROPS);
     batchEntities(PROPS, G.entities, eye, FOG[1] + 60, seen, drawEntity);   // past the fog: skipped
     batchEntities(PROPS, G.scenery, eye, FOG[1] + 60, seen, drawEntity);
     R.drawProps(PROPS, R.meshes.props);
+    // The forest (docs/specs/39-forest.md): its trees by kind, out to the
+    // fog's end; from above, round where the map looks, out to TREES.draw.
+    if (G.trees) {
+      const at = top ? top.at : eye;
+      batchTrees(TREE_B, G.trees, TREE_KINDS, at[0], at[2], top ? TREES.draw : FOG[1] + 10, seen, cellsNear, TREES.cell);
+      R.drawProps(TREE_B, R.meshes.props, top ? null : TREES.fade);   // in the cockpit, what's close dithers away (render/gl.js)
+    }
     for (const s of G.base?.sites || []) { const e = s.parts.find(p => p.alive); if (e?.foot) drawSite(e); }
   }
   function drawShotsAndBeams(eye, gd) {
@@ -774,7 +783,7 @@ export function createScene(app) {
     drawRemains();
     drawThings();
     drawLanding();
-    drawEntities(eye);
+    drawEntities(eye, top);
     drawShotsAndBeams(eye, gd);
     // Effects: one instanced draw per shape (spec 14 P1), each particle a
     // shape by its kind (mesh/effects.js), the dithering ones last; per-particle

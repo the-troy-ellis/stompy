@@ -1,6 +1,7 @@
 import { keepIf } from '../util/math.js';
 import { seamAt, isoAt, oreSpread } from '../world/seams.js';
 import { undermine, heard } from './under.js';
+import { settleTrees } from './trees.js';
 import { cheat } from './cheats.js';
 import { BIG_DIG } from '../data/debug.js';
 import { DIG, CRUSH, TORQUE, WEAPONS } from '../data/weapons.js';
@@ -351,6 +352,7 @@ function settle(G, x, z, r) {
     if (e.kind === 'structure' || hypot(e.x - x, e.z - z) > r + e.radius) continue;   // structures: held up or not by their whole footprint (undermine, above)
     e.y = Math.min(e.y, ter.groundBelow(e.x, e.y + 1, e.z));
   }
+  settleTrees(G, x, z, r + 6);   // a forest's trees ride the ground down (sim/trees.js)
   const n = sceneryNear(G, x, z, r + 8, NEAR);
   for (let i = 0; i < n; i++) {
     const e = NEAR[i];

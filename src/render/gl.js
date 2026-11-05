@@ -318,7 +318,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
   // with render/propBatch.js's layout. Lit, fogged, headlit and IR-shaded by
   // the main fragment shader, exactly as R.draw would with T·RY·S. Where the
   // extension is missing, each instance is an R.draw.
-  const propProg = ext && compile(`
+  const PROP_VS = `
     attribute vec3 aPos, aNrm, aCol; attribute vec4 iAt, iSz;
     uniform mat4 uVP; uniform vec3 uLight, uCam, uShade; uniform vec2 uFog;
     varying vec3 vCol, vWorld, vNrm, vBase; varying float vFog;
@@ -333,15 +333,33 @@ export function createRenderer(cv, { antialias = true } = {}) {
       vCol = mix(base * (0.36 + 0.78 * d) * uShade, base, iSz.w);
       vWorld = wp; vNrm = n; vBase = base * (1.0 - iSz.w);
       vFog = clamp((length(wp - uCam) - uFog.x) / (uFog.y - uFog.x), 0.0, 1.0);
-    }`, MAIN_FS);
+    }`;
+  const propProg = ext && compile(PROP_VS, MAIN_FS);
+  // The forest's trees (docs/specs/39-forest.md): the same, but what's close
+  // to the cockpit dithers away (the ordered 4x4 threshold the smoke uses, no
+  // blending): whole past uNear.x metres from the eye, gone inside uNear.y,
+  // so a mech brushing past a pine sees through its boughs.
+  const treeProg = ext && compile(PROP_VS, MAIN_FS.replace('void main() {', `uniform vec3 uEyeF; uniform vec2 uNear;
+    float tb2(vec2 a) { return mod(2.0 * a.x + 3.0 * a.y, 4.0); }
+    float tb4(vec2 p) { vec2 q = mod(floor(p), 4.0); return (4.0 * tb2(mod(q, 2.0)) + tb2(floor(q / 2.0)) + 0.5) / 16.0; }
+    void main() {
+      float near = clamp((uNear.x - length(vWorld - uEyeF)) / (uNear.x - uNear.y), 0.0, 1.0);
+      if (near >= tb4(gl_FragCoord.xy)) discard;`));
   let PP = null;
+  const progLocs = pr => {
+    const L4 = n => gl.getUniformLocation(pr, n), A4 = n => gl.getAttribLocation(pr, n);
+    const o = { prog: pr, U: { VP: L4('uVP'), light: L4('uLight'), shade: L4('uShade'), cam: L4('uCam'), fog: L4('uFog'), fogCol: L4('uFogCol'), ir: L4('uIR'), heat: L4('uHeat'), eye: L4('uEyeF'), near: L4('uNear'), ...spotLocs(L4) },
+      A: [A4('aPos'), A4('aNrm'), A4('aCol')], I: [A4('iAt'), A4('iSz')] };
+    o.all = [...o.A, ...o.I];
+    return o;
+  };
+  let PT = null;
   if (propProg) {
-    const L4 = n => gl.getUniformLocation(propProg, n), A4 = n => gl.getAttribLocation(propProg, n);
-    PP = { U: { VP: L4('uVP'), light: L4('uLight'), shade: L4('uShade'), cam: L4('uCam'), fog: L4('uFog'), fogCol: L4('uFogCol'), ir: L4('uIR'), heat: L4('uHeat'), ...spotLocs(L4) },
-      A: [A4('aPos'), A4('aNrm'), A4('aCol')], I: [A4('iAt'), A4('iSz')], buf: gl.createBuffer() };
-    PP.all = [...PP.A, ...PP.I];
+    PP = { ...progLocs(propProg), buf: gl.createBuffer() };
+    if (treeProg) PT = progLocs(treeProg);
     gl.bindBuffer(gl.ARRAY_BUFFER, PP.buf);
     gl.bufferData(gl.ARRAY_BUFFER, PROP_CAP * PROP_FLOATS * 4, gl.DYNAMIC_DRAW);
+    PP.cap = PROP_CAP;
   }
   const ONE_M = new Float32Array(16), ONE_T = [1, 1, 1];
   ONE_M[15] = 1;
@@ -357,16 +375,18 @@ export function createRenderer(cv, { antialias = true } = {}) {
       }
     }
   };
-  const drawProps = (B, meshes) => {
+  // `near` (trees only): [whole past, gone inside] metres from the eye.
+  const drawProps = (B, meshes, near = null) => {
     let any = false;
     for (const k in B) if (B[k].n) { any = true; break; }
     if (!any) return;
     if (!PP) { drawPropsOneByOne(B, meshes); return; }
-    const f = R.frame, U4 = PP.U, [iAt, iSz] = PP.I;
+    const L = near && PT ? PT : PP, f = R.frame, U4 = L.U, [iAt, iSz] = L.I;
     for (const a of [A.pos, A.nrm, A.col]) gl.disableVertexAttribArray(a);
-    gl.useProgram(propProg);
-    for (const a of PP.all) gl.enableVertexAttribArray(a);
-    for (const a of PP.I) ext.vertexAttribDivisorANGLE(a, 1);
+    gl.useProgram(L.prog);
+    for (const a of L.all) gl.enableVertexAttribArray(a);
+    for (const a of L.I) ext.vertexAttribDivisorANGLE(a, 1);
+    if (L === PT) { gl.uniform3fv(U4.eye, f.cam); gl.uniform2f(U4.near, near[0], near[1]); }
     gl.uniformMatrix4fv(U4.VP, false, f.VP); gl.uniform3fv(U4.light, f.light); gl.uniform3fv(U4.cam, f.cam); gl.uniform3fv(U4.shade, f.shade);
     gl.uniform2f(U4.fog, f.fog[0], f.fog[1]); gl.uniform3fv(U4.fogCol, f.fogCol); gl.uniform1f(U4.ir, f.ir); gl.uniform1f(U4.heat, R.drawHeat);
     setSpot(U4, f.spot);
@@ -374,18 +394,19 @@ export function createRenderer(cv, { antialias = true } = {}) {
       const b = B[k], mesh = meshes[k];
       if (!b.n) continue;
       gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
-      gl.vertexAttribPointer(PP.A[0], 3, gl.FLOAT, false, 36, 0);
-      gl.vertexAttribPointer(PP.A[1], 3, gl.FLOAT, false, 36, 12);
-      gl.vertexAttribPointer(PP.A[2], 3, gl.FLOAT, false, 36, 24);
+      gl.vertexAttribPointer(L.A[0], 3, gl.FLOAT, false, 36, 0);
+      gl.vertexAttribPointer(L.A[1], 3, gl.FLOAT, false, 36, 12);
+      gl.vertexAttribPointer(L.A[2], 3, gl.FLOAT, false, 36, 24);
       gl.bindBuffer(gl.ARRAY_BUFFER, PP.buf);
+      if (b.n > PP.cap) { PP.cap = b.data.length / PROP_FLOATS; gl.bufferData(gl.ARRAY_BUFFER, PP.cap * PROP_FLOATS * 4, gl.DYNAMIC_DRAW); }   // the forest's batches are bigger than the props' (render/propBatch.js TREE_CAP): grown once, to the biggest
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, b.data.subarray(0, b.n * PROP_FLOATS));
       gl.vertexAttribPointer(iAt, 4, gl.FLOAT, false, PROP_FLOATS * 4, 0);
       gl.vertexAttribPointer(iSz, 4, gl.FLOAT, false, PROP_FLOATS * 4, 16);
       ext.drawArraysInstancedANGLE(gl.TRIANGLES, 0, mesh.count, b.n);
       R.draws++;
     }
-    for (const a of PP.I) ext.vertexAttribDivisorANGLE(a, 0);
-    for (const a of PP.all) gl.disableVertexAttribArray(a);
+    for (const a of L.I) ext.vertexAttribDivisorANGLE(a, 0);
+    for (const a of L.all) gl.disableVertexAttribArray(a);
     gl.useProgram(prog);
     for (const a of [A.pos, A.nrm, A.col]) gl.enableVertexAttribArray(a);
     R.curMesh = null;
