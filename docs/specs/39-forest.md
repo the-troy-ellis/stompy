@@ -92,9 +92,15 @@ where every mech has been.
 - The map's canopy: Free Play has no map view (no crew); a forest mission
   with a crew sees the trees in 3D round the focus. A drawn canopy waits for
   a forest mission.
-- Known: walking right up to a pine, its lowest boughs can brush the
-  cockpit (a mech stops 3 m from the trunk; the lowest cone reaches about
-  3.3 m at eye height). Part 2 looks at it with the shoving.
+- **What's close dithers away** (the owner, 2026-11-05: add it to part 1):
+  in the cockpit, any tree within `TREES.fade` (12 m, gone inside 6 m) of
+  the eye dithers out by the same ordered 4×4 threshold the smoke uses (no
+  blending), so the boughs a mech brushes past (it stops 3 m from a trunk;
+  a pine's lowest cone reaches about 3.3 m at eye height) don't fill the
+  view. Only near the cockpit: dithering all the foliage would crawl as you
+  move, cost the phone its early depth test across layers of crowns, and
+  undercut the woods hiding things (part 3). A second build of the props'
+  program (`render/gl.js treeProg`); props keep theirs.
 
 ### 2. Crushing and toppling
 

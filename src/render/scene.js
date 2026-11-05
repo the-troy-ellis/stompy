@@ -557,7 +557,7 @@ export function createScene(app) {
     if (G.trees) {
       const at = top ? top.at : eye;
       batchTrees(TREE_B, G.trees, TREE_KINDS, at[0], at[2], top ? TREES.draw : FOG[1] + 10, seen, cellsNear, TREES.cell);
-      R.drawProps(TREE_B, R.meshes.props);
+      R.drawProps(TREE_B, R.meshes.props, top ? null : TREES.fade);   // in the cockpit, what's close dithers away (render/gl.js)
     }
     for (const s of G.base?.sites || []) { const e = s.parts.find(p => p.alive); if (e?.foot) drawSite(e); }
   }
