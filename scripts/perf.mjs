@@ -144,8 +144,8 @@ export const BUDGETS = {
   'map-sweep':    { meanDraws: 7, peakDraws: 29, tris: 78500, allocKB: 90, gpuMB: 24, heapMB: 50 },   // the map view carried over the whole map (spec 34): with #392 undone it holds 27.5 MB on the GPU (and, before spec 35 part 2, 123 MB of heap)
   'big-map':      { meanDraws: 11, peakDraws: 20, tris: 105000, allocKB: 85, gpuMB: 9, heapMB: 34 },   // the 3 km test canyon walked end to end (spec 35 part 5): 7.5 MB on the GPU, against ~21 MB on today's map
   'big-map-view': { meanDraws: 7, peakDraws: 9, tris: 64500, allocKB: 60, gpuMB: 26, heapMB: 50 },   // and swept from above, zoomed out along it: every far square, ~22 MB
-  'forest':       { meanDraws: 11, peakDraws: 16, tris: 80000, allocKB: 70, gpuMB: 27, heapMB: 56 },   // the forest (spec 39 part 1) walked through: ~51,000 trees, one draw a kind, out to the mist (68k triangles, 9 draws)
-  'forest-view':  { meanDraws: 14, peakDraws: 14, tris: 65000, allocKB: 60, gpuMB: 28, heapMB: 56 },   // and swept from above, trees out to TREES.draw round the focus (56k triangles)
+  'forest':       { meanDraws: 19, peakDraws: 40, tris: 80000, allocKB: 85, gpuMB: 27, heapMB: 56 },   // the forest (spec 39) walked through: ~51,000 trees, one draw a kind standing and one lying, out to the mist (68k triangles); felling ahead every 20 frames (part 2), each falling tree a draw of its own and its dust (16 draws, peak 34)
+  'forest-view':  { meanDraws: 16, peakDraws: 20, tris: 65000, allocKB: 60, gpuMB: 28, heapMB: 56 },   // and swept from above, trees out to TREES.draw round the focus
 };
 // PERF_BUDGET_SCALE=0.5 npm run perf scales every budget (e.g. to see it fail).
 const SCALE = Number(process.env.PERF_BUDGET_SCALE) || 1;
