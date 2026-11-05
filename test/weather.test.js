@@ -13,8 +13,8 @@ import { missionDef, fpWeather } from '../src/data/missions.js';
 const game = (weather, pal = 'ice') => { const G = createGame({ fx: recordFx(), seed: 1 }); startMatch(G, { name: 'W', pal, foes: [], intel: '', weather }, 9, false, 'kestrel', { terrainOpts: { flat: true } }); return G; };
 
 test('the spec 07 table: fog and radar factors per kind; clear changes nothing', () => {
-  assert.deepEqual(WEATHER_KINDS, ['clear', 'rain', 'snow', 'dust', 'fog']);
-  const want = { clear: [1, 1], rain: [0.7, 0.9], snow: [0.5, 0.8], dust: [0.35, 0.5], fog: [0.3, 0.6] };
+  assert.deepEqual(WEATHER_KINDS, ['clear', 'rain', 'snow', 'dust', 'fog', 'mist']);
+  const want = { clear: [1, 1], rain: [0.7, 0.9], snow: [0.5, 0.8], dust: [0.35, 0.5], fog: [0.3, 0.6], mist: [0.6, 0.8] };   // mist: the forest's (spec 39)
   for (const [k, [f, r]] of Object.entries(want)) {
     const G = game(k), base = palAt('ice').fog, fog = fogOf(G);
     assert.ok(Math.abs(fog[0] - base[0] * f) < 1e-9 && Math.abs(fog[1] - base[1] * f) < 1e-9, `${k} fog`);

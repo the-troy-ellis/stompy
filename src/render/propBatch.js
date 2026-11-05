@@ -38,3 +38,33 @@ export function batchEntities(B, entities, eye, far, seen, rest) {
     if (prop.glow) add(B[prop.glow], e.x, e.y, e.z, e.yaw, e.radius, prop.sy, prop.tint, 1);
   }
 }
+
+// The forest's trees (docs/specs/39-forest.md), batched the same way: one
+// instanced draw per kind. Trees come from the field's cells within `far` of
+// (cx, cz), each cell culled whole by `seen`; a standing tree goes in as its
+// crown radius and height, turned and tinted by its own dice.
+export const TREE_CAP = 6000;
+export function makeTreeBatches(kinds) {
+  return Object.fromEntries(kinds.map(k => [k, { key: k, data: new Float32Array(TREE_CAP * PROP_FLOATS), n: 0 }]));
+}
+export function batchTrees(B, T, kinds, cx, cz, far, seen, cellsNear, cell) {
+  for (const k in B) B[k].n = 0;
+  if (!T) return;
+  const [x0, x1, z0, z1] = cellsNear(T, cx, cz, far, NEAR_CELLS), list = kinds.map(k => B[k]), f2 = far * far;
+  for (let j = z0; j <= z1; j++) for (let i = x0; i <= x1; i++) {
+    const c = i + T.nx * j, a = T.start[c], b = T.start[c + 1];
+    if (a === b) continue;
+    if (!seen(T.x[a], T.y[a] + 10, T.z[a], cell + 12)) continue;
+    for (let t = a; t < b; t++) {
+      if (T.state[t]) continue;
+      const dx = T.x[t] - cx, dz = T.z[t] - cz;
+      if (dx * dx + dz * dz > f2) continue;
+      const bt = list[T.kind[t]];
+      if (bt.n >= TREE_CAP) continue;
+      const d = bt.data, o = bt.n++ * PROP_FLOATS;
+      d[o] = T.x[t]; d[o + 1] = T.y[t]; d[o + 2] = T.z[t]; d[o + 3] = T.yaw[t] * (Math.PI * 2 / 256);
+      d[o + 4] = T.r[t]; d[o + 5] = T.h[t]; d[o + 6] = 0.85 + T.tint[t] * (0.3 / 256); d[o + 7] = 0;
+    }
+  }
+}
+const NEAR_CELLS = [0, 0, 0, 0];

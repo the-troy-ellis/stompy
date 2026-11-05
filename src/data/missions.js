@@ -231,10 +231,10 @@ export function contractDef(n) {
   return def;
 }
 // Free play: a one-off battle on the chosen map with the chosen number of hostiles.
-export const FP_MAPS = ['random', 'dusk', 'ice', 'volcanic', 'base', 'canyon', 'endless'];   // base: BASE_MISSION, not a skirmish; canyon: data/maps.js CANYON, 3 km long (last: a saved pick is an index)
+export const FP_MAPS = ['random', 'dusk', 'ice', 'volcanic', 'base', 'canyon', 'endless', 'forest'];   // forest: docs/specs/39-forest.md   // base: BASE_MISSION, not a skirmish; canyon: data/maps.js CANYON, 3 km long (last: a saved pick is an index)
 // Free Play's WEATHER (RANDOM rolls one that suits the map, clear half the time)
 // and TIME (NORMAL is the map's own light).
-export const FP_WEATHER = ['clear', 'random', 'rain', 'snow', 'dust', 'fog'];
+export const FP_WEATHER = ['clear', 'random', 'rain', 'snow', 'dust', 'fog', 'mist'];
 export const FP_TIMES = ['day', 'dawn', 'night'];
 export function fpWeather(pick, biome, rand) {
   if (pick !== 'random') return pick;

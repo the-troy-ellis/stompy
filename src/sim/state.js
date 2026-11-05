@@ -15,6 +15,7 @@ import { initBase } from './base.js';
 import { initFeel } from './feel.js';
 import { flatZones, initObjectives } from './objectives.js';
 import { placeScenery } from './entities.js';
+import { initTrees } from './trees.js';
 import { polar } from './placement.js';
 import { PROFILES } from './ai/profiles.js';
 import { applyLoadout, stockLoadout } from './loadout.js';
@@ -114,5 +115,6 @@ export function startMatch(G, def, seed, gentle, chassis, { partsKey, terrainOpt
   initBase(G, def);   // the silo, if the mission has a base (sim/base.js, spec 20); first, so a `keep` finds it
   initObjectives(G, def);
   placeScenery(G, def, st);
+  initTrees(G, def, st);   // a forest's trees (sim/trees.js, docs/specs/39-forest.md)
   G.state = 'play'; G.paused = false;
 }

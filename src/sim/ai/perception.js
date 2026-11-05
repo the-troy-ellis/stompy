@@ -22,12 +22,15 @@ const { hypot } = Math;
 
 // How far it can see the player: its difficulty's sight by day; at night 250
 // m, or 600 m if the player's lights are on, never more than by day; and
-// weather cuts it as it cuts the radar (data/weather.js).
+// weather cuts it as it cuts the radar (data/weather.js). Never much past the
+// palette's own fog (the forest's, spec 39, ends at 140 m; every other
+// biome's ends past the sight, so nothing changes there).
+const PAST_FOG = 1.1;   // a shape a little way into the grey can still be made out
 export function sightOf(G, P) {
-  const day = diffOf(G).sight, dark = darkness(G.pal), wx = radarOf(G);
-  if (!dark) return day * wx;
+  const day = diffOf(G).sight, dark = darkness(G.pal), wx = radarOf(G), fog = G.pal?.fog ? G.pal.fog[1] * PAST_FOG : Infinity;
+  if (!dark) return Math.min(day * wx, fog);
   const night = Math.min(day, P.lights && !P.shutdown ? NIGHT_SIGHT.lit : NIGHT_SIGHT.dark);
-  return (day + (night - day) * dark) * wx;
+  return Math.min((day + (night - day) * dark) * wx, fog);
 }
 export function canSee(G, e, P) {
   if (!P.alive) return false;

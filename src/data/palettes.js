@@ -20,6 +20,12 @@ export const PALS = {
     high: [0.5, 0.34, 0.25], rock: [0.13, 0.1, 0.1], ore: [0.35, 0.72, 0.25], iso: [0.3, 0.9, 0.98], fog: [140, 1000], light: norm([0.3, 0.6, 0.6]),
     night: { zen: [0.02, 0.0, 0.01], hor: [0.3, 0.08, 0.03], fog: [100, 700], light: norm([-0.3, 0.75, 0.5]), shade: [0.5, 0.36, 0.34] },
     dawn: { zen: [0.16, 0.08, 0.12], hor: [0.82, 0.42, 0.22], fog: [130, 900], light: norm([0.85, 0.35, 0.1]), shade: [0.92, 0.8, 0.76] } },
+  // The forest (docs/specs/39-forest.md): moss, bark and needles under a grey-green
+  // mist that closes in at 140 m, so every fight in it is close.
+  forest: { name: 'Forest', zen: [0.32, 0.38, 0.4], hor: [0.58, 0.64, 0.6], low: [0.2, 0.27, 0.15], mid: [0.28, 0.36, 0.2],
+    high: [0.42, 0.48, 0.36], rock: [0.3, 0.3, 0.28], ore: [0.85, 0.62, 0.22], iso: [0.4, 0.92, 0.98], fog: [30, 140], light: norm([0.35, 0.8, -0.4]),
+    night: { zen: [0.02, 0.03, 0.04], hor: [0.1, 0.13, 0.12], fog: [20, 95], light: norm([-0.3, 0.8, 0.45]), shade: [0.32, 0.38, 0.46] },
+    dawn: { zen: [0.24, 0.28, 0.36], hor: [0.8, 0.74, 0.62], fog: [30, 125], light: norm([0.85, 0.3, 0.2]), shade: [0.94, 0.88, 0.84] } },
 };
 export const TIMES = ['day', 'dusk', 'night', 'dawn'];
 const NO_SHADE = [1, 1, 1];

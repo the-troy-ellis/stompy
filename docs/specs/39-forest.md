@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | draft (the owner, 2026-11-05: "Also what about a forest biome?"; "I think thick woods becomes more interesting. Especially if fog is involved. Very close range") |
+| Status | in progress: part 1 built (the tree field). Approved (the owner merged it, then "start the forest", 2026-11-05); first asked for 2026-11-05: "Also what about a forest biome?"; "I think thick woods becomes more interesting. Especially if fog is involved. Very close range" |
 | Milestone | M16 (proposed, with or before spec 38's city) |
 | Size | L, in five parts (the tree field; crushing and toppling; concealment and the mist; fighting up close; the arena) |
 | Depends on | [07-atmosphere.md](07-atmosphere.md) (fog, weather, props), [13-thunk.md](13-thunk.md), [14-look-and-performance.md](14-look-and-performance.md), [35-bigger-maps.md](35-bigger-maps.md), [38-buildings.md](38-buildings.md) (rigid pieces) |
@@ -62,6 +62,39 @@ where every mech has been.
   instanced (per-tree position, yaw, size, state), only out to the fog's
   end: in mist that's ~120 m, so few squares are drawn at once.
 - **The map** draws the woods as a dark canopy, clearings and paths open.
+
+#### As built (part 1)
+
+- `world/forest.js plantTrees`: a jittered grid (2 × 2 to a 16 m cell, so
+  about 8 m apart), kinds by share (`data/forest.js TREES.kinds`), cut into
+  clearings by a noise field (`TREES.clear`), three straight old roads, no
+  tree on slopes over `TREES.slope` or in `avoid`. About 51,000 trees on
+  today's map; typed arrays sorted by cell.
+- Sizes, after seeing them from the cockpit: pines 18–28 m and broadleaves
+  16–22 m tall, crowns over the cockpit (a mech's eye is about 8 m up), so
+  the woods are trunks at eye level and canopy above; saplings 3–5 m.
+- `sim/trees.js`: `initTrees` (forest biome only; clear of the start 45 m,
+  the zones, the structures and every mech's footing), `pushOutOfTrees`
+  (trunks stop mechs; saplings don't), `settleTrees` (trees ride dug ground
+  down). Crushing, shoving and felling are part 2.
+- Drawn through the props' instanced program (`render/propBatch.js
+  batchTrees`, one draw per kind), cells culled whole; in the cockpit out to
+  the fog's end, from above round the map view's focus out to `TREES.draw`
+  (250 m). Its buffer grows once to the biggest batch.
+- The forest palette (moss, bark, needles; fog 30–140 m by day, 20–95 at
+  night), the `mist` weather (fog ×0.6, radar ×0.8, a muffled bed), the
+  forest's ambient bed (wind in the canopy over a low hush), and FOREST at
+  the end of Free Play's MAP (so saved picks keep their place).
+- **Foes can't see much past the fog** (`ai/perception.js sightOf`): never
+  past 1.1 × the palette's own fog end. Only the forest's fog is shorter
+  than foes' sight, so nothing changes elsewhere (fog weather still cuts
+  sight by its radar factor, as before).
+- The map's canopy: Free Play has no map view (no crew); a forest mission
+  with a crew sees the trees in 3D round the focus. A drawn canopy waits for
+  a forest mission.
+- Known: walking right up to a pine, its lowest boughs can brush the
+  cockpit (a mech stops 3 m from the trunk; the lowest cone reaches about
+  3.3 m at eye height). Part 2 looks at it with the shoving.
 
 ### 2. Crushing and toppling
 

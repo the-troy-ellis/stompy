@@ -342,6 +342,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
     PP.all = [...PP.A, ...PP.I];
     gl.bindBuffer(gl.ARRAY_BUFFER, PP.buf);
     gl.bufferData(gl.ARRAY_BUFFER, PROP_CAP * PROP_FLOATS * 4, gl.DYNAMIC_DRAW);
+    PP.cap = PROP_CAP;
   }
   const ONE_M = new Float32Array(16), ONE_T = [1, 1, 1];
   ONE_M[15] = 1;
@@ -378,6 +379,7 @@ export function createRenderer(cv, { antialias = true } = {}) {
       gl.vertexAttribPointer(PP.A[1], 3, gl.FLOAT, false, 36, 12);
       gl.vertexAttribPointer(PP.A[2], 3, gl.FLOAT, false, 36, 24);
       gl.bindBuffer(gl.ARRAY_BUFFER, PP.buf);
+      if (b.n > PP.cap) { PP.cap = b.data.length / PROP_FLOATS; gl.bufferData(gl.ARRAY_BUFFER, PP.cap * PROP_FLOATS * 4, gl.DYNAMIC_DRAW); }   // the forest's batches are bigger than the props' (render/propBatch.js TREE_CAP): grown once, to the biggest
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, b.data.subarray(0, b.n * PROP_FLOATS));
       gl.vertexAttribPointer(iAt, 4, gl.FLOAT, false, PROP_FLOATS * 4, 0);
       gl.vertexAttribPointer(iSz, 4, gl.FLOAT, false, PROP_FLOATS * 4, 16);

@@ -14,6 +14,7 @@ const C = {
   char: [0.2, 0.19, 0.18], ash: [0.32, 0.3, 0.28], tank: [0.78, 0.76, 0.7], pad: [0.3, 0.31, 0.32],
   concrete: [0.56, 0.55, 0.51], bark: [0.36, 0.31, 0.27], rock: [0.25, 0.21, 0.2], lava: [1, 0.42, 0.08],
   ice: [0.74, 0.86, 0.94], iceDeep: [0.48, 0.66, 0.8],
+  needle: [0.14, 0.27, 0.16], leaf: [0.24, 0.4, 0.18], leafHi: [0.31, 0.47, 0.21], young: [0.33, 0.49, 0.22],
 };
 const part = f => { const b = new Builder(); f(b); return b; };
 const box = (b, x, y, z, w, h, d, col, extra = M.id(), tx = 1, tz = 1) => b.cube(chain(extra, M.T(x, y + h / 2, z), M.S(w, h, d)), col, tx, tz);
@@ -157,6 +158,24 @@ const BUILD = {
       const r = (0.42 + (0.69 - y) * 0.83) * 0.924, s = Math.sin(a), c = Math.cos(a);   // on the face, not the corner
       return [s * (r + 0.01) + c * x, y, c * (r + 0.01) - s * x];
     }), C.lava, [0, 0.4, 0]);
+  },
+  // The forest's trees (docs/specs/39-forest.md), drawn instanced from the
+  // tree field (world/forest.js), not as entities: 1 across the crown's
+  // radius, 1 tall. A pine: a bare trunk and three stacked cones.
+  pine: b => {
+    b.cyl(chain(M.T(0, 0.2, 0), M.S(0.2, 0.4, 0.2)), C.bark, 5);
+    for (const [y, h, r] of [[0.3, 0.4, 1], [0.5, 0.35, 0.75], [0.68, 0.32, 0.5]]) b.cyl(chain(M.T(0, y + h / 2, 0), M.S(2 * r, h, 2 * r)), C.needle, 6, 0);
+  },
+  // A broadleaf: a thicker trunk under two lumpy crowns.
+  broadleaf: b => {
+    b.cyl(chain(M.T(0, 0.3, 0), M.S(0.2, 0.6, 0.2)), C.bark, 5);
+    b.sphere(chain(M.T(0, 0.74, 0), M.S(2, 0.5, 2)), C.leaf, 6, 3);
+    b.sphere(chain(M.T(0.3, 0.9, -0.18), M.S(1.1, 0.3, 1.1)), C.leafHi, 5, 3);
+  },
+  // A sapling: a small bright cone on a stub.
+  sapling: b => {
+    b.cyl(chain(M.T(0, 0.06, 0), M.S(0.2, 0.12, 0.2)), C.bark, 4);
+    b.cyl(chain(M.T(0, 0.56, 0), M.S(2, 0.88, 2)), C.young, 5, 0);
   },
   // An ice spire: a tall six-sided shard with two smaller ones leaning off it.
   spire: b => {
