@@ -415,6 +415,15 @@ through the outposts' blocks today. Spec:
 building records and concrete; rigid falls; the city; streets for the AI
 and props that break; the arena in cities and the editor's building brush.
 
+Then, or before the city's rigid falls, the forest
+([specs/39-forest.md](specs/39-forest.md)): thick woods in mist where the
+fight is close. Trees are a field (a few bytes each, drawn by kind), saplings
+fold underfoot, heavy mechs shove through, punched or shot trees fall as one
+piece and crush what they land on (the rigid pieces spec 38 needs, built on
+the simplest shape first), and woods hide you from sight by how much of them
+is in between. In five parts: the tree field; crushing and toppling;
+concealment and the mist; fighting up close; the arena.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
