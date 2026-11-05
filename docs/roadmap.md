@@ -404,6 +404,17 @@ In four parts: navigation; tunnels on the map; undermining; being heard.
 
 - **Built:** all four parts of spec 37 (#416–#418, and being heard).
 
+## M16 — Buildings, and the city (proposed)
+
+Goal: buildings that are stored as voxels but behave like buildings: they
+know what they are, they're concrete, they have storeys, and cut loose
+they tip and fall as one piece. An urban biome of streets and blocks with
+some towers; the outposts become small towns, which fixes mechs walking
+through the outposts' blocks today. Spec:
+[specs/38-buildings.md](specs/38-buildings.md). In six parts: measure;
+building records and concrete; rigid falls; the city; streets for the AI
+and props that break; the arena in cities and the editor's building brush.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
