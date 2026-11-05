@@ -69,6 +69,12 @@ export function think(G, e, dt, prey = null) {
   if (!e.ai.aware) {
     if (!e.ai.wp || hypot(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z) < 30) e.ai.wp = [clampN(e.x + r.range(-250, 250), -BX, BX), clampN(e.z + r.range(-250, 250), -BZ, BZ)];
     moveYaw = routeYaw(G, e, e.ai.wp[0], G.ter.height(e.ai.wp[0], e.ai.wp[1]), e.ai.wp[1]) ?? atan2(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z); thr = 0.5;
+  } else if (e.ai.state === 'search' && e.ai.waitAt && G.time < e.ai.waitAt.until) {
+    // Heard a digger underground, on HARD (sim/under.js heard, spec 37): go
+    // and stand over the spot, facing it, for whoever comes up.
+    const w = e.ai.waitAt, d = hypot(w.x - e.x, w.z - e.z);
+    moveYaw = d > 8 ? routeYaw(G, e, w.x, G.ter.height(w.x, w.z), w.z) ?? atan2(w.x - e.x, w.z - e.z) : atan2(w.x - e.x, w.z - e.z);
+    thr = d > 8 ? 0.8 : 0;
   } else if (e.ai.state === 'search') {
     // Lost contact: go to where they were last seen, then poke around it.
     const b = e.ai.belief;

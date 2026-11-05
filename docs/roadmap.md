@@ -393,7 +393,7 @@ chunks, far ground by distance, a size per map.
 
 - **Built:** all five parts of spec 35, with a 3 km test canyon in Free Play.
 
-## M15 — Tunnelling in (proposed)
+## M15 — Tunnelling in
 
 Goal: digging by hand gets a job the command view can't do. Dig in out of
 sight, follow a MARK through the rock with DEPTH on the HUD and what's
@@ -401,6 +401,8 @@ above shown as outlines, see your tunnels on the map, and come up under a
 building, which drops into the hole and tips over. Foes hear a digger at
 work by difficulty. Spec: [specs/37-tunnelling.md](specs/37-tunnelling.md).
 In four parts: navigation; tunnels on the map; undermining; being heard.
+
+- **Built:** all four parts of spec 37 (#416–#418, and being heard).
 
 ## Parked
 

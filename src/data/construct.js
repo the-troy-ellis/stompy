@@ -102,7 +102,10 @@ export const ORE_LODES = { n: 3, r: 12.5, mult: 3, near: 200, far: 400, find: 60
 //   dropHp   share of its full hp a structure loses when it falls
 //   perM     and this much more for each metre it falls
 //   inset    the footprint's corner points, as a share of its radius
-export const UNDER = { above: 1, surface: 4, sense: 60, up: 0.15, trail: 6, points: 4000, hold: 3, dropHp: 0.4, perM: 0.05, inset: 0.7 };
+//   hear     foes this near a digger's bite underground hear it (m)
+//   blur     how far off what they hear can be (m)
+//   wait     on HARD, how long the nearest waits over the spot after the last bite it heard (s)
+export const UNDER = { above: 1, surface: 4, sense: 60, up: 0.15, trail: 6, points: 4000, hold: 3, dropHp: 0.4, perM: 0.05, inset: 0.7, hear: 120, blur: 25, wait: 20 };
 export const ENDLESS = { first: 90, every: 120, base: 2, most: 8, mixed: 3, heavy: 6 };
 export const PLACE_ORDER = ['factory', 'bay', 'wall', 'tower', 'silo', 'beacon', 'shop', 'line', 'plant', 'lab', 'armory'];
 // The buildings, as mission entities (sim/entities.js): unit meshes in mesh/props.js.
