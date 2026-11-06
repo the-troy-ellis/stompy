@@ -10,6 +10,8 @@ import { hitQueue, sendFx } from './hitqueue.js';
 import { feel } from './feel.js';
 import { fxPunch } from '../net/protocol.js';
 import { damageEntity, solid, sceneryNear } from './entities.js';
+import { hurtTree } from './trees.js';
+import { cellsNear, trunkOf } from '../world/forest.js';
 import { mechsNear, nearRadius } from './near.js';
 
 const { atan2, hypot, sin, cos } = Math;
@@ -43,7 +45,7 @@ export function meleeGhost(m, dt, pu) {
   if (m.melee.t >= def.windup + def.recover) m.melee = null;
 }
 
-const NEAR = [], BY = [];
+const NEAR = [], BY = [], CELLS = [0, 0, 0, 0], TREE_T = { tree: -1, x: 0, z: 0 };
 // The mech this one's swing would land on right now, or null.
 export function meleeTarget(G, m) {
   const def = meleeOf(m), c = center(m), facing = viewYaw(m), reach = def.reach * m.ch.scale;
@@ -70,6 +72,22 @@ export function meleeTarget(G, m) {
     if (Math.abs(wrapA(atan2(dx, dz) - facing)) > def.arc) continue;
     best = e; bestD = d;
   }
+  // A forest's trees (sim/trees.js): a punch fells one, the way the fist goes.
+  const T = G.trees;
+  if (T) {
+    const [x0, x1, z0, z1] = cellsNear(T, m.x, m.z, reach + 2, CELLS);
+    for (let cz = z0; cz <= z1; cz++) for (let cx = x0; cx <= x1; cx++) {
+      const cc = cx + T.nx * cz;
+      for (let i = T.start[cc]; i < T.start[cc + 1]; i++) {
+        const tr = !T.state[i] && trunkOf(T, i);
+        if (!tr) continue;
+        const dx = T.x[i] - m.x, dz = T.z[i] - m.z, d = hypot(dx, dz) - tr;
+        if (d > reach || d >= bestD || Math.abs(wrapA(atan2(dx, dz) - facing)) > def.arc) continue;
+        TREE_T.tree = i; TREE_T.x = T.x[i]; TREE_T.z = T.z[i];
+        best = TREE_T; bestD = d;
+      }
+    }
+  }
   void c;
   return best;
 }
@@ -83,7 +101,14 @@ export function meleeTick(G, m, dt) {
   if (st.phase === 'windup' && st.t >= def.windup) {
     st.phase = 'recover';
     const t = meleeTarget(G, m);
-    if (t && t.kind) {
+    if (t && t.tree != null) {   // a tree (sim/trees.js): over it goes, away from the fist
+      const p = [t.x, m.y + 5 * m.ch.scale, t.z];
+      hurtTree(G, t.tree, def.dmg, m, atan2(t.x - m.x, t.z - m.z));
+      st.hit = { p, v: 0 };
+      m.heat += def.heat;
+      feel(G, 'punch', { mech: m, k: 1, at: m === G.player ? null : p });
+      G.fx.sfx.punch(m === G.player ? null : p, true);
+    } else if (t && t.kind) {
       // A structure or vehicle: the blow, the thunk, no knockback (it is bolted down, or a truck).
       const dx = t.x - m.x, dz = t.z - m.z, hd = hypot(dx, dz) || 1;
       const p = [t.x - dx / hd * t.radius, clampN(m.y + 5 * m.ch.scale, t.y + 0.5, t.y + t.height - 0.5), t.z - dz / hd * t.radius];

@@ -1,6 +1,7 @@
 import { M, add, chain, mul, sub, len } from '../util/math.js';
 import { geoOf } from '../data/geo.js';
 import { sceneryAlong } from './entities.js';
+import { rayTrees } from './trees.js';
 import { mechsAlong, nearRadius } from './near.js';
 
 const { sqrt } = Math;
@@ -52,7 +53,7 @@ export function rayCyl(o, d, m) {
 // A ray against an upright cylinder standing at (x, y, z): the nearest t >= 0
 // on its side that's within its height, or null. Plain numbers, no garbage:
 // every shot and sight line tests every mech and prop.
-function rayUpright(o, d, x, y, z, R, H) {
+export function rayUpright(o, d, x, y, z, R, H) {
   const ox = o[0] - x, oz = o[2] - z, a = d[0] * d[0] + d[2] * d[2];
   if (a < 1e-8) return null;
   const b = 2 * (ox * d[0] + oz * d[2]), c = ox * ox + oz * oz - R * R, disc = b * b - 4 * a * c;
@@ -71,7 +72,7 @@ export function rayTerrain(G, o, d, maxT) {
 }
 // Structures and vehicles are cylinders too (entities.js); a nav point has no body.
 export function rayEnt(o, d, e) { return rayUpright(o, d, e.x, e.y, e.z, e.radius, e.height); }
-const NEAR = [], BY = [];
+const NEAR = [], BY = [], TREE_HIT = { t: 0, i: -1 };
 export function rayHit(G, o, d, maxT, ignore) {
   let bt = Infinity, bm = null, be = null;
   const k = mechsAlong(G, o[0], o[2], o[0] + d[0] * maxT, o[2] + d[2] * maxT, nearRadius(G), BY);   // spec 34: only the mechs along it
@@ -95,9 +96,13 @@ export function rayHit(G, o, d, maxT, ignore) {
     const t = rayEnt(o, d, NEAR[i]);
     if (t != null && t <= maxT && t < bt) { bt = t; bm = null; be = NEAR[i]; }
   }
-  let best = bt < Infinity ? { t: bt, mech: bm, ent: be } : null;
+  // A forest's trunks (sim/trees.js, docs/specs/39-forest.md): `tree` is its index.
+  let bTree = null;
+  const th = G.trees && rayTrees(G, o, d, bt < Infinity ? bt : maxT, TREE_HIT);
+  if (th && th.t < bt) { bt = th.t; bm = null; be = null; bTree = th.i; }
+  let best = bt < Infinity ? { t: bt, mech: bm, ent: be, tree: bTree } : null;
   const tt = rayTerrain(G, o, d, best ? best.t : maxT);
-  if (tt != null) best = { t: tt, mech: null, ent: null };
+  if (tt != null) best = { t: tt, mech: null, ent: null, tree: null };
   if (best) best.point = add(o, mul(d, best.t));
   return best;
 }

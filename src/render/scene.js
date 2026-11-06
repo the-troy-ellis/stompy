@@ -27,6 +27,7 @@ import { propInto } from '../mesh/props.js';
 import { batchEntities, clearProps, makePropBatches, makeTreeBatches, batchTrees } from './propBatch.js';
 import { TREES, TREE_KINDS } from '../data/forest.js';
 import { cellsNear } from '../world/forest.js';
+import { tipOf } from '../sim/pieces.js';
 import { WEAPONS } from '../data/weapons.js';
 import { PARTS } from '../data/construct.js';
 import { CHASSIS } from '../data/chassis.js';
@@ -515,7 +516,7 @@ export function createScene(app) {
   // World entities: structures and vehicles (a nav point has no body). Props
   // go into one instanced draw per mesh (render/propBatch.js); a toppled one,
   // and anything without a prop mesh, is drawn here on its own.
-  const PROPS = makePropBatches(), TREE_B = makeTreeBatches(TREE_KINDS), ONE = {};
+  const PROPS = makePropBatches(), TREE_B = makeTreeBatches(TREE_KINDS), TINT3 = [1, 1, 1], ONE = {};
   // A construction site's hazard tape round its footprint, with a post at each
   // corner (docs/specs/23-construction-sites.md); a wall's slabs share one, drawn once.
   const TAPE = [0.95, 0.75, 0.1], POST = [0.12, 0.12, 0.13];
@@ -558,6 +559,13 @@ export function createScene(app) {
       const at = top ? top.at : eye;
       batchTrees(TREE_B, G.trees, TREE_KINDS, at[0], at[2], top ? TREES.draw : FOG[1] + 10, seen, cellsNear, TREES.cell);
       R.drawProps(TREE_B, R.meshes.props, top ? null : TREES.fade);   // in the cockpit, what's close dithers away (render/gl.js)
+      // Trees falling (sim/pieces.js): each on its own, tipping about its foot toward where it falls.
+      const T = G.trees;
+      for (const p of G.pieces || []) {
+        const i = p.tree, k = TREE_KINDS[T.kind[i]], tint = 0.85 + T.tint[i] * (0.3 / 256);
+        TINT3[0] = TINT3[1] = TINT3[2] = tint;
+        R.draw(R.meshes.props[k], chain(M.T(T.x[i], T.y[i], T.z[i]), M.RY(p.yaw), M.RX(tipOf(p)), M.RY(-p.yaw), M.RY(T.yaw[i] * (Math.PI * 2 / 256)), M.S(T.r[i], T.h[i], T.r[i])), TINT3);
+      }
     }
     for (const s of G.base?.sites || []) { const e = s.parts.find(p => p.alive); if (e?.foot) drawSite(e); }
   }

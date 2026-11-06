@@ -3,6 +3,7 @@ import { muzzle, rayHit } from './geom.js';
 import { damage } from './combat.js';
 import { damageEntity } from './entities.js';
 import { particle } from './effects.js';
+import { hurtTree } from './trees.js';
 import { hitQueue } from './hitqueue.js';
 
 const { min, max } = Math;
@@ -40,6 +41,7 @@ export function beamTick(G, m, dt, aim) {
     if (!hit) continue;
     if (r.chance(dt * 25)) particle(G, end, [r.range(-3, 3), r.range(1, 5), r.range(-3, 3)], 0.25, 0.3 + 0.1 * mult, w.def.col, 'fire');
     if (hit.ent) damageEntity(G, hit.ent, w.def.dps * dt, m, end);   // structures don't melt: plain dps
+    if (hit.tree != null) hurtTree(G, hit.tree, w.def.dps * dt, m, Math.atan2(dir[0], dir[2]));   // a tree burns through and goes over (sim/trees.js)
     if (t) {
       m.beamMech = t;
       damage(G, t, end, w.def.dps * mult * dt, m, true);

@@ -22,6 +22,7 @@ import { hitQueue, sendFx } from './hitqueue.js';
 import { coopDown, coopLives } from './coopRules.js';
 import { damageEntity } from './entities.js';
 import { LINE } from '../data/construct.js';
+import { hurtTree } from './trees.js';
 import { dig, digOf, deathDig, ownsDigs } from './dig.js';
 
 const { sin, cos } = Math;
@@ -339,6 +340,7 @@ export function stepShots(G, dt) {
       s.life = -1;
       if (hit.mech && !s.ghost) { damage(G, hit.mech, hit.point, s.dmg, s.owner); onShotHit(G, s, hit.mech, hit.point); }   // ghosts are other pilots' shots: theirs to score
       if (hit.ent && !s.ghost) damageEntity(G, hit.ent, s.dmg, s.owner, hit.point);
+      if (hit.tree != null && !s.ghost) hurtTree(G, hit.tree, s.dmg, s.owner, Math.atan2(dir[0], dir[2]));   // a forest's tree (sim/trees.js)
       if (s.kind === 'missile' && !s.ghost) blast(G, hit.point, s.dmg, s.owner, hit.mech || hit.ent);
       dig(G, hit.point, digOf(s.type), !s.ghost);   // ghosts are other pilots' shots: theirs to dig
       explode(G, hit.point, false);
