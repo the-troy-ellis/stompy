@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress: part 1 built (the tree field, #422); part 2 built (crushing and toppling). Approved (the owner merged it, then "start the forest", 2026-11-05); first asked for 2026-11-05: "Also what about a forest biome?"; "I think thick woods becomes more interesting. Especially if fog is involved. Very close range" |
+| Status | in progress: part 1 built (the tree field, #422); part 2 built (crushing and toppling, #423); part 3 built (concealment). Approved (the owner merged it, then "start the forest", 2026-11-05); first asked for 2026-11-05: "Also what about a forest biome?"; "I think thick woods becomes more interesting. Especially if fog is involved. Very close range" |
 | Milestone | M16 (proposed, with or before spec 38's city) |
 | Size | L, in five parts (the tree field; crushing and toppling; concealment and the mist; fighting up close; the arena) |
 | Depends on | [07-atmosphere.md](07-atmosphere.md) (fog, weather, props), [13-thunk.md](13-thunk.md), [14-look-and-performance.md](14-look-and-performance.md), [35-bigger-maps.md](35-bigger-maps.md), [38-buildings.md](38-buildings.md) (rigid pieces) |
@@ -163,6 +163,28 @@ where every mech has been.
   than they're seen (sounds are already placed by where they happen, `audio/`), and a little louder in the
   woods, so you can tell where the radar blip is heavy and coming.
 
+#### As built (part 3)
+
+- The density grid (`world/forest.js`): `dense`, standing grown trees a
+  16 m cell (saplings don't count, they're under a mech's eyes), against
+  `full`, a thick cell's (2.4 on seed spacing). `woodsAt` reads it, 0 to 1;
+  a tree comes off it as it starts to fall (`dropTree`, from
+  `pieces.js fellTree`), so a lane opens as it's felled.
+- `sim/sight.js`: `woodsBetween` adds 8 m a sample of `woodsAt` along the
+  line, leaving out the ends' own 4 m, so a mech at the woods' edge isn't
+  in them; `woodsCut` is (1 − `TREES.hide`)^(metres / 10); `sees` is in
+  range through the woods and over the hills. The AI's `canSee` and the
+  editor's `sightGrid` use it. In seed woods (about 0.8 thick) two mechs see
+  each other at about 65 m; in thick woods at about 58 m.
+- The pilot's side: `sightLine` (fog × 1.2) moved from the HUD to
+  `sim/sight.js`, with `inView` (range through the woods, no hills, as the
+  HUD always drew): the target brackets and the enemy chevrons need it, and
+  so does a missile lock (`update.js G.lock`, in a forest only).
+- Sound carries: in a forest every placed sound's full-volume reach
+  (`ref`, `audio/sound.js spatial`) is ×`TREES.carry` (1.5), so footfalls
+  and guns are heard well past the mist.
+- The mist (`mist` weather) and the forest's fog came with part 1.
+
 ### 4. Fighting up close
 
 - **The AI in the woods:** a foe that isn't seen holds still among trees
@@ -195,6 +217,7 @@ frame).
 | `clear` | 30–80 m | a clearing across |
 | `push` | 60 t | a mech at least this heavy shoves through trees |
 | `hide` | 15% a 10 m | sight lost to woods in between |
+| `carry` | ×1.5 | how much further sounds carry in a forest |
 | `cell` | 16 m | the density grid's cells |
 | forest palette fog | 30–140 m | the woods' own mist |
 | `mist` weather | fog ×0.6, radar ×0.8 | the forest's fog |

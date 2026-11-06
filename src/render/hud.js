@@ -4,7 +4,7 @@ import { CHEATS } from '../data/debug.js';
 import { CONSTRUCT } from '../data/construct.js';
 import { NAMES } from '../data/names.js';
 import { SWAP_WIPE } from '../sim/crew.js';
-import { RADAR_RANGE, radarOf, fogOf } from '../data/weather.js';
+import { RADAR_RANGE, radarOf } from '../data/weather.js';
 import { TAU, clampN, len, rnd, sub } from '../util/math.js';
 import { WEAPONS, CATS, CAT_OF, CAT_LABEL, CAT_KEY } from '../data/weapons.js';
 import { MP_COLORS, hudPalette } from '../data/colors.js';
@@ -22,6 +22,7 @@ import { oreRoom, isoRoom } from '../sim/base.js';
 import { TUT } from '../data/tutorial.js';
 import { depthOf, underground, nearSurface, markAt, above } from '../sim/under.js';
 import { clipTo, seg } from './markers.js';
+import { sightLine, inView } from '../sim/sight.js';
 
 const LAG_MS = 200;   // a round trip to the relay past this shows LAG (docs/specs/10-internet-play.md § Latency)
 
@@ -35,10 +36,9 @@ const FUSION_NO_TARGET = `${WEAPONS.fusion.name}: NO TARGET`;   // made once
 // short line per objective, never more than 24 characters. Pure, for the tests.
 export const fmtDist = m => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`);
 export const fmtClock = s => `${Math.floor(Math.ceil(s) / 60)}:${String(Math.ceil(s) % 60).padStart(2, '0')}`;
-// The target brackets and enemy chevrons show out to 1.2x what the fog lets
-// you see (spec 07); in clear weather that is past the radar anyway.
-const FOG_TMP = [0, 0];
-export const sightLine = G => (G.pal ? fogOf(G, FOG_TMP)[1] * 1.2 : Infinity);
+// The target brackets and enemy chevrons: out to what the fog and the woods
+// let you see (sim/sight.js sightLine, inView).
+export { sightLine };
 export function objectiveLine(o) {
   const d = o.def, fit = (head, tail) => `${head.slice(0, 24 - tail.length)}${tail}`.trim();
   switch (d.type) {
@@ -769,7 +769,7 @@ export function createHud(app) {
     const jl = !!(t && P.jet?.lock === t && (P.jet.charge > 0 || P.jet.blasted)), jOn = jl && (P.jet.blasted ? P.jet.at?.mech === t : P.jet.on);
     stepSpring(lockSnap, lastBracketAt ? min(0.05, (nowB - lastBracketAt) / 1000) : 0, G.lockOn || jl ? 1 : 0);
     lastBracketAt = nowB;
-    if (t && t.alive && hypot(t.x - P.x, t.z - P.z) < sees) {
+    if (t && t.alive && inView(G, G.eye, t, sees)) {   // past the fog, or deep in the woods (spec 39), no brackets
       const f = t.kind ? t.hp / t.max : t.hp.T / t.max.T, col = f < BRACKET_LOW && floor(G.time * 6) % 2 ? '#fff' : hpCol(f);   // the target's torso: the brackets' and the lead's colour
       const a = project([t.x, t.y + (t.kind ? t.height : 8.2 * t.ch.scale), t.z]), b = project([t.x, t.y, t.z]);
       if (a && b) {
@@ -807,7 +807,7 @@ export function createHud(app) {
     }
     // Enemy markers in view (small chevrons), so far-off mechs can be found.
     for (const m of G.mechs) {
-      if (!m.alive || m.team === 0 || m === t || hypot(m.x - P.x, m.z - P.z) > sees) continue;   // past what the weather lets you see
+      if (!m.alive || m.team === 0 || m === t || !inView(G, G.eye, m, sees)) continue;   // past what the weather and the woods let you see
       const p = project([m.x, m.y + 9 * m.ch.scale, m.z]);
       if (!p || p[1] > L.viewBottom) continue;
       ctx.fillStyle = m.remote ? app.net.pilotCss(m.netId) : RED;
