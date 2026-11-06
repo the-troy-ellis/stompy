@@ -1,4 +1,5 @@
 import { TREES } from '../data/forest.js';
+import { dropTree } from '../world/forest.js';
 import { geoOf } from '../data/geo.js';
 import { damage } from './combat.js';
 import { feel } from './feel.js';
@@ -19,7 +20,7 @@ export const tipOf = p => (PI / 2) * min(1, (p.t / p.dur) ** 2);
 export function fellTree(G, i, yaw, by = null) {
   const T = G.trees;
   if (!T || T.state[i]) return false;
-  T.state[i] = 1;
+  T.state[i] = 1; dropTree(T, i);   // off the density grid as it starts to go
   const P = (G.pieces ||= []);
   if (P.length >= TREES.pieces) land(G, P.shift());   // past the cap the oldest lands now
   P.push({ tree: i, yaw, t: 0, dur: TREES.fall * sqrt(T.h[i]), by });

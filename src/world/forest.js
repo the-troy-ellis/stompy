@@ -48,8 +48,25 @@ export function plantTrees(seed, ter, { avoid = [] } = {}) {
     }
   }
   start[nx * nz] = n;
-  return { n, nx, nz, x: X.subarray(0, n), y: Y.subarray(0, n), z: Z.subarray(0, n), r: R.subarray(0, n), h: H.subarray(0, n),
+  const dense = new Uint8Array(nx * nz);   // the density grid (part 3): standing grown trees a cell
+  for (let c = 0; c < nx * nz; c++) for (let i = start[c]; i < start[c + 1]; i++) if (TREES.kinds[TREE_KINDS[K[i]]].trunk) dense[c]++;
+  const full = per * per * (1 - TREES.kinds.sapling.share / total);   // a thick cell's
+  return { n, nx, nz, dense, full, x: X.subarray(0, n), y: Y.subarray(0, n), z: Z.subarray(0, n), r: R.subarray(0, n), h: H.subarray(0, n),
     kind: K.subarray(0, n), yaw: YAW.subarray(0, n), tint: TINT.subarray(0, n), state: new Uint8Array(n), fall: new Uint8Array(n), start };   // fall: the way it fell (a 256th of a turn), once down
+}
+
+// The density grid (docs/specs/39-forest.md part 3): how much of the cell
+// at (x, z) is woods, 0 (open, or off the map) to 1 (thick). Saplings don't
+// count: they're under a mech's eyes. A tree going over takes itself off it
+// (dropTree), so a felled lane lets sight through.
+export function woodsAt(T, x, z) {
+  const cx = floor((x + BX) / TREES.cell), cz = floor((z + BZ) / TREES.cell);
+  if (cx < 0 || cz < 0 || cx >= T.nx || cz >= T.nz) return 0;
+  return min(1, T.dense[cx + T.nx * cz] / T.full);
+}
+export function dropTree(T, i) {
+  const cx = floor((T.x[i] + BX) / TREES.cell), cz = floor((T.z[i] + BZ) / TREES.cell), c = cx + T.nx * cz;
+  if (T.dense[c]) T.dense[c]--;
 }
 
 // The cells within `rad` of (x, z), as [c0x, c1x, c0z, c1z] into `out`.

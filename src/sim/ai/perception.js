@@ -1,6 +1,5 @@
 import { center, eyeOf } from '../geom.js';
-import { blocked } from '../sight.js';
-import { sub, len } from '../../util/math.js';
+import { sees } from '../sight.js';
 import { diffOf, PERCEPTION as K } from '../../data/ai.js';
 import { darkness, NIGHT_SIGHT } from '../../data/palettes.js';
 import { radarOf } from '../../data/weather.js';
@@ -34,9 +33,7 @@ export function sightOf(G, P) {
 }
 export function canSee(G, e, P) {
   if (!P.alive) return false;
-  const o = eyeOf(e), t = center(P);
-  if (len(sub(t, o)) > sightOf(G, P)) return false;
-  return !blocked(G, o, t);
+  return sees(G, eyeOf(e), center(P), sightOf(G, P));   // over the hills and through the woods (spec 39)
 }
 
 // A fresh fix on the player: where they are and how they are moving.

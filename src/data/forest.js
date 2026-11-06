@@ -15,12 +15,14 @@
 //   fall     a felled tree's fall time (s) per square-root metre of its height
 //   crush    damage to a mech a falling tree lands on, per metre of tree, at most `crushMax`
 //   blastR   a missile's blast fells trees this near (m)
+//   hide     sight lost to woods in between: each 10 m of them takes this share off what's left (part 3)
+//   carry    in a forest, sounds carry this much further before they fall off (part 3)
 //   pieces   trees falling at once; past it the oldest lands now (shared with spec 38's rigid pieces)
 //   kinds    each kind's share, crown radius and height ranges (m), and
 //            trunk (m, the radius that stops a mech; 0: it folds underfoot)
 export const TREES = {
   gap: 7, cell: 16, clear: -0.9, paths: 3, pathW: 12, slope: 0.7, draw: 250, fade: [12, 6],
-  push: 60, shove: 0.6, hp: 8, hitR: 0.8, fall: 0.35, crush: 1.5, crushMax: 40, blastR: 10, pieces: 4,
+  push: 60, shove: 0.6, hp: 8, hitR: 0.8, fall: 0.35, crush: 1.5, crushMax: 40, blastR: 10, pieces: 4, hide: 0.15, carry: 1.5,
   kinds: {
     pine: { share: 0.35, r: [2.5, 3.5], h: [18, 28], trunk: 0.6 },   // two to three mechs tall: the crowns are over the cockpit
     broadleaf: { share: 0.25, r: [4, 5.5], h: [16, 22], trunk: 0.9 },

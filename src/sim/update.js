@@ -28,6 +28,7 @@ import { stepFeel, stepBob } from './feel.js';
 import { netInterp } from '../net/interp.js';
 import { pushOutOfEntities, stepEntities } from './entities.js';
 import { tickObjectives } from './objectives.js';
+import { inView } from './sight.js';
 import { stepTurrets } from './turrets.js';
 import { stepTowers } from './towers.js';
 import { tickCoopRespawn } from './coopRules.js';
@@ -108,7 +109,8 @@ function frame(G, input, dt) {
   G.aim = aimHit ? aimHit.point : add(G.eye, mul(G.view, 1100));
   G.aimMech = aimHit?.mech || (aimHit?.ent?.targetable ? aimHit.ent : null);   // R targets it; a structure counts
   const t = G.target;
-  G.lock = !!(t && t.alive && len(sub(center(t), G.eye)) < WEAPONS.lrm.range && dot(norm(sub(center(t), G.eye)), G.view) > cos(0.3));
+  G.lock = !!(t && t.alive && len(sub(center(t), G.eye)) < WEAPONS.lrm.range && dot(norm(sub(center(t), G.eye)), G.view) > cos(0.3)
+    && (!G.trees || inView(G, G.eye, t)));   // you can't lock what the woods hide (spec 39)
   // A lock that means something: you carry missiles that can fly. The HUD's
   // brackets snap to a diamond on it, and it chirps as it comes on.
   const was = G.lockOn;

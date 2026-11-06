@@ -8,6 +8,7 @@ import { createAmbience } from './ambience.js';
 import { platform } from '../platform/index.js';
 import { TOOL } from '../data/tools.js';
 import { HEAT, hotFrac, FEEL } from '../data/feel.js';
+import { TREES } from '../data/forest.js';
 
 const { sin, cos, atan2, min, max, abs, PI, random, hypot, floor } = Math;
 
@@ -96,6 +97,7 @@ export function createAudio(app) {
     if (!at) return { g: 1, pan: 0, lp: 0 };
     const ear = G.ear || G.eye, dx = at[0] - ear[0], dy = at[1] - ear[1], dz = at[2] - ear[2], d = hypot(dx, dy, dz);
     if (!Number.isFinite(d)) return null;
+    if (G.trees) ref *= TREES.carry;   // the woods: heard further than seen (spec 39)
     const g = d <= ref ? 1 : ref / (ref + 1.4 * (d - ref));
     if (g < 0.02) return null;
     // yaw grows to the left; StereoPanner is -1 left .. +1 right. Right
