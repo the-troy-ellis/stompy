@@ -500,6 +500,8 @@ export function createHud(app) {
       let on = '';
       for (const [k, l] of CHEATS) if (G.cheats?.[k]) on += (on ? ' · ' : '') + l;
       if (on) lines.push(G.mode === 'sp' ? `CHEATS: ${on}` : 'CHEATS (OFF HERE)');
+      const pd = app.padDebug;   // what a controller and the keyboard report, and what has focus (input/input.js)
+      if (pd && (pd.pad || pd.keys.length)) lines.push(`PAD ${pd.pad || 'none'}`, `KEYS ${pd.keys.join(' ') || '-'}  FOCUS ${pd.focus || '-'}`);
     }
   }
   function drawDebug() {
