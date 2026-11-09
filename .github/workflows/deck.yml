@@ -1,0 +1,27 @@
+# Stompy for the Steam Deck (docs/specs/40-steam-deck.md): the web build in
+# the Electron shell in deck/, as a Linux AppImage. Its own workflow, so the
+# web checks (ci.yml) never need Electron. Runs on pushes to main, on PRs that
+# touch the shell, and by hand (Actions > Steam Deck > Run workflow); the
+# AppImage is the run's `stompy-deck-appimage` artifact.
+name: Steam Deck
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths: ['deck/**', '.github/workflows/deck.yml']
+  workflow_dispatch:
+jobs:
+  appimage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: '**/package-lock.json' }
+      - run: npm ci
+      - run: npm run build
+      - run: npm ci
+        working-directory: deck
+      - run: npm run appimage
+        working-directory: deck
+      - uses: actions/upload-artifact@v4
+        with: { name: stompy-deck-appimage, path: deck/out/*.AppImage, if-no-files-found: error }

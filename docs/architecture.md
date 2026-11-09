@@ -315,7 +315,9 @@ changing behaviour. The constraints it worked under:
   Xcode) on the owner's terms: it never breaks the web version. Nothing in
   `src/` imports it (only `src/platform/` looks for `window.Capacitor`, and
   falls back to the browser), and `npm run build` and every web check run
-  without it.
+  without it. The Steam Deck app (spec 40) is the same deal: Electron and
+  electron-builder in `deck/`, around `dist/`, which the page never knows
+  about.
 - Pure modules (no `document`, `window`, `gl`, `AudioContext`) are the ones
   tests import. The split is designed around that boundary.
 
@@ -406,6 +408,7 @@ src/
   platform/
     index.js       platform: the device layer, the only code that knows about the phone apps' shells (M11, spec 24)
 app/               the phone apps' Capacitor shells around dist/, with their own package.json (M11, spec 24)
+deck/              the Steam Deck app: an Electron shell around dist/ as a Linux AppImage, own package.json (spec 40); .github/workflows/deck.yml builds it
   android/         the Android project; .github/workflows/android.yml builds its debug APK
 server/
   server.py        the relay (moved; same code)

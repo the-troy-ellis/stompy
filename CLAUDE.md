@@ -10,8 +10,9 @@ Rules that are easy to miss:
 
 - No new runtime dependencies. Dev tooling is limited to what
   `docs/architecture.md` lists (esbuild, ESLint, Playwright, `node --test`),
-  plus the phone apps' native tooling (Capacitor and its plugins, Gradle,
-  Xcode; spec 24) as long as it never breaks the web version: nothing in
+  plus the native shells' tooling (the phone apps' Capacitor and its plugins,
+  Gradle, Xcode, spec 24; the Steam Deck app's Electron and
+  electron-builder, spec 40) as long as it never breaks the web version: nothing in
   `src/` imports it, and `npm run build` and every web check work without it.
 - Every feature works on a phone held sideways with two thumbs, or it is not
   done. Test on a real phone, not device mode.
