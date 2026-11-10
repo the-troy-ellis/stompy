@@ -8,9 +8,11 @@ tuned number. Port numbers, never reinvent them. **The plan of record is in
 
 Rules that are easy to miss:
 
-- C11, SDL2 and OpenGL 3.3 core. No other library, no build system but the
-  Makefile. `make lint` fails if `src/sim`, `src/data` or `src/util` include
-  SDL or GL.
+- C11, SDL2 and OpenGL 3.3 core, and no build system but the Makefile. Any
+  other library (or a tool the build depends on) needs the owner's yes first:
+  ask, and say what it does, why writing it here is worse, its licence and
+  its size. Don't add it until they answer. `make lint` fails if `src/sim`,
+  `src/data` or `src/util` include SDL or GL.
 - Thunk is the top pillar. Anything that adds an action or an impact ships
   with its feel row, sound, rumble and body reaction (`docs/specs/01-thunk.md`).
 - Steam Deck first: the pad, 1280 by 800, a locked 60. Mouse and keyboard

@@ -56,7 +56,9 @@ afternoon), M (a day or two), L (a week).
 18. **Ambience** (S). The noise beds per biome and per weather kind.
 19. **CC0 samples** (M). The reference's Kenney clips (steps, punches,
     plates, lasers, booms, loops) decoded from WAV and layered under the
-    synthesis; a small loader, no library.
+    synthesis. Candidate library to ask the owner about: stb_vorbis (one
+    public-domain file) to load the packs' OGG files directly; without it,
+    WAV through SDL_LoadWAV.
 20. **The cockpit voice** (M). Recorded lines (the owner's, or a flat TTS
     render they pick), one WAV per line, played by `say`. The chirp stays as
     the fallback.

@@ -64,8 +64,11 @@ These came from the owner's brief and are not up for re-litigation in a PR.
   polygons at the screen's own resolution, no textures, no imported models,
   no shadows, no post-processing, no blending (a dither is the one
   see-through). Synthesised tones, with a few CC0 samples to come.
-- **Tech:** C11, SDL2 and OpenGL 3.3 core. Nothing else. SDL is the platform
-  (the Deck ships it); it is not a dependency in the sense the rules mean.
+- **Tech:** C11, SDL2 and OpenGL 3.3 core. SDL is the platform (the Deck
+  ships it). Any other library needs the owner's yes first: ask, with a
+  justification (what it does, why writing it here is worse, its licence,
+  its size), and wait for the answer. Single-file, permissively licensed
+  libraries are the easiest yes.
 - **The second arm (construction) comes later, and only if it earns it.**
   When it does, the bucket must visibly bite and drag the dirt continuously
   before anything else is built on it.

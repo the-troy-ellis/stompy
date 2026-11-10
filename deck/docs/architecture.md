@@ -2,7 +2,8 @@
 
 Three halves that only meet in `src/game/app.c`: the **sim** (headless,
 tested), the **platform** (SDL: window, pad, audio, rumble) and the
-**renderer** (OpenGL 3.3, flat polygons, the HUD). C11, nothing else.
+**renderer** (OpenGL 3.3, flat polygons, the HUD). C11; any library beyond
+SDL2 and GL is the owner's call (docs/README.md § Decisions).
 
 ```
 deck/

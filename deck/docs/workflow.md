@@ -75,8 +75,9 @@ are drafts.
 
 ## Things agents get wrong here
 
-- Adding a library. Don't. SDL2 and GL are the platform; everything else is
-  written here.
+- Adding a library without asking. Ask the owner first, with the
+  justification: what it does, why writing it here is worse, its licence and
+  its size. Only add it once they say yes, and record it in the PR.
 - Changing balance numbers in a PR about something else.
 - Making it lighter, twitchier or more polite. Thunk wins.
 - Making it solemn. If a name would fit a military manual, try again.
