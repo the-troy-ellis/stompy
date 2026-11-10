@@ -10,11 +10,11 @@ afternoon), M (a day or two), L (a week).
 2. **DIRECT throttle mode** (S). A SETTINGS toggle: the left stick's position
    is the throttle. Default stays HOLD until the playtest says otherwise.
 3. **Rumble tuning** (S). A SETTINGS slider for rumble strength; the per-event
-   mapping (`fxThump` in app.c) tuned on the Deck: low motor from bass, high
+   mapping (`App::events` in app.rs) tuned on the Deck: low motor from bass, high
    motor from the kick, length from the haptic column.
 4. **Live FEEL tuning** (M). F3's debug page gets a FEEL tab: the rows of the
    feel table editable with the D-pad, printed to stderr to copy back into
-   `data.c`. The reference's `?debug=1` panel, for the Deck.
+   `crates/sim/src/data/mod.rs`. The reference's `?debug=1` panel, for the Deck.
 5. **Cockpit arms** (S). Keep, shrink or drop, per the playtest. If kept,
    the barrels should point where the torso does.
 6. **HUD scale and placement** (S). HUD SCALE in SETTINGS (the plumbing is
@@ -74,7 +74,8 @@ afternoon), M (a day or two), L (a week).
 
 ## Any time
 
-25. **A CI job for deck/** (S). `.github/workflows/deck.yml` builds, lints
-    and tests on Ubuntu with libsdl2-dev. (Included in this branch.)
+25. **A CI job for deck/** (S). `.github/workflows/deck.yml` builds,
+    runs clippy, fmt and the tests on Ubuntu with libsdl2-dev. (Included in
+    this branch.)
 26. **Split deck/ into its own repository** (S). `git subtree split -P deck`
     when the owner wants it apart from the browser version.

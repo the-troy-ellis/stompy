@@ -8,7 +8,7 @@
 ## Summary
 
 The top pillar made concrete: one table of feedback tunables (`FEEL` in
-`src/data/data.c`), one spring helper (`src/util/spring.c`), and a pass over
+`crates/sim/src/data/mod.rs`), one spring helper (`crates/sim/src/spring.rs`), and a pass over
 every action and impact so that each has a camera response, a body response,
 a sound with low end and a buzz in the hands. The numbers are the reference's.
 
@@ -40,7 +40,7 @@ stomp, whiff, blast (the push), fusionFire.
 
 ## The rumble
 
-`fxThump` in `src/game/app.c`: the low motor from the bass column, the high
+`App::events` in `crates/game/src/app.rs`: the low motor from the bass column, the high
 motor from the haptic column, for the haptic column's milliseconds; the
 strongest buzz in progress wins until it runs out. Charging the jets hums the
 pad. REDUCED MOTION turns the haptic column off and scales the camera

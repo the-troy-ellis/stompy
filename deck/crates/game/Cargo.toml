@@ -1,0 +1,12 @@
+[package]
+name = "stompy"
+description = "Stompy for the Steam Deck."
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[dependencies]
+stompy-sim = { path = "../sim" }
+# The owner approved these two (2026-11-10): the bindings to the platform the game already used.
+sdl2 = { version = "0.38", features = ["hidapi"] }   # hidapi: the Deck's gyro and touchpads as controller sensors
+glow = "0.14"

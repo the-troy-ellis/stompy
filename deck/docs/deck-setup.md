@@ -5,19 +5,18 @@ ships. No installer, no launcher, no store.
 
 ## Build
 
-On any Linux box with a C compiler, SDL2 headers and Mesa headers:
+On any Linux box with Rust (from rustup.rs), SDL2 headers and Mesa headers:
 
 ```
 sudo apt install build-essential libsdl2-dev libgl1-mesa-dev   # Debian and Ubuntu
 cd deck
-make            # build/stompy
-make test       # the headless sim tests (no SDL or GL needed)
-make lint       # the sim imports no platform
-./build/stompy --window    # run in a window; without --window it is fullscreen
+cargo build --release          # target/release/stompy
+cargo test --workspace         # the sim's tests (no display needed)
+cargo run --release -- --window    # run in a window; without --window it is fullscreen
 ```
 
 The binary links SDL2 dynamically, so one built on a desktop runs on the Deck
-as long as the glibc is not newer than SteamOS's. Building on the Deck itself
+as long as its glibc is not newer than SteamOS's. Building on the Deck itself
 is cleaner.
 
 ## Building on the Deck
@@ -27,15 +26,16 @@ SteamOS's root is read-only and has no compiler, so build in a container:
 1. Switch to Desktop mode. Open Konsole.
 2. Install a toolbox: `distrobox` is in Discover (or `podman` + `toolbox`).
    `distrobox create -n build -i ubuntu:24.04 && distrobox enter build`.
-3. Inside: `sudo apt update && sudo apt install -y build-essential git libsdl2-dev libgl1-mesa-dev`.
-4. `git clone <this repo> && cd stompy/deck && make`.
-5. The binary runs from the host too (`./build/stompy`), because the Deck's
-   own SDL2 and Mesa satisfy it. Copy it anywhere on the Deck.
+3. Inside: `sudo apt update && sudo apt install -y build-essential git curl libsdl2-dev libgl1-mesa-dev`,
+   then Rust: `curl --proto '=https' -sSf https://sh.rustup.rs | sh`.
+4. `git clone <this repo> && cd stompy/deck && cargo build --release`.
+5. The binary runs from the host too (`target/release/stompy`), because the
+   Deck's own SDL2 and Mesa satisfy it. Copy it anywhere on the Deck.
 
 ## Adding it to Steam
 
 1. In Desktop mode, Steam: Games, "Add a Non-Steam Game to My Library",
-   browse to `build/stompy`. Name it Stompy.
+   browse to `target/release/stompy`. Name it Stompy.
 2. In the game's Properties set Launch Options to nothing (fullscreen is the
    default and saves itself in `~/.config/stompy-deck/settings.txt`).
 3. Switch to Game mode and run it from the library.

@@ -88,7 +88,7 @@ wrong. When two good ideas conflict, the more thunky one wins.
   critical."). Jokes only come after the fact ("Leg destroyed. Recommend
   hopping.").
 - No characters, no story, no references outside the game.
-- `make test` checks every brief and voice line against these rules.
+- `cargo test` checks every brief and voice line against these rules.
 
 ## Non-goals
 

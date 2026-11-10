@@ -53,10 +53,10 @@ These came from the owner's brief and are not up for re-litigation in a PR.
 - **Port the numbers, do not reinvent them.** `src/data` in the reference is
   the result of a lot of tuning. Balance numbers change only in issues about
   balance.
-- **The sim is headless and tested.** `deck/src/sim`, `data` and `util` never
-  include SDL or GL; `make lint` enforces it.
+- **The sim is headless and tested.** `crates/sim` has no dependencies, so
+  it cannot reach SDL or GL; the compiler enforces it.
 - **Names are the owner's.** Stable keys in code, display names in one table
-  (`src/data/names.c`), placeholders for anything new, and a NAMING section
+  (`crates/sim/src/data/names.rs`), placeholders for anything new, and a NAMING section
   on any PR that makes a new thing visible.
 - **Tone:** minimal, not solemn. Board-book briefs, a flat cockpit voice,
   jokes after the fact, silly hardware names, no characters, no references.
@@ -64,8 +64,9 @@ These came from the owner's brief and are not up for re-litigation in a PR.
   polygons at the screen's own resolution, no textures, no imported models,
   no shadows, no post-processing, no blending (a dither is the one
   see-through). Synthesised tones, with a few CC0 samples to come.
-- **Tech:** C11, SDL2 and OpenGL 3.3 core. SDL is the platform (the Deck
-  ships it). Any other library needs the owner's yes first: ask, with a
+- **Tech:** Rust (the owner, 2026-11-10: modern development, old school
+  looks), SDL2 and OpenGL 3.3 core. The crates `sdl2` and `glow` are
+  approved; SDL is the platform (the Deck ships it). Any other library needs the owner's yes first: ask, with a
   justification (what it does, why writing it here is worse, its licence,
   its size), and wait for the answer. Single-file, permissively licensed
   libraries are the easiest yes.

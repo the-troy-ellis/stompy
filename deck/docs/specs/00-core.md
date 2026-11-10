@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | shipped for M0 (built and tested headless; screenshots under software GL; **not yet played on a Deck**) |
+| Status | shipped for M0 (built in C, then ported to Rust on 2026-11-10 with the same numbers and tests; screenshots under software GL; **not yet played on a Deck**) |
 | Milestone | M0 |
 | Depends on | the reference's `src/data` for every number |
 
@@ -17,7 +17,7 @@ missions. Everything in the sim is the reference's, number for number.
 
 ## Design
 
-### Legs and torso (`sim/gait.c`, `sim/mech.c`)
+### Legs and torso (`sim/gait.rs`, `sim/mech.rs`)
 
 The left stick turns the legs (`yaw`) at the chassis's turn rate and nudges
 a throttle that holds. The right stick (and the gyro, and the mouse) twists
@@ -34,20 +34,20 @@ gone: the lean and the limp. Both gone: the hull sits. In the air the legs
 hang. All of the body's motion is drawn; where the mech is, its speed and its
 feet are the same under any of it.
 
-### Heat (`sim/mech.c`)
+### Heat (`sim/mech.rs`)
 
 Firing adds heat (beams per second, shells and volleys per shot, the jets at
 blast-off, a punch). Sinks take it off per second. At 100 the reactor shuts
 down: no movement, no firing, the sag, `Reactor shutdown.`; it restarts under
 45 with `Reactor online.`. `Warning. Heat critical.` over 80, flat.
 
-### Sections (`sim/combat.c`)
+### Sections (`sim/combat.rs`)
 
 Torso, two arms, two legs, each with hp from the chassis. A hit is routed by
 where it lands on the body cylinder. A section at zero: its weapons die, the
 part comes off, the overflow goes to the torso. The torso at zero: the death.
 
-### Weapons (`sim/combat.c`, `beams.c`, `missiles.c`, `fusion.c`)
+### Weapons (`sim/combat.rs`, `beams.rs`, `missiles.rs`, `fusion.rs`)
 
 By category, each on its own control: energy (beams whose damage ramps with
 the target's melt, shared by every beam on it, cooling when nothing is on
@@ -60,7 +60,7 @@ under half a second pauses it; the torso is drawn toward the target), then
 the pulse that kills on arrival, heat to 140, the shutdown, 35% of your own
 torso.
 
-### Melee (`sim/melee.c`)
+### Melee (`sim/melee.rs`)
 
 Everyone shoves (8 damage, 9 m reach, a 10 m/s impulse); PURPLE PUNCHER
 punches (30, 14 m, 22) with whichever fist it still has, and shoves with
@@ -70,7 +70,7 @@ scaled by mass (scale³), clamped 0.3..2.5×, with a fifth of it back on the
 attacker. Landing on a mech after 0.6 s in the air is a stomp; from a high
 blast-off, an insta-stomp.
 
-### Jets (`sim/jets.c`)
+### Jets (`sim/jets.rs`)
 
 Hold A on the ground with the jets ready and they charge (the mech crouches);
 let go and it blasts off, up by the charge and along the heading by the
@@ -80,7 +80,7 @@ STOMP cue). In the air the left stick steers a little and the lock pulls the
 flight on. The landing is hard. The jets need three seconds to be ready
 again.
 
-### AI (`sim/ai.c`)
+### AI (`sim/ai.rs`)
 
 Perception by line of sight within the difficulty's sight (400, 600, 800 m),
 after its react delay (1.5, 0.8, 0.3 s), or by being hit, or an ally's shout;
@@ -94,7 +94,7 @@ never retreats, alpha under 40%). Fire discipline: a heat cap (60, 72, 85)
 with a cool-down, missiles only with a lock and never under 120 m, section
 targeting on HARD, an alpha when your torso is under a quarter.
 
-### Free Play and missions (`sim/state.c`)
+### Free Play and missions (`sim/state.rs`)
 
 Free Play: a place, a time, one to eight foes from a pool weighted light, a
 difficulty. Missions: LIL SNOOZERS (two SKEDADDLEs, one asleep, one a
@@ -103,14 +103,14 @@ over four minutes). TOWER TOPPLER and HELPLESS LIL BUDDIES are listed as
 SOON: they need structures and trucks (M2). Clearing mission 4 unlocks
 SLOWPOKE; the rest unlock on the reference's schedule.
 
-### The look (`render/`)
+### The look (`game/scene.rs`, `game/mesh.rs`)
 
 Flat-shaded polygons at the screen's resolution, one light and the
 palette's sky and fog, the dither for the shockwaves' tails and the HUD's
 flashes. Each chassis's parts are the reference's. The cockpit draws the
 mech's own arms, drawn in and forward of the eye.
 
-### The HUD (`render/hud.c`)
+### The HUD (`game/hud.rs`)
 
 The ring: heat up the left (amber over 55, red over 80, flashing over 85),
 jets up the right with the charge inside it, speed along the bottom with a
@@ -125,7 +125,7 @@ shutdown.
 
 ## Code touchpoints
 
-All of `src/`. The tests in `test/sim_test.c`.
+All of `crates/`. The tests in `crates/sim/tests/`.
 
 ## Acceptance criteria
 

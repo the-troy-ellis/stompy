@@ -1,8 +1,8 @@
 # Controls
 
 The pad is the primary input and the Deck's whole layout is used. Everything
-here is in `src/platform/controls.c` (pure, so the mapping is testable) and
-`src/platform/platform.c` (SDL). Settings live in SETTINGS.
+here is in `crates/game/src/controls.rs` (pure, with unit tests) and
+`crates/game/src/platform.rs` (SDL). Settings live in SETTINGS.
 
 ## Steam Deck
 

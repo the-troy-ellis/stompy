@@ -7,9 +7,15 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: deck
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libgl1-mesa-dev
-      - run: make -C deck lint
-      - run: make -C deck test
-      - run: make -C deck OPT="-O2 -Werror"
+      # The runner ships rustup; no third-party actions (they'd be tools the build depends on).
+      - run: rustup update stable && rustup default stable && rustup component add clippy rustfmt
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - run: cargo build --release

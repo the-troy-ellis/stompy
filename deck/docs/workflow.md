@@ -18,15 +18,16 @@ A PR is done when all of these hold:
 
 1. **Acceptance criteria** in the spec are met, each demonstrable (a test, a
    screenshot from `tools/shot.sh`, or a reviewer step).
-2. **Tests**: new sim logic has checks in `test/`; `make test` and `make lint`
-   are green; `make` builds with no warnings.
+2. **Tests**: new sim logic has tests in `crates/sim/tests/`; `cargo test
+   --workspace` is green, `cargo clippy --workspace --all-targets -- -D
+   warnings` is clean and `cargo fmt --all --check` passes.
 3. **The Deck**: the playtest checklist below was run on a real Deck, in Game
    mode, with the pad. Not a desktop with a controller; not device
    emulation.
 4. **Budget**: anything touching `update`, the scene, the HUD or particles
    reports the draw count and whether 60 held on the Deck (F3).
 5. **Docs**: spec status moved; the architecture map updated if files moved.
-6. **Tone**: new strings pass the tone tests (`make test`: briefs in the
+6. **Tone**: new strings pass the tone tests (`cargo test`: briefs in the
    board-book voice, the voice flat and short, no exclamation marks).
 7. **Thunk**: anything that adds an action or an impact ships with its feel
    row, its sound, its rumble and its body reaction. A silent, still action
@@ -67,15 +68,15 @@ A PR is done when all of these hold:
 ## Naming things
 
 The owner names mechs, weapons, missions and verdicts after seeing them.
-Keys are not names: code, saves and data use stable keys (`CH_LIGHT1`,
-`W_PPC`, `m07`); display names live in `src/data/names.c` and nowhere else.
+Keys are not names: code, saves and data use stable keys (`Ch::Light1`,
+`Wpn::Ppc`, `m07`); display names live in `crates/sim/src/data/names.rs` and nowhere else.
 Build with a placeholder, show it, then ask in the PR's NAMING section.
 Confirmed so far: every chassis, every weapon, Act I's missions. The verdicts
 are drafts.
 
 ## Things agents get wrong here
 
-- Adding a library without asking. Ask the owner first, with the
+- Adding a crate without asking (the approved ones are `sdl2` and `glow`). Ask the owner first, with the
   justification: what it does, why writing it here is worse, its licence and
   its size. Only add it once they say yes, and record it in the PR.
 - Changing balance numbers in a PR about something else.
