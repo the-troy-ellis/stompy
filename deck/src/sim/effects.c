@@ -81,7 +81,8 @@ void hitSparks(Game *G, Mech *m, v3 p, int sec, float amt) {
     shedPart(G, m, PART_PLATE, vadd(p, vmul(n, 0.3f)), vadd(vmul(n, rngRange(r, 3, 7)), V3(rngRange(r, -2, 2), rngRange(r, 3, 7), rngRange(r, -2, 2))));
 }
 void scorch(Game *G, float x, float z, float r, float y) {
-  for (int i = 0; i < G->nScorch; i++) { Scorch *s = &G->scorch[i]; if (s->r >= r * 0.8f && hypot2(s->x - x, s->z - z) < s->r * 0.6f) return; }
+  if (r < 3) return;   // small blasts leave no mark: a volley of ten would tile the ground
+  for (int i = 0; i < G->nScorch; i++) { Scorch *s = &G->scorch[i]; if (s->r >= r * 0.8f && hypot2(s->x - x, s->z - z) < s->r * 1.2f) return; }
   Scorch *s = &G->scorch[G->scorchAt]; G->scorchAt = (G->scorchAt + 1) % MAX_SCORCH; if (G->nScorch < MAX_SCORCH) G->nScorch++;
   s->x = x; s->z = z; s->r = r; s->y = y;
 }

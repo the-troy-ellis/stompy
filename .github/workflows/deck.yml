@@ -1,0 +1,15 @@
+name: deck
+on:
+  push:
+    paths: ['deck/**', '.github/workflows/deck.yml']
+  pull_request:
+    paths: ['deck/**', '.github/workflows/deck.yml']
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libgl1-mesa-dev
+      - run: make -C deck lint
+      - run: make -C deck test
+      - run: make -C deck OPT="-O2 -Werror"
