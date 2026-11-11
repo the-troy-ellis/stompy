@@ -1,9 +1,11 @@
 # Stompy — notes for agents
 
-Stompy is a 90s-style browser mech sim: raw WebGL, flat-shaded polygons at
-full resolution (no textures, sprites or blending; see
-`docs/specs/14-look-and-performance.md`), no libraries, touch and desktop both
-first-class. **The plan of record is in `docs/`.**
+Stompy is a 90s-style mech sim made for fun, for the owner's own Steam
+Deck: a web game (raw WebGL, flat-shaded polygons at full resolution, no
+textures, sprites or blending; see `docs/specs/14-look-and-performance.md`,
+no libraries) that runs on the Deck as a native app (an Electron shell,
+`deck/`, spec 40). Controller first, mouse and keyboard second; touch still
+works but is not designed for. **The plan of record is in `docs/`.**
 Start with `docs/README.md`, then the spec your issue links to.
 
 Rules that are easy to miss:
@@ -13,8 +15,12 @@ Rules that are easy to miss:
   plus the phone apps' native tooling (Capacitor and its plugins, Gradle,
   Xcode; spec 24) as long as it never breaks the web version: nothing in
   `src/` imports it, and `npm run build` and every web check work without it.
-- Every feature works on a phone held sideways with two thumbs, or it is not
-  done. Test on a real phone, not device mode.
+- Every feature works with the Steam Deck's controls and with mouse and
+  keyboard, or it is not done. A Deck check an agent can't run is left to
+  the owner as `Deck check: open`, never claimed.
+- Play before building: the owner plays and writes notes; new work is
+  designed around them. Bugs are fixed as they come in; new systems wait
+  for the notes. Nothing is geared toward an audience or monetisation.
 - Text is minimal but not solemn: board-book descriptions (short, plain,
   action-first sentences, like a toddler's board book but never baby talk),
   a deadpan cockpit voice, silly hardware names (PURPLE PUNCHER, BIG BONKER),

@@ -299,7 +299,11 @@ placing from the map.
   GUARD, and the polish: the gamepad and smoke runs), and both parts of
   construction sites.
 
-## M11 — Phone apps and the full-game unlock (proposed)
+## M11 — Phone apps and the full-game unlock (parked)
+
+Parked on 2026-11-09: the game's home is the Steam Deck (M17), it is made
+for fun rather than for a store, and the phone is no longer designed for.
+Part 1 (the platform layer, the Android shell) stays built and harmless.
 
 Goal: Stompy on Android and iOS as native-feeling apps (Capacitor shells
 around the same `dist/`), with real haptics, the back button and pausing
