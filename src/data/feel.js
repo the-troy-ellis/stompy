@@ -14,7 +14,7 @@
 //   bass    sub-bass thump gain
 //   duck    how much the reactor hum ducks for a moment
 //   dust    particle burst multiplier (used by the event's own particle code)
-//   haptic  navigator.vibrate milliseconds on touch
+//   haptic  the controller's rumble (platform rumbleOf) when a pad is in use, else navigator.vibrate milliseconds on touch
 //   push    horizontal impulse on the mech in m/s along the event's direction (recoil, knockback); it decays over about a second (mech.js PUSH_DECAY)
 // Rows are plain mutable objects so the ?debug=1 FEEL panel can tune them live.
 // How hard a hit on each section lands, as a factor on the hit row: legs

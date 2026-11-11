@@ -38,3 +38,31 @@ test("Capacitor's web build (not native) counts as the browser", () => {
   assert.equal(p.isApp, false);
   assert.equal(p.os, 'web');
 });
+
+// Rumble (docs/specs/40-steam-deck.md): the feel table's haptic column in the
+// controller, through the first pad with a vibration actuator.
+import { rumbleOf } from '../src/platform/index.js';
+
+test('rumbleOf: a footfall is a short weak tick, a blast-off brings in the strong motor', () => {
+  const step = rumbleOf(10), blast = rumbleOf(110);
+  assert.equal(step.strongMagnitude, 0, 'no strong motor for a step');
+  assert.ok(step.weakMagnitude > 0 && step.weakMagnitude < 0.5);
+  assert.equal(step.duration, 30, 'never shorter than a pad can play');
+  assert.equal(blast.strongMagnitude, 1);
+  assert.equal(blast.weakMagnitude, 1);
+  assert.equal(blast.duration, 220, 'capped');
+  for (const v of Object.values(blast)) assert.ok(v >= 0 && Number.isFinite(v));
+});
+
+test('rumble plays a dual-rumble effect on the first pad that has an actuator, and is quiet without one', () => {
+  const played = [];
+  const pad = { vibrationActuator: { playEffect: (type, fx) => { played.push([type, fx]); return Promise.resolve('complete'); } } };
+  const p = createPlatform({ navigator: { getGamepads: () => [null, { id: 'no rumble' }, pad] } });
+  assert.equal(p.rumble(40), true);
+  assert.equal(played.length, 1);
+  assert.equal(played[0][0], 'dual-rumble');
+  assert.deepEqual(played[0][1], rumbleOf(40));
+  assert.equal(createPlatform({ navigator: {} }).rumble(40), false);
+  assert.equal(createPlatform({ navigator: { getGamepads() { throw new Error('no'); } } }).rumble(40), false);
+  assert.equal(createPlatform(undefined).rumble(40), false);
+});
