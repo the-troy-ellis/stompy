@@ -1,0 +1,39 @@
+{
+  "name": "stompy-deck",
+  "productName": "Stompy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Stompy as a native Linux app for the Steam Deck: an Electron shell around ../dist (docs/specs/40-steam-deck.md). Not needed for the web version.",
+  "main": "main.cjs",
+  "scripts": {
+    "game": "node -e \"const fs=require('fs');fs.rmSync('game',{recursive:true,force:true});fs.cpSync('../dist','game',{recursive:true})\"",
+    "start": "npm run game && electron .",
+    "appimage": "npm run game && electron-builder --linux AppImage --x64 --publish never"
+  },
+  "build": {
+    "appId": "com.troyellis.stompy",
+    "productName": "Stompy",
+    "files": [
+      "main.cjs",
+      "game/**/*",
+      "!game/**/*.map",
+      "!game/sw.js"
+    ],
+    "linux": {
+      "target": "AppImage",
+      "category": "Game",
+      "icon": "game/icons/icon-512.png",
+      "syncDesktopName": true
+    },
+    "artifactName": "Stompy-${version}-x86_64.${ext}",
+    "directories": {
+      "output": "out"
+    },
+    "publish": null
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "26.18.0"
+  },
+  "desktopName": "stompy.desktop"
+}

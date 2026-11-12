@@ -424,6 +424,16 @@ the simplest shape first), and woods hide you from sight by how much of them
 is in between. In five parts: the tree field; crushing and toppling;
 concealment and the mist; fighting up close; the arena.
 
+## M17 — Stompy on the Steam Deck (proposed)
+
+Goal: the game's home is the owner's Steam Deck, as a native app.
+
+- Part 1: the native shell. An Electron AppImage around `dist/`, full
+  screen, built by `.github/workflows/deck.yml`
+  ([specs/40-steam-deck.md](specs/40-steam-deck.md)).
+- After that, from the owner's playtest notes: controls, HUD and budgets for
+  the Deck.
+
 ## Parked
 
 - **Portrait cockpit** ([specs/17-portrait-cockpit.md](specs/17-portrait-cockpit.md)):
