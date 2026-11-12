@@ -29,7 +29,8 @@
     "directories": {
       "output": "out"
     },
-    "publish": null
+    "publish": null,
+    "afterPack": "./afterPack.cjs"
   },
   "devDependencies": {
     "electron": "45.0.0",
