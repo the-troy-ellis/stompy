@@ -184,8 +184,12 @@ function start(root) {
   if (params.has('edit')) { G.state = 'edit'; ov.hidden = true; import('./ui/editor.js').then(m => { app.editor = m.createEditor(app); }); }
   else app.ui.mainMenu();
   if (app.bench && params.has('bench')) app.bench.start();   // ?debug=1&bench=1: straight into the bench
-  // Installed and offline (the built game only): a new version waiting shows UPDATED · RELOAD on the menu.
-  registerServiceWorker(apply => { app.update = apply; if (G.state === 'menu' && !G.lobby && document.activeElement?.tagName !== 'INPUT') app.ui.renderMenu(); });
+  // A new version waiting shows UPDATED · RELOAD on the menu: installed and
+  // offline on the web (the built game only), or in the Steam Deck app once
+  // it has downloaded its next build (deck/main.cjs, docs/specs/40-steam-deck.md).
+  const offerUpdate = apply => { app.update = apply; if (G.state === 'menu' && !G.lobby && document.activeElement?.tagName !== 'INPUT') app.ui.renderMenu(); };
+  registerServiceWorker(offerUpdate);
+  platform.onShellUpdate(offerUpdate);
   requestAnimationFrame(loop);
   setTimeout(() => wrap.focus(), 0);
 }

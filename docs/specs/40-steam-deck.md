@@ -83,6 +83,41 @@ window waited for its first frame (`ready-to-show`) before showing.
 Checked in the container: with `WAYLAND_DISPLAY` set, the launcher chose X11
 and the page loaded. Deck check: open.
 
+### Part 3: it updates itself (built)
+
+The owner, 2026-11-12: "Is it possible for the game to download and install
+its own updates so i don't have to keep switching between game mode and
+desktop mode?" Then "Go ahead".
+
+- **When.** 5 s after the window opens, in the background (`deck/main.cjs
+  update()`). The app fetches `deck-latest/Stompy-x86_64.AppImage.sha256`
+  and compares it with a hash of its own file (`$APPIMAGE`, which the
+  AppImage runtime sets).
+- **On a newer build.** It downloads `Stompy-x86_64.AppImage` to
+  `<AppImage>.download` beside it, hashing as it goes. It renames that over
+  the running AppImage only if the hash matches the release's checksum.
+  Linux lets a running file be replaced, and the path doesn't change, so
+  Steam's shortcut and its launch options keep working.
+- **Telling the player.** The page hears of it through `preload.cjs`
+  (`window.stompyShell`) and the platform layer
+  (`src/platform/index.js onShellUpdate`). The main menu shows the button the
+  offline web version already uses, **UPDATED · RELOAD**: no new text. The
+  button relaunches the AppImage (`app.relaunch` with `execPath:
+  $APPIMAGE`); otherwise the next launch is the new build.
+- **Failures change nothing.** No network, a 404 (say, mid-publish), a
+  checksum mismatch or a folder it can't write: it logs `update: skipped …`
+  or `update: checksum mismatch, discarded`, removes the partial file, keeps
+  the old AppImage, and plays on.
+- **Switches.** Off outside an AppImage (`npm start`) and with
+  `STOMPY_NO_UPDATE=1`. `STOMPY_UPDATE_URL` points it at another release,
+  for tests.
+- **Checked in the container** under Electron with a fake release on a local
+  server: a new build was downloaded, checked and swapped in; the menu
+  showed UPDATED · RELOAD; pressing it relaunched the new file. A wrong
+  checksum left the old file and no `.download` behind.
+- Deck check: open. Desktop Mode is needed once more, to install the first
+  build that has the updater.
+
 ### Later (from the playtest notes, not decided here)
 
 What the Deck changes in the game itself waits for the owner's playtest

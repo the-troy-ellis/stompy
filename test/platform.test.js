@@ -66,3 +66,19 @@ test('rumble plays a dual-rumble effect on the first pad that has an actuator, a
   assert.equal(createPlatform({ navigator: { getGamepads() { throw new Error('no'); } } }).rumble(40), false);
   assert.equal(createPlatform(undefined).rumble(40), false);
 });
+
+// The Steam Deck app's update offer (docs/specs/40-steam-deck.md): through
+// window.stompyShell when the shell is there, and nothing anywhere else.
+test('onShellUpdate: the shell says ready once, and apply restarts it; no shell, no offer', () => {
+  let ready = null, restarts = 0;
+  const p = createPlatform({ stompyShell: { onUpdateReady: cb => { ready = cb; }, restart: () => { restarts++; } } });
+  const offers = [];
+  p.onShellUpdate(apply => offers.push(apply));
+  assert.equal(offers.length, 0, 'nothing until the build is in place');
+  ready();
+  assert.equal(offers.length, 1);
+  offers[0]();
+  assert.equal(restarts, 1);
+  createPlatform({ navigator: {} }).onShellUpdate(() => assert.fail('no shell, no offer'));
+  createPlatform(undefined).onShellUpdate(() => assert.fail('no window, no offer'));
+});
