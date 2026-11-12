@@ -33,8 +33,16 @@ By hand:
    **Add a Non-Steam Game to My Library** → **Browse** → pick the AppImage.
 5. Back in **Game Mode**, it's under Library → **Non-Steam**.
 
-To update, download it again over the old file. Steam's shortcut keeps
-working because the path doesn't change.
+**It updates itself.** A few seconds after each launch, the app checks the
+deck-latest release in the background. If there's a newer build, it
+downloads it while you play, checks it against its checksum, and puts it
+in place of the old file. **UPDATED · RELOAD** then appears on the main
+menu; press it to restart into the new build, or just play on, and the next
+launch is the new build. The path stays the same, so Steam's shortcut and
+its launch options keep working. With no network, or a download that
+doesn't match its checksum, it keeps the old file and plays on.
+`STOMPY_NO_UPDATE=1 %command%` in the launch options turns it off. Only the
+first install (or a build with a broken updater) needs Desktop Mode.
 
 A build from a branch or a PR isn't released. It's the
 `stompy-deck-appimage` artifact on that workflow run (Actions → **Steam
@@ -98,9 +106,11 @@ everything under `~`. Don't use `sudo` or `pacman`, and don't run
    the Steam logo, read `~/.config/Stompy/stompy.log` afterwards: the last
    line says where it stopped.
 
-5. **Updating later:** repeat step 1 only. The path stays the same, so the
-   Steam shortcut and its launch options keep working. Saves live in
-   `~/.config/Stompy/` and survive updates.
+5. **Updating later:** nothing to do. The app updates itself on launch
+   (above), and its log says so (`update: up to date`, `update: installed
+   …`, or `update: skipped` with why). To force it by hand, repeat step 1;
+   the path stays the same. Saves live in `~/.config/Stompy/` and survive
+   updates.
 
 **Building it on the Deck instead** (only if the release is missing, or you
 were asked to build a branch): Node isn't installed on SteamOS, so put it in
@@ -176,11 +186,20 @@ F11 toggles full screen.
   launcher passes `--ozone-platform=x11` when there's an X display (gamescope
   shows only X11 windows) and `--no-sandbox` when user namespaces aren't
   allowed or it runs as root, and writes `~/.config/Stompy/stompy.log`.
+- `preload.cjs`: the page's only view of Electron, `window.stompyShell`
+  (`onUpdateReady`, `restart`). The game's platform layer
+  (`src/platform/index.js onShellUpdate`) turns it into the menu's
+  UPDATED · RELOAD, the same button the offline web version uses.
 - `main.cjs`: the window and a `stompy://game/` scheme serving `game/` (the
   copied web build). It isn't `file://`, so modules, the ground's worker and
   saves behave as they do on the web. The window shows at once, black,
   rather than waiting for a first frame. Navigation can't leave the game.
   Sound starts without a click, since a controller press doesn't count as a
   gesture in the browser. It logs each step of the launch to the same file.
+  It updates itself (`update()`): 5 s after the window opens it compares
+  the release's `.sha256` with a hash of `$APPIMAGE`. On a difference it
+  downloads to `<AppImage>.download`, hashing as it goes, and renames over
+  the AppImage only on a match. Off without `$APPIMAGE` (`npm start`) or with
+  `STOMPY_NO_UPDATE`; `STOMPY_UPDATE_URL` points it elsewhere, for tests.
 - `package.json`: Electron and electron-builder, pinned, and the AppImage
   settings.
