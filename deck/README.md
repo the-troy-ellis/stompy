@@ -11,21 +11,109 @@ and the root `npm ci`, `npm run build` and every web check run without it.
 
 ## Getting it onto the Deck
 
-GitHub builds it on every push to `main` (and by hand: Actions →
-**Steam Deck** → **Run workflow**).
+GitHub builds it on every push to `main` and publishes it as the
+**deck-latest** release, replaced each time, under a fixed name:
+
+```
+https://github.com/the-troy-ellis/stompy/releases/download/deck-latest/Stompy-x86_64.AppImage
+```
+
+No GitHub login is needed (the repository is public). A
+`Stompy-x86_64.AppImage.sha256` checksum sits beside it.
+
+By hand:
 
 1. On the Deck, switch to **Desktop Mode** (Steam button → Power → Switch to
    Desktop).
-2. In the browser, open the repository's **Actions** tab, then **Steam
-   Deck**, then the latest green run. Download the `stompy-deck-appimage`
-   artifact, a zip.
-3. Unzip it (Dolphin: right-click → Extract). Move
-   `Stompy-0.1.0-x86_64.AppImage` somewhere it will stay, such as
+2. In the browser, open the link above. It downloads
+   `Stompy-x86_64.AppImage`. Move it somewhere it will stay, such as
    `~/Games/`.
-4. Right-click it → **Properties** → **Permissions** → tick **Is executable**.
-5. Right-click it → **Add to Steam**. If that's missing: open Steam → Games →
+3. Right-click it → **Properties** → **Permissions** → tick **Is executable**.
+4. Right-click it → **Add to Steam**. If that's missing: open Steam → Games →
    **Add a Non-Steam Game to My Library** → **Browse** → pick the AppImage.
-6. Back in **Game Mode**, it's under Library → **Non-Steam**.
+5. Back in **Game Mode**, it's under Library → **Non-Steam**.
+
+To update, download it again over the old file. Steam's shortcut keeps
+working because the path doesn't change.
+
+A build from a branch or a PR isn't released. It's the
+`stompy-deck-appimage` artifact on that workflow run (Actions → **Steam
+Deck**), which needs a GitHub login to download and comes as a zip.
+
+## If you're an agent on the Deck
+
+You're on the owner's Steam Deck, probably in Desktop Mode with a terminal
+(Konsole). SteamOS is Arch-based. Its system files are read-only, so put
+everything under `~`. Don't use `sudo` or `pacman`, and don't run
+`steamos-readonly disable`. Steps:
+
+1. **Download and check it:**
+
+   ```sh
+   mkdir -p ~/Games/Stompy && cd ~/Games/Stompy
+   base=https://github.com/the-troy-ellis/stompy/releases/download/deck-latest
+   curl -fL -o Stompy-x86_64.AppImage.new "$base/Stompy-x86_64.AppImage"
+   curl -fL -o Stompy-x86_64.AppImage.sha256 "$base/Stompy-x86_64.AppImage.sha256"
+   # the checksum names the final file, so check it under that name
+   mv -f Stompy-x86_64.AppImage.new Stompy-x86_64.AppImage
+   sha256sum -c Stompy-x86_64.AppImage.sha256
+   chmod +x Stompy-x86_64.AppImage
+   ```
+
+   If `sha256sum -c` fails, the download was cut short. Download again;
+   don't run a file that fails the check.
+
+2. **Check it starts:**
+
+   ```sh
+   STOMPY_WINDOWED=1 ./Stompy-x86_64.AppImage & pid=$!
+   sleep 15; kill -0 $pid && echo "running" ; kill $pid
+   ```
+
+   A window with the game's menu should appear, and `running` should print.
+   - If it exits at once mentioning the sandbox, add `--no-sandbox`
+     (`./Stompy-x86_64.AppImage --no-sandbox`) and use it in step 3's
+     launch options.
+   - If it mentions FUSE, use `./Stompy-x86_64.AppImage
+     --appimage-extract-and-run`.
+
+3. **Add it to Steam:**
+
+   ```sh
+   steamos-add-to-steam ~/Games/Stompy/Stompy-x86_64.AppImage
+   ```
+
+   Steam has to be running, which it always is in Desktop Mode. If
+   `steamos-add-to-steam` isn't there, ask the owner to do it by hand:
+   Steam → Games → **Add a Non-Steam Game to My Library** → **Browse**.
+
+   Launch options can't be set from the command line. If step 2 needed a
+   flag, tell the owner to open the game's **Properties** in Steam and set
+   the launch options to `%command% --no-sandbox`, or the flag it needed.
+
+4. **Tell the owner:** it's in Game Mode under Library → **Non-Steam**. If
+   the buttons do nothing in game, they should pick the **Gamepad**
+   template in its controller settings.
+
+5. **Updating later:** repeat step 1 only. The path stays the same, so the
+   Steam shortcut and its launch options keep working. Saves live in
+   `~/.config/Stompy/` and survive updates.
+
+**Building it on the Deck instead** (only if the release is missing, or you
+were asked to build a branch): Node isn't installed on SteamOS, so put it in
+`~`:
+
+```sh
+mkdir -p ~/.local/node && curl -fL https://nodejs.org/dist/v22.11.0/node-v22.11.0-linux-x64.tar.xz \
+  | tar -xJ -C ~/.local/node --strip-components=1
+export PATH="$HOME/.local/node/bin:$PATH"
+git clone https://github.com/the-troy-ellis/stompy ~/src/stompy && cd ~/src/stompy   # or git pull, or check out the branch
+npm ci && npm run build
+cd deck && npm ci && npm run appimage
+cp out/Stompy-*-x86_64.AppImage ~/Games/Stompy/Stompy-x86_64.AppImage
+```
+
+Then continue from step 2.
 
 ### Controls
 
@@ -71,6 +159,9 @@ F11 toggles full screen.
 
 ## What's here
 
+- `.github/workflows/deck.yml` builds the AppImage. On `main` it also
+  replaces the `deck-latest` release, with the AppImage under a fixed name
+  and its checksum.
 - `main.cjs`: the window and a `stompy://game/` scheme serving `game/` (the
   copied web build). It isn't `file://`, so modules, the ground's worker and
   saves behave as they do on the web. Navigation can't leave the game. Sound

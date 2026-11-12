@@ -52,7 +52,14 @@ No new text.
   or localhost) and isn't packaged: the app's files are its cache.
 - `.github/workflows/deck.yml` builds the AppImage on pushes to `main`, on
   PRs touching `deck/`, and by hand. The artifact is `stompy-deck-appimage`.
-  `deck/README.md` says how to put it on the Deck.
+  On `main` it also replaces the **deck-latest** release:
+  `Stompy-x86_64.AppImage` under a fixed name, plus its `.sha256`, fetched
+  with one `curl` and no GitHub login (the repository is public).
+- `deck/README.md` says how to put it on the Deck: by hand, and step by step
+  for an agent on the Deck (download and checksum into `~/Games/Stompy`,
+  a start check, `steamos-add-to-steam`, updating, and building there with
+  Node under `~` if the release is missing). Nothing needs `sudo`; SteamOS's
+  system files stay read-only.
 
 ### Later (from the playtest notes, not decided here)
 
@@ -76,7 +83,8 @@ Nothing in `src/` changes.
 ## Acceptance criteria
 
 1. `npm run appimage` in `deck/` (after the root build) makes
-   `out/Stompy-<version>-x86_64.AppImage`. The workflow uploads it.
+   `out/Stompy-<version>-x86_64.AppImage`. The workflow uploads it, and on
+   `main` publishes it as `deck-latest/Stompy-x86_64.AppImage`.
 2. The app opens full screen into the menu, plays a match, and keeps
    settings between runs, with no browser.
 3. On the Deck, added as a non-Steam game, it runs in Game Mode, and the
