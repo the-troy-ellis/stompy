@@ -93,6 +93,7 @@ export function createInput(app) {
   document.addEventListener('pointerlockchange', onLockChange);
 
   const onMouseMove = e => {
+    if (G.padActive && (e.movementX || e.movementY)) { G.padActive = false; syncTouchUI(); }   // the mouse is back in charge: the cursor returns
     if (G.state !== 'play' || G.paused) return;
     if (!locked()) return;
     if (G.spectate) { orbitSpectate(G, -e.movementX * 0.004 * prefs.mouseSens, e.movementY * 0.003 * prefs.mouseSens * (prefs.invert ? -1 : 1)); return; }   // waiting to respawn: orbit
@@ -229,6 +230,7 @@ export function createInput(app) {
   };
   const syncTouchUI = () => {
     tui.hidden = !(G.touchUI && !G.padActive && (G.state === 'play' || G.state === 'over') && !G.paused && !G.command);   // a gamepad in use, or up in the command view: out of the way
+    wrap.classList.toggle('pad-on', !!G.padActive);   // no cursor in the middle of the screen while a pad flies (the Deck); a mouse move brings it back
     const map = root.querySelector('[data-t="map"]');
     if (map) map.hidden = !app.command?.can();   // MAP: only with a crew (docs/specs/22-command-view.md)
     const h = tui.getBoundingClientRect().height || window.innerHeight;

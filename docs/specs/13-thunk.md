@@ -6,7 +6,7 @@
 | Milestone | M1 (the table and the first pass); every later feature adds rows |
 | Size | M (split: feel table + footfalls + landing; hit wobble + recoil + knockback; shutdown + death; audio layer; reduced motion) |
 | Depends on | M0 |
-| Touch parity | all of it is output; phones also get the vibration API where available |
+| Touch parity | all of it is output; a controller gets rumble, phones the vibration API where available |
 
 ## Summary
 
@@ -215,6 +215,17 @@ values, mixed under the existing clips. `duck` lowers the reactor hum and
 servo loops by that fraction for 250 ms with a 400 ms recovery. On phones,
 the bass is barely audible on the speaker; the haptic column does that job
 there.
+
+**In the controller (the Steam Deck, 2026-11-11):** while a pad is in use
+(`G.padActive`) the haptic column plays as rumble instead of a buzz.
+`platform.rumble(ms)` (`src/platform/index.js`) sends a dual-rumble effect to
+the first pad with a vibration actuator, shaped by `rumbleOf(ms)`: a
+footfall's 8 to 10 is a 30 ms tick on the weak motor; from about 20 the
+strong motor comes in; a blast-off's 110 is both motors at full for 220 ms.
+HAPTICS in Settings and REDUCED MOTION turn it off as they did the buzz.
+The cursor is hidden over the game while a pad is in use (`.mech-wrap.pad-on`)
+and comes back, with mouse control, on the first mouse move. Checked on the
+Deck itself: open.
 
 ### Reduced motion
 

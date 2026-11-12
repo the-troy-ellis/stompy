@@ -508,12 +508,15 @@ export function createAudio(app) {
 
 
   // The feel table's sound columns: bass is the sub thump voice, duck pulls
-  // the loops down for a moment, haptic is a buzz on touch (phone speakers
+  // the loops down for a moment, haptic is rumble in the controller when one
+  // is in use (the Steam Deck, spec 40) or a buzz on touch (phone speakers
   // can't do the bass; the buzz does that job there).
   function thump(bass, duck, haptic, at) {
     thumper.hit(bass, at);
     thumper.duck(duck);
-    if (haptic > 2 && G.touchUI && prefs.haptics !== false) platform.haptic(min(100, Math.round(haptic)));
+    if (!(haptic > 2) || prefs.haptics === false) return;
+    if (G.padActive) platform.rumble(Math.round(haptic));
+    else if (G.touchUI) platform.haptic(min(100, Math.round(haptic)));
   }
   return { Sound, settings, loadSamples, play, loopSet, loops, sfx, say, beamSound, meltSound, fusionSound, thump, tick: audioTick, ambience };
 }
