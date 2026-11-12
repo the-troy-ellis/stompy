@@ -22,7 +22,7 @@ import { oreRoom, isoRoom } from '../sim/base.js';
 import { TUT } from '../data/tutorial.js';
 import { depthOf, underground, nearSurface, markAt, above } from '../sim/under.js';
 import { clipTo, seg } from './markers.js';
-import { sightLine, inView } from '../sim/sight.js';
+import { sightLine, inView, audible } from '../sim/sight.js';
 
 const LAG_MS = 200;   // a round trip to the relay past this shows LAG (docs/specs/10-internet-play.md § Latency)
 
@@ -223,6 +223,18 @@ export function createHud(app) {
     ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6, 3); ctx.lineTo(-6, 3); ctx.closePath(); ctx.fill();
     ctx.restore();
     ctx.fillText(`${label}${fmtDist(dist)}`, e.x, e.y + (e.y > (top + bottom) / 2 ? -12 : 20));
+  }
+  // A foe heard but not seen, in the woods (docs/specs/39-forest.md part 4):
+  // a faint arrow at the view's edge the way it is, HEARD by it. No distance:
+  // you only know where.
+  function drawHeard(L, m) {
+    const P = G.player, top = 72, bottom = L.viewBottom - 16, e = edgePoint(V.W, top, bottom, 18, viewYaw(P), P, [m.x, m.y, m.z]);
+    ctx.globalAlpha = 0.6; ctx.fillStyle = RED; ctx.textAlign = 'center';
+    ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.a);
+    ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6, 3); ctx.lineTo(-6, 3); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.fillText('HEARD', e.x, e.y + (e.y > (top + bottom) / 2 ? -12 : 20));
+    ctx.globalAlpha = 1;
   }
   // Where the view edge is crossed going from the centre toward the objective's bearing.
   function edgePoint(W, top, bottom, m, vy, P, p) { return markerEdge(W, top, bottom, m, atan2(p[0] - P.x, p[2] - P.z) - vy); }
@@ -944,6 +956,7 @@ export function createHud(app) {
     // ground like every marker. Underground, what's above you as outlines.
     const mk = markAt(G);
     if (mk) drawMarker(L, mk, '#fff', 'MARK ');   // white: apart from the objectives' amber and green, in every colour mode
+    if (G.trees && !(P.scramble > 0)) for (const m of G.mechs) if (m.team !== P.team && m.team !== 0 && audible(G, G.eye, m)) drawHeard(L, m);
     if (underground(G, G.player)) drawAbove();
     // Status lines.
     ctx.textAlign = 'center';

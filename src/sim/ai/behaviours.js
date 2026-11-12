@@ -2,7 +2,8 @@ import { clampN, wrapA } from '../../util/math.js';
 import { BX, BZ } from '../../world/terrain.js';
 import { geoOf } from '../../data/geo.js';
 import { center } from '../geom.js';
-import { eyeAt, blocked } from '../sight.js';
+import { eyeAt, blocked, woodsHide } from '../sight.js';
+import { sightOf } from './perception.js';
 import { BEHAVIOUR as B } from '../../data/ai.js';
 import { gradeFactor, grips } from '../mech.js';
 import { mechsNear, nearRadius } from '../near.js';
@@ -81,13 +82,14 @@ export const ridgeRelocate = (G, e, ctx, dt) => ridge(G, e, ctx, dt, { relocate:
 export const harassStomp = (G, e, ctx, dt) => harass(G, e, ctx, dt, { stomp: true });
 
 // Hot or hurt: find the nearest spot nearby from which the target cannot be
-// seen, walk there and wait until cool. Sample 8 bearings x 3 distances.
+// seen, walk there and wait until cool. Sample 8 bearings x 3 distances. A
+// hill hides it; so do enough woods in between (spec 39).
 export function findCover(G, e, target) {
-  const tc = center(target);
+  const tc = center(target), range = G.trees ? sightOf(G, target) : 0;
   let best = null;
   for (const d of B.coverDists) for (let k = 0; k < 8; k++) {
-    const a = k * PI / 4, x = inMapX(e.x + sin(a) * d), z = inMapZ(e.z + cos(a) * d);
-    if (!blocked(G, eyeAt(G, e, x, z), tc)) continue;
+    const a = k * PI / 4, x = inMapX(e.x + sin(a) * d), z = inMapZ(e.z + cos(a) * d), eye = eyeAt(G, e, x, z);
+    if (!woodsHide(G, eye, tc, range) && !blocked(G, eye, tc)) continue;
     const t = travel(G, e, x, z);
     if (t === Infinity) continue;
     if (!best || t < best.d) best = { x, z, d: t };
@@ -117,16 +119,18 @@ export const useCover = cover();
 export const coverWhenHot = cover({ hurt: false });
 
 // Snipers: a spot well above the target with line of sight, re-sampled on a
-// slow timer from a ring around the target. No opinion once it is there.
+// slow timer from a ring around the target. No opinion once it is there. In
+// a forest, a line of sight the woods don't cut: it looks for clearings.
 export function findRidge(G, e, target, avoid = null) {
-  const tc = center(target), base = G.ter.height(target.x, target.z);
+  const tc = center(target), base = G.ter.height(target.x, target.z), range = G.trees ? sightOf(G, target) : 0;
   let best = null;
   for (const r of B.ridgeRadii) for (let k = 0; k < 16; k++) {
     const a = k * PI / 8, x = inMapX(target.x + sin(a) * r), z = inMapZ(target.z + cos(a) * r);
     const h = G.ter.height(x, z);
     if (h < base + B.ridgeAbove) continue;
     if (avoid && hypot(x - avoid.x, z - avoid.z) < B.relocateAway) continue;   // somewhere it has not just been shooting from
-    if (blocked(G, eyeAt(G, e, x, z), tc)) continue;
+    const eye = eyeAt(G, e, x, z);
+    if (woodsHide(G, eye, tc, range) || blocked(G, eye, tc)) continue;
     const d = travel(G, e, x, z);
     if (d === Infinity) continue;
     if (!best || d < best.d) best = { x, z, d };
