@@ -126,7 +126,21 @@ export function createInput(app) {
     'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyG', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
   // Keys are taken at the document: hiding the overlay drops focus to <body>,
   // and pointer lock doesn't move it back.
+  // What the pad and the keyboard actually report, for ?debug=1's overlay
+  // (render/hud.js): a controller that misbehaves on one browser (an iPad's
+  // Safari: the sticks work, the buttons bring up the keyboard) shows there
+  // whether the presses reach the page as pad buttons, as keys, or not at all,
+  // and what has focus.
+  const padDebug = app.padDebug = { pad: '', keys: [], focus: '' };
+  const noteKey = (kind, e) => { padDebug.keys.unshift(`${kind}${e.key || '?'}/${e.code || '?'}`); padDebug.keys.length = Math.min(padDebug.keys.length, 4); };
+  const noteFocus = () => { const a = document.activeElement; padDebug.focus = a && a !== document.body ? `${a.tagName}${a.id ? '#' + a.id : ''}${a.className && typeof a.className === 'string' ? '.' + a.className.split(' ')[0] : ''}` : 'BODY'; };
+  if (app.params?.has?.('debug')) {
+    document.addEventListener('keyup', e => noteKey('^', e), true);
+    document.addEventListener('focusin', noteFocus, true);
+    document.addEventListener('focusout', () => setTimeout(noteFocus, 0), true);
+  }
   const onKeyDown = e => {
+    if (app.params?.has?.('debug')) noteKey('v', e);
     if (e.target.closest?.('input')) { if (e.key === 'Enter' && G.state === 'menu') { e.preventDefault(); app.ui.go(); } return; }
     if (e.key === 'F2') { e.preventDefault(); exitLock(); if (app.net.mp()) app.net.leaveArena(); else app.ui.mainMenu(); return; }
     if (e.code === 'KeyM') { app.ui.OPTS.sound[2](!prefs.sound); msg(G, prefs.sound ? 'SOUND ON' : 'SOUND OFF'); return; }
@@ -348,6 +362,11 @@ export function createInput(app) {
     const gp = firstPad(navigator.getGamepads?.());
     if (!gp) { pad = null; return; }
     pad = readPad(gp, padHeld); padHeld = pad.held;
+    if (app.params?.has?.('debug')) {
+      let on = '';
+      for (let i = 0; i < gp.buttons.length; i++) { const b = gp.buttons[i]; if (b.pressed || b.value > 0.05) on += `${on ? ' ' : ''}${i}${b.pressed ? '' : '~'}`; }
+      padDebug.pad = `${gp.mapping || 'no-mapping'} ${gp.buttons.length}b ${gp.axes.length}a  ON ${on || '-'}  ${(gp.id || '').slice(0, 24)}`;
+    }
     if (!pad.active) return;
     if (!G.padActive) { G.padActive = true; syncTouchUI(); }
     const p = pad.pressed, P = G.player;
