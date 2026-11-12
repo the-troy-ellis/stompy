@@ -71,11 +71,12 @@ everything under `~`. Don't use `sudo` or `pacman`, and don't run
    ```
 
    A window with the game's menu should appear, and `running` should print.
-   - If it exits at once mentioning the sandbox, add `--no-sandbox`
-     (`./Stompy-x86_64.AppImage --no-sandbox`) and use it in step 3's
-     launch options.
-   - If it mentions FUSE, use `./Stompy-x86_64.AppImage
-     --appimage-extract-and-run`.
+   The launcher inside the AppImage picks X11 and the sandbox by itself.
+   - If it didn't start, read `~/.config/Stompy/stompy.log`. It shows the
+     launcher's flags and how far the app got.
+   - If the terminal mentions FUSE, use `./Stompy-x86_64.AppImage
+     --appimage-extract-and-run`, and tell the owner it needs that as a
+     launch option.
 
 3. **Add it to Steam:**
 
@@ -88,12 +89,14 @@ everything under `~`. Don't use `sudo` or `pacman`, and don't run
    Steam → Games → **Add a Non-Steam Game to My Library** → **Browse**.
 
    Launch options can't be set from the command line. If step 2 needed a
-   flag, tell the owner to open the game's **Properties** in Steam and set
-   the launch options to `%command% --no-sandbox`, or the flag it needed.
+   flag, tell the owner to open the game's **Properties** in Steam and add
+   it to the launch options after `%command%`.
 
 4. **Tell the owner:** it's in Game Mode under Library → **Non-Steam**. If
    the buttons do nothing in game, they should pick the **Gamepad**
-   template in its controller settings.
+   template in its controller settings. If a launch from Game Mode hangs on
+   the Steam logo, read `~/.config/Stompy/stompy.log` afterwards: the last
+   line says where it stopped.
 
 5. **Updating later:** repeat step 1 only. The path stays the same, so the
    Steam shortcut and its launch options keep working. Saves live in
@@ -134,14 +137,20 @@ If the buttons do nothing in game, open the game's controller settings
 
 ### If it won't start
 
-Open its **Properties** in Steam and set the launch options to:
+The app starts through a small launcher that handles the two known Game
+Mode problems itself: it asks for X11 (gamescope only shows X11 windows),
+and it turns Chromium's sandbox off where SteamOS doesn't allow it. No
+launch options are needed.
 
-```
-%command% --no-sandbox
-```
+Every launch writes a log to `~/.config/Stompy/stompy.log` (the one before
+it is `stompy.log.1`). If the Steam logo just spins, or it closes at once,
+that file says how far it got: the launcher's flags, then `start`, `ready`,
+`window`, `page loaded`, and any process that died. Send it over.
 
-For the debug overlay (frame times, what the controller reports), use
-`STOMPY_QUERY=debug=1 %command%` instead.
+Launch options still work for testing:
+- `STOMPY_QUERY=debug=1 %command%`: the debug overlay (frame times, what the
+  controller reports).
+- `STOMPY_WAYLAND=1 %command%`: skip the X11 choice.
 
 ## Building it yourself
 
@@ -162,10 +171,16 @@ F11 toggles full screen.
 - `.github/workflows/deck.yml` builds the AppImage. On `main` it also
   replaces the `deck-latest` release, with the AppImage under a fixed name
   and its checksum.
+- `afterPack.cjs`: electron-builder's hook. It puts a launcher script where
+  the app's executable was (the real one becomes `stompy-deck.bin`). The
+  launcher passes `--ozone-platform=x11` when there's an X display (gamescope
+  shows only X11 windows) and `--no-sandbox` when user namespaces aren't
+  allowed or it runs as root, and writes `~/.config/Stompy/stompy.log`.
 - `main.cjs`: the window and a `stompy://game/` scheme serving `game/` (the
   copied web build). It isn't `file://`, so modules, the ground's worker and
-  saves behave as they do on the web. Navigation can't leave the game. Sound
-  starts without a click, since a controller press doesn't count as a
-  gesture in the browser.
+  saves behave as they do on the web. The window shows at once, black,
+  rather than waiting for a first frame. Navigation can't leave the game.
+  Sound starts without a click, since a controller press doesn't count as a
+  gesture in the browser. It logs each step of the launch to the same file.
 - `package.json`: Electron and electron-builder, pinned, and the AppImage
   settings.

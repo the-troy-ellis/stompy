@@ -61,6 +61,28 @@ No new text.
   Node under `~` if the release is missing). Nothing needs `sudo`; SteamOS's
   system files stay read-only.
 
+### Fix: the spinning logo in Game Mode (2026-11-12)
+
+The owner's first launch from Game Mode sat on Steam's spinning logo. The
+likely cause: Electron chooses Wayland whenever a Wayland socket exists, and
+gamescope has one, but Game Mode only shows X11 windows. A second risk: the
+window waited for its first frame (`ready-to-show`) before showing.
+
+- The packaged app now starts through a launcher script
+  (`deck/afterPack.cjs`, electron-builder's afterPack hook; the Electron
+  binary becomes `stompy-deck.bin`). With an X display it passes
+  `--ozone-platform=x11`. It passes `--no-sandbox` when unprivileged user
+  namespaces aren't allowed (`unshare -Ur` fails) or it runs as root. Both
+  have to be on the command line, before any app JavaScript runs.
+- The window shows at once, black.
+- Every launch logs to `~/.config/Stompy/stompy.log` (the previous launch is
+  `.1`): the launcher's flags, Electron's own output, and the app's steps
+  (`start`, `env`, `ready`, `window`, `gpu`, `page loaded`), plus any process
+  that dies.
+
+Checked in the container: with `WAYLAND_DISPLAY` set, the launcher chose X11
+and the page loaded. Deck check: open.
+
 ### Later (from the playtest notes, not decided here)
 
 What the Deck changes in the game itself waits for the owner's playtest
