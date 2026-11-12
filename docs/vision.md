@@ -2,11 +2,31 @@
 
 ## One line
 
-Stompy is a 90s-style mech sim you can play in a browser tab or on a phone
-held sideways: big thunky machines that stomp, punch and overheat, heat that
-matters, legs and torso that turn apart, and a deadpan cockpit computer that
-reads out the bad news. It is called Stompy. One of the mechs is called
-PURPLE PUNCHER. It is allowed to be funny.
+Stompy is a 90s-style mech sim made for the Steam Deck, in your hands: big
+thunky machines that stomp, punch and overheat, heat that matters, legs and
+torso that turn apart, and a deadpan cockpit computer that reads out the bad
+news. It is called Stompy. One of the mechs is called PURPLE PUNCHER. It is
+allowed to be funny.
+
+## Why it is made
+
+For fun. The owner makes Stompy because making it and playing it are fun,
+and the one test every change has to pass is whether the game is genuinely
+fun to play on the owner's own Steam Deck. It is not made for a market, a
+store or an audience; if it can be released or sold one day that is a bonus,
+never a reason. When a choice would gear the game toward a particular
+audience or toward money, that is the wrong choice (the owner, 2026-11-06).
+
+Two consequences for how it is built:
+
+- **Play before building.** The owner plays, writes down what feels right
+  and what feels off, without reaching for fixes, and the next work is
+  designed around the shape of those notes. No new system before the last
+  one has been played.
+- **The platform is where it feels best:** the Steam Deck (a fixed screen,
+  a fixed control layout, Linux), with mouse and keyboard on a Linux or any
+  desktop second. The web game still runs in any browser, and on a phone it
+  still works, but nothing is designed around a phone any more.
 
 ## What finished looks like
 
@@ -60,12 +80,16 @@ When two good ideas conflict, the pillar higher in this list wins.
    that is flat about absurd things. Never in walls of text, never at the
    expense of a tense moment.
 3. **Readable at a glance.** Flat shading, high-contrast palettes, a HUD that
-   tells you heat, damage, target and ammo without reading. A phone player at
-   arm's length must be able to parse the screen.
-4. **Two thumbs.** Every control fits the touch layout: the left thumb flies
-   the mech (a turn-and-aim stick in the corner, the throttle stick just above it), the right thumb shoots
-   (hold-to-fire buttons by category, one punch button). Desktop
-   gets more buttons, never more *necessary* buttons.
+   tells you heat, damage, target and ammo without reading. A player holding
+   a 7-inch screen at arm's length must be able to parse it.
+4. **In the hands.** Every control fits the Steam Deck's layout, and uses
+   it: two sticks (legs on one, torso on the other), the triggers and
+   bumpers for the weapon groups, the face buttons, the back buttons, and
+   the trackpads or gyro where fine aim helps. Mouse and keyboard get the
+   same game with more keys, never more *necessary* ones. Touch still
+   works (two floating sticks and buttons) but is no longer designed for;
+   a feature that only works on touch is wrong, and one that only works
+   with a mouse needs a controller way too.
 5. **Depth from systems, not menus.** Heat, melt, ammo, per-section damage,
    knockback, the fusion cannon's trade-off. New depth should come from how
    systems interact in a fight, not from screens between fights.
@@ -96,7 +120,11 @@ When two good ideas conflict, the pillar higher in this list wins.
   and keeps score; clients are trusted.
 - Persistent progression beyond campaign position, unlocked chassis and saved
   loadouts. No currency, no salvage, no XP.
-- Native apps. The PWA is the app.
+- Native apps on phones. The Steam Deck app is an Electron shell around the
+  same web build (specs/40-steam-deck.md); the phone apps (spec 24) are
+  parked.
+- Designing for monetisation. No demo split, no unlock, no store-shaped
+  decisions until the owner decides to release, if ever.
 
 ## Reference points
 
