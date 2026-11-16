@@ -1,7 +1,45 @@
-# Building it and putting it on the Deck
+# Putting it on the Deck, and building it
 
 The game is one binary that needs SDL2 and OpenGL 3.3, both of which the Deck
-ships. No installer, no launcher, no store.
+ships. A small launcher script keeps it up to date, so after one setup in
+Desktop mode you never leave Game mode: every push to `main` that passes CI
+becomes the next build, and the launcher installs it the next time you start
+the game.
+
+## Installing on the Deck (once, in Desktop mode)
+
+1. Switch to Desktop mode and open Konsole. Fetch the launcher:
+
+   ```
+   mkdir -p ~/Games/stompy
+   curl -fsSL https://raw.githubusercontent.com/the-troy-ellis/stompy/main/deck/tools/stompy-launch.sh -o ~/Games/stompy/stompy-launch.sh
+   chmod +x ~/Games/stompy/stompy-launch.sh
+   ```
+2. In Steam: Games, "Add a Non-Steam Game to My Library", Browse, set the file
+   type to All Files, and pick `~/Games/stompy/stompy-launch.sh`. Rename the
+   shortcut Stompy in its Properties.
+3. Switch back to Game mode and start it. The first start downloads the game.
+
+From then on, each start checks GitHub for a newer build (for at most five
+seconds), downloads it if there is one (about 2 MB), checks its SHA-256, and
+swaps it in whole. Offline, or if anything fails, it runs the build it already
+has. The game lives in `~/.local/share/stompy-deck`; the settings stay in
+`~/.config/stompy-deck/settings.txt`.
+
+- **To skip the update check** for a session, set the shortcut's Launch
+  Options to `STOMPY_NO_UPDATE=1 %command%`.
+- **To pass the game arguments**, add them after `%command%`, for example
+  `%command% --debug`.
+- **The launcher doesn't update itself.** It is small and should rarely
+  change; if it does, repeat step 1.
+
+How a build gets published: `.github/workflows/deck.yml`'s `release` job runs
+on every push to `main` after the checks pass. It builds in Valve's Steam
+Runtime 3 ("sniper") SDK container, whose glibc 2.31 is older than any
+SteamOS 3, using `tools/build-release.sh`, and replaces the GitHub release
+tagged `deck-latest` (a pre-release, so it never shows as the repository's
+latest release). The checksum file is also the version: a different checksum
+is a new build.
 
 ## Build
 
@@ -19,9 +57,9 @@ The binary links SDL2 dynamically, so one built on a desktop runs on the Deck
 as long as its glibc is not newer than SteamOS's. Building on the Deck itself
 is cleaner.
 
-## Building on the Deck
+## Building on the Deck (optional, for working on it there)
 
-SteamOS's root is read-only and has no compiler, so build in a container:
+You don't need this to play: the launcher installs CI's builds. SteamOS's root is read-only and has no compiler, so build in a container:
 
 1. Switch to Desktop mode. Open Konsole.
 2. Install a toolbox: `distrobox` is in Discover (or `podman` + `toolbox`).
@@ -32,13 +70,10 @@ SteamOS's root is read-only and has no compiler, so build in a container:
 5. The binary runs from the host too (`target/release/stompy`), because the
    Deck's own SDL2 and Mesa satisfy it. Copy it anywhere on the Deck.
 
-## Adding it to Steam
-
-1. In Desktop mode, Steam: Games, "Add a Non-Steam Game to My Library",
-   browse to `target/release/stompy`. Name it Stompy.
-2. In the game's Properties set Launch Options to nothing (fullscreen is the
-   default and saves itself in `~/.config/stompy-deck/settings.txt`).
-3. Switch to Game mode and run it from the library.
+To play a build you made yourself instead of CI's, add `target/release/stompy`
+to Steam as a non-Steam game the same way, or copy it over the launcher's
+copy at `~/.local/share/stompy-deck/stompy` and start with
+`STOMPY_NO_UPDATE=1` so the launcher doesn't replace it.
 
 ## The controller layout in Steam Input
 

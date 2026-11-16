@@ -22,6 +22,8 @@ deck/
       tests/            sim.rs (the invariants and acceptance criteria), tone.rs (the tone guide)
     game/               stompy: the binary
   tools/shot.sh         a screenshot under a virtual screen, for boxes with no display
+  tools/build-release.sh  the release build and its package (CI runs it in the Steam Runtime)
+  tools/stompy-launch.sh  the Deck's launcher: updates from the deck-latest release, then runs the game
   docs/                 this plan
 ```
 
@@ -104,6 +106,16 @@ ELIMINATE is implemented.
 | `mesh.rs` | The builder (cube, cylinder, sphere, tri), every chassis's parts ported from the reference's `mesh/mechParts.js`, the effect shapes, the terrain in 16 chunks, the sky dome, the wrecks. |
 | `scene.rs` | The cockpit camera (kick, bob, shake, wobble, heat sway, squash, sag, the fall; the volley's nose camera), the world, each mech posed from its planted feet by IK, the cockpit's own arms, debris, wrecks, shots, beams, particles instanced by shape, shockwaves dithered away, the jets' landing ring. |
 | `hud.rs`, `font.rs` | A 5 by 7 pixel font as quads, lines and arcs as quads; the ring (heat, jets, speed, the damage diagram), the weapons by category, the radar, the crosshair, the target's brackets, the compass, the messages, the dithered flashes. |
+
+## Releases
+
+Every push to `main` that passes the checks runs the `release` job in
+`.github/workflows/deck.yml`: `tools/build-release.sh` inside Valve's Steam
+Runtime 3 SDK container (glibc 2.31, older than any SteamOS 3), then the
+package and its SHA-256 replace the `deck-latest` pre-release. On the Deck,
+`tools/stompy-launch.sh` compares that checksum with the installed one,
+downloads and verifies a new build, swaps it in whole and starts the game;
+offline or on any failure it runs what it has (docs/deck-setup.md).
 
 ## Invariants you must not break
 

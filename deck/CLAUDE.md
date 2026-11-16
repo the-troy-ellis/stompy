@@ -29,6 +29,9 @@ Rules that are easy to miss:
 - Text: board-book briefs, a flat cockpit voice, jokes after the fact, no
   exclamation marks, no references outside the game. `cargo test` checks it.
 - Balance numbers change only in issues about balance.
+- Every push to `main` that passes CI is published as the `deck-latest`
+  release, and the owner's Deck installs it on its next start
+  (`tools/stompy-launch.sh`). Keep `main` playable.
 - New sim logic gets a test in `crates/sim/tests/sim.rs`. Mechs are indices,
   not references; the sim talks to the outside only through `Game::events`.
 

@@ -12,6 +12,9 @@ How a piece of work moves from an issue to `main`. Agents and people alike.
    A PR that adds a system while the previous milestone's playtest is open
    waits.
 
+Merging to `main` publishes the build to the owner's Deck (docs/deck-setup.md),
+so `main` must always be playable.
+
 ## Definition of done
 
 A PR is done when all of these hold:

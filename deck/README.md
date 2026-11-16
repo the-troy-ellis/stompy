@@ -14,8 +14,8 @@ cargo test --workspace            # the headless sim tests
 ```
 
 - [docs/README.md](docs/README.md): the plan of record. Start there.
-- [docs/deck-setup.md](docs/deck-setup.md): building it, putting it on the
-  Deck, the controller layout.
+- [docs/deck-setup.md](docs/deck-setup.md): putting it on the Deck (a launcher
+  that updates it in Game mode), building it, the controller layout.
 - [docs/controls.md](docs/controls.md): the Deck layout.
 
 The repository around this folder is the browser version and the reference
