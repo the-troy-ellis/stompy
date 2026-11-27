@@ -40,6 +40,8 @@ pub struct Prefs {
     pub rumble: bool,
     pub reduced_motion: bool,
     pub hud_scale: f32,
+    /// The dither's cell in pixels: 0 (off, smooth), 1, 2 or 3.
+    pub dither: u32,
     pub fullscreen: bool,
     pub diff: Diff,
     pub chassis: Ch,
@@ -62,6 +64,7 @@ impl Default for Prefs {
             rumble: true,
             reduced_motion: false,
             hud_scale: 1.,
+            dither: 2,
             fullscreen: true,
             diff: Diff::Normal,
             chassis: Ch::Kestrel,
@@ -112,6 +115,7 @@ impl Prefs {
                 "rumble" => p.rumble = v != 0.,
                 "reducedMotion" => p.reduced_motion = v != 0.,
                 "hudScale" => p.hud_scale = clamp(v, 0.75, 1.5),
+                "dither" => p.dither = clamp(v, 0., 3.) as u32,
                 "fullscreen" => p.fullscreen = v != 0.,
                 "diff" => p.diff = pick(Diff::ALL, v),
                 "chassis" => p.chassis = pick(Ch::ALL, v),
@@ -138,9 +142,9 @@ impl Prefs {
         }
         let b = |v: bool| if v { 1 } else { 0 };
         let s = format!(
-            "padSens={}\nmouseSens={}\ngyroSens={}\nfov={}\nvolume={}\ninvertY={}\ngyro={}\nrumble={}\nreducedMotion={}\nhudScale={}\nfullscreen={}\ndiff={}\nchassis={}\nmission={}\nbiome={}\ntime={}\nfoes={}\ncleared={}\n",
+            "padSens={}\nmouseSens={}\ngyroSens={}\nfov={}\nvolume={}\ninvertY={}\ngyro={}\nrumble={}\nreducedMotion={}\nhudScale={}\ndither={}\nfullscreen={}\ndiff={}\nchassis={}\nmission={}\nbiome={}\ntime={}\nfoes={}\ncleared={}\n",
             self.pad_sens, self.mouse_sens, self.gyro_sens, self.fov, self.volume, b(self.invert_y), idx(&GYROS, self.gyro), b(self.rumble), b(self.reduced_motion),
-            self.hud_scale, b(self.fullscreen), self.diff.i(), self.chassis.i(), self.mission.map_or(-1, |m| m as i32), self.biome.i(), self.time.i(), self.foes, self.cleared
+            self.hud_scale, self.dither, b(self.fullscreen), self.diff.i(), self.chassis.i(), self.mission.map_or(-1, |m| m as i32), self.biome.i(), self.time.i(), self.foes, self.cleared
         );
         let _ = std::fs::write(path, s);
     }
@@ -167,6 +171,8 @@ pub struct Args {
     pub debug: bool,
     pub screen: Option<Screen>,
     pub mech: Option<usize>,
+    /// Overrides the DITHER setting for this run (the tools).
+    pub dither: Option<u32>,
 }
 /// A line the cockpit voice will say, and when.
 struct Line {
@@ -538,6 +544,10 @@ impl App {
                     ("INVERT Y", on(p.invert_y)),
                     ("FOV", format!("{}", p.fov as i32)),
                     ("HUD SCALE", format!("{:.2}X", p.hud_scale)),
+                    (
+                        "DITHER",
+                        ["OFF", "FINE", "CHUNKY", "CHUNKIER"][p.dither as usize].into(),
+                    ),
                     ("VOLUME", format!("{}%", (p.volume * 100.).round() as i32)),
                     ("RUMBLE", on(p.rumble)),
                     ("REDUCED MOTION", on(p.reduced_motion)),
@@ -560,9 +570,10 @@ impl App {
                         4 => p.invert_y = !p.invert_y,
                         5 => p.fov = clamp(p.fov + d * 5., 50., 95.),
                         6 => p.hud_scale = clamp(p.hud_scale + d * 0.25, 0.75, 1.5),
-                        7 => p.volume = clamp(p.volume + d * 0.1, 0., 1.),
-                        8 => p.rumble = !p.rumble,
-                        9 => p.reduced_motion = !p.reduced_motion,
+                        7 => p.dither = (p.dither as i32 + d as i32).rem_euclid(4) as u32,
+                        8 => p.volume = clamp(p.volume + d * 0.1, 0., 1.),
+                        9 => p.rumble = !p.rumble,
+                        10 => p.reduced_motion = !p.reduced_motion,
                         _ => p.fullscreen = !p.fullscreen,
                     }
                     let v = self.prefs.volume;
@@ -744,6 +755,9 @@ impl App {
             frame: 0,
             quit: false,
         };
+        if let Some(d) = a.dither {
+            app.prefs.dither = d.min(3);
+        }
         if let Some(k) = a.mech {
             app.sel = k % Ch::N;
             app.prefs.chassis = MECH_ORDER[app.sel];
@@ -850,6 +864,7 @@ impl App {
             let in_match = matches!(self.screen, Screen::Play | Screen::Pause | Screen::Debrief);
             self.audio.tick(if in_match { Some(&self.g) } else { None });
             self.hud.begin(w, h);
+            self.scene.cell = self.prefs.dither;
             if in_match {
                 let vp = self
                     .scene

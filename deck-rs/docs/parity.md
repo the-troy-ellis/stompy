@@ -98,5 +98,6 @@ port spec's "Changed" list is approved.
 |---|---|---|---|---|
 | 2026-11-10 | Platform | web, phones, desktop | the Steam Deck (mouse and keyboard second) | the game's home is the Deck |
 | 2026-11-10 | Weapon groups | none (one control per kind) | the same | kept on purpose |
+| 2026-11-27 | The look | smooth shading, a PIXELS setting (240 lines) | an ordered dither onto a ramp per place and time; full-resolution edges; DITHER in SETTINGS (off, fine, chunky, chunkier), chunky by default | the owner: dithering is the style, more distinct palettes |
 | 2026-11-27 | Order | the campaign before the second arm | the core and the engine first, the campaign later | the owner's call: get the game's core and engine right first |
 | 2026-11-27 | Rust version | (n/a) | pinned in `rust-toolchain.toml` | fmt and clippy don't drift between builds |

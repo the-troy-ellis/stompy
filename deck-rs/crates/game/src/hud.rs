@@ -17,6 +17,8 @@ pub const RED: Col = [1., 0.27, 0.27];
 pub const DIM: Col = [0.14, 0.42, 0.14];
 pub const WHITE: Col = [0.95, 1., 0.95];
 pub const BLACK: Col = [0.02, 0.03, 0.02];
+/// Behind the text: dark enough to hold the green off any palette.
+pub const SHADOW: Col = [0.01, 0.04, 0.02];
 
 #[derive(Default)]
 pub struct Hud {
@@ -99,14 +101,18 @@ impl Hud {
     pub fn text_w(px: f32, s: &str) -> f32 {
         s.chars().count() as f32 * 6. * px - px
     }
+    /// Text with a dark drop shadow one font pixel down and right, so the green reads on any
+    /// palette (the glacier's white, the desert's peach).
     pub fn text(&mut self, x: f32, y: f32, px: f32, s: &str, c: Col) {
-        for (k, ch) in s.chars().enumerate() {
-            let Some(g) = glyph(ch) else { continue };
-            let x0 = x + k as f32 * 6. * px;
-            for r in 0..7 {
-                for q in 0..5 {
-                    if g.get(r * 5 + q) == Some(&b'#') {
-                        self.rect(x0 + q as f32 * px, y + r as f32 * px, px, px, c);
+        for (dx, col) in [(px, SHADOW), (0., c)] {
+            for (k, ch) in s.chars().enumerate() {
+                let Some(g) = glyph(ch) else { continue };
+                let x0 = x + dx + k as f32 * 6. * px;
+                for r in 0..7 {
+                    for q in 0..5 {
+                        if g.get(r * 5 + q) == Some(&b'#') {
+                            self.rect(x0 + q as f32 * px, y + dx + r as f32 * px, px, px, col);
+                        }
                     }
                 }
             }

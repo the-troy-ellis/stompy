@@ -547,6 +547,8 @@ pub struct Game {
     pub weather: Weather,
     pub pal: Light,
     pub ramp: Option<(Light, Light, f32)>,
+    /// The times of day a ramp runs between (the renderer blends their palettes the same way).
+    pub ramp_tod: Option<(TimeOfDay, TimeOfDay)>,
     pub rng: Rng,
     pub events: Vec<Event>,
     pub input: Input,

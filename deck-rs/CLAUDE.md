@@ -24,7 +24,9 @@ Rules that are easy to miss:
 - Keep the invariants in `docs/architecture.md`: feet never slide, ground
   queries match the mesh, melt belongs to the target, heat 100/45, the sim
   never includes the platform, `dt` is a fixed 1/60, everything visible is a
-  polygon (no textures, no blending; the dither is the one see-through).
+  polygon (no textures, no blending), and the ordered dither is the look:
+  the ground, sky and fog in the place's ramp (`crates/game/src/look.rs`,
+  `docs/specs/02-look.md`).
 - Names are the owner's: stable enum keys in code, display names only in
   `crates/sim/src/data/names.rs`, placeholders for anything new, a NAMING section on any
   PR that makes a new thing visible.

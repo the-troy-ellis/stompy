@@ -63,8 +63,8 @@ These came from the owner's brief and are not up for re-litigation in a PR.
   jokes after the fact, silly hardware names, no characters, no references.
 - **Look and sound:** 1996 on a very good machine. Flat-shaded hand-built
   polygons at the screen's own resolution, no textures, no imported models,
-  no shadows, no post-processing, no blending (a dither is the one
-  see-through). Synthesised tones, with a few CC0 samples to come.
+  no shadows, no blending. The ordered dither is the style: each place's
+  own ramp of colours, and the see-through (specs/02-look.md). Synthesised tones, with a few CC0 samples to come.
 - **Tech:** Rust (the owner, 2026-11-10: modern development, old school
   looks), SDL2 and OpenGL 3.3 core. The crates `sdl2` and `glow` are
   approved; SDL is the platform (the Deck ships it). Any other library needs the owner's yes first: ask, with a

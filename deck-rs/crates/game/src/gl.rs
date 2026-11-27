@@ -1,6 +1,9 @@
 //! OpenGL 3.3 core through glow. One shader: flat-shaded polygons with a colour
-//! per vertex, one light, the palette's sky and fog, an ordered 4x4 dither for
-//! the few things that fade (never blending), and a 2D mode for the HUD.
+//! per vertex, one light, the palette's sky and fog, and a 2D mode for the HUD.
+//! The ordered 4x4 dither is the look (`look.rs`): the ground, the sky and the fog
+//! land on the place's ramp of colours, a mech's light comes in steps, the fog
+//! creeps over things pixel by pixel, and the few things that fade do it by
+//! skipping pixels. Never blending. Cell 0 turns the dither off (smooth shading).
 use glow::HasContext;
 use stompy_sim::math::*;
 
@@ -28,6 +31,10 @@ struct Uniforms {
     dither: glow::UniformLocation,
     zen: glow::UniformLocation,
     hor: glow::UniformLocation,
+    cell: glow::UniformLocation,
+    world: glow::UniformLocation,
+    ramp: glow::UniformLocation,
+    tone: glow::UniformLocation,
 }
 pub struct Gl {
     pub gl: glow::Context,
@@ -39,7 +46,7 @@ const VS: &str = r#"#version 330 core
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNrm; layout(location=2) in vec3 aCol;
 layout(location=3) in vec4 m0; layout(location=4) in vec4 m1; layout(location=5) in vec4 m2; layout(location=6) in vec4 m3; layout(location=7) in vec4 aInst;
 uniform mat4 uVP; uniform vec3 uEye; uniform vec3 uLight; uniform vec3 uShade; uniform int uMode;
-out vec3 vCol; out float vDist;
+out vec3 vCol; out float vDist; out float vDiff; out float vEm;
 void main() {
   mat4 M = mat4(m0, m1, m2, m3);
   vec4 wp = M * vec4(aPos, 1.0);
@@ -47,21 +54,48 @@ void main() {
   vec3 col = aCol * aInst.rgb;
   float em = max(aInst.a, uMode == 1 ? 1.0 : 0.0);
   float diff = max(0.0, dot(n, uLight)) * 0.72 + 0.28 + 0.1 * n.y;
-  vec3 lit = col * diff * uShade;
-  vCol = (uMode == 0) ? mix(lit, col, em) : (uMode == 2 ? normalize(aPos) : col);
+  vCol = uMode == 2 ? normalize(aPos) : col;
+  vDiff = diff; vEm = (uMode == 0) ? em : 1.0;
   vDist = length(wp.xyz - uEye);
   if (uMode == 2) { gl_Position = uVP * vec4(uEye + normalize(aPos) * 1500.0, 1.0); gl_Position.z = gl_Position.w * 0.9999; }
   else gl_Position = uVP * wp;
 }"#;
 const FS: &str = r#"#version 330 core
-in vec3 vCol; in float vDist; out vec4 o;
+in vec3 vCol; in float vDist; in float vDiff; in float vEm; out vec4 o;
 uniform vec3 uFog; uniform vec2 uFogRange; uniform int uMode; uniform float uDither; uniform vec3 uZen; uniform vec3 uHor;
+uniform vec3 uShade; uniform int uCell; uniform int uWorld; uniform vec3 uRamp[9]; uniform vec3 uTone;
 const float B[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+float bayer(ivec2 p) { return (B[(p.y & 3) * 4 + (p.x & 3)] + 0.5) / 16.0; }
+float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+// A brightness onto the ramp: the two colours it falls between, picked by the dither.
+vec3 ramp(float l, float th) {
+  float t = pow(clamp((l - uTone.x) / (uTone.y - uTone.x), 0.0, 1.0), uTone.z) * 8.0;
+  float i = floor(t);
+  if (t - i > th) i += 1.0;
+  return uRamp[int(min(i, 8.0))];
+}
 void main() {
-  if (uDither < 1.0) { int x = int(gl_FragCoord.x) & 3, y = int(gl_FragCoord.y) & 3; if ((B[y * 4 + x] + 0.5) / 16.0 >= uDither) discard; }
-  vec3 c = vCol;
-  if (uMode == 2) { float t = smoothstep(-0.02, 0.35, vCol.y); c = mix(uHor, uZen, t); }
-  else if (uMode != 3) { float f = clamp((vDist - uFogRange.x) / (uFogRange.y - uFogRange.x), 0.0, 1.0); c = mix(c, uFog, f * f * (3.0 - 2.0 * f)); }
+  ivec2 p = ivec2(gl_FragCoord.xy) / max(uCell, 1);
+  float th = bayer(p), th2 = bayer(p.yx + ivec2(2, 1));
+  if (uDither < 1.0 && th >= uDither) discard;
+  if (uMode == 3) { o = vec4(vCol, 1.0); return; }
+  float f = clamp((vDist - uFogRange.x) / (uFogRange.y - uFogRange.x), 0.0, 1.0);
+  f = f * f * (3.0 - 2.0 * f);
+  vec3 c;
+  if (uMode == 2) {
+    c = mix(uHor, uZen, smoothstep(-0.02, 0.35, vCol.y));
+    if (uCell > 0) c = ramp(lum(c), th);
+  } else if (uCell == 0) {
+    c = mix(mix(vCol * vDiff * uShade, vCol, vEm), uFog, f);
+  } else if (uWorld == 1) {
+    // The ground: lit and fogged, then onto the ramp, so shadow and distance walk its colours.
+    c = ramp(lum(mix(vCol * vDiff * uShade, uFog, f)), th);
+  } else {
+    // A mech, a shot, a spark: its own colour, the light in fifths, the fog dithered over it.
+    float d = vEm < 1.0 ? max(floor(vDiff * 5.0 + th) / 5.0, 0.2) : vDiff;
+    c = mix(vCol * d * uShade, vCol, vEm);
+    if (th2 < f) c = ramp(lum(uFog), th);
+  }
   o = vec4(c, 1.0);
 }"#;
 fn bytes(v: &[f32]) -> &[u8] {
@@ -106,6 +140,10 @@ impl Gl {
                 dither: loc("uDither")?,
                 zen: loc("uZen")?,
                 hor: loc("uHor")?,
+                cell: loc("uCell")?,
+                world: loc("uWorld")?,
+                ramp: loc("uRamp")?,
+                tone: loc("uTone")?,
             };
             gl.enable(glow::DEPTH_TEST);
             gl.enable(glow::CULL_FACE);
@@ -172,6 +210,21 @@ impl Gl {
                 }
             }
         }
+    }
+    /// The look for this frame: the dither's cell in pixels (0: off), the place's ramp and its
+    /// tone range (darkest, lightest, gamma).
+    pub fn look(&self, cell: u32, ramp: &[[f32; 3]; crate::look::RAMP], tone: [f32; 3]) {
+        let flat: Vec<f32> = ramp.iter().flatten().copied().collect();
+        unsafe {
+            self.gl.uniform_1_i32(Some(&self.u.cell), cell as i32);
+            self.gl.uniform_3_f32_slice(Some(&self.u.ramp), &flat);
+            self.gl
+                .uniform_3_f32(Some(&self.u.tone), tone[0], tone[1], tone[2]);
+        }
+    }
+    /// The ground (onto the ramp) or everything else (its own colours).
+    pub fn world(&self, on: bool) {
+        unsafe { self.gl.uniform_1_i32(Some(&self.u.world), on as i32) }
     }
     /// 1: solid. Less: an ordered 4x4 dither of drawn and skipped pixels, the 1996 see-through.
     pub fn dither(&self, coverage: f32) {

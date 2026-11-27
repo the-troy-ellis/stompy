@@ -72,8 +72,13 @@ wrong. When two good ideas conflict, the more thunky one wins.
 
 ## Look and sound
 
-- 1996 on a very good machine: flat-shaded, chunky, hand-built polygon
-  meshes. No textures, no imported models, no shadows, no post-processing.
+- 1996 on a very good machine: flat-shaded, hand-built polygon meshes with
+  enough faces to have detail, every face one colour. No textures, no
+  imported models, no shadows, no blending.
+- **Dithering is the style.** Each place at each time of day has its own
+  small ramp of colours, and the ground, the sky and the fog land on it
+  through an ordered dither. Places look unlike each other. Mechs keep their
+  own paint, lit in dithered steps (specs/02-look.md).
 - Atmosphere comes from palettes, fog, weather and dust.
 - A monospace green HUD, readable at a glance at arm's length: heat, a
   damage diagram, the target and the ammo without reading.
@@ -96,7 +101,7 @@ wrong. When two good ideas conflict, the more thunky one wins.
 - Weapon groups beyond the three categories and the special.
 - A story with characters, dialogue, cutscenes or branching.
 - Parody or references to other games, memes or the real world.
-- Textured or imported art, shadow maps, post-processing, alpha blending.
+- Textured or imported art, shadow maps, alpha blending.
 - Multiplayer (the browser version has it; this rebuild does not, until the
   owner asks).
 - A market. Nothing here is built for a store page.

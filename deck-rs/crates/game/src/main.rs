@@ -3,7 +3,8 @@
 //!   --window             in a window; --size W H its size
 //!   --free               straight into Free Play; --seed N its seed
 //!   --shot N file.ppm    save frame N and exit; --skip S runs the sim S seconds first;
-//!   --demo               the mech flies itself; --debug the readout; --screen NAME and --mech N open a menu
+//!   --demo               the mech flies itself; --debug the readout; --screen NAME and --mech N open a menu;
+//!   --dither N           the dither's cell for this run (0 off, 1, 2, 3)
 //! The last five are for the tools (tools/shot.sh): screenshots on a box with no display.
 // Indexed loops over parallel arrays and long drawing signatures read better here than the alternatives.
 #![allow(
@@ -17,6 +18,7 @@ mod controls;
 mod font;
 mod gl;
 mod hud;
+mod look;
 mod mesh;
 mod platform;
 mod scene;
@@ -36,6 +38,7 @@ fn main() {
         debug: false,
         screen: None,
         mech: None,
+        dither: None,
     };
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut it = args.iter();
@@ -47,6 +50,7 @@ fn main() {
             "--free" => a.free = true,
             "--demo" => a.demo = true,
             "--debug" => a.debug = true,
+            "--dither" => a.dither = Some(num(it.next()) as u32),
             "--seed" => a.seed = num(it.next()) as u32,
             "--skip" => a.skip = num(it.next()) as f32,
             "--mech" => a.mech = Some(num(it.next()) as usize),

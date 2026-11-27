@@ -58,6 +58,7 @@ impl Game {
             weather: Weather::Clear,
             pal: PALS[0].day,
             ramp: None,
+            ramp_tod: None,
             rng: Rng::new(seed),
             events: vec![],
             input: Input::default(),
@@ -328,6 +329,7 @@ pub fn start_mission(g: &mut Game, mission: usize, ch: Ch, diff: Diff, flat: boo
     g.mission = Some(mission);
     if let Some((a, b, secs)) = def.ramp {
         g.ramp = Some((pal_at(def.biome, a), pal_at(def.biome, b), secs));
+        g.ramp_tod = Some((a, b));
         g.pal = pal_at(def.biome, a);
     }
     begin(g, ch);

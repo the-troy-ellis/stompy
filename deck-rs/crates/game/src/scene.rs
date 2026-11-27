@@ -21,6 +21,8 @@ pub struct Scene {
     right: V3,
     up: V3,
     jitter: f32,
+    /// The dither's cell in pixels (0: smooth), from SETTINGS.
+    pub cell: u32,
 }
 /// A fixed camera instead of the cockpit (the menu's turntable).
 pub struct Cam {
@@ -75,6 +77,7 @@ impl Scene {
             right: v3(1., 0., 0.),
             up: v3(0., 1., 0.),
             jitter: 0.,
+            cell: 2,
         }
     }
     fn parts(&mut self, gl: &Gl, ch: Ch) -> &MechParts {
@@ -371,6 +374,7 @@ impl Scene {
     }
     fn draw_world(&mut self, gl: &mut Gl, g: &Game, eye: V3, fog_far: f32) {
         let half = g.ter.hx / TER_CHUNKS as f32;
+        gl.world(true);
         for (m, c) in &self.ground {
             let (dx, dz) = (
                 ((c.x - eye.x).abs() - half).max(0.),
@@ -390,6 +394,7 @@ impl Scene {
                 0.,
             );
         }
+        gl.world(false);
         for w in &g.wrecks {
             self.parts(gl, w.ch);
             let sink = (1. - w.settle) * 0.8;
@@ -467,6 +472,9 @@ impl Scene {
         gl.camera(&vp, eye);
         gl.light(g.pal.light, g.pal.shade, g.pal.hor, fog[0], fog[1]);
         gl.sky(g.pal.zen, g.pal.hor);
+        let (ramp, tone) = crate::look::look_for(g);
+        gl.look(self.cell, &ramp, tone);
+        gl.world(false);
         gl.mode(Mode::Sky);
         gl.depth(false, false);
         gl.draw_plain(&self.sky, &M4::ID);
