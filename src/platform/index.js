@@ -20,7 +20,31 @@ export function createPlatform(win = typeof window === 'undefined' ? undefined :
     // The page out of sight: a background tab, or the app sent home (the
     // WebView hides the page when the app pauses).
     hidden: () => !!doc?.hidden,
+    // Rumble in the controller (the Steam Deck's, docs/specs/40-steam-deck.md):
+    // the feel table's haptic column (`ms`, 8 for a footfall to 110 for a
+    // blast-off) as a dual-rumble pulse on the first pad that has one. Short
+    // pulses on the weak motor, big ones bring in the strong motor and last a
+    // little longer; the pad plays one effect at a time, the newest winning.
+    rumble(ms) {
+      try {
+        const pads = nav?.getGamepads?.() || [];
+        for (const gp of pads) {
+          const act = gp?.vibrationActuator;
+          if (!act?.playEffect) continue;
+          act.playEffect('dual-rumble', rumbleOf(ms))?.catch?.(() => {});
+          return true;
+        }
+      } catch { /* no pad, or no rumble on it */ }
+      return false;
+    },
   };
+}
+
+// A dual-rumble effect for a haptic of `ms`: the duration in ms and the two
+// motors' strengths, 0..1. Pure, for the tests.
+export function rumbleOf(ms) {
+  const k = Math.max(0, Math.min(1, ms / 100));
+  return { duration: Math.round(Math.max(30, Math.min(220, ms * 2))), weakMagnitude: Math.min(1, k * 2.5), strongMagnitude: Math.max(0, (k - 0.2) * 1.25), startDelay: 0 };
 }
 
 export const platform = createPlatform();

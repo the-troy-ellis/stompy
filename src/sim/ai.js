@@ -9,7 +9,9 @@ import { keepRange, steer, strafeTick } from './ai/behaviours.js';
 import { planFor } from './ai/profiles.js';
 import { routeYaw, feelers } from './ai/nav.js';
 import { decideFire } from './ai/fire.js';
-import { PERCEPTION as K, FAR_THINK as FAR } from '../data/ai.js';
+import { PERCEPTION as K, FAR_THINK as FAR, diffOf } from '../data/ai.js';
+import { TREES } from '../data/forest.js';
+import { woodsAt } from '../world/forest.js';
 import { mechsNear } from './near.js';
 import { revealing } from './waves.js';
 import { pilotsOf } from './hitqueue.js';
@@ -66,7 +68,8 @@ export function think(G, e, dt, prey = null) {
   const dx = tx - e.x, dz = tz - e.z, dist = hypot(dx, dz);
   const toYaw = atan2(dx, dz);
   let moveYaw, thr = 1;
-  if (!e.ai.aware) {
+  if (ambushing(G, e, seen)) { moveYaw = e.yaw; thr = 0; }   // among trees, unseen: wait for them (spec 39)
+  else if (!e.ai.aware) {
     if (!e.ai.wp || hypot(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z) < 30) e.ai.wp = [clampN(e.x + r.range(-250, 250), -BX, BX), clampN(e.z + r.range(-250, 250), -BZ, BZ)];
     moveYaw = routeYaw(G, e, e.ai.wp[0], G.ter.height(e.ai.wp[0], e.ai.wp[1]), e.ai.wp[1]) ?? atan2(e.ai.wp[0] - e.x, e.ai.wp[1] - e.z); thr = 0.5;
   } else if (e.ai.state === 'search' && e.ai.waitAt && G.time < e.ai.waitAt.until) {
@@ -120,6 +123,21 @@ export function think(G, e, dt, prey = null) {
   if (e.melee) { e.beamOn = false; return; }
   if (!seen) { e.ai.lockT = 0; return; }   // no shooting at a memory
   decideFire(G, e, P, { dist, toYaw }, dt);
+}
+
+// An ambush (docs/specs/39-forest.md part 4): in a forest, a foe among
+// trees (TREES.among) that can't see its prey holds still: it makes no
+// sound, and the woods hide it. Whether it's the waiting kind is drawn once,
+// by difficulty (DIFF.ambush). A hit means it's been found; past TREES.wait
+// s since it last saw you it goes looking. Seeing you, it fights as ever.
+const FOUND_FOR = 3;   // s after a hit before it may settle again
+export function ambushing(G, e, seen) {
+  if (!G.trees || seen) return false;
+  const a = e.ai;
+  if (a.ambusher == null) a.ambusher = G.rng.next() < (diffOf(G).ambush ?? 0);
+  if (!a.ambusher || woodsAt(G.trees, e.x, e.z) < TREES.among) return false;
+  if (G.time - (a.hitAt ?? -Infinity) < FOUND_FOR) return false;
+  return !(a.aware && G.time - (a.lastSeen ?? G.time) > TREES.wait);
 }
 
 // Target selection for escorts (docs/specs/03-objectives.md § Entities): on

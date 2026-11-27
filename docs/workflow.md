@@ -39,14 +39,14 @@ Title: `M2: THUNDERCLAP weapon (#42)`. Body uses this template (also in
 One paragraph. Link the spec section.
 
 ## How to try it
-Steps for a reviewer, on desktop and on a phone.
+Steps for a reviewer, on the Steam Deck (or a controller) and on mouse and keyboard.
 
 ## Checks
 - [ ] `npm test` passes locally
 - [ ] `npm run lint` clean
 - [ ] `npm run build` produces a working `dist/`
-- [ ] Playtest checklist run on desktop (browser, OS)
-- [ ] Playtest checklist run on a phone (model, browser)
+- [ ] Playtest checklist run with a controller (the Deck, or name the pad and OS)
+- [ ] Playtest checklist run with mouse and keyboard (browser, OS)
 - [ ] Frame budget checked where the change touches render/update
 - [ ] Spec status updated; README/docs updated if behaviour changed
 - [ ] NAMING section included if this PR makes a new mech, weapon, mission or verdict visible (see Naming things)
@@ -68,12 +68,14 @@ A PR is done when all of these hold:
 2. **Tests**: new sim logic has unit tests in `test/`; changed sim logic
    keeps existing tests green or updates them with a reason. Server changes
    have `unittest` coverage. The Playwright smoke test passes.
-3. **Both platforms**: the playtest checklist below was run on a desktop
-   browser and on a phone (real device, not an emulator; the browser's
-   device mode does not reproduce touch, audio unlock or performance).
+3. **Both inputs**: the playtest checklist below was run with a controller
+   (on the Steam Deck when the change is about controls, the HUD or
+   performance; otherwise any standard-mapping pad, named) and with mouse
+   and keyboard. The Deck checks that an agent can't run are left to the
+   owner and marked `Deck check: open` in the PR, never claimed.
 4. **Budget**: anything touching `update`, `render`, the HUD or particles
-   reports before/after frame time on the reference phone, or on the slowest
-   phone available with the model named.
+   reports before/after frame time (`npm run perf`, and on the Deck when
+   available).
 5. **Docs**: spec status moved; architecture map updated if files moved;
    README updated if a player would notice.
 6. **Tone**: new strings pass the tone guide in [vision.md](vision.md).
@@ -102,7 +104,11 @@ Run the whole list; it takes about eight minutes. Report deviations in the PR.
 - [ ] Win: debrief, NEXT MISSION / REPLAY / MAIN MENU all work.
 - [ ] Pause and resume; losing focus pauses; F2 returns to menu.
 
-**Touch (phone, landscape)**
+**Controller (the Steam Deck, or a standard-mapping pad)**
+- [ ] Left stick: throttle and turn. Right stick: torso twist and pitch. RT / LT / RB / LB fire energy / missiles / ballistic / fusion; A jets, B centres, X next target, Y zoom, R3 punches; Start pauses; menus move with the D-pad or stick and A presses.
+- [ ] On the Deck: full screen in Game Mode with no browser, sound from the first button press, and no stutter walking into a fight.
+
+**Touch (still works; no longer designed for)**
 - [ ] Full screen and landscape lock requested on launch; upright phone shows the turn-sideways prompt.
 - [ ] Lower left: the stick turns the mech for as long as it's held, and tilts; tap, then tap and hold, charges the jump jets, and letting go blasts off. Just above it: the stick sets throttle and twists the torso; a double tap punches. A tap on the compass centres the torso. On a tablet both are within one thumb's reach. Right side: buttons only; two fire buttons can be held at once while the left thumb flies.
 - [ ] Missile button drag steers the guided volley; fusion button drag aims.
@@ -163,9 +169,11 @@ to fail for one reason.
 
 ## Performance checks
 
-Reference devices: a Pixel 6a or Galaxy A53-class phone (2021 mid-range) for
-the 60 fps budget, and a Pixel 3a-class phone for the 30 fps floor. If you have
-neither, name what you used.
+Reference device: the Steam Deck (LCD or OLED), 1280×800, for a steady
+60 fps. The phone budgets (a Pixel 6a-class phone at 60, a Pixel 3a-class
+at 30) are history: `npm run perf`'s numbers were set against them, so they
+are conservative for the Deck and stay as the regression floor until the
+Deck's own numbers replace them. If you have no Deck, name what you used.
 
 Procedure: Free Play, 6 hostiles, volcanic plain, with any new feature on.
 Open the browser's performance panel or use the in-game frame-time readout
@@ -225,10 +233,10 @@ the thing exists. Rules:
 - Making it solemn. If a new mech, weapon or mission name would fit in a
   military manual, try again. If it would fit in a Saturday-morning cartoon
   toy line, that is closer.
-- Shipping a desktop-only control. If it needs a key, it needs a touch
-  affordance, or it is a desktop *convenience* for something touch does
-  another way.
-- Testing in device mode. Real phones only.
+- Shipping a keyboard-only control. If it needs a key, it needs a place on
+  the Deck's controller, or it is a desktop *convenience* for something the
+  pad does another way.
+- Claiming a Deck check you did not run. Leave it `Deck check: open`.
 - Changing balance numbers in a PR about something else. Balance changes are
   their own issues with before/after notes.
 - Breaking the arena silently. Any change to the state message or `fx`

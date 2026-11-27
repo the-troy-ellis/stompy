@@ -1,0 +1,49 @@
+# Stompy for the Steam Deck (docs/specs/40-steam-deck.md): the web build in
+# the Electron shell in deck/, as a Linux AppImage. Its own workflow, so the
+# web checks (ci.yml) never need Electron. Runs on pushes to main, on PRs that
+# touch the shell, and by hand (Actions > Steam Deck > Run workflow); the
+# AppImage is the run's `stompy-deck-appimage` artifact.
+#
+# On main it is also published as the `deck-latest` release, replaced on every
+# push, under a fixed name, so the Deck (or an agent on it) fetches it with one
+# curl and no GitHub login:
+#   https://github.com/<owner>/<repo>/releases/download/deck-latest/Stompy-x86_64.AppImage
+# with Stompy-x86_64.AppImage.sha256 beside it.
+name: Steam Deck
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths: ['deck/**', '.github/workflows/deck.yml']
+  workflow_dispatch:
+concurrency:
+  group: deck-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  appimage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # the deck-latest release, on main only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: '**/package-lock.json' }
+      - run: npm ci
+      - run: npm run build
+      - run: npm ci
+        working-directory: deck
+      - run: npm run appimage
+        working-directory: deck
+      - uses: actions/upload-artifact@v4
+        with: { name: stompy-deck-appimage, path: deck/out/*.AppImage, if-no-files-found: error }
+      - name: Publish the deck-latest release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp deck/out/*.AppImage Stompy-x86_64.AppImage
+          sha256sum Stompy-x86_64.AppImage > Stompy-x86_64.AppImage.sha256
+          gh release delete deck-latest --yes --cleanup-tag || true
+          gh release create deck-latest Stompy-x86_64.AppImage Stompy-x86_64.AppImage.sha256 \
+            --prerelease --target "$GITHUB_SHA" --title "Stompy for the Steam Deck (latest main)" \
+            --notes "Built from ${GITHUB_SHA::7} on main. Replaced on every push to main. Install: deck/README.md."

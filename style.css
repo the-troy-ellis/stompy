@@ -17,6 +17,7 @@ html, body {
 #app { position: fixed; inset: 0; display: flex; }
 
 .mech-wrap { position: relative; flex: 1; background: #000; overflow: hidden; cursor: crosshair; outline: none; }
+.mech-wrap.pad-on, .mech-wrap.pad-on * { cursor: none; }   /* a controller is flying it (the Steam Deck): no pointer over the game */
 .mech-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
 .mech-overlay {

@@ -299,7 +299,11 @@ placing from the map.
   GUARD, and the polish: the gamepad and smoke runs), and both parts of
   construction sites.
 
-## M11 — Phone apps and the full-game unlock (proposed)
+## M11 — Phone apps and the full-game unlock (parked)
+
+Parked on 2026-11-09: the game's home is the Steam Deck (M17), it is made
+for fun rather than for a store, and the phone is no longer designed for.
+Part 1 (the platform layer, the Android shell) stays built and harmless.
 
 Goal: Stompy on Android and iOS as native-feeling apps (Capacitor shells
 around the same `dist/`), with real haptics, the back button and pausing
@@ -423,6 +427,16 @@ piece and crush what they land on (the rigid pieces spec 38 needs, built on
 the simplest shape first), and woods hide you from sight by how much of them
 is in between. In five parts: the tree field; crushing and toppling;
 concealment and the mist; fighting up close; the arena.
+
+## M17 — Stompy on the Steam Deck (proposed)
+
+Goal: the game's home is the owner's Steam Deck, as a native app.
+
+- Part 1: the native shell. An Electron AppImage around `dist/`, full
+  screen, built by `.github/workflows/deck.yml`
+  ([specs/40-steam-deck.md](specs/40-steam-deck.md)).
+- After that, from the owner's playtest notes: controls, HUD and budgets for
+  the Deck.
 
 ## Parked
 

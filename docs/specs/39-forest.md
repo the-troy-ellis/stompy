@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | in progress: part 1 built (the tree field, #422); part 2 built (crushing and toppling, #423); part 3 built (concealment). Approved (the owner merged it, then "start the forest", 2026-11-05); first asked for 2026-11-05: "Also what about a forest biome?"; "I think thick woods becomes more interesting. Especially if fog is involved. Very close range" |
+| Status | in progress: part 1 built (the tree field, #422); part 2 built (crushing and toppling, #423); part 3 built (concealment, #424); part 4 built (fighting up close). Approved (the owner merged it, then "start the forest", 2026-11-05); first asked for 2026-11-05: "Also what about a forest biome?"; "I think thick woods becomes more interesting. Especially if fog is involved. Very close range" |
 | Milestone | M16 (proposed, with or before spec 38's city) |
 | Size | L, in five parts (the tree field; crushing and toppling; concealment and the mist; fighting up close; the arena) |
 | Depends on | [07-atmosphere.md](07-atmosphere.md) (fog, weather, props), [13-thunk.md](13-thunk.md), [14-look-and-performance.md](14-look-and-performance.md), [35-bigger-maps.md](35-bigger-maps.md), [38-buildings.md](38-buildings.md) (rigid pieces) |
@@ -39,6 +39,7 @@ where every mech has been.
 ### New text (for the tone check)
 
 - Free Play's MAP: `FOREST` (placeholder; NAMING in its PR).
+- HUD: `HEARD` by the pointer to a foe heard but not seen.
 - Voice, after the fact: `Timber.` when a tree you pushed or shot comes
   down on a foe (candidate; flat alternative `Tree down.`).
 
@@ -197,6 +198,25 @@ where every mech has been.
 - **The HUD:** a foe heard but not seen gets a faint pointer at the edge
   (`HEARD`), so the fog is tense, not blind.
 
+#### As built (part 4)
+
+- The ambush (`sim/ai.js ambushing`): in a forest, a foe standing where the
+  woods are at least `TREES.among` (0.5) thick that can't see its prey
+  holds still, facing where it believes you are: it makes no sound, and the
+  woods hide it. Whether a foe is the waiting kind is drawn once, by
+  `DIFF.ambush` (HARD all, NORMAL half, EASY none). A hit means it's found
+  (3 s before it may settle again); past `TREES.wait` (30 s) since it last
+  saw you it goes looking; seeing you, it fights as ever (brawlers close).
+- Cover (`ai/behaviours.js findCover`): a spot where enough woods are in
+  between hides as well as a hill does (`sight.js woodsHide`), against the
+  foe's own sight range.
+- Snipers (`findRidge`): a spot the woods hide the target from doesn't
+  count, so in a forest they look for clearings.
+- `HEARD` (`render/hud.js`, `sim/sight.js audible`): in a forest, a foe on
+  the move (one standing still is silent) within `TREES.hear` (200 m) that
+  the woods or the fog hide gets a faint red arrow at the view's edge the
+  way it is, `HEARD` by it, no distance.
+
 ### 5. The arena
 
 - Trees falling must match on every screen: a felled tree is sent as its
@@ -218,6 +238,10 @@ frame).
 | `push` | 60 t | a mech at least this heavy shoves through trees |
 | `hide` | 15% a 10 m | sight lost to woods in between |
 | `carry` | ×1.5 | how much further sounds carry in a forest |
+| `among` | 0.5 | woods this thick where a foe stands: it may wait there |
+| `wait` | 30 s | an ambusher waits this long since it last saw you |
+| `hear` | 200 m | a hidden foe on the move this near gets `HEARD` |
+| `DIFF.ambush` | EASY 0, NORMAL 0.5, HARD 1 | the share of foes that wait |
 | `cell` | 16 m | the density grid's cells |
 | forest palette fog | 30–140 m | the woods' own mist |
 | `mist` weather | fog ×0.6, radar ×0.8 | the forest's fog |

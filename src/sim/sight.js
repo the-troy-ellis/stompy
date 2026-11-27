@@ -36,6 +36,9 @@ export function sees(G, from, to, range) {
   if (d > range || d > range * woodsCut(G, from, to)) return false;
   return !blocked(G, from, to);
 }
+// The woods alone hide `to` from `from` at a sight range of `range` m (part
+// 4: cover among trees, and snipers' spots in the clear).
+export const woodsHide = (G, from, to, range) => !!G.trees && Math.hypot(to[0] - from[0], to[2] - from[2]) > range * woodsCut(G, from, to);
 
 // The pilot's own sight: the target brackets and enemy chevrons show out to
 // 1.2x what the fog lets you see (spec 07; in clear weather that is past the
@@ -51,6 +54,15 @@ export function inView(G, eye, m, range = sightLine(G)) {
   if (!G.trees) return true;
   MID[0] = m.x; MID[1] = m.y; MID[2] = m.z;
   return d < range * woodsCut(G, eye, MID);
+}
+
+// A foe the pilot hears but can't see (part 4, the HUD's HEARD pointer): in
+// a forest, on the move (one standing still is silent), within TREES.hear
+// m, and hidden by the woods or the fog.
+export function audible(G, eye, m) {
+  if (!G.trees || !m.alive || Math.abs(m.speed || 0) < 0.5 && !m.air) return false;
+  if (Math.hypot(m.x - eye[0], m.z - eye[2]) > TREES.hear) return false;
+  return !inView(G, eye, m);
 }
 
 // What can be seen from `eye` out to `range` m, on a grid of `cell` m: the
