@@ -1,0 +1,6 @@
+# One Rust for every build (local, CI, the release container), so fmt and clippy
+# don't change under us when a new stable ships. Bump it on purpose, in its own commit.
+[toolchain]
+channel = "1.97.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
