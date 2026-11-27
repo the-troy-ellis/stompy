@@ -12,6 +12,8 @@ under the entry, marked as a note, but changes no code for it.
 
 | # | What happened | Where | Found |
 |---|---|---|---|
+| 1 | The start menu pops up and immediately closes. | The Deck, at launch | 2026-11-27, build 6f75358 |
+| 2 | The arms in the cockpit view point oddly and don't line up with the lasers. | The Deck, in play | 2026-11-27, build 6f75358 |
 
 ## Fixed
 
