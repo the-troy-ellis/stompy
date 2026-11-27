@@ -100,6 +100,83 @@ impl Builder {
             }
         }
     }
+    /// A lump about radius 0.5: an icosahedron, split `splits` times, each corner pushed in or
+    /// out by up to `lumpy` (the same corner the same amount, so the faces stay joined), and
+    /// stretched by `m`. Smoke, dust, flame and rock are all lumps of different shapes.
+    pub fn lump(&mut self, m: M4, col: [f32; 3], splits: usize, lumpy: f32, seed: f32) {
+        let t = (1. + 5f32.sqrt()) / 2.;
+        let mut vs: Vec<V3> = [
+            (-1., t, 0.),
+            (1., t, 0.),
+            (-1., -t, 0.),
+            (1., -t, 0.),
+            (0., -1., t),
+            (0., 1., t),
+            (0., -1., -t),
+            (0., 1., -t),
+            (t, 0., -1.),
+            (t, 0., 1.),
+            (-t, 0., -1.),
+            (-t, 0., 1.),
+        ]
+        .iter()
+        .map(|&(x, y, z)| v3(x, y, z).norm())
+        .collect();
+        let mut fs: Vec<[usize; 3]> = vec![
+            [0, 11, 5],
+            [0, 5, 1],
+            [0, 1, 7],
+            [0, 7, 10],
+            [0, 10, 11],
+            [1, 5, 9],
+            [5, 11, 4],
+            [11, 10, 2],
+            [10, 7, 6],
+            [7, 1, 8],
+            [3, 9, 4],
+            [3, 4, 2],
+            [3, 2, 6],
+            [3, 6, 8],
+            [3, 8, 9],
+            [4, 9, 5],
+            [2, 4, 11],
+            [6, 2, 10],
+            [8, 6, 7],
+            [9, 8, 1],
+        ];
+        for _ in 0..splits {
+            let mut mid = std::collections::HashMap::new();
+            let mut half = |a: usize, b: usize, vs: &mut Vec<V3>| {
+                *mid.entry((a.min(b), a.max(b))).or_insert_with(|| {
+                    vs.push(((vs[a] + vs[b]) * 0.5).norm());
+                    vs.len() - 1
+                })
+            };
+            let mut next = Vec::with_capacity(fs.len() * 4);
+            for [a, b, c] in fs {
+                let (ab, bc, ca) = (
+                    half(a, b, &mut vs),
+                    half(b, c, &mut vs),
+                    half(c, a, &mut vs),
+                );
+                next.extend([[a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]]);
+            }
+            fs = next;
+        }
+        let ps: Vec<V3> = vs
+            .iter()
+            .map(|&v| {
+                let h =
+                    (v.x * 12.9898 + v.y * 78.233 + v.z * 37.719 + seed * 4.1).sin() * 43758.547;
+                let r = 0.5 * (1. + lumpy * ((h - h.floor()) * 2. - 1.));
+                m.apply(v * r)
+            })
+            .collect();
+        let ctr = m.apply(V3::ZERO);
+        for [a, b, c] in fs {
+            self.tri(ps[a], ps[b], ps[c], col, Some(ctr), false);
+        }
+    }
     /// A unit sphere (radius 0.5): n sides round, r bands pole to pole, flat-shaded facets.
     pub fn sphere(&mut self, m: M4, col: [f32; 3], n: usize, r: usize) {
         let ctr = m.apply(V3::ZERO);
@@ -415,6 +492,10 @@ pub fn build_mech_parts(gl: &Gl, ch: Ch) -> MechParts {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Fx {
+    Puff,
+    DustPuff,
+    Shard,
+    Rock,
     Cube,
     Tetra,
     Spark,
@@ -427,7 +508,11 @@ pub enum Fx {
     Beam,
     Disc,
 }
-pub const FX_ALL: [Fx; 11] = [
+pub const FX_ALL: [Fx; 15] = [
+    Fx::Puff,
+    Fx::DustPuff,
+    Fx::Shard,
+    Fx::Rock,
     Fx::Cube,
     Fx::Tetra,
     Fx::Spark,
@@ -445,6 +530,14 @@ pub fn build_effect(gl: &Gl, k: Fx) -> Mesh {
     let mut b = Builder::default();
     let o = Some(V3::ZERO);
     match k {
+        // Smoke: a soft lump of faces, more round than not.
+        Fx::Puff => b.lump(M4::ID, W, 1, 0.22, 1.),
+        // Dust: the same, squashed down onto the ground.
+        Fx::DustPuff => b.lump(s(1.7, 0.55, 1.7), W, 1, 0.25, 2.),
+        // Flame: a tall jagged tongue, few faces.
+        Fx::Shard => b.lump(t(0., 0.25, 0.) * s(0.55, 1.5, 0.55), W, 0, 0.45, 3.),
+        // Debris: a craggy rock, a dozen-odd faces.
+        Fx::Rock => b.lump(s(1.1, 0.8, 0.95), W, 0, 0.5, 4.),
         Fx::Cube => b.cube1(M4::ID, W),
         Fx::Flat => b.cube1(s(1.6, 0.35, 1.6), W),
         Fx::Chunk => b.cube(M4::ID, W, 0.6, 0.7),

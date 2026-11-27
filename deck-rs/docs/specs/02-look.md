@@ -39,6 +39,16 @@ the assets but still flat-shaded, and palettes that look unlike each other.
   for a tools run.
 - **HUD text** has a dark drop shadow, so the green reads on any ramp.
 
+### Effects as lumps (prototype, built)
+
+Smoke, dust, flame and debris were cubes, slabs and tetrahedra. Now they are
+lumps (`Builder::lump`): an icosahedron, split, each corner pushed in or out
+a little, stretched per kind. Smoke is a round lump that swells as it rises;
+dust the same squashed flat; flame a tall jagged tongue; debris a craggy
+rock. A smoke or dust puff dissolves pixel by pixel through the dither (an
+instance carries how much of it is still drawn), instead of shrinking.
+First pass: the smoke still reads a little like boulders.
+
 ### Part 2: more faces (next)
 
 Today's mechs are mostly boxes, a few hundred triangles each. The target is

@@ -46,13 +46,16 @@ const VS: &str = r#"#version 330 core
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNrm; layout(location=2) in vec3 aCol;
 layout(location=3) in vec4 m0; layout(location=4) in vec4 m1; layout(location=5) in vec4 m2; layout(location=6) in vec4 m3; layout(location=7) in vec4 aInst;
 uniform mat4 uVP; uniform vec3 uEye; uniform vec3 uLight; uniform vec3 uShade; uniform int uMode;
-out vec3 vCol; out float vDist; out float vDiff; out float vEm;
+out vec3 vCol; out float vDist; out float vDiff; out float vEm; out float vCov;
 void main() {
   mat4 M = mat4(m0, m1, m2, m3);
   vec4 wp = M * vec4(aPos, 1.0);
   vec3 n = normalize(mat3(M) * aNrm);
   vec3 col = aCol * aInst.rgb;
-  float em = max(aInst.a, uMode == 1 ? 1.0 : 0.0);
+  // The instance's last number packs its glow (0..1) and, above 2, sixteenths still drawn.
+  float k = floor(aInst.a / 2.0);
+  vCov = k < 1.0 ? 1.0 : k / 16.0;
+  float em = max(aInst.a - 2.0 * k, uMode == 1 ? 1.0 : 0.0);
   float diff = max(0.0, dot(n, uLight)) * 0.72 + 0.28 + 0.1 * n.y;
   vCol = uMode == 2 ? normalize(aPos) : col;
   vDiff = diff; vEm = (uMode == 0) ? em : 1.0;
@@ -61,7 +64,7 @@ void main() {
   else gl_Position = uVP * wp;
 }"#;
 const FS: &str = r#"#version 330 core
-in vec3 vCol; in float vDist; in float vDiff; in float vEm; out vec4 o;
+in vec3 vCol; in float vDist; in float vDiff; in float vEm; in float vCov; out vec4 o;
 uniform vec3 uFog; uniform vec2 uFogRange; uniform int uMode; uniform float uDither; uniform vec3 uZen; uniform vec3 uHor;
 uniform vec3 uShade; uniform int uCell; uniform int uWorld; uniform vec3 uRamp[9]; uniform vec3 uTone;
 const float B[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
@@ -77,7 +80,7 @@ vec3 ramp(float l, float th) {
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy) / max(uCell, 1);
   float th = bayer(p), th2 = bayer(p.yx + ivec2(2, 1));
-  if (uDither < 1.0 && th >= uDither) discard;
+  if (th >= min(uDither, vCov)) discard;
   if (uMode == 3) { o = vec4(vCol, 1.0); return; }
   float f = clamp((vDist - uFogRange.x) / (uFogRange.y - uFogRange.x), 0.0, 1.0);
   f = f * f * (3.0 - 2.0 * f);

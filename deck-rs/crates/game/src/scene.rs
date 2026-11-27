@@ -62,6 +62,12 @@ fn beam_mat(a: V3, b: V3, w: f32) -> M4 {
         1.,
     ])
 }
+/// An instance's last number: its glow (0..1), plus how much of it is still drawn, in
+/// sixteenths, for the dither to dissolve it (`gl.rs` unpacks it; solid packs as 0).
+fn dissolve(glow: f32, solid: f32) -> f32 {
+    let k = (solid.clamp(0., 1.) * 16.).round();
+    glow.min(0.999) + if k >= 16. { 0. } else { 2. * k.max(1.) }
+}
 fn inst_mat(p: V3, yaw: f32, tumble: f32, size: f32) -> M4 {
     M4::t(p.x, p.y, p.z) * M4::ry(yaw) * M4::rx(tumble) * M4::s1(size)
 }
@@ -210,14 +216,14 @@ impl Scene {
     }
     fn draw_particles(&mut self, gl: &mut Gl, g: &Game, fog: [f32; 3]) {
         let shape = |k: PKind| match k {
-            PKind::Smoke => Fx::Cube,
-            PKind::Fire | PKind::Flame => Fx::Tetra,
+            PKind::Smoke => Fx::Puff,
+            PKind::Fire | PKind::Flame => Fx::Shard,
             PKind::Spark => Fx::Spark,
-            PKind::Debris => Fx::Chunk,
-            PKind::Dust => Fx::Flat,
+            PKind::Debris => Fx::Rock,
+            PKind::Dust => Fx::DustPuff,
             PKind::Shock => Fx::Ring,
         };
-        for f in [Fx::Cube, Fx::Tetra, Fx::Spark, Fx::Chunk, Fx::Flat] {
+        for f in [Fx::Puff, Fx::Shard, Fx::Spark, Fx::Rock, Fx::DustPuff] {
             self.inst.clear();
             for (i, p) in g.parts.iter().enumerate() {
                 if shape(p.kind) != f || p.kind == PKind::Shock {
@@ -226,22 +232,19 @@ impl Scene {
                 let age = 1. - p.life / p.life0;
                 let (m, col, glow) = match p.kind {
                     PKind::Smoke | PKind::Dust => {
-                        // Fading by colour toward the fog and by shrinking, never by blending.
+                        // A puff swells as it ages, greys toward the fog, and dissolves pixel
+                        // by pixel through the dither. Never blending.
                         let t = clamp((age - 0.5) / 0.5, 0., 1.) * 0.8;
-                        let size = p.size
-                            * if age < 0.85 {
-                                1.
-                            } else {
-                                1. - (age - 0.85) / 0.15
-                            };
+                        let size = p.size * (0.7 + 0.6 * age);
+                        let solid = 1. - smooth((age - 0.55) / 0.45);
                         (
-                            inst_mat(p.p, age * 1.5 + i as f32, age * 0.8, size),
+                            inst_mat(p.p, age * 1.5 + i as f32, age * 0.8 + i as f32 * 0.9, size),
                             [
                                 lerp(p.col[0], fog[0], t),
                                 lerp(p.col[1], fog[1], t),
                                 lerp(p.col[2], fog[2], t),
                             ],
-                            0.45,
+                            dissolve(0.45, solid),
                         )
                     }
                     PKind::Fire | PKind::Flame => {
