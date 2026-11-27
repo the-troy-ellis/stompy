@@ -20,3 +20,7 @@ cargo test --workspace            # the headless sim tests
 
 The repository around this folder is the browser version and the reference
 implementation: every tuned number here is ported from its `src/data/`.
+`../deck/` is a different thing: the browser version wrapped in Electron as a
+Deck app, with its own `deck-latest` release. This Rust rebuild uses its own
+names throughout (`deck-rs/`, the `deck-rs.yml` workflow, the `deck-rs-latest`
+release, `~/Games/stompy-rs`), so the two install side by side.

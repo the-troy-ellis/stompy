@@ -7,7 +7,7 @@ How a piece of work moves from an issue to `main`. Agents and people alike.
 1. Work comes from GitHub issues on the repository, labelled `deck`, with a
    milestone (M1 to M5), a size and a link to its spec. [issues.md](issues.md)
    is the seed list; once filed, GitHub is the truth.
-2. One issue per branch per PR. Branch from `main`: `deck/m1/throttle-direct`.
+2. One issue per branch per PR. Branch from `main`: `deck-rs/m1/throttle-direct`.
 3. No new system ships before the owner has played the last one on the Deck.
    A PR that adds a system while the previous milestone's playtest is open
    waits.

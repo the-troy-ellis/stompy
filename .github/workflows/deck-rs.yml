@@ -1,15 +1,15 @@
-name: deck
+name: Steam Deck (Rust)
 on:
   push:
-    paths: ['deck/**', '.github/workflows/deck.yml']
+    paths: ['deck-rs/**', '.github/workflows/deck-rs.yml']
   pull_request:
-    paths: ['deck/**', '.github/workflows/deck.yml']
+    paths: ['deck-rs/**', '.github/workflows/deck-rs.yml']
 jobs:
   build-and-test:
     runs-on: ubuntu-24.04
     defaults:
       run:
-        working-directory: deck
+        working-directory: deck-rs
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libgl1-mesa-dev
@@ -21,30 +21,30 @@ jobs:
       - run: cargo build --release
 
   # Every push to main that passes the checks becomes the build the Deck's launcher installs
-  # (deck/tools/stompy-launch.sh): the release tagged deck-latest, replaced each time.
+  # (deck-rs/tools/stompy-launch.sh): the release tagged deck-rs-latest, replaced each time.
   release:
     needs: build-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
-    concurrency: deck-release
+    concurrency: deck-rs-release
     steps:
       - uses: actions/checkout@v4
       # Valve's Steam Runtime 3 (sniper) SDK has glibc 2.31, so the binary runs on every SteamOS 3.
       - name: Build in the Steam Runtime
         run: |
-          docker run --rm -v "$PWD:/src" -w /src/deck registry.gitlab.steamos.cloud/steamrt/sniper/sdk:latest sh -c '
+          docker run --rm -v "$PWD:/src" -w /src/deck-rs registry.gitlab.steamos.cloud/steamrt/sniper/sdk:latest sh -c '
             set -e
             git config --global --add safe.directory "*"
             pkg-config --exists sdl2 || (apt-get update && apt-get install -y libsdl2-dev)
             sh tools/build-release.sh'
-      - name: Publish as deck-latest
-        working-directory: deck
+      - name: Publish as deck-rs-latest
+        working-directory: deck-rs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete deck-latest --cleanup-tag --yes || true
-          gh release create deck-latest dist/stompy-deck.tar.gz dist/stompy-deck.tar.gz.sha256 \
+          gh release delete deck-rs-latest --cleanup-tag --yes || true
+          gh release create deck-rs-latest dist/stompy-rs.tar.gz dist/stompy-rs.tar.gz.sha256 \
             --target "$GITHUB_SHA" --prerelease --title "Stompy for the Deck (latest build)" \
-            --notes "Built from ${GITHUB_SHA::7}. The Deck's launcher (deck/tools/stompy-launch.sh) installs this on its next start."
+            --notes "Built from ${GITHUB_SHA::7}. The Deck's launcher (deck-rs/tools/stompy-launch.sh) installs this on its next start."

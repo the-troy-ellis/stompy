@@ -4,7 +4,7 @@ This folder is the Rust rebuild of Stompy aimed at the Steam Deck. The
 repository around it is the browser version and the **reference
 implementation**: its `docs/` has the specs and its `src/data/` has every
 tuned number. Port numbers, never reinvent them. **The plan of record is in
-`deck/docs/`**; start with `docs/README.md`.
+`deck-rs/docs/`**; start with `docs/README.md`.
 
 Rules that are easy to miss:
 
@@ -29,7 +29,7 @@ Rules that are easy to miss:
 - Text: board-book briefs, a flat cockpit voice, jokes after the fact, no
   exclamation marks, no references outside the game. `cargo test` checks it.
 - Balance numbers change only in issues about balance.
-- Every push to `main` that passes CI is published as the `deck-latest`
+- Every push to `main` that passes CI is published as the `deck-rs-latest`
   release, and the owner's Deck installs it on its next start
   (`tools/stompy-launch.sh`). Keep `main` playable.
 - New sim logic gets a test in `crates/sim/tests/sim.rs`. Mechs are indices,

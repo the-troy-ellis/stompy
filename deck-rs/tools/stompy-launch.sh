@@ -4,9 +4,9 @@
 # and runs the game. Offline, or if anything fails, it runs the copy it already has.
 # Nothing here needs Desktop mode after the first install (docs/deck-setup.md).
 REPO="the-troy-ellis/stompy"
-URL="${STOMPY_UPDATE_URL:-https://github.com/$REPO/releases/download/deck-latest}"
-DIR="${STOMPY_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/stompy-deck}"
-PKG="stompy-deck.tar.gz"
+URL="${STOMPY_UPDATE_URL:-https://github.com/$REPO/releases/download/deck-rs-latest}"
+DIR="${STOMPY_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/stompy-rs}"
+PKG="stompy-rs.tar.gz"
 mkdir -p "$DIR"
 log() { echo "stompy-launch: $*" >&2; }
 

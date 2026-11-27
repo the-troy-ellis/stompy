@@ -27,7 +27,7 @@ pub enum Screen {
     Pause,
     Debrief,
 }
-/// The saved settings: a few key=value lines in ~/.config/stompy-deck/settings.txt.
+/// The saved settings: a few key=value lines in ~/.config/stompy-rs/settings.txt.
 #[derive(Clone)]
 pub struct Prefs {
     pub pad_sens: f32,
@@ -79,7 +79,7 @@ fn prefs_path() -> std::path::PathBuf {
         .unwrap_or_else(|| {
             std::path::PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".config")
         });
-    base.join("stompy-deck").join("settings.txt")
+    base.join("stompy-rs").join("settings.txt")
 }
 fn pick<T: Copy>(all: &[T], i: f32) -> T {
     all[(i.max(0.) as usize).min(all.len() - 1)]

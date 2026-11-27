@@ -2,7 +2,7 @@
 
 This folder is the plan for the Deck rebuild. It exists so that the owner, or
 any agent, can pick up a piece of work cold, build it the way the project
-wants, and hand it off without a conversation. The game is in `deck/src`; the
+wants, and hand it off without a conversation. The game is in `deck-rs/src`; the
 reference implementation (the browser version, with every tuned number) is
 the repository around it.
 

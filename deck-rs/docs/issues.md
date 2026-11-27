@@ -74,8 +74,8 @@ afternoon), M (a day or two), L (a week).
 
 ## Any time
 
-25. **A CI job for deck/** (S). `.github/workflows/deck.yml` builds,
+25. **A CI job for deck-rs/** (S). `.github/workflows/deck-rs.yml` builds,
     runs clippy, fmt and the tests on Ubuntu with libsdl2-dev. (Included in
     this branch.)
-26. **Split deck/ into its own repository** (S). `git subtree split -P deck`
+26. **Split deck-rs/ into its own repository** (S). `git subtree split -P deck-rs`
     when the owner wants it apart from the browser version.

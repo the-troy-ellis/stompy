@@ -14,7 +14,7 @@ Libraries: `sdl2` (with `hidapi`, for the Deck's gyro and trackpads) and
 library needs the owner's yes first (docs/README.md § Decisions).
 
 ```
-deck/
+deck-rs/
   Cargo.toml            the workspace; cargo build, cargo test, cargo clippy, cargo fmt
   crates/
     sim/                stompy-sim: the simulation, no dependencies
@@ -23,7 +23,7 @@ deck/
     game/               stompy: the binary
   tools/shot.sh         a screenshot under a virtual screen, for boxes with no display
   tools/build-release.sh  the release build and its package (CI runs it in the Steam Runtime)
-  tools/stompy-launch.sh  the Deck's launcher: updates from the deck-latest release, then runs the game
+  tools/stompy-launch.sh  the Deck's launcher: updates from the deck-rs-latest release, then runs the game
   docs/                 this plan
 ```
 
@@ -110,9 +110,9 @@ ELIMINATE is implemented.
 ## Releases
 
 Every push to `main` that passes the checks runs the `release` job in
-`.github/workflows/deck.yml`: `tools/build-release.sh` inside Valve's Steam
+`.github/workflows/deck-rs.yml`: `tools/build-release.sh` inside Valve's Steam
 Runtime 3 SDK container (glibc 2.31, older than any SteamOS 3), then the
-package and its SHA-256 replace the `deck-latest` pre-release. On the Deck,
+package and its SHA-256 replace the `deck-rs-latest` pre-release. On the Deck,
 `tools/stompy-launch.sh` compares that checksum with the installed one,
 downloads and verifies a new build, swaps it in whole and starts the game;
 offline or on any failure it runs what it has (docs/deck-setup.md).
