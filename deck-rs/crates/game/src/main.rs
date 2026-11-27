@@ -4,6 +4,8 @@
 //!   --free               straight into Free Play; --seed N its seed
 //!   --shot N file.ppm    save frame N and exit; --skip S runs the sim S seconds first;
 //!   --demo               the mech flies itself; --debug the readout; --screen NAME and --mech N open a menu;
+//!   --watch              a camera outside, following your own mech (clips of it walking)
+//!   --record N K dir     save frames N to N+K-1 as dir/0000.ppm and on, then exit (clips)
 //!   --dither N           the dither's cell for this run (0 off, 1, 2, 3); --detail N the models' (0 boxes, 1, 2)
 //! The last five are for the tools (tools/shot.sh): screenshots on a box with no display.
 // Indexed loops over parallel arrays and long drawing signatures read better here than the alternatives.
@@ -41,6 +43,8 @@ fn main() {
         mech: None,
         dither: None,
         detail: None,
+        record: None,
+        watch: false,
     };
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut it = args.iter();
@@ -51,6 +55,7 @@ fn main() {
             "--fullscreen" => a.fullscreen = Some(true),
             "--free" => a.free = true,
             "--demo" => a.demo = true,
+            "--watch" => a.watch = true,
             "--debug" => a.debug = true,
             "--dither" => a.dither = Some(num(it.next()) as u32),
             "--detail" => a.detail = Some(num(it.next()) as u8),
@@ -64,6 +69,10 @@ fn main() {
             "--shot" => {
                 let n = num(it.next()) as u64;
                 a.shot = it.next().map(|p| (n, p.clone()));
+            }
+            "--record" => {
+                let (n, k) = (num(it.next()) as u64, num(it.next()) as u64);
+                a.record = it.next().map(|p| (n, k, p.clone()));
             }
             "--screen" => {
                 a.screen = match it.next().map(String::as_str) {

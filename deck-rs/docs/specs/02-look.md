@@ -65,8 +65,8 @@ Counted for a whole mech, both legs and arms (test: `models::tests`):
   the thighs, rails on the pods, exhausts, side plates, claw tips, an
   antenna light and a coolant line on the gun.
 
-`--detail N` (0 the boxes, 1, 2) picks for a tools run; 1 is the default
-until the owner picks. Then the other five, and the ground's faces come with
+`--detail N` (0 the boxes, 1, 2) picks for a tools run. **The owner picked
+level 2** (2026-11-27), the default. Then the other five, and the ground's faces come with
 the voxel ground (P2).
 
 ### Sprites (agreed in principle, not built)

@@ -86,7 +86,7 @@ impl Scene {
             up: v3(0., 1., 0.),
             jitter: 0.,
             cell: 2,
-            detail: 1,
+            detail: 2,
         }
     }
     fn parts(&mut self, gl: &Gl, ch: Ch) -> &MechParts {

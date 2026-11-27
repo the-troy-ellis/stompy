@@ -6,7 +6,7 @@ use crate::controls::*;
 use crate::gl::Gl;
 use crate::hud::*;
 use crate::platform::Platform;
-use crate::scene::Scene;
+use crate::scene::{Cam, Scene};
 use stompy_sim::data::names::*;
 use stompy_sim::data::*;
 use stompy_sim::geom::center_of;
@@ -166,6 +166,8 @@ pub struct Args {
     pub free: bool,
     pub seed: u32,
     pub shot: Option<(u64, String)>,
+    /// Frames N to N+K-1 saved into a folder, then exit (clips to judge animation by).
+    pub record: Option<(u64, u64, String)>,
     pub skip: f32,
     pub demo: bool,
     pub debug: bool,
@@ -175,6 +177,8 @@ pub struct Args {
     pub dither: Option<u32>,
     /// The models' detail for this run (the tools): 0 boxes, 1, 2.
     pub detail: Option<u8>,
+    /// A camera outside, three-quarters on, following the player's mech (tools).
+    pub watch: bool,
 }
 /// A line the cockpit voice will say, and when.
 struct Line {
@@ -205,6 +209,8 @@ pub struct App {
     debug: bool,
     demo: bool,
     shot: Option<(u64, String)>,
+    record: Option<(u64, u64, String)>,
+    watch: bool,
     frame: u64,
     quit: bool,
     tool_run: bool,
@@ -752,8 +758,10 @@ impl App {
             fps: 60.,
             debug: a.debug,
             demo: a.demo,
-            tool_run: a.shot.is_some(),
+            tool_run: a.shot.is_some() || a.record.is_some(),
             shot: a.shot,
+            record: a.record,
+            watch: a.watch,
             frame: 0,
             quit: false,
         };
@@ -806,7 +814,12 @@ impl App {
             }
             let (w, h) = self.plat.size();
             let now = self.plat.now();
-            let dt = (now - last).min(0.1); // a hitch never becomes a leap
+            // A hitch never becomes a leap; a tools run ticks one step a frame, however slow.
+            let dt = if self.tool_run {
+                STEP
+            } else {
+                (now - last).min(0.1)
+            };
             last = now;
             self.fps += ((1. / dt.max(1e-4)) as f32 - self.fps) * 0.05;
             let m = to_menu(&self.raw, &self.raw_was);
@@ -871,9 +884,19 @@ impl App {
             self.hud.begin(w, h);
             self.scene.cell = self.prefs.dither;
             if in_match {
-                let vp = self
-                    .scene
-                    .render(&mut self.gl, &self.g, self.prefs.fov, w, h, None);
+                let cam = self.watch.then(|| {
+                    let p = self.g.p();
+                    let (a, r, up) = (p.yaw + 1.1, 24. * p.ch.scale, 5.5 * p.ch.scale);
+                    let at = v3(p.x, p.y + up, p.z);
+                    Cam {
+                        eye: at + v3(a.sin() * r, 2.5, a.cos() * r),
+                        at,
+                        fov: 0.8,
+                    }
+                });
+                let vp =
+                    self.scene
+                        .render(&mut self.gl, &self.g, self.prefs.fov, w, h, cam.as_ref());
                 let o = HudOpts {
                     scale: self.prefs.hud_scale,
                     debug: self.debug,
@@ -924,6 +947,16 @@ impl App {
             self.hud.flush(&mut self.gl, 1.);
             self.plat.swap();
             self.frame += 1;
+            if let Some((n, k, dir)) = &self.record {
+                if self.frame >= *n {
+                    let px = self.gl.read_pixels(w, h);
+                    let _ = std::fs::create_dir_all(dir);
+                    save_ppm(&format!("{dir}/{:04}.ppm", self.frame - n), w, h, &px);
+                    if self.frame + 1 >= n + k {
+                        break;
+                    }
+                }
+            }
             if let Some((n, path)) = &self.shot {
                 if self.frame >= *n {
                     let px = self.gl.read_pixels(w, h);
