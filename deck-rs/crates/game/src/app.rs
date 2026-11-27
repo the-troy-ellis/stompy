@@ -173,6 +173,8 @@ pub struct Args {
     pub mech: Option<usize>,
     /// Overrides the DITHER setting for this run (the tools).
     pub dither: Option<u32>,
+    /// The models' detail for this run (the tools): 0 boxes, 1, 2.
+    pub detail: Option<u8>,
 }
 /// A line the cockpit voice will say, and when.
 struct Line {
@@ -755,6 +757,9 @@ impl App {
             frame: 0,
             quit: false,
         };
+        if let Some(d) = a.detail {
+            app.scene.detail = d.min(2);
+        }
         if let Some(d) = a.dither {
             app.prefs.dither = d.min(3);
         }

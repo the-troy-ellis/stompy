@@ -23,6 +23,8 @@ pub struct Scene {
     jitter: f32,
     /// The dither's cell in pixels (0: smooth), from SETTINGS.
     pub cell: u32,
+    /// Model detail: 0 the boxes, 1 or 2 the detailed models where there are some.
+    pub detail: u8,
 }
 /// A fixed camera instead of the cockpit (the menu's turntable).
 pub struct Cam {
@@ -84,10 +86,12 @@ impl Scene {
             up: v3(0., 1., 0.),
             jitter: 0.,
             cell: 2,
+            detail: 1,
         }
     }
     fn parts(&mut self, gl: &Gl, ch: Ch) -> &MechParts {
-        self.parts[ch.i()].get_or_insert_with(|| build_mech_parts(gl, ch))
+        let d = self.detail;
+        self.parts[ch.i()].get_or_insert_with(|| build_mech_parts(gl, ch, d))
     }
     fn load_world(&mut self, gl: &Gl, g: &Game) {
         let key = (g.ter.seed, g.biome);

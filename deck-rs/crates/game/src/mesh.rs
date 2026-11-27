@@ -68,6 +68,116 @@ impl Builder {
             self.quad(c[f[0]], c[f[1]], c[f[2]], c[f[3]], col, ctr);
         }
     }
+    /// A box `size` across with its edges cut off `bev` wide (world units, after `m`'s
+    /// position and turn, which must not scale), its top face shrunk by `taper`. 44 faces:
+    /// the six sides, a strip on each edge, a triangle on each corner.
+    pub fn bbox(&mut self, m: M4, size: V3, bev: f32, taper: f32, col: [f32; 3]) {
+        let h = size * 0.5;
+        let b = bev.min(h.x.min(h.y).min(h.z) * 0.45);
+        let tp = |x: f32, y: f32, z: f32| {
+            let k = if y > 0. { taper } else { 1. };
+            m.apply(v3(x * k, y, z * k))
+        };
+        let a = |sx: f32, sy: f32, sz: f32| tp(sx * h.x, sy * (h.y - b), sz * (h.z - b));
+        let bb = |sx: f32, sy: f32, sz: f32| tp(sx * (h.x - b), sy * h.y, sz * (h.z - b));
+        let c = |sx: f32, sy: f32, sz: f32| tp(sx * (h.x - b), sy * (h.y - b), sz * h.z);
+        let ctr = m.apply(V3::ZERO);
+        const S: [f32; 2] = [1., -1.];
+        for s in S {
+            self.quad(
+                a(s, 1., 1.),
+                a(s, 1., -1.),
+                a(s, -1., -1.),
+                a(s, -1., 1.),
+                col,
+                ctr,
+            );
+            self.quad(
+                bb(1., s, 1.),
+                bb(-1., s, 1.),
+                bb(-1., s, -1.),
+                bb(1., s, -1.),
+                col,
+                ctr,
+            );
+            self.quad(
+                c(1., 1., s),
+                c(-1., 1., s),
+                c(-1., -1., s),
+                c(1., -1., s),
+                col,
+                ctr,
+            );
+        }
+        for p in S {
+            for q in S {
+                self.quad(
+                    a(p, q, 1.),
+                    a(p, q, -1.),
+                    bb(p, q, -1.),
+                    bb(p, q, 1.),
+                    col,
+                    ctr,
+                );
+                self.quad(
+                    a(p, 1., q),
+                    a(p, -1., q),
+                    c(p, -1., q),
+                    c(p, 1., q),
+                    col,
+                    ctr,
+                );
+                self.quad(
+                    bb(1., p, q),
+                    bb(-1., p, q),
+                    c(-1., p, q),
+                    c(1., p, q),
+                    col,
+                    ctr,
+                );
+                for r in S {
+                    self.tri(a(p, q, r), bb(p, q, r), c(p, q, r), col, Some(ctr), false);
+                }
+            }
+        }
+    }
+    /// A round rod `d` across from `a` to `b`, n sides.
+    pub fn rod(&mut self, a: V3, b: V3, d: f32, n: usize, col: [f32; 3]) {
+        let ax = b - a;
+        let y = ax.norm();
+        let up = if y.y.abs() < 0.9 {
+            v3(0., 1., 0.)
+        } else {
+            v3(1., 0., 0.)
+        };
+        let x = y.cross(up).norm();
+        let z = x.cross(y).norm();
+        let mid = (a + b) * 0.5;
+        let m = M4([
+            x.x * d,
+            x.y * d,
+            x.z * d,
+            0.,
+            ax.x,
+            ax.y,
+            ax.z,
+            0.,
+            z.x * d,
+            z.y * d,
+            z.z * d,
+            0.,
+            mid.x,
+            mid.y,
+            mid.z,
+            1.,
+        ]);
+        self.cyl(m, col, n, 1.);
+    }
+    /// Triangles so far (for the budget).
+    #[cfg(test)]
+    pub fn tris(&self) -> usize {
+        self.d.len() / (crate::gl::FLOATS * 3)
+    }
     pub fn cube1(&mut self, m: M4, col: [f32; 3]) {
         self.cube(m, col, 1., 1.);
     }
@@ -245,7 +355,29 @@ fn ball(b: &mut Builder, at: V3, d: f32, col: [f32; 3]) {
 }
 
 /// Every part of a chassis: legs from its leg type sized by its body plan, body from its style.
-pub fn build_mech_parts(gl: &Gl, ch: Ch) -> MechParts {
+/// `detail` above 0 swaps in the detailed model where there is one (`models.rs`; BARRY so far).
+pub fn build_mech_parts(gl: &Gl, ch: Ch, detail: u8) -> MechParts {
+    let mut p = build_box_parts(gl, ch);
+    if detail > 0 && ch == Ch::Kestrel {
+        let d = crate::models::barry(detail);
+        for (slot, mut b) in [
+            (&mut p.hip, d.hip),
+            (&mut p.uleg, d.uleg),
+            (&mut p.lleg, d.lleg),
+            (&mut p.foot, d.foot),
+            (&mut p.torso, d.torso),
+            (&mut p.arm, d.arm),
+        ] {
+            gl.free(std::mem::replace(slot, b.upload(gl)));
+        }
+        let mut b = d.barrel;
+        if let Some(old) = p.barrel.replace(b.upload(gl)) {
+            gl.free(old);
+        }
+    }
+    p
+}
+fn build_box_parts(gl: &Gl, ch: Ch) -> MechParts {
     let c = chassis(ch);
     let g = geo_for(ch);
     let (col, dark, acc) = (c.col, mulc(c.col, 0.55), c.acc);

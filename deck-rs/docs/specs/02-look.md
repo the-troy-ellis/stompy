@@ -49,13 +49,34 @@ rock. A smoke or dust puff dissolves pixel by pixel through the dither (an
 instance carries how much of it is still drawn), instead of shrinking.
 First pass: the smoke still reads a little like boulders.
 
-### Part 2: more faces (next)
+### Part 2: more faces (BARRY built at two levels, the owner picks)
 
-Today's mechs are mostly boxes, a few hundred triangles each. The target is
-1,500 to 4,000: bevelled plates, 8 to 12 sided cylinders for actuators,
-pistons, vents, toes and a canopy, each face still one colour. BARRY first,
-at two levels, for the owner to pick from screenshots and on the Deck; then
-the other five. The ground's faces are redone by the voxel ground (P2).
+The boxes were about 700 triangles a mech. `models.rs` builds BARRY on the
+same joints (every pivot, the legs' lengths and the gun's muzzle where the
+sim expects them) from bevelled boxes (`Builder::bbox`, 44 faces), rods
+between two points (`Builder::rod`), pistons, drums, vents and lumps.
+Counted for a whole mech, both legs and arms (test: `models::tests`):
+
+- **Level 1, about 4,300:** bevelled armour, chest plates, round knee and
+  shoulder drums, pistons behind the thighs and shins, three clawed toes and
+  a heel spur, a domed cockpit with a framed canopy, hollow missile tubes, a
+  ringed gun barrel with a muzzle, an antenna. Round things have 8 sides.
+- **Level 2, about 9,200:** all that with 16 sides, plus vents, bolts on
+  the thighs, rails on the pods, exhausts, side plates, claw tips, an
+  antenna light and a coolant line on the gun.
+
+`--detail N` (0 the boxes, 1, 2) picks for a tools run; 1 is the default
+until the owner picks. Then the other five, and the ground's faces come with
+the voxel ground (P2).
+
+### Sprites (agreed in principle, not built)
+
+The owner (2026-11-27) is open to sprites where they earn it, used
+judiciously. Candidates: weather (to be talked through with a weather
+engine), explosion fireballs and muzzle flashes, the sky (sun, moon,
+stars). Not on mechs, the ground or anything walked round. Sprites would be
+cut out (no blending), drawn in the place's ramp. Building them needs the
+"no textures" rule narrowed, which is the owner's call when it comes up.
 
 ## Kept, changed, asked
 
