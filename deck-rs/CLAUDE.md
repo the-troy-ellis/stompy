@@ -3,7 +3,9 @@
 This folder is the Rust rebuild of Stompy aimed at the Steam Deck. The
 repository around it is the browser version and the **reference
 implementation**: its `docs/` has the specs and its `src/data/` has every
-tuned number. Port numbers, never reinvent them. **The plan of record is in
+tuned number. Port numbers, never reinvent them. Bringing a feature across follows
+`deck-rs/docs/parity.md`: a port spec that says what is kept, what is
+changed and why, and what to ask the owner, before any code. **The plan of record is in
 `deck-rs/docs/`**; start with `docs/README.md`.
 
 Rules that are easy to miss:

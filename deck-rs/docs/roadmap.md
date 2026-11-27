@@ -5,9 +5,13 @@ building more, and no new system ships before the owner has played the last
 one. So each milestone ends on the Deck in the owner's hands, and the next
 one starts from what they said.
 
+M1 to M5 are parity phases P1 to P3 in [parity.md](parity.md), which also
+lists what comes after them (the ground, the second arm, the world) and how
+each feature is brought across from the browser version.
+
 | Milestone | What it is | Done when |
 |---|---|---|
-| **M0** The core, built | Everything in [specs/00-core.md](specs/00-core.md): one mech that walks, shoots, overheats, punches, jumps and falls apart, felt. Six chassis, eleven weapons, the AI, Free Play, two Act I missions. | **Now.** Built and tested headless; screenshots under software GL. Not yet played on a Deck. |
+| **M0** The core, built | Everything in [specs/00-core.md](specs/00-core.md): one mech that walks, shoots, overheats, punches, jumps and falls apart, felt. Six chassis, eleven weapons, the AI, Free Play, two Act I missions. | **Now.** Built and tested headless; installed on the owner's Deck on 2026-11-27, with updates on every merge to `main`. |
 | **M1** Played, then tuned | The owner plays it on the Deck. The first Deck playtest decides: stick feel and dead zones, gyro on or off and how strong, the throttle (hold or direct), rumble strength per event, the cockpit arms, the HUD's size, the FOV. Then the tuning pass on feel: footfalls, landings, hits, punches (the FEEL rows, live-tunable). | Three words from the owner that include heavy, chunky, thunky or satisfying. Issues filed for what was wrong. |
 | **M2** The campaign's rest of Act I | Structures and vehicles (towers to topple, trucks to escort), waves, the DESTROY, ESCORT, SURVIVE and EXTRACT objectives, the debrief verdicts for them, mission 1's silent tutorial prompts. TOWER TOPPLER and HELPLESS LIL BUDDIES playable. | Act I winnable on NORMAL in a stock BARRY. |
 | **M3** Mechlab-lite | The FIT screen: hardpoints by category, systems (sinks, armour, jets, KNUCKLES), the tonnage bar, saved per chassis. Enemies stay stock. | A JACKAL with two BLINKYs and sinks sustains fire longer than stock (test). |

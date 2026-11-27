@@ -14,6 +14,7 @@ Read in this order the first time:
 | [architecture.md](architecture.md) | The code as it is: the sim, the platform, the renderer, how they talk, the invariants. |
 | [controls.md](controls.md) | The Deck layout, the gyro, the paddles, and the keyboard and mouse second. |
 | [deck-setup.md](deck-setup.md) | Building it, putting it on the Deck, the Steam Input layout, playtesting. |
+| [parity.md](parity.md) | Reaching parity with the browser version: how each feature comes across, where each stands, the phases, the decision log. |
 | [roadmap.md](roadmap.md) | The milestones, what is in each, what the owner plays before the next starts. |
 | [workflow.md](workflow.md) | How work is claimed, tested, playtested on the Deck and merged. The definition of done. |
 | [issues.md](issues.md) | The backlog, as ready-to-file issues. |
