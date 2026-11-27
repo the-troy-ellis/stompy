@@ -6,9 +6,11 @@
 # CI uses Valve's Steam Runtime 3 "sniper" SDK container (glibc 2.31). It installs Rust if it is missing.
 set -eu
 if ! command -v cargo >/dev/null 2>&1; then
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
   . "$HOME/.cargo/env"
 fi
+# The version rust-toolchain.toml names (a no-op when cargo isn't rustup's).
+if command -v rustup >/dev/null 2>&1; then rustup toolchain install; fi
 cargo build --release --locked -p stompy
 rm -rf dist && mkdir -p dist/pkg
 cp target/release/stompy dist/pkg/

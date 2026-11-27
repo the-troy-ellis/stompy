@@ -35,7 +35,8 @@ Rules that are easy to miss:
 - New sim logic gets a test in `crates/sim/tests/sim.rs`. Mechs are indices,
   not references; the sim talks to the outside only through `Game::events`.
 
-Build and check: `cargo test --workspace`, `cargo clippy --workspace
+`rust-toolchain.toml` pins the Rust version for every build; bump it on
+purpose, in its own commit. Build and check: `cargo test --workspace`, `cargo clippy --workspace
 --all-targets -- -D warnings`, `cargo fmt --all --check`. Run: `cargo run
 --release -- --window`. Screenshots on a headless box:
 `tools/shot.sh out.png 30 --free --demo --skip 30`.
