@@ -33,6 +33,8 @@ Rules that are easy to miss:
 - Text: board-book briefs, a flat cockpit voice, jokes after the fact, no
   exclamation marks, no references outside the game. `cargo test` checks it.
 - Balance numbers change only in issues about balance.
+- Bugs the owner reports go in `docs/bugs.md` and wait there. Don't fix one
+  until the owner picks it, even if it looks like a one-liner.
 - Every push to `main` that passes CI is published as the `deck-rs-latest`
   release, and the owner's Deck installs it on its next start
   (`tools/stompy-launch.sh`). Keep `main` playable.

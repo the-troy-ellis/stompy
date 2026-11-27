@@ -17,6 +17,7 @@ Read in this order the first time:
 | [parity.md](parity.md) | Reaching parity with the browser version: how each feature comes across, where each stands, the phases, the decision log. |
 | [roadmap.md](roadmap.md) | The milestones, what is in each, what the owner plays before the next starts. |
 | [workflow.md](workflow.md) | How work is claimed, tested, playtested on the Deck and merged. The definition of done. |
+| [bugs.md](bugs.md) | The owner's bug list. Logged as found, fixed only when the owner picks one. |
 | [issues.md](issues.md) | The backlog, as ready-to-file issues. |
 | [specs/](specs/) | One spec per feature: what was built, what it touches, acceptance criteria, tests. |
 
