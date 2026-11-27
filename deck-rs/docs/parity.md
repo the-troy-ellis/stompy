@@ -39,45 +39,52 @@ better on the way, not the same code.
 | Six combat chassis, eleven weapons | spec 06 | **ported** | P1 |
 | Free Play; Act I missions 1 and 4 | spec 04 | **ported** | P1 |
 | Debug page, test range, cheats, live tuning | spec 19 | a debug overlay (F3) | P1 |
-| Structures, trucks, waves; DESTROY, ESCORT, SURVIVE, EXTRACT | spec 03 | data only | P2 |
-| Act I missions 2 and 3; the silent tutorial | specs 04, 11 | not yet | P2 |
-| Mechlab-lite (FIT) | spec 02 | not yet | P2 |
-| Night, headlights, weather, props, ambience, explosions' extras | spec 07 | palettes, weather keys, no drawing | P3 |
-| The glacier, volcanic plain and forest; Acts II and III; contracts | specs 04, 39 | palettes only | P3 |
-| Voxel ground: canyons, caves, craters, falling ground, on a 4 m grid | specs 18, 27, 29 | not yet (heightfield) | P4 |
-| Bigger maps and big fights (memory and cost that scale) | specs 34, 35 | not yet | P4 |
-| Digging: BIG SCOOPER, hold to dig, dig up, dig feel | specs 20, 25, 28, 30 | not yet | P5 |
-| The base: silo, factory, crew and SWAP, raids, salvage | spec 20 | not yet | P5 |
-| Command view, orders, sites, the builder | specs 22, 23, 31 | not yet | P6 |
-| Base loop, production, territory, stealing, tunnelling | specs 32, 33, 37 | not yet | P6 |
-| Buildings and the city; the forest's toppling trees | specs 36, 38, 39 | not yet | P7 |
+| Structures: things in the world to shoot, punch and topple | spec 03 | data only | P2 |
+| Trucks, waves; DESTROY, ESCORT, SURVIVE, EXTRACT | spec 03 | data only | campaign |
+| Act I missions 2 and 3; the silent tutorial | specs 04, 11 | not yet | campaign |
+| Mechlab-lite (FIT) | spec 02 | not yet | P3 |
+| Night, headlights, weather, props, explosions' extras | spec 07 | palettes, weather keys, no drawing | P5 |
+| Ambience, CC0 samples, a recorded cockpit voice | spec 07 | synthesis only | campaign |
+| The glacier, volcanic plain and forest; Acts II and III; contracts | specs 04, 39 | palettes only | campaign |
+| Voxel ground: canyons, caves, craters, falling ground, on a 4 m grid | specs 18, 27, 29 | not yet (heightfield) | P2 |
+| Bigger maps and big fights (memory and cost that scale) | specs 34, 35 | not yet | P2 |
+| The AI in canyons, caves and tunnels | spec 18 | not yet | P3 |
+| Digging: BIG SCOOPER, hold to dig, dig up, dig feel | specs 20, 25, 28, 30 | not yet | P3 |
+| The base: silo, factory, crew and SWAP, raids, salvage | spec 20 | not yet | P3 |
+| Command view, orders, sites, the builder | specs 22, 23, 31 | not yet | P4 |
+| Base loop, production, territory, stealing, tunnelling | specs 32, 33, 37 | not yet | P4 |
+| Buildings and the city; the forest's toppling trees | specs 36, 38, 39 | not yet | P5 |
 | Mission editor | spec 15 | not yet | **owner decides** |
 | LAN arena, co-op, internet play | specs 08, 09, 10 | not yet | **owner decides** |
 | Phones, portrait cockpit, touch, PWA, app store | specs 11, 17, 24 | not planned | out |
 
 ## The phases
 
-Each phase starts with its asks and ends with the owner playing it on the
-Deck. The order follows dependencies and keeps the game a good fighting game
-at every step. The big systems (voxel ground, then construction) come after
-the fighting game is whole, because they change what the fighting game's
-ground and missions are.
+**The gameplay core and the engine first; the campaign later** (the owner,
+2026-11-27). Until the campaign, new things are played in Free Play and the
+test range, so the test range comes first. Each phase starts with its asks
+and ends with the owner playing it on the Deck.
 
-- **P1: Play the core, tune it.** The Deck playtest (`roadmap.md` § M1), then
-  the tuning it asks for. The debug page grows a test range and live FEEL
-  tuning first, since every later playtest uses them.
-- **P2: Act I whole.** Entities and objectives, missions 2 and 3, the silent
-  tutorial, mechlab-lite.
-- **P3: The campaign whole.** Night, weather, props, ambience, the other
-  three biomes, Acts II and III, contracts.
-- **P4: The ground.** Voxel ground on a 4 m grid, built for bigger maps and
-  big fights from the start rather than retrofitted (in the browser version
-  these came as three rewrites).
-- **P5: The second arm, by hand.** BIG SCOOPER and digging, the base, the
-  crew and SWAP, raids: spec 20's smallest loop.
-- **P6: The second arm, from above.** Command view, the builder, the base
+- **P1: Play the core, tune it.** The debug page grows a test range (a flat
+  field or a canyon, the foes you pick), cheats, live FEEL tuning and a
+  frame-time readout, since every later playtest uses them. Then the Deck
+  playtest (`roadmap.md` § M1) and the tuning it asks for.
+- **P2: The engine.** Voxel ground on a 4 m grid: chunks meshed off the main
+  thread, 3D ground questions for feet, shots and sight, craters, falling
+  ground. Built for bigger maps and big fights from the start, with the
+  Deck's frame budget measured in a crowd scene, rather than retrofitted (in
+  the browser version these came as three rewrites). Structures as a
+  general thing in the world that can be shot, punched and toppled.
+- **P3: Core gameplay on the new ground.** The AI in canyons and caves,
+  mechlab-lite, then the second arm by hand: BIG SCOOPER and digging, the
+  base, the crew and SWAP, raids (spec 20's smallest loop, in Free Play).
+- **P4: The second arm from above.** Command view, the builder, the base
   loop, production, tunnelling.
-- **P7: The world.** Buildings and the city, the forest's falling trees.
+- **P5: The world.** Buildings and the city, the forest, night and
+  headlights, weather, props, explosions' extras.
+- **Later: the campaign.** Trucks, waves and the objective types, the
+  silent tutorial, the missions of Acts I to III, contracts, ambience and the
+  recorded voice.
 
 The editor and multiplayer slot in wherever the owner wants them, or
 nowhere.
@@ -91,4 +98,5 @@ port spec's "Changed" list is approved.
 |---|---|---|---|---|
 | 2026-11-10 | Platform | web, phones, desktop | the Steam Deck (mouse and keyboard second) | the game's home is the Deck |
 | 2026-11-10 | Weapon groups | none (one control per kind) | the same | kept on purpose |
+| 2026-11-27 | Order | the campaign before the second arm | the core and the engine first, the campaign later | the owner's call: get the game's core and engine right first |
 | 2026-11-27 | Rust version | (n/a) | pinned in `rust-toolchain.toml` | fmt and clippy don't drift between builds |

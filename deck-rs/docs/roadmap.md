@@ -5,9 +5,11 @@ building more, and no new system ships before the owner has played the last
 one. So each milestone ends on the Deck in the owner's hands, and the next
 one starts from what they said.
 
-M1 to M5 are parity phases P1 to P3 in [parity.md](parity.md), which also
-lists what comes after them (the ground, the second arm, the world) and how
-each feature is brought across from the browser version.
+**The order changed on 2026-11-27:** the gameplay core and the engine come
+first, the campaign later. [parity.md](parity.md) has the phases now. M1 is
+its P1, M3 (mechlab) is in its P3, and M2, M4's ambience and voice, and M5
+are the campaign, which waits. The table below keeps what each milestone
+contains.
 
 | Milestone | What it is | Done when |
 |---|---|---|
