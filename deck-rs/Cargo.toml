@@ -1,0 +1,20 @@
+# Stompy for the Steam Deck. Two crates:
+#   crates/sim   the simulation: no dependencies at all, so it cannot reach SDL or GL
+#   crates/game  the game: SDL2 (the platform), glow (OpenGL bindings), and the sim
+[workspace]
+resolver = "2"
+members = ["crates/sim", "crates/game"]
+
+[workspace.package]
+edition = "2021"
+version = "0.2.0"
+publish = false
+
+[profile.dev]
+opt-level = 1          # the sim and the renderer stay quick enough to play a debug build
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+debug = 1
