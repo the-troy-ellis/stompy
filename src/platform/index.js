@@ -4,7 +4,9 @@
 // these calls, never which platform it's on, and in a browser each one falls
 // back to what the browser has. So the web plays exactly as it did.
 //
-// Part 1 (now): isApp, os, haptic in milliseconds, hidden.
+// Part 1 (now): isApp, os, haptic in milliseconds, hidden. The Steam Deck
+// app (Electron, deck/) adds window.stompyShell, read only by onShellUpdate;
+// rumble is the Gamepad API's own.
 // Native haptic kinds, back, keep-awake (part 2) and the unlock (part 3) come
 // later, here.
 
@@ -20,6 +22,14 @@ export function createPlatform(win = typeof window === 'undefined' ? undefined :
     // The page out of sight: a background tab, or the app sent home (the
     // WebView hides the page when the app pauses).
     hidden: () => !!doc?.hidden,
+    // The Steam Deck app (deck/, docs/specs/40-steam-deck.md) downloads its next
+    // build while you play; when it's in place, `cb(apply)` is called once, and
+    // `apply()` restarts the app into it. Nothing happens anywhere else.
+    onShellUpdate(cb) {
+      const shell = win?.stompyShell;
+      if (!shell?.onUpdateReady) return;
+      shell.onUpdateReady(() => cb(() => shell.restart()));
+    },
     // Rumble in the controller (the Steam Deck's, docs/specs/40-steam-deck.md):
     // the feel table's haptic column (`ms`, 8 for a footfall to 110 for a
     // blast-off) as a dual-rumble pulse on the first pad that has one. Short

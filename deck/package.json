@@ -15,6 +15,7 @@
     "productName": "Stompy",
     "files": [
       "main.cjs",
+      "preload.cjs",
       "game/**/*",
       "!game/**/*.map",
       "!game/sw.js"
