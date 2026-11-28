@@ -27,6 +27,12 @@ and the few words on screen keep the board-book voice.
   scatter from the other city's, but they don't fight.
 - **Crowds get stomped. Hence Stompy** (the owner). It is an honour for a
   tiny robot to be squished back into ore by a demigod. Ore to ore.
+- **The ore loop** (the owner). The **digger** (a demigod, BIG SCOOPER)
+  unearths ore and reveals it; the **tiny robots** harvest it and bring it
+  back to the city; the temple smelts it into demigods.
+- **Honour has a cost** (the owner). The tiny robots are the ones who
+  gather the ore, so every one squished is a pair of hands fewer bringing
+  it home. A careless stride through your own fields slows your city.
 - **The rite** (the owner, for its tone): **"Ore to ore."** and **"Smelt
   me into thy image."** The dead feed the living: salvage is smelted into the
   next demigod, literally, in the temple's smelter. The one place the flat
@@ -110,8 +116,9 @@ What the tiny robots see, and what is happening:
 - The tiny robots don't run from their own demigods: they gather at the
   roadside, cheer, and some kneel in its path.
 - They do run from the other city's: its foot flattens, it doesn't honour.
-- A squished tiny robot leaves a little ore. The others carry it to the
-  temple's hoppers. The loop closes.
+- A squished tiny robot leaves a little ore, which the others carry to the
+  temple's hoppers; but it was a gatherer, and the city now has one fewer
+  (a little ore now, less ore for good).
 - Felt: a small crunch, a puff of ore dust, and the cheering a beat after.
 
 ### Shown, not told
@@ -123,11 +130,12 @@ and dry: "Relic recovered. The faithful are pleased."
 
 ## Open
 
-1. **Who makes the tiny robots, and what a squish costs:** does the temple
-   make them too (so a squish trades a worker for a little ore), or do
-   they come from somewhere else?
-2. **The construction machines:** is BIG SCOOPER a demigod of digging, with
-   the tiny robots doing the small work, or do tiny robots do it all?
+1. **Where new tiny robots come from:** made at the temple (ore spent on
+   hands), or something slower (they turn up, they're found in the dead
+   cities)?
+2. **Building:** the digger reveals and the tiny robots gather; who puts
+   up buildings (the temple, new halls): the tiny robots, or a builder
+   demigod?
 3. **Which needs become systems:** power (a Spark deep in the ground,
    beside ore), memory (relics unlock demigods), protection (the loop
    itself)? The rest stays flavour.
