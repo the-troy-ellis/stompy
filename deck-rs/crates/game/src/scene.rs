@@ -153,6 +153,19 @@ fn piston(b: &mut Batch, a: V3, z: V3, pi: &crate::models::Piston, sc: f32, dark
         0.,
     );
 }
+/// A chain from `a` to `b`: links half a metre long (by scale), every other one fatter, so it
+/// reads as links and not a rod.
+fn chain(b: &mut Batch, a: V3, z: V3, sc: f32) {
+    let len = (z - a).len();
+    let link = 0.5 * sc;
+    let n = (len / link).ceil().max(1.) as usize;
+    for i in 0..n {
+        let (u0, u1) = (i as f32 / n as f32, (i as f32 + 0.85) / n as f32);
+        let (p0, p1) = (a + (z - a) * u0, a + (z - a) * u1.min(1.));
+        let d = if i % 2 == 0 { 0.26 } else { 0.16 } * sc;
+        b.fx(Fx::Rod, false, &rod_mat(p0, p1, d), [0.3, 0.31, 0.34], 0.);
+    }
+}
 /// A box from `a` to `b`, `w` across: the beams and the tracers.
 fn beam_mat(a: V3, b: V3, w: f32) -> M4 {
     let d = b - a;
@@ -508,7 +521,44 @@ impl Scene {
                 b.part(ch, lod, Slot::Arm, &a);
             }
             if p.fist.is_some() {
-                b.part(ch, lod, Slot::Fist, &a);
+                match m.flail.filter(|f| f.arm == sec) {
+                    // Out on its chain: the ball where the sim has it, facing the way it flies,
+                    // and the links back to the wrist.
+                    Some(f) => {
+                        use crate::models::{BALL, BALL_R};
+                        let z = f.dir;
+                        let up = if z.y.abs() < 0.9 {
+                            v3(0., 1., 0.)
+                        } else {
+                            v3(1., 0., 0.)
+                        };
+                        let x = up.cross(z).norm();
+                        let y = z.cross(x);
+                        let ball = M4([
+                            x.x * sc,
+                            x.y * sc,
+                            x.z * sc,
+                            0.,
+                            y.x * sc,
+                            y.y * sc,
+                            y.z * sc,
+                            0.,
+                            z.x * sc,
+                            z.y * sc,
+                            z.z * sc,
+                            0.,
+                            f.at.x,
+                            f.at.y,
+                            f.at.z,
+                            1.,
+                        ]) * M4::t(-BALL[0], -BALL[1], -BALL[2]);
+                        b.part(ch, lod, Slot::Fist, &ball);
+                        let from = a.apply(v3(0., -1.3, 0.3));
+                        let to = f.at - z * (BALL_R * sc);
+                        chain(b, from, to, sc);
+                    }
+                    None => b.part(ch, lod, Slot::Fist, &a),
+                }
             }
             if p.barrel.is_some() && m.w.iter().any(|w| w.mount == sec && !w.dead) {
                 let gun = a * M4::t(0., 0., -back);

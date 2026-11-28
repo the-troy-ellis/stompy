@@ -769,6 +769,10 @@ pub const PUNCH_TOES: [[f32; 4]; 3] = [
     [0.58, -0.3, 0.86, 0.22],
 ];
 pub const PUNCH_TOE_1: f32 = 0.42;
+/// PURPLE PUNCHER's wrecking ball: its centre in the arm's frame and its radius. Flying, it is
+/// drawn with this point at the ball's place in the sim.
+pub const BALL: [f32; 3] = [0., -2.35, 0.3];
+pub const BALL_R: f32 = 1.05;
 /// PURPLE PUNCHER's: BARRY's layout, thicker, for its girth.
 pub const PUNCH_KNEE: Piston = Piston {
     from: [0., -0.55, -0.84],
@@ -1077,34 +1081,57 @@ pub fn puncher(level: u8, paint: [f32; 3]) -> Parts {
         arm.bbox(t(0., 0.6, 0.05), v3(1.55, 0.45, 1.6), 0.12, 0.85, col);
     }
 
-    // The fist, in the accent and bigger than the arm: a cuff, the hand, a row of knuckles
-    // across the top of the front (the punching face), four fingers curled down it, the thumb
-    // tucked under.
+    // The fist: a wrecking ball in the accent, bigger than the arm (the owner, 2026-11-28: the
+    // fists are wrecking balls on chains). Knuckle studs across its face, a steel band round
+    // it, and the shackle the chain runs from, docked in a socket at the wrist.
     let mut fist = Builder::default();
-    fist.rod(v3(0., -1.0, 0.3), v3(0., -1.3, 0.3), 1.2, n, dark);
-    fist.bbox(t(0., -2.2, 0.3), v3(1.6, 1.95, 1.6), 0.3, 0.92, acc);
-    for i in 0..4 {
-        let x = (i as f32 - 1.5) * 0.37;
-        fist.sphere(
-            t(x, -1.55, 1.02) * M4::s(0.2, 0.22, 0.2),
-            acc,
-            if hi { 10 } else { 6 },
-            if hi { 5 } else { 3 },
-        );
-        fist.bbox(t(x, -2.2, 1.12), v3(0.33, 1.0, 0.14), 0.05, 1., acc_dk);
-    }
-    fist.bbox(
-        t(0., -2.95, 0.85) * M4::rx(0.35),
-        v3(1.0, 0.34, 0.5),
-        0.1,
-        0.9,
-        acc_dk,
+    fist.rod(v3(0., -1.0, 0.3), v3(0., -1.3, 0.3), 1.15, n, dark);
+    fist.rod(v3(0., -1.3, 0.3), v3(0., -1.42, 0.3), 0.5, n, STEEL);
+    fist.sphere(
+        t(BALL[0], BALL[1], BALL[2]) * M4::s1(2. * BALL_R),
+        acc,
+        n,
+        n / 2,
     );
-    if hi {
-        fist.bbox(t(0., -1.3, 0.3), v3(1.35, 0.14, 1.45), 0.04, 1., dark);
-        for s in [1., -1.] {
-            fist.bbox(t(s * 0.81, -2.2, 0.3), v3(0.06, 1.1, 1.1), 0.02, 1., acc_dk);
+    fist.rod(
+        v3(BALL[0], BALL[1] - 0.12, BALL[2]),
+        v3(BALL[0], BALL[1] + 0.12, BALL[2]),
+        BALL_R * 2.08,
+        n,
+        STEEL,
+    );
+    for i in 0..4 {
+        let x = (i as f32 - 1.5) * 0.36;
+        for y in [-0.25, 0.22] {
+            fist.sphere(
+                t(x, BALL[1] + y, BALL[2] + BALL_R * 0.93) * M4::s1(0.16),
+                acc_dk,
+                if hi { 8 } else { 5 },
+                if hi { 4 } else { 3 },
+            );
         }
+    }
+    if hi {
+        for k in 0..8 {
+            let a = k as f32 / 8. * TAU;
+            fist.sphere(
+                t(
+                    BALL[0] + a.cos() * BALL_R * 1.04,
+                    BALL[1],
+                    BALL[2] + a.sin() * BALL_R * 1.04,
+                ) * M4::s1(0.07),
+                dark,
+                6,
+                3,
+            );
+        }
+        fist.bbox(
+            t(BALL[0], BALL[1] + BALL_R * 0.98, BALL[2]),
+            v3(0.18, 0.3, 0.5),
+            0.05,
+            1.,
+            STEEL,
+        );
     }
     Parts {
         hip,

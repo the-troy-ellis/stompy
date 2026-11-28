@@ -83,8 +83,12 @@ with a big purple buckle, exhaust stacks behind; the BIG BOOMER low in the
 chest and the FIRECRACKERS on the right shoulder; thick legs on broad flat
 feet with three stubby toes; short thick arms with elbow pistons; and two
 big purple fists bigger than the arms, a row of knuckles across the front,
-four fingers curled down it, the thumb tucked under. No arm guns, no
-antenna. Level 1 about 4,900 triangles, level 2 about 9,700.
+four fingers curled down it, the thumb tucked under; then, the owner
+asking for wrecking balls on chains, two big purple wrecking balls with
+knuckle studs across the face, a bolted steel band and a shackle, docked in
+a socket at each wrist. Out on its chain, the ball faces the way it flies
+and the links (alternately fat and thin) run back to the wrist. No arm
+guns, no antenna. Level 1 about 4,900 triangles, level 2 about 9,700.
 
 Then the other three, and the ground's faces come with
 the voxel ground (P2).

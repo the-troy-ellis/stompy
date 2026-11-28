@@ -65,8 +65,17 @@ torso.
 ### Melee (`sim/melee.rs`)
 
 Only PURPLE PUNCHER punches (the owner, 2026-11-28: punching is its unique
-mechanic; it was everyone's shove): 30 damage, 14 m, 22, with whichever
-fist it still has, and nothing once both are gone. Every mech stomps.
+mechanic; it was everyone's shove), with whichever fist it still has, and
+nothing once both are gone. Its fists are **wrecking balls on chains** (the
+owner: "launched on a chain and then retracted ... more formidable"): after
+the wind-up (0.45 s) the ball leaves the wrist down the aim (the player's
+crosshair, the AI's target) at 75 m/s by scale, pays out to 34 m by scale
+(44 m), hits the first mech it meets (the ball 1.4 m by scale) for the
+punch's 30 and knock 22 and a one-second stagger (the legs buckle, no
+walking, 30% turning), stops at the ground, and is reeled back at 40 m/s
+by scale; the recovery lasts until it is home. A flight you can dodge, and
+a miss reels in empty. PUNCH shows (and the AI throws) with a mech within
+the reach and 10° of the aim (`data::FIST_CHAIN`, `CHAIN_ARC`). Every mech stomps.
 The AI punches only with it, keeps out of its reach only, and walks up to
 a shut-down player only to punch. A press starts a wind-up, the hit frame takes the nearest mech within
 reach and arc, then a recovery with no guns and half turn rate. Knockback is

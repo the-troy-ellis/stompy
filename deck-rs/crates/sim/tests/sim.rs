@@ -273,7 +273,7 @@ fn a_punch_moves_light_mechs_far_and_heavy_ones_little() {
     update(&mut g, &i, DT);
     assert!(g.p().melee.is_some());
     let jz = g.mechs[j].z;
-    steps(&mut g, &input(), 60);
+    steps(&mut g, &input(), 90);
     let light = g.mechs[j].z - jz;
     assert!(light >= 6., "a SKEDADDLE moved {light} m");
     assert!(g.p().z < 0., "the puncher recoils");
@@ -282,7 +282,7 @@ fn a_punch_moves_light_mechs_far_and_heavy_ones_little() {
     let w = foe(&mut g, Ch::Warden, 0., 14., PI);
     update(&mut g, &i, DT);
     let wz = g.mechs[w].z;
-    steps(&mut g, &input(), 60);
+    steps(&mut g, &input(), 90);
     let heavy = g.mechs[w].z - wz;
     assert!(
         heavy > 0. && heavy < light * 0.5,
@@ -302,10 +302,10 @@ fn no_punch_while_shut_down_or_mid_swing() {
         g.p().melee.is_some() && !melee_press(&mut g, PLAYER),
         "not during the recovery"
     );
-    steps(&mut g, &input(), 60);
+    steps(&mut g, &input(), 150);
     assert!(
-        g.p().melee.is_none() && sfx_count(&g, "punch") == 1,
-        "a whiff"
+        g.p().melee.is_none() && g.p().flail.is_none() && sfx_count(&g, "chain") >= 1,
+        "a whiff: out to the chain's end and home"
     );
 }
 #[test]
@@ -827,4 +827,114 @@ fn walking_forward_recentres_the_torso_when_it_is_left_alone() {
     i.twist_by = 0.01;
     steps(&mut g, &i, 60);
     assert!(g.p().twist > 0.8, "aiming holds it");
+}
+
+fn wreck_setup(dist: f32) -> (Game, MechId) {
+    let mut g = flat_game(Ch::Puncher, 9);
+    let j = foe(&mut g, Ch::Jackal, 0., dist, PI);
+    g.mechs[j].hp[Sec::T.i()] = 500.;
+    (g, j)
+}
+#[test]
+fn a_wrecking_ball_reaches_far_hits_staggers_and_comes_home() {
+    // 35 m: three times the old punch's reach.
+    let (mut g, j) = wreck_setup(35.);
+    let mut i = input();
+    i.punch = true;
+    update(&mut g, &i, DT);
+    assert!(g.p().melee.is_some());
+    let total = |g: &Game| g.mechs[j].hp.iter().sum::<f32>();
+    let (t0, mut hit_at, mut out) = (total(&g), None, 0f32);
+    for k in 0..300 {
+        update(&mut g, &input(), DT);
+        if let Some(f) = g.p().flail {
+            out = out.max(f.out);
+        }
+        if hit_at.is_none() && total(&g) < t0 {
+            hit_at = Some(k);
+            assert!(g.mechs[j].stagger > 0.9, "it staggers");
+            assert_eq!(sfx_count(&g, "wreck"), 1);
+        }
+    }
+    let k = hit_at.expect("the ball lands");
+    // The wind-up, then a flight you could dodge: not instant.
+    assert!(k > 30 && k < 60, "landed at frame {k}");
+    assert!(out > 25., "out {out} m on its chain");
+    assert!(g.p().flail.is_none() && g.p().melee.is_none(), "home again");
+    assert!(
+        t0 - total(&g) >= FIST_MELEE.dmg - 0.01,
+        "the punch's damage"
+    );
+}
+#[test]
+fn a_wrecking_ball_aimed_away_misses_and_reels_in() {
+    let (mut g, j) = wreck_setup(30.);
+    g.pm().twist = 1.2;
+    let t0 = g.mechs[j].hp[Sec::T.i()];
+    let mut i = input();
+    i.punch = true;
+    update(&mut g, &i, DT);
+    let mut out = 0f32;
+    for _ in 0..240 {
+        update(&mut g, &input(), DT);
+        if let Some(f) = g.p().flail {
+            out = out.max(f.out);
+        }
+    }
+    assert_eq!(g.mechs[j].hp[Sec::T.i()], t0, "a miss");
+    assert_eq!(sfx_count(&g, "wreck"), 0);
+    assert!(out > 0. && g.p().flail.is_none(), "out and home");
+}
+#[test]
+fn a_staggered_mech_cannot_walk_and_its_legs_buckle() {
+    let mut g = flat_game(Ch::Kestrel, 9);
+    g.pm().stagger = FIST_CHAIN.stagger;
+    let mut i = input();
+    i.thr = 1.;
+    i.turn = 1.;
+    let yaw0 = g.p().yaw;
+    steps(&mut g, &i, 30);
+    assert!(g.p().speed.abs() < 0.01, "no walking");
+    assert!(g.p().sag.x > 0.2, "the legs buckle: {}", g.p().sag.x);
+    let turned = (g.p().yaw - yaw0).abs();
+    assert!(
+        turned < g.p().ch.turn * 0.5 * STAGGER_TURN * 1.5,
+        "a slow turn: {turned}"
+    );
+    steps(&mut g, &i, 60);
+    assert!(
+        g.p().stagger == 0. && g.p().speed > 0.5,
+        "then it walks again"
+    );
+}
+#[test]
+fn a_wrecking_ball_on_you_is_the_hardest_feel_there_is() {
+    let mut g = flat_game(Ch::Kestrel, 9);
+    let e = foe(&mut g, Ch::Puncher, 0., 30., PI);
+    g.mechs[e].ai.target = Some(PLAYER);
+    g.mechs[e].hp[Sec::T.i()] = 500.;
+    assert!(stompy_sim::melee::melee_press(&mut g, e));
+    let mut thump = 0f32;
+    let mut rang = false;
+    for _ in 0..120 {
+        g.events.clear();
+        update(&mut g, &input(), DT);
+        for ev in &g.events {
+            if let Event::Thump { haptic, .. } = ev {
+                thump = thump.max(*haptic);
+            }
+        }
+        rang |= sfx_count(&g, "ring") > 0;
+        if rang {
+            break;
+        }
+    }
+    assert!(rang, "your head rings");
+    assert!(thump >= 300., "the longest rumble: {thump} ms");
+    assert!(g.p().stagger > 0.9 && g.shake > 0.8, "staggered and shaken");
+    // Nothing else in the table hits as hard.
+    let w = stompy_sim::data::feel_row(Feel::Wrecked);
+    for row in stompy_sim::data::FEEL.iter() {
+        assert!(row.haptic <= w.haptic && row.kick <= w.kick && row.bass <= w.bass);
+    }
 }

@@ -654,7 +654,7 @@ pub fn think(g: &mut Game, id: MechId, dt: f32) {
         g.mechs[id].jetting = jets;
     }
     let e = &mut g.mechs[id];
-    let turn = e.ch.turn * dt;
+    let turn = e.ch.turn * dt * if e.stagger > 0. { STAGGER_TURN } else { 1. };
     e.yaw += clamp(wrap(move_yaw - e.yaw), -turn, turn);
     e.throttle = thr;
     if !e.ai.aware || e.ai.target.is_none() {

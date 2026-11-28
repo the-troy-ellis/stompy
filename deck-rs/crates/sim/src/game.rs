@@ -66,6 +66,13 @@ pub enum Sfx {
     Punch {
         hit: bool,
     },
+    /// The chain paying out or reeling in; the wrecking ball landing; the ring in your own head
+    /// after one lands on you.
+    Chain {
+        back: bool,
+    },
+    Wreck,
+    Ring,
     Whine,
     Powerdown,
     Powerup,
@@ -90,6 +97,9 @@ impl Sfx {
             Sfx::Land(_) => "land",
             Sfx::Blastoff(_) => "blastoff",
             Sfx::Punch { .. } => "punch",
+            Sfx::Chain { .. } => "chain",
+            Sfx::Wreck => "wreck",
+            Sfx::Ring => "ring",
             Sfx::Whine => "whine",
             Sfx::Powerdown => "powerdown",
             Sfx::Powerup => "powerup",
@@ -156,6 +166,16 @@ pub enum HitBy {
 pub enum SwingPhase {
     Windup,
     Recover,
+}
+/// A wrecking-ball fist on its chain: which arm, which way it flies, how far out it is, whether
+/// it is coming back, and where it is.
+#[derive(Clone, Copy, Debug)]
+pub struct Flail {
+    pub arm: Sec,
+    pub dir: V3,
+    pub out: f32,
+    pub back: bool,
+    pub at: V3,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct Swing {
@@ -320,6 +340,10 @@ pub struct Mech {
     pub fusion: FusionScan,
     pub melee: Option<Swing>,
     pub melee_cd: f32,
+    /// A wrecking-ball fist out on its chain.
+    pub flail: Option<Flail>,
+    /// Seconds left staggering from a wrecking ball: legs buckled, no walking, slow turns.
+    pub stagger: f32,
     pub last_arm: Sec,
     pub last_hit: Option<HitBy>,
     pub jet: JetState,

@@ -6,7 +6,7 @@ use crate::combat::damage;
 use crate::data::*;
 use crate::feel::feel;
 use crate::game::*;
-use crate::geom::center_of;
+use crate::geom::{center_of, torso_frame};
 use crate::math::*;
 
 pub const KNOCK_MIN: f32 = 0.3;
@@ -45,11 +45,16 @@ pub fn punches(m: &Mech) -> bool {
 }
 /// How far its punch reaches (metres, to the target's skin); none for a mech that can't punch.
 pub fn punch_reach(m: &Mech) -> f32 {
-    if punches(m) {
-        melee_of(m).reach * m.ch.scale
-    } else {
-        0.
+    if !punches(m) {
+        return 0.;
     }
+    let def = melee_of(m);
+    def.chain.map_or(def.reach, |c| c.reach) * m.ch.scale
+}
+/// Where a fist hangs from: the wrist of that arm, in the world.
+pub fn wrist(m: &Mech, arm: Sec) -> V3 {
+    let side = if arm == Sec::LA { 1. } else { -1. };
+    torso_frame(m).apply(v3(side * m.geo.arm_x, m.geo.arm_y - 1.3, 0.3))
 }
 pub fn can_punch(g: &Game, id: MechId) -> bool {
     let m = &g.mechs[id];
@@ -82,7 +87,11 @@ pub fn melee_press(g: &mut Game, id: MechId) -> bool {
 pub fn melee_target(g: &Game, id: MechId) -> Option<MechId> {
     let m = &g.mechs[id];
     let def = melee_of(m);
-    let (facing, reach) = (m.view_yaw(), def.reach * m.ch.scale);
+    let facing = m.view_yaw();
+    let (reach, arc) = match def.chain {
+        Some(_) => (punch_reach(m), CHAIN_ARC),
+        None => (def.reach * m.ch.scale, def.arc),
+    };
     let mut best: Option<(MechId, f32)> = None;
     for (i, t) in g.mechs.iter().enumerate() {
         if i == id || !t.alive {
@@ -92,7 +101,7 @@ pub fn melee_target(g: &Game, id: MechId) -> Option<MechId> {
         let d = hypot2(dx, dz) - t.radius();
         if d > reach
             || best.is_some_and(|(_, bd)| d >= bd)
-            || wrap(dx.atan2(dz) - facing).abs() > def.arc
+            || wrap(dx.atan2(dz) - facing).abs() > arc
         {
             continue;
         }
@@ -137,7 +146,135 @@ pub fn knock(
     t.pitch = clamp(t.pitch + KNOCK_PITCH * j, -0.4, 0.45);
     v
 }
+/// A wrecking ball leaves its wrist down the aim: the player's crosshair, or an AI's target.
+fn launch(g: &mut Game, id: MechId, arm: Sec) {
+    let m = &g.mechs[id];
+    let from = wrist(m, arm);
+    let aim = if id == PLAYER {
+        g.aim
+    } else {
+        m.ai.target.filter(|&t| g.mechs[t].alive).map_or_else(
+            || {
+                let (y, p) = (m.view_yaw(), m.pitch);
+                from + v3(y.sin() * p.cos(), p.sin(), y.cos() * p.cos()) * 50.
+            },
+            |t| center_of(&g.mechs[t]),
+        )
+    };
+    let dir = (aim - from).norm();
+    g.mechs[id].flail = Some(Flail {
+        arm,
+        dir,
+        out: 0.,
+        back: false,
+        at: from,
+    });
+    // A heave as it goes, and the chain paying out.
+    feel(g, Feel::Whiff, Some(id), 1., 0., None, None);
+    g.sfx_by(id, Sfx::Chain { back: false }, from);
+}
+/// The ball on its chain: out until it meets a mech, the ground or the chain's end, then back.
+fn flail_tick(g: &mut Game, id: MechId, dt: f32) {
+    let Some(mut f) = g.mechs[id].flail else {
+        return;
+    };
+    let m = &g.mechs[id];
+    let Some(c) = melee_of(m).chain.or(FIST_MELEE.chain) else {
+        g.mechs[id].flail = None;
+        return;
+    };
+    let (sc, from) = (m.ch.scale, wrist(m, f.arm));
+    if f.back {
+        f.out -= c.back * sc * dt;
+        if f.out <= 0. {
+            g.mechs[id].flail = None;
+            g.sfx_by(id, Sfx::Punch { hit: false }, from);
+            return;
+        }
+        f.at = from + f.dir * f.out;
+        g.mechs[id].flail = Some(f);
+        return;
+    }
+    f.out += c.out * sc * dt;
+    let at = from + f.dir * f.out;
+    f.at = at;
+    let ball = c.ball * sc;
+    let hit = g
+        .mechs
+        .iter()
+        .enumerate()
+        .filter(|&(i, t)| {
+            i != id
+                && t.alive
+                && hypot2(t.x - at.x, t.z - at.z) <= t.radius() + ball
+                && at.y >= t.y - ball
+                && at.y <= t.top() + ball
+        })
+        .min_by(|a, b| {
+            let d = |t: &Mech| hypot2(t.x - at.x, t.z - at.z);
+            d(a.1).total_cmp(&d(b.1))
+        })
+        .map(|(i, _)| i);
+    if let Some(t) = hit {
+        f.back = true;
+        g.mechs[id].flail = Some(f);
+        wreck(g, id, t, at, f.dir, c);
+        return;
+    }
+    if at.y < g.ter.height(at.x, at.z) + ball * 0.5 {
+        // It hits the ground: a thud and dust, and back it comes.
+        f.back = true;
+        feel(g, Feel::Whiff, Some(id), 0.6, 0., None, None);
+        g.sfx_by(id, Sfx::Land(0.5), at);
+    } else if f.out >= c.reach * sc {
+        f.back = true;
+        g.sfx_by(id, Sfx::Chain { back: true }, at);
+    }
+    g.mechs[id].flail = Some(f);
+}
+/// A wrecking ball lands: the punch's blow and shove, a stagger, and the hardest feel there is
+/// for the one it hit.
+fn wreck(g: &mut Game, id: MechId, t: MechId, at: V3, dir: V3, c: &ChainDef) {
+    let def = melee_of(&g.mechs[id]);
+    let flat = hypot2(dir.x, dir.z).max(1e-6);
+    let (nx, nz) = (dir.x / flat, dir.z / flat);
+    let tyaw = g.mechs[t].view_yaw();
+    g.mechs[t].last_hit = Some(HitBy::Punch);
+    damage(g, t, at, def.dmg, Some(id), false, true);
+    let v = knock(g, t, Some(id), def.knock, [nx, nz], true);
+    g.mechs[id].heat += def.heat;
+    g.mechs[t].stagger = g.mechs[t].stagger.max(c.stagger);
+    let side = sign(nx * tyaw.cos() - nz * tyaw.sin());
+    let side = if side == 0. { 1. } else { side };
+    feel(
+        g,
+        Feel::Punch,
+        Some(id),
+        1.,
+        0.,
+        None,
+        if id == PLAYER { None } else { Some(at) },
+    );
+    feel(
+        g,
+        Feel::Wrecked,
+        Some(t),
+        1.,
+        -side,
+        None,
+        if t == PLAYER { None } else { Some(at) },
+    );
+    if id == PLAYER || t == PLAYER {
+        g.hit_stop = g.hit_stop.max(2. * HIT_STOP);
+    }
+    g.sfx(Sfx::Wreck, if t == PLAYER { None } else { Some(at) });
+    if t == PLAYER {
+        g.sfx(Sfx::Ring, None);
+    }
+    g.farthest_shove = g.farthest_shove.max(v);
+}
 pub fn melee_tick(g: &mut Game, id: MechId, dt: f32) {
+    flail_tick(g, id, dt);
     let m = &mut g.mechs[id];
     m.melee_cd = (m.melee_cd - dt).max(0.);
     let Some(mut sw) = m.melee else { return };
@@ -147,6 +284,11 @@ pub fn melee_tick(g: &mut Game, id: MechId, dt: f32) {
     if sw.phase == SwingPhase::Windup && sw.t >= def.windup {
         sw.phase = SwingPhase::Recover;
         g.mechs[id].melee = Some(sw);
+        if def.chain.is_some() {
+            let arm = sw.arm.unwrap_or(Sec::RA);
+            launch(g, id, arm);
+            return;
+        }
         match melee_target(g, id) {
             Some(t) => {
                 // The blow lands on the target's skin, facing the attacker, at fist height.
@@ -194,7 +336,11 @@ pub fn melee_tick(g: &mut Game, id: MechId, dt: f32) {
             }
         }
     }
-    if sw.phase == SwingPhase::Recover && sw.t >= def.windup + def.recover {
+    // The recovery lasts until the ball is home.
+    if sw.phase == SwingPhase::Recover
+        && sw.t >= def.windup + def.recover
+        && g.mechs[id].flail.is_none()
+    {
         g.mechs[id].melee = None;
     }
 }

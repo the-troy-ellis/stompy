@@ -688,6 +688,7 @@ pub struct MeleeDef {
     pub stomp_knock: f32,
     pub stomp_air: f32,
     pub fists: bool,
+    pub chain: Option<&'static ChainDef>,
 }
 /// What every chassis has without fists: the stomp. It doesn't punch or shove (punching is
 /// PURPLE PUNCHER's alone, the owner 2026-11-28); its punch numbers are unused. Reach is metres
@@ -705,6 +706,7 @@ pub static DEFAULT_MELEE: MeleeDef = MeleeDef {
     stomp_knock: 6.,
     stomp_air: 0.6,
     fists: false,
+    chain: None,
 };
 /// PURPLE PUNCHER's fists: the real punch.
 pub static FIST_MELEE: MeleeDef = MeleeDef {
@@ -720,7 +722,35 @@ pub static FIST_MELEE: MeleeDef = MeleeDef {
     stomp_knock: 14.,
     stomp_air: 0.6,
     fists: true,
+    chain: Some(&FIST_CHAIN),
 };
+/// PURPLE PUNCHER's fists are wrecking balls on chains (the owner, 2026-11-28): launched down
+/// the aim, they hit the first mech in their path and are reeled back in. Reach and the ball's
+/// size are metres times the chassis's scale.
+#[derive(Clone, Copy, Debug)]
+pub struct ChainDef {
+    /// How far the chain pays out, how fast the ball flies out and is reeled back (m/s).
+    pub reach: f32,
+    pub out: f32,
+    pub back: f32,
+    /// The ball's radius, for what it hits.
+    pub ball: f32,
+    /// How long a mech it hits staggers: its legs buckle, it can't walk, it turns slowly.
+    pub stagger: f32,
+}
+pub static FIST_CHAIN: ChainDef = ChainDef {
+    reach: 34.,
+    out: 75.,
+    back: 40.,
+    ball: 1.4,
+    stagger: 1.0,
+};
+/// How far off the aim a mech may stand and still count as in a chained punch's line, for the
+/// HUD's PUNCH and the AI's decision (the ball itself hits only what it meets).
+pub const CHAIN_ARC: f32 = 10. * PI / 180.;
+/// While staggered: the share of the turn rate left, and how far the hips sag (metres, by scale).
+pub const STAGGER_TURN: f32 = 0.3;
+pub const STAGGER_SAG: f32 = 0.6;
 /// The AI's taste for punching: the chance per second of opportunity, by difficulty, and how far outside the player's reach it keeps.
 pub const AI_PUNCH_CHANCE: [f32; Diff::N] = [0.3, 0.6, 0.9];
 pub const AI_PUNCH_KEEP_OUT: f32 = 1.3;
@@ -1011,7 +1041,7 @@ pub const KNUCKLES_MULT: f32 = 1.5;
 // --- the feel table (docs/specs/01-thunk.md) ----------------------------------------------------
 keyed!(/// Every event that is felt.
     Feel { Step, NearStep, Blastoff, Land, FireAc, FireGauss, FireMg, FireBolt, Bolt, FireLrm, Hit, Shutdown, Restart,
-        SectionLost, Death, Explosion, Punch, Punched, Stomp, Whiff, Blast, FusionFire });
+        SectionLost, Death, Explosion, Punch, Punched, Stomp, Whiff, Blast, FusionFire, Wrecked });
 /// One row: each column multiplied by the event's intensity.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FeelRow {
@@ -1097,6 +1127,13 @@ pub static FEEL: [FeelRow; Feel::N] = [
     fr(0.3, 0., 0., 0., 0., 0., 0.2, 0., 0., 0., 0., 0.),    // whiff
     fr(0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 4.),      // blast: a missile blast's shove
     fr(0.6, 0., 1.2, 0.4, 0.7, 0.1, 0.8, 1.2, 1.0, 0., 80., 0.), // fusionFire
+    // wrecked: a wrecking ball, on the mech it hits. The top of every column: the eye slammed
+    // down, the view shaken to its cap, red and white, the body crushed and rocked, the deepest
+    // thump, the music gone, dust, the longest rumble. It should feel debilitating from inside.
+    FeelRow {
+        sag: 0.,
+        ..fr(1.8, 0., 1.2, 0.6, 0.55, 0.35, 1.8, 1.8, 1.0, 5., 320., 0.)
+    },
 ];
 pub fn feel_row(e: Feel) -> &'static FeelRow {
     &FEEL[e.i()]

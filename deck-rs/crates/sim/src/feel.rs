@@ -45,6 +45,9 @@ pub fn step_feel(m: &mut Mech, dt: f32) {
     step_tilt(m, dt);
     let sag = if m.shutdown {
         feel_row(Feel::Shutdown).sag * m.ch.scale
+    } else if m.stagger > 0. {
+        // Staggered, the legs buckle under it, deepest at first.
+        STAGGER_SAG * m.ch.scale * (m.stagger / FIST_CHAIN.stagger).min(1.)
     } else {
         0.
     };

@@ -85,8 +85,11 @@ fn drive(g: &mut Game, i: &Input, dt: f32) {
     }
     // Half the turn rate on one leg, and mid-swing.
     let both = p.hp[Sec::LL.i()] > 0. && p.hp[Sec::RL.i()] > 0.;
-    let leg_rate =
-        p.ch.turn * dt * if both { 1. } else { 0.5 } * if p.melee.is_some() { 0.5 } else { 1. };
+    let leg_rate = p.ch.turn
+        * dt
+        * if both { 1. } else { 0.5 }
+        * if p.melee.is_some() { 0.5 } else { 1. }
+        * if p.stagger > 0. { STAGGER_TURN } else { 1. };
     p.yaw += clamp(i.turn, -1., 1.) * leg_rate;
     if guiding {
         let gd = g.guide.as_mut().unwrap();

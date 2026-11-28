@@ -290,6 +290,9 @@ pub struct Cockpit {
     struck_till: f32,
     blink_at: f32,
     blinks: u32,
+    /// The head knocked about the eye by a wrecking ball: sideways and down, on loose springs.
+    jolt: [Spring; 2],
+    stagger_was: f32,
     t: f32,
     eye: V3,
     vel: V3,
@@ -543,6 +546,8 @@ impl Cockpit {
             struck_till: -1.,
             blink_at: 3.,
             blinks: 0,
+            jolt: [Spring::new(70., 0.25), Spring::new(90., 0.3)],
+            stagger_was: 0.,
             t: -1.,
             eye: V3::ZERO,
             vel: V3::ZERO,
@@ -620,11 +625,33 @@ impl Cockpit {
             None => mood_for(&r, &cue),
         };
         let left = right * -1.;
+        let dt = time - self.t;
+        // A wrecking ball: the whole head is knocked about the eye, sideways and down, and
+        // rattles back on loose springs.
+        if m.stagger > self.stagger_was + 0.5 {
+            let side = if (time * 7.3).sin() >= 0. { 1. } else { -1. };
+            self.jolt[0].kick(side * 2.6);
+            self.jolt[1].kick(-2.2);
+        }
+        self.stagger_was = m.stagger;
+        if (0.0..0.1).contains(&dt) && dt > 0. {
+            for j in &mut self.jolt {
+                j.step(dt, 0.);
+                j.x = j.x.clamp(-0.3, 0.3);
+            }
+        }
+        let shake = if m.stagger > 0. {
+            0.012 * (m.stagger / stompy_sim::data::FIST_CHAIN.stagger).min(1.)
+        } else {
+            0.
+        };
+        let eye = eye
+            + right * (self.jolt[0].x + shake * (time * 61.).sin())
+            + up * (self.jolt[1].x + shake * (time * 53.).cos());
         let view = M4([
             left.x, left.y, left.z, 0., up.x, up.y, up.z, 0., dir.x, dir.y, dir.z, 0., eye.x,
             eye.y, eye.z, 1.,
         ]);
-        let dt = time - self.t;
         if (0.0..0.1).contains(&dt) && dt > 0. {
             let vel = (eye - self.eye) * (1. / dt);
             let acc = (vel - self.vel) * (1. / dt);

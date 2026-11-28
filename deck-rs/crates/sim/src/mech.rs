@@ -104,7 +104,9 @@ pub fn step_mech(g: &mut Game, id: MechId, dt: f32) {
         m.dig = (m.dig - dt).max(0.);
         max_s *= DIG_SLOW;
     }
-    let target = if !m.alive || m.shutdown {
+    // A wrecking ball's stagger: the legs won't walk until it passes.
+    m.stagger = (m.stagger - dt).max(0.);
+    let target = if !m.alive || m.shutdown || m.stagger > 0. {
         0.
     } else {
         m.throttle * max_s
