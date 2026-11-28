@@ -68,6 +68,116 @@ impl Builder {
             self.quad(c[f[0]], c[f[1]], c[f[2]], c[f[3]], col, ctr);
         }
     }
+    /// A box `size` across with its edges cut off `bev` wide (world units, after `m`'s
+    /// position and turn, which must not scale), its top face shrunk by `taper`. 44 faces:
+    /// the six sides, a strip on each edge, a triangle on each corner.
+    pub fn bbox(&mut self, m: M4, size: V3, bev: f32, taper: f32, col: [f32; 3]) {
+        let h = size * 0.5;
+        let b = bev.min(h.x.min(h.y).min(h.z) * 0.45);
+        let tp = |x: f32, y: f32, z: f32| {
+            let k = if y > 0. { taper } else { 1. };
+            m.apply(v3(x * k, y, z * k))
+        };
+        let a = |sx: f32, sy: f32, sz: f32| tp(sx * h.x, sy * (h.y - b), sz * (h.z - b));
+        let bb = |sx: f32, sy: f32, sz: f32| tp(sx * (h.x - b), sy * h.y, sz * (h.z - b));
+        let c = |sx: f32, sy: f32, sz: f32| tp(sx * (h.x - b), sy * (h.y - b), sz * h.z);
+        let ctr = m.apply(V3::ZERO);
+        const S: [f32; 2] = [1., -1.];
+        for s in S {
+            self.quad(
+                a(s, 1., 1.),
+                a(s, 1., -1.),
+                a(s, -1., -1.),
+                a(s, -1., 1.),
+                col,
+                ctr,
+            );
+            self.quad(
+                bb(1., s, 1.),
+                bb(-1., s, 1.),
+                bb(-1., s, -1.),
+                bb(1., s, -1.),
+                col,
+                ctr,
+            );
+            self.quad(
+                c(1., 1., s),
+                c(-1., 1., s),
+                c(-1., -1., s),
+                c(1., -1., s),
+                col,
+                ctr,
+            );
+        }
+        for p in S {
+            for q in S {
+                self.quad(
+                    a(p, q, 1.),
+                    a(p, q, -1.),
+                    bb(p, q, -1.),
+                    bb(p, q, 1.),
+                    col,
+                    ctr,
+                );
+                self.quad(
+                    a(p, 1., q),
+                    a(p, -1., q),
+                    c(p, -1., q),
+                    c(p, 1., q),
+                    col,
+                    ctr,
+                );
+                self.quad(
+                    bb(1., p, q),
+                    bb(-1., p, q),
+                    c(-1., p, q),
+                    c(1., p, q),
+                    col,
+                    ctr,
+                );
+                for r in S {
+                    self.tri(a(p, q, r), bb(p, q, r), c(p, q, r), col, Some(ctr), false);
+                }
+            }
+        }
+    }
+    /// A round rod `d` across from `a` to `b`, n sides.
+    pub fn rod(&mut self, a: V3, b: V3, d: f32, n: usize, col: [f32; 3]) {
+        let ax = b - a;
+        let y = ax.norm();
+        let up = if y.y.abs() < 0.9 {
+            v3(0., 1., 0.)
+        } else {
+            v3(1., 0., 0.)
+        };
+        let x = y.cross(up).norm();
+        let z = x.cross(y).norm();
+        let mid = (a + b) * 0.5;
+        let m = M4([
+            x.x * d,
+            x.y * d,
+            x.z * d,
+            0.,
+            ax.x,
+            ax.y,
+            ax.z,
+            0.,
+            z.x * d,
+            z.y * d,
+            z.z * d,
+            0.,
+            mid.x,
+            mid.y,
+            mid.z,
+            1.,
+        ]);
+        self.cyl(m, col, n, 1.);
+    }
+    /// Triangles so far (for the budget).
+    #[cfg(test)]
+    pub fn tris(&self) -> usize {
+        self.d.len() / (crate::gl::FLOATS * 3)
+    }
     pub fn cube1(&mut self, m: M4, col: [f32; 3]) {
         self.cube(m, col, 1., 1.);
     }
@@ -98,6 +208,83 @@ impl Builder {
             if top > 0. {
                 self.tri(c_hi, hi[i], hi[j], col, Some(ctr), false);
             }
+        }
+    }
+    /// A lump about radius 0.5: an icosahedron, split `splits` times, each corner pushed in or
+    /// out by up to `lumpy` (the same corner the same amount, so the faces stay joined), and
+    /// stretched by `m`. Smoke, dust, flame and rock are all lumps of different shapes.
+    pub fn lump(&mut self, m: M4, col: [f32; 3], splits: usize, lumpy: f32, seed: f32) {
+        let t = (1. + 5f32.sqrt()) / 2.;
+        let mut vs: Vec<V3> = [
+            (-1., t, 0.),
+            (1., t, 0.),
+            (-1., -t, 0.),
+            (1., -t, 0.),
+            (0., -1., t),
+            (0., 1., t),
+            (0., -1., -t),
+            (0., 1., -t),
+            (t, 0., -1.),
+            (t, 0., 1.),
+            (-t, 0., -1.),
+            (-t, 0., 1.),
+        ]
+        .iter()
+        .map(|&(x, y, z)| v3(x, y, z).norm())
+        .collect();
+        let mut fs: Vec<[usize; 3]> = vec![
+            [0, 11, 5],
+            [0, 5, 1],
+            [0, 1, 7],
+            [0, 7, 10],
+            [0, 10, 11],
+            [1, 5, 9],
+            [5, 11, 4],
+            [11, 10, 2],
+            [10, 7, 6],
+            [7, 1, 8],
+            [3, 9, 4],
+            [3, 4, 2],
+            [3, 2, 6],
+            [3, 6, 8],
+            [3, 8, 9],
+            [4, 9, 5],
+            [2, 4, 11],
+            [6, 2, 10],
+            [8, 6, 7],
+            [9, 8, 1],
+        ];
+        for _ in 0..splits {
+            let mut mid = std::collections::HashMap::new();
+            let mut half = |a: usize, b: usize, vs: &mut Vec<V3>| {
+                *mid.entry((a.min(b), a.max(b))).or_insert_with(|| {
+                    vs.push(((vs[a] + vs[b]) * 0.5).norm());
+                    vs.len() - 1
+                })
+            };
+            let mut next = Vec::with_capacity(fs.len() * 4);
+            for [a, b, c] in fs {
+                let (ab, bc, ca) = (
+                    half(a, b, &mut vs),
+                    half(b, c, &mut vs),
+                    half(c, a, &mut vs),
+                );
+                next.extend([[a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]]);
+            }
+            fs = next;
+        }
+        let ps: Vec<V3> = vs
+            .iter()
+            .map(|&v| {
+                let h =
+                    (v.x * 12.9898 + v.y * 78.233 + v.z * 37.719 + seed * 4.1).sin() * 43758.547;
+                let r = 0.5 * (1. + lumpy * ((h - h.floor()) * 2. - 1.));
+                m.apply(v * r)
+            })
+            .collect();
+        let ctr = m.apply(V3::ZERO);
+        for [a, b, c] in fs {
+            self.tri(ps[a], ps[b], ps[c], col, Some(ctr), false);
         }
     }
     /// A unit sphere (radius 0.5): n sides round, r bands pole to pole, flat-shaded facets.
@@ -142,6 +329,12 @@ pub struct MechParts {
     pub barrel: Option<Mesh>,
     pub fist: Option<Mesh>,
     pub wreck: Mesh,
+    /// Pieces that move on their own (`anim.rs`), and whether the pistons are drawn live.
+    pub pods: Option<[Mesh; 2]>,
+    pub antenna: Option<Mesh>,
+    pub toe1: Option<Mesh>,
+    pub toe2: Option<Mesh>,
+    pub pistons: bool,
 }
 fn t(x: f32, y: f32, z: f32) -> M4 {
     M4::t(x, y, z)
@@ -168,10 +361,41 @@ fn ball(b: &mut Builder, at: V3, d: f32, col: [f32; 3]) {
 }
 
 /// Every part of a chassis: legs from its leg type sized by its body plan, body from its style.
-pub fn build_mech_parts(gl: &Gl, ch: Ch) -> MechParts {
+/// `detail` above 0 swaps in the detailed model where there is one (`models.rs`; BARRY so far).
+/// `team` picks the paint: a mech's colour is its side's (`look::TEAM_PAINT`).
+pub fn build_mech_parts(gl: &Gl, ch: Ch, detail: u8, team: u8) -> MechParts {
+    let paint = crate::look::paint(team);
+    let mut p = build_box_parts(gl, ch, paint);
+    if detail > 0 && ch == Ch::Kestrel {
+        let d = crate::models::barry(detail, paint);
+        for (slot, mut b) in [
+            (&mut p.hip, d.hip),
+            (&mut p.uleg, d.uleg),
+            (&mut p.lleg, d.lleg),
+            (&mut p.foot, d.foot),
+            (&mut p.torso, d.torso),
+            (&mut p.arm, d.arm),
+        ] {
+            gl.free(std::mem::replace(slot, b.upload(gl)));
+        }
+        let mut b = d.barrel;
+        if let Some(old) = p.barrel.replace(b.upload(gl)) {
+            gl.free(old);
+        }
+        let ([mut pl, mut pr], mut ant) = (d.pods, d.antenna);
+        p.pods = Some([pl.upload(gl), pr.upload(gl)]);
+        p.antenna = Some(ant.upload(gl));
+        let (mut t1, mut t2) = (d.toe1, d.toe2);
+        p.toe1 = Some(t1.upload(gl));
+        p.toe2 = Some(t2.upload(gl));
+        p.pistons = true;
+    }
+    p
+}
+fn build_box_parts(gl: &Gl, ch: Ch, paint: [f32; 3]) -> MechParts {
     let c = chassis(ch);
     let g = geo_for(ch);
-    let (col, dark, acc) = (c.col, mulc(c.col, 0.55), c.acc);
+    let (col, dark, acc) = (paint, mulc(paint, 0.55), c.acc);
     let mut b = Builder::default();
     let (l1, l2) = (g.l1, g.l2);
     let (hip, uleg, lleg, foot) = match c.legs {
@@ -410,11 +634,21 @@ pub fn build_mech_parts(gl: &Gl, ch: Ch) -> MechParts {
         barrel,
         fist,
         wreck,
+        pods: None,
+        antenna: None,
+        toe1: None,
+        toe2: None,
+        pistons: false,
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Fx {
+    Rod,
+    Puff,
+    DustPuff,
+    Shard,
+    Rock,
     Cube,
     Tetra,
     Spark,
@@ -427,7 +661,12 @@ pub enum Fx {
     Beam,
     Disc,
 }
-pub const FX_ALL: [Fx; 11] = [
+pub const FX_ALL: [Fx; 16] = [
+    Fx::Rod,
+    Fx::Puff,
+    Fx::DustPuff,
+    Fx::Shard,
+    Fx::Rock,
     Fx::Cube,
     Fx::Tetra,
     Fx::Spark,
@@ -445,6 +684,16 @@ pub fn build_effect(gl: &Gl, k: Fx) -> Mesh {
     let mut b = Builder::default();
     let o = Some(V3::ZERO);
     match k {
+        // A unit rod (radius 0.5, -0.5..0.5 along y): the live pistons.
+        Fx::Rod => b.cyl(M4::ID, W, 12, 1.),
+        // Smoke: a soft lump of faces, more round than not.
+        Fx::Puff => b.lump(M4::ID, W, 1, 0.22, 1.),
+        // Dust: the same, squashed down onto the ground.
+        Fx::DustPuff => b.lump(s(1.7, 0.55, 1.7), W, 1, 0.25, 2.),
+        // Flame: a tall jagged tongue, few faces.
+        Fx::Shard => b.lump(t(0., 0.25, 0.) * s(0.55, 1.5, 0.55), W, 0, 0.45, 3.),
+        // Debris: a craggy rock, a dozen-odd faces.
+        Fx::Rock => b.lump(s(1.1, 0.8, 0.95), W, 0, 0.5, 4.),
         Fx::Cube => b.cube1(M4::ID, W),
         Fx::Flat => b.cube1(s(1.6, 0.35, 1.6), W),
         Fx::Chunk => b.cube(M4::ID, W, 0.6, 0.7),

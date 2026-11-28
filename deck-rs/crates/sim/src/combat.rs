@@ -23,12 +23,16 @@ pub const BEAM_CONTACT_GAP: f32 = 0.6;
 
 fn alert(g: &mut Game, e: MechId, src: Option<MechId>) {
     let t = g.time;
-    let belief = src.filter(|&s| s != e).map(|s| g.mechs[s].pos());
+    // Being hit by an enemy is a contact: the shooter becomes the target, its spot the belief.
+    let team = g.mechs[e].team;
+    let src = src.filter(|&s| s != e && g.mechs[s].team != team);
+    let belief = src.map(|s| g.mechs[s].pos());
     let a = &mut g.mechs[e].ai;
     a.aware = true;
     a.hit_at = Some(t);
-    if let Some(p) = belief {
-        a.belief = Some((p, [0., 0.], t)); // being hit is a contact; the shooter's spot is the belief
+    if let (Some(s), Some(p)) = (src, belief) {
+        a.target = Some(s);
+        a.belief = Some((p, [0., 0.], t));
     }
 }
 /// What a round does beyond its damage: a bolt scrambles and rattles; anything with `knock` shoves.
@@ -183,6 +187,12 @@ pub fn destroy(g: &mut Game, id: MechId, src: Option<MechId>) {
         g.stats.kills += 1;
         g.last_kill = Some(how);
     }
+    // The cockpit reports the player's kills (and a foe that dies of nothing in particular), not
+    // every death in a battle.
+    let enemy = g.mechs[id].team != g.mechs[PLAYER].team;
+    if !enemy || src.is_some_and(|s| s != PLAYER) {
+        return;
+    }
     let key = match how {
         Some(HitBy::Stomp) => Vo::KillStomp,
         Some(HitBy::Punch) => Vo::KillPunch,
@@ -283,7 +293,7 @@ fn make_wreck(g: &mut Game, id: MechId, roll: f32) {
     }
     let m = &g.mechs[id];
     let ammo = m.w.iter().any(|w| w.def.ammo > 0 && w.ammo > 0 && !w.dead);
-    let (x, y, z, yaw, ch, scale) = (m.x, m.y, m.z, m.yaw, m.key(), m.ch.scale);
+    let (x, y, z, yaw, ch, scale, team) = (m.x, m.y, m.z, m.yaw, m.key(), m.ch.scale, m.team);
     let n = 2 + g.rng.int(3);
     let mut pops: Vec<f32> = (0..n).map(|_| g.rng.range(0.3, WRECK_POPS)).collect();
     pops.sort_by(f32::total_cmp);
@@ -298,6 +308,7 @@ fn make_wreck(g: &mut Game, id: MechId, roll: f32) {
         z,
         yaw,
         ch,
+        team,
         scale,
         t: 0.,
         roll,

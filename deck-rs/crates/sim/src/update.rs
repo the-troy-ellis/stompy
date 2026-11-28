@@ -40,7 +40,21 @@ fn apart(g: &mut Game) {
 }
 /// ELIMINATE: the match is won when no enemy is left.
 fn tick_objectives(g: &mut Game) {
-    if g.state != State::Play || g.enemies_left() > 0 {
+    if g.state != State::Play {
+        return;
+    }
+    if g.spectate {
+        // Watching: over when either side is gone; "won" if yours is the one standing.
+        let (yours, theirs) = (g.allies_left(), g.enemies_left());
+        if yours > 0 && theirs > 0 {
+            return;
+        }
+        g.won = theirs == 0;
+        g.state = State::Over;
+        g.end_t = 3.2;
+        return;
+    }
+    if g.enemies_left() > 0 {
         return;
     }
     g.won = true;
@@ -152,7 +166,8 @@ pub fn update(g: &mut Game, i: &Input, dt: f32) {
     steer_volley(g, dt);
 
     for id in 0..g.mechs.len() {
-        if g.mechs[id].team != 0 && g.mechs[id].alive {
+        // Every mech but the player's thinks, on either side.
+        if id != PLAYER && g.mechs[id].alive {
             if g.mechs[id].ai.still {
                 g.mechs[id].throttle = 0.;
                 g.mechs[id].jetting = false;

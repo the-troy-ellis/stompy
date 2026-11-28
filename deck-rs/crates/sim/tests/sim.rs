@@ -623,3 +623,110 @@ fn missions_start_with_their_foes() {
         assert_eq!(g.state, State::Play);
     }
 }
+
+#[test]
+fn two_armies_fight_each_other_not_just_the_player() {
+    use stompy_sim::state::start_battle;
+    let mut g = Game::new(3);
+    start_battle(
+        &mut g,
+        Biome::Dusk,
+        TimeOfDay::Dusk,
+        15,
+        16,
+        3,
+        Ch::Kestrel,
+        Diff::Normal,
+        true,
+    );
+    assert_eq!(g.mechs.iter().filter(|m| m.team == 0).count(), 16);
+    assert_eq!(g.mechs.iter().filter(|m| m.team == 1).count(), 16);
+    let i = Input::default(); // the player stands at the back of their own block
+    for _ in 0..60 * 120 {
+        update(&mut g, &i, 1. / 60.);
+        g.events.clear();
+    }
+    let lost = |team: u8| {
+        g.mechs
+            .iter()
+            .enumerate()
+            .filter(|(id, m)| m.team == team && *id != PLAYER && !m.alive)
+            .count()
+    };
+    // Both sides lose mechs that the player never fought: allies and foes fight each other.
+    assert!(lost(0) >= 3, "allies lost {}", lost(0));
+    assert!(lost(1) >= 3, "foes lost {}", lost(1));
+    // An AI on the player's side has a foe as its target, and a foe can have an ally as its.
+    let foe_of_ally = g
+        .mechs
+        .iter()
+        .skip(1)
+        .filter(|m| m.team == 0)
+        .filter_map(|m| m.ai.target);
+    assert!(foe_of_ally.clone().all(|t| g.mechs[t].team == 1));
+}
+
+#[test]
+fn in_a_battle_the_cockpit_reports_only_the_players_kills() {
+    use stompy_sim::combat::destroy;
+    use stompy_sim::state::start_battle;
+    let mut g = Game::new(3);
+    start_battle(
+        &mut g,
+        Biome::Dusk,
+        TimeOfDay::Dusk,
+        2,
+        3,
+        3,
+        Ch::Kestrel,
+        Diff::Normal,
+        true,
+    );
+    let (ally, foe) = (1, 4);
+    assert_eq!((g.mechs[ally].team, g.mechs[foe].team), (0, 1));
+    g.events.clear();
+    destroy(&mut g, foe, Some(ally)); // an ally's kill: no line
+    destroy(&mut g, ally, Some(foe)); // an ally lost: no line
+    let says = |g: &Game| {
+        g.events
+            .iter()
+            .filter(|e| matches!(e, Event::Say { .. }))
+            .count()
+    };
+    assert_eq!(says(&g), 0);
+    destroy(&mut g, 5, Some(PLAYER)); // yours: the line
+    assert_eq!(says(&g), 1);
+}
+
+#[test]
+fn watching_a_battle_nobody_targets_you_and_it_ends_when_a_side_is_gone() {
+    use stompy_sim::state::{spectate, start_battle};
+    let mut g = Game::new(5);
+    start_battle(
+        &mut g,
+        Biome::Dusk,
+        TimeOfDay::Dusk,
+        8,
+        8,
+        5,
+        Ch::Kestrel,
+        Diff::Hard,
+        true,
+    );
+    spectate(&mut g);
+    let i = Input::default();
+    let mut t = 0.;
+    while g.state == State::Play && t < 600. {
+        update(&mut g, &i, 1. / 60.);
+        g.events.clear();
+        t += 1. / 60.;
+        assert!(
+            g.mechs.iter().all(|m| m.ai.target != Some(PLAYER)),
+            "someone targets the spectator"
+        );
+    }
+    assert!(g.p().alive, "the parked mech is never hurt");
+    assert_eq!(g.state, State::Over, "the battle ended ({t} s)");
+    assert!(g.allies_left() == 0 || g.enemies_left() == 0);
+    assert_eq!(g.won, g.enemies_left() == 0);
+}

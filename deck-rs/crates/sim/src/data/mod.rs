@@ -1276,6 +1276,8 @@ pub const LINE_RANGE: f32 = 150.;
 pub const ALLY_GAP: f32 = 6.;
 /// Perception.
 pub const LOOK_EVERY: f32 = 0.15;
+/// How many of the nearest enemies a look checks the sight line to (the ground ray is dear).
+pub const SPOT_CHECKS: usize = 3;
 pub const LOST_AFTER: f32 = 8.;
 pub const SHOUT_RANGE: f32 = 200.;
 pub const SHOUT_DELAY: f32 = 1.;

@@ -1,6 +1,7 @@
 //! The 3D view: the sky, the ground, every mech posed from its planted feet,
 //! the shots, beams, debris, wrecks and effects, and the cockpit camera with
 //! its kick, bob, shake, wobble and heat sway.
+use crate::anim::{self, Anim};
 use crate::gl::{Gl, Mesh, Mode};
 use crate::mesh::*;
 use stompy_sim::data::*;
@@ -13,6 +14,12 @@ use stompy_sim::*;
 
 pub struct Scene {
     parts: Vec<Option<MechParts>>,
+    /// The plain models, drawn far off (`LOD_FAR`).
+    boxes: Vec<Option<MechParts>>,
+    /// This frame's drawing, gathered by shape.
+    batch: Batch,
+    /// Where the camera is this frame (for the detail by distance).
+    eye: V3,
     fx: Vec<Mesh>,
     sky: Mesh,
     ground: Vec<(Mesh, V3)>,
@@ -21,6 +28,12 @@ pub struct Scene {
     right: V3,
     up: V3,
     jitter: f32,
+    /// The dither's cell in pixels (0: smooth), from SETTINGS.
+    pub cell: u32,
+    /// Model detail: 0 the boxes, 1 or 2 the detailed models where there are some.
+    pub detail: u8,
+    /// Each mech's drawn-only motion (`anim.rs`), by index.
+    anims: Vec<Option<Anim>>,
 }
 /// A fixed camera instead of the cockpit (the menu's turntable).
 pub struct Cam {
@@ -28,8 +41,104 @@ pub struct Cam {
     pub at: V3,
     pub fov: f32,
 }
+fn fx_index(k: Fx) -> usize {
+    FX_ALL.iter().position(|&f| f == k).unwrap()
+}
 fn fx_mesh(s: &Scene, k: Fx) -> &Mesh {
-    &s.fx[FX_ALL.iter().position(|&f| f == k).unwrap()]
+    &s.fx[fx_index(k)]
+}
+/// Past this distance a mech is drawn with its plain model and no drawn-only motion: at 120 m
+/// it is a few dozen pixels tall.
+const LOD_FAR: f32 = 120.;
+/// A piece of a chassis, for the batch.
+#[derive(Clone, Copy)]
+enum Slot {
+    Hip,
+    ULeg,
+    LLeg,
+    Foot,
+    Plate,
+    Torso,
+    Arm,
+    Barrel,
+    Fist,
+    Wreck,
+    PodL,
+    PodR,
+    Antenna,
+    Toe1,
+    Toe2,
+}
+const SLOTS: usize = 15;
+/// Two sides, two paints: a chassis's models are built once a side.
+const SIDES: usize = 2;
+/// Which model set: a side's paint on a chassis.
+fn kit(ch: Ch, team: u8) -> usize {
+    (team as usize).min(SIDES - 1) * Ch::N + ch.i()
+}
+fn slot_mesh(p: &MechParts, s: usize) -> Option<&Mesh> {
+    match s {
+        0 => Some(&p.hip),
+        1 => Some(&p.uleg),
+        2 => Some(&p.lleg),
+        3 => Some(&p.foot),
+        4 => Some(&p.plate),
+        5 => Some(&p.torso),
+        6 => Some(&p.arm),
+        7 => p.barrel.as_ref(),
+        8 => p.fist.as_ref(),
+        9 => Some(&p.wreck),
+        10 => p.pods.as_ref().map(|q| &q[0]),
+        11 => p.pods.as_ref().map(|q| &q[1]),
+        12 => p.antenna.as_ref(),
+        13 => p.toe1.as_ref(),
+        _ => p.toe2.as_ref(),
+    }
+}
+/// A frame's drawing gathered by shape, so every copy of one shape goes out in one instanced
+/// draw: a crowd of mechs costs a few dozen draws, not dozens each.
+struct Batch {
+    /// By chassis, detail (0 the full model, 1 the plain one) and slot.
+    parts: Vec<Vec<f32>>,
+    /// By effect shape, lit or glowing.
+    fx: Vec<Vec<f32>>,
+}
+fn push(v: &mut Vec<f32>, m: &M4, col: [f32; 3], glow: f32) {
+    v.extend_from_slice(&m.0);
+    v.extend_from_slice(&[col[0], col[1], col[2], glow]);
+}
+impl Batch {
+    fn new() -> Batch {
+        Batch {
+            parts: vec![vec![]; SIDES * Ch::N * 2 * SLOTS],
+            fx: vec![vec![]; FX_ALL.len() * 2],
+        }
+    }
+    fn part(&mut self, k: usize, lod: usize, s: Slot, m: &M4) {
+        push(
+            &mut self.parts[(k * 2 + lod) * SLOTS + s as usize],
+            m,
+            [1.; 3],
+            0.,
+        );
+    }
+    fn fx(&mut self, f: Fx, glows: bool, m: &M4, col: [f32; 3], glow: f32) {
+        push(&mut self.fx[fx_index(f) * 2 + glows as usize], m, col, glow);
+    }
+}
+/// A live piston: the fat cylinder from its upper end, the rod the rest of the way.
+fn piston(b: &mut Batch, a: V3, z: V3, pi: &crate::models::Piston, sc: f32, dark: [f32; 3]) {
+    let len = (z - a).len().max(1e-3);
+    let f = (pi.fat * sc).min(len * 0.92);
+    let mid = a + (z - a) * (f / len);
+    b.fx(Fx::Rod, false, &rod_mat(a, mid, pi.d * sc), dark, 0.);
+    b.fx(
+        Fx::Rod,
+        false,
+        &rod_mat(mid, z, pi.d * sc * 0.5),
+        [0.3, 0.31, 0.34],
+        0.,
+    );
 }
 /// A box from `a` to `b`, `w` across: the beams and the tracers.
 fn beam_mat(a: V3, b: V3, w: f32) -> M4 {
@@ -60,13 +169,59 @@ fn beam_mat(a: V3, b: V3, w: f32) -> M4 {
         1.,
     ])
 }
+/// An instance's last number: its glow (0..1), plus how much of it is still drawn, in
+/// sixteenths, for the dither to dissolve it (`gl.rs` unpacks it; solid packs as 0).
+fn dissolve(glow: f32, solid: f32) -> f32 {
+    let k = (solid.clamp(0., 1.) * 16.).round();
+    glow.min(0.999) + if k >= 16. { 0. } else { 2. * k.max(1.) }
+}
+/// A unit rod (`Fx::Rod`) laid from `a` to `b`, `d` across.
+fn rod_mat(a: V3, b: V3, d: f32) -> M4 {
+    let ax = b - a;
+    let y = ax.norm();
+    let up = if y.y.abs() < 0.9 {
+        v3(0., 1., 0.)
+    } else {
+        v3(1., 0., 0.)
+    };
+    let x = y.cross(up).norm();
+    let z = x.cross(y).norm();
+    let m = (a + b) * 0.5;
+    M4([
+        x.x * d,
+        x.y * d,
+        x.z * d,
+        0.,
+        ax.x,
+        ax.y,
+        ax.z,
+        0.,
+        z.x * d,
+        z.y * d,
+        z.z * d,
+        0.,
+        m.x,
+        m.y,
+        m.z,
+        1.,
+    ])
+}
+/// What a shot kicked back: a gun on one side, or the pods.
+#[derive(Clone, Copy, PartialEq)]
+enum Kicked {
+    Arm(f32),
+    Pod(usize),
+}
 fn inst_mat(p: V3, yaw: f32, tumble: f32, size: f32) -> M4 {
     M4::t(p.x, p.y, p.z) * M4::ry(yaw) * M4::rx(tumble) * M4::s1(size)
 }
 impl Scene {
     pub fn new(gl: &Gl) -> Scene {
         Scene {
-            parts: (0..Ch::N).map(|_| None).collect(),
+            parts: (0..SIDES * Ch::N).map(|_| None).collect(),
+            boxes: (0..SIDES * Ch::N).map(|_| None).collect(),
+            batch: Batch::new(),
+            eye: V3::ZERO,
             fx: FX_ALL.iter().map(|&k| build_effect(gl, k)).collect(),
             sky: build_sky(gl),
             ground: vec![],
@@ -75,10 +230,52 @@ impl Scene {
             right: v3(1., 0., 0.),
             up: v3(0., 1., 0.),
             jitter: 0.,
+            cell: 2,
+            detail: 2,
+            anims: vec![],
         }
     }
-    fn parts(&mut self, gl: &Gl, ch: Ch) -> &MechParts {
-        self.parts[ch.i()].get_or_insert_with(|| build_mech_parts(gl, ch))
+    /// Builds a chassis's models the first time it is drawn: the full one and the plain one.
+    fn ensure(&mut self, gl: &Gl, ch: Ch, team: u8) -> usize {
+        let (d, k) = (self.detail, kit(ch, team));
+        self.parts[k].get_or_insert_with(|| build_mech_parts(gl, ch, d, team));
+        self.boxes[k].get_or_insert_with(|| build_mech_parts(gl, ch, 0, team));
+        k
+    }
+    /// Draws everything gathered this frame, a draw a shape, and empties the lists.
+    fn flush(&mut self, gl: &mut Gl) {
+        gl.mode(Mode::Lit);
+        for k in 0..SIDES * Ch::N {
+            for lod in 0..2 {
+                let set = if lod == 0 {
+                    &self.parts[k]
+                } else {
+                    &self.boxes[k]
+                };
+                let Some(p) = set.as_ref() else { continue };
+                for sl in 0..SLOTS {
+                    let l = &mut self.batch.parts[(k * 2 + lod) * SLOTS + sl];
+                    if l.is_empty() {
+                        continue;
+                    }
+                    if let Some(m) = slot_mesh(p, sl) {
+                        gl.draw_inst(m, l);
+                    }
+                    l.clear();
+                }
+            }
+        }
+        for glows in [false, true] {
+            gl.mode(if glows { Mode::Emissive } else { Mode::Lit });
+            for i in 0..FX_ALL.len() {
+                let l = &mut self.batch.fx[i * 2 + glows as usize];
+                if !l.is_empty() {
+                    gl.draw_inst(&self.fx[i], l);
+                    l.clear();
+                }
+            }
+        }
+        gl.mode(Mode::Lit);
     }
     fn load_world(&mut self, gl: &Gl, g: &Game) {
         let key = (g.ter.seed, g.biome);
@@ -108,8 +305,10 @@ impl Scene {
     /// One mech: the hull on its springs, the torso on top, the arms, the legs by IK from the feet.
     fn draw_mech(&mut self, gl: &mut Gl, g: &Game, id: MechId, arms_only: bool) {
         let m = &g.mechs[id];
-        self.parts(gl, m.key());
+        let ch = self.ensure(gl, m.key(), m.team);
         let (geo, sc) = (m.geo, m.ch.scale);
+        let far = !arms_only && hypot2(m.x - self.eye.x, m.z - self.eye.z) > LOD_FAR;
+        let lod = far as usize;
         let base = if let Some(d) = m.dying {
             // The legs buckle and the body topples about the ground under it.
             M4::t(m.x, m.y, m.z)
@@ -136,10 +335,89 @@ impl Scene {
             * M4::t(0., 0., lunge)
             * M4::rx(m.wob_p.x - lean + m.torso_nod + m.run_lean)
             * M4::rz(m.wob_r.x);
-        let p = self.parts[m.key().i()].as_ref().unwrap();
+        // The drawn-only motion: springs moved on, then read below.
+        let prof = if self.detail > 0 && m.dying.is_none() && !far {
+            anim::profile(m.key())
+        } else {
+            None
+        };
+        if let Some(pr) = prof {
+            if self.anims.len() < g.mechs.len() {
+                self.anims.resize_with(g.mechs.len(), || None);
+            }
+            self.anims[id]
+                .get_or_insert_with(|| Anim::new(pr, g.time))
+                .tick(pr, m, g.time, &tb);
+        }
+        let an = prof.zip(self.anims.get(id).and_then(|a| a.as_ref()));
+        // Which gun the last shot kicked, and how far back it sits now.
+        let age = g.frame.saturating_sub(m.flash.frame);
+        let kicked = match an {
+            Some((pr, _)) if m.flash.frame > 0 && age < 20 => {
+                let k = anim::kick(pr, age, m.flash.big);
+                let at = |v: V3| (tb.apply(v) - m.flash.p).len();
+                let (ax, ay) = (geo.arm_x, geo.arm_y - 1.2);
+                let (pl, pr) = (
+                    at(v3(1.25, geo.rack_y, 0.6)),
+                    at(v3(-1.25, geo.rack_y, 0.6)),
+                );
+                let (l, r) = (at(v3(ax, ay, 2.4)), at(v3(-ax, ay, 2.4)));
+                let which = if pl.min(pr) < l.min(r) {
+                    Kicked::Pod(if pl < pr { 0 } else { 1 })
+                } else if l < r {
+                    Kicked::Arm(1.)
+                } else {
+                    Kicked::Arm(-1.)
+                };
+                Some((which, k))
+            }
+            _ => None,
+        };
+        let kick_of = |w: Kicked| kicked.filter(|k| k.0 == w).map_or(0., |k| k.1);
+        let p = if far {
+            &self.boxes[ch]
+        } else {
+            &self.parts[ch]
+        };
+        let p = p.as_ref().unwrap();
+        let b = &mut self.batch;
         if !arms_only {
-            gl.draw_plain(&p.hip, &(base * M4::t(0., geo.hip, 0.) * M4::ry(m.hip_yaw)));
-            gl.draw_plain(&p.torso, &tb);
+            b.part(
+                ch,
+                lod,
+                Slot::Hip,
+                &(base * M4::t(0., geo.hip, 0.) * M4::ry(m.hip_yaw)),
+            );
+            b.part(ch, lod, Slot::Torso, &tb);
+            if p.pods.is_some() {
+                for j in 0..2 {
+                    let sx = if j == 0 { 1. } else { -1. };
+                    let (drop, sway, h) = match an {
+                        Some((pr, a)) => (a.pod[j].x, a.sway[j].x, pr.pod_hinge),
+                        None => (0., 0., [0.; 3]),
+                    };
+                    let h = [h[0] * sx, h[1], h[2]];
+                    let back = kick_of(Kicked::Pod(j));
+                    b.part(
+                        ch,
+                        lod,
+                        if j == 0 { Slot::PodL } else { Slot::PodR },
+                        &(tb * M4::t(h[0], h[1] + drop, h[2] - back * 0.5)
+                            * M4::rx(-drop * 1.2 - back * 0.5)
+                            * M4::rz(sway * sx)
+                            * M4::t(-h[0], -h[1], -h[2])),
+                    );
+                }
+            }
+            if let (true, Some((pr, a))) = (p.antenna.is_some(), an) {
+                let at = pr.ant_base;
+                b.part(
+                    ch,
+                    lod,
+                    Slot::Antenna,
+                    &(tb * M4::t(at[0], at[1], at[2]) * M4::rx(a.ant_x.x) * M4::rz(a.ant_z.x)),
+                );
+            }
         }
         for (side, sec) in [(1., Sec::LA), (-1., Sec::RA)] {
             if m.hp[sec.i()] <= 0. && m.dying.is_none() {
@@ -147,25 +425,34 @@ impl Scene {
             }
             let swinging = m.melee.is_some_and(|s| s.arm.is_none_or(|a| a == sec));
             let sw = if swinging { arm_swing } else { 0. };
+            let back = kick_of(Kicked::Arm(side));
             let a = if arms_only {
                 // The cockpit's own arms: drawn in and forward of the eye.
                 tb * M4::t(side * 2.4, geo.eye[1] - 0.9, geo.eye[2] + 1.9)
                     * M4::rx(-1.25 - m.pitch * 0.5 + sw)
                     * M4::s1(0.55)
             } else {
-                tb * M4::t(side * geo.arm_x, geo.arm_y, 0.) * M4::rx(-m.pitch + sw)
+                let (swing, lag) = match an {
+                    Some((pr, a)) => (anim::arm_swing(pr, m, side), a.lag.x),
+                    None => (0., 0.),
+                };
+                tb * M4::t(side * geo.arm_x, geo.arm_y, 0.)
+                    * M4::ry(lag)
+                    * M4::rx(-m.pitch + sw + swing + back * 0.25)
             };
-            gl.draw_plain(&p.arm, &a);
-            if let Some(f) = &p.fist {
-                gl.draw_plain(f, &a);
+            b.part(ch, lod, Slot::Arm, &a);
+            if p.fist.is_some() {
+                b.part(ch, lod, Slot::Fist, &a);
             }
-            if let (Some(b), true) = (&p.barrel, m.w.iter().any(|w| w.mount == sec && !w.dead)) {
-                gl.draw_plain(b, &a);
+            if p.barrel.is_some() && m.w.iter().any(|w| w.mount == sec && !w.dead) {
+                b.part(ch, lod, Slot::Barrel, &(a * M4::t(0., 0., -back)));
             }
         }
         if arms_only {
             return;
         }
+        let paint = crate::look::paint(m.team);
+        let dark = [paint[0] * 0.55, paint[1] * 0.55, paint[2] * 0.55];
         let (c, sn) = (m.yaw.cos(), m.yaw.sin());
         for (i, l) in geo.legs().iter().enumerate() {
             let sec = if l.hx > 0. { Sec::LL } else { Sec::RL };
@@ -184,14 +471,47 @@ impl Scene {
                 Knee::Forward => v3(sn, 0., c),
             };
             let k = solve_knee(hp, ankle, pole, geo.l1 * sc, geo.l2 * sc);
-            gl.draw_plain(&p.uleg, &M4::limb(hp, k, pole, sc));
-            gl.draw_plain(&p.lleg, &M4::limb(k, ankle, pole, sc));
-            gl.draw_plain(
-                &p.foot,
-                &(M4::t(ankle.x, ankle.y - geo.ankle * sc + 0.2 * sc, ankle.z)
-                    * M4::ry(m.feet[i].yaw)
-                    * M4::s1(sc)),
-            );
+            let (mt, ms) = (M4::limb(hp, k, pole, sc), M4::limb(k, ankle, pole, sc));
+            let roll = an.map_or(0., |(pr, _)| anim::foot_roll(pr, m, i));
+            let mf = M4::t(ankle.x, ankle.y - geo.ankle * sc + 0.2 * sc, ankle.z)
+                * M4::ry(m.feet[i].yaw)
+                * M4::rx(roll)
+                * M4::s1(sc);
+            b.part(ch, lod, Slot::ULeg, &mt);
+            b.part(ch, lod, Slot::LLeg, &ms);
+            b.part(ch, lod, Slot::Foot, &mf);
+            if p.toe1.is_some() {
+                use crate::models::{TOES, TOE_1};
+                let (curl, spread) =
+                    an.map_or((0., 1.), |(pr, a)| anim::toe_pose(pr, m, a, i, g.time));
+                for h in TOES {
+                    let near =
+                        mf * M4::t(h[0], h[1], h[2]) * M4::ry(h[3] * spread) * M4::rx(curl * 0.55);
+                    b.part(ch, lod, Slot::Toe1, &near);
+                    let tip = near * M4::t(0., 0., TOE_1) * M4::rx(curl * 0.75);
+                    b.part(ch, lod, Slot::Toe2, &tip);
+                }
+            }
+            if p.pistons {
+                use crate::models::{ANKLE, KNEE};
+                let v = |a: [f32; 3]| v3(a[0], a[1], a[2]);
+                piston(
+                    b,
+                    mt.apply(v(KNEE.from)),
+                    ms.apply(v(KNEE.to)),
+                    &KNEE,
+                    sc,
+                    dark,
+                );
+                piston(
+                    b,
+                    ms.apply(v(ANKLE.from)),
+                    mf.apply(v(ANKLE.to)),
+                    &ANKLE,
+                    sc,
+                    dark,
+                );
+            }
         }
         if m.flash.frame + 1 >= g.frame {
             // The muzzle flash, two frames, facing the camera's plane.
@@ -200,21 +520,19 @@ impl Scene {
             let mm = M4([
                 r.x, r.y, r.z, 0., u.x, u.y, u.z, 0., 0., 0., 1., 0., f.x, f.y, f.z, 1.,
             ]);
-            gl.mode(Mode::Emissive);
-            gl.draw(fx_mesh(self, Fx::Star), &mm, [1., 0.9, 0.5], 1.);
-            gl.mode(Mode::Lit);
+            b.fx(Fx::Star, true, &mm, [1., 0.9, 0.5], 1.);
         }
     }
     fn draw_particles(&mut self, gl: &mut Gl, g: &Game, fog: [f32; 3]) {
         let shape = |k: PKind| match k {
-            PKind::Smoke => Fx::Cube,
-            PKind::Fire | PKind::Flame => Fx::Tetra,
+            PKind::Smoke => Fx::Puff,
+            PKind::Fire | PKind::Flame => Fx::Shard,
             PKind::Spark => Fx::Spark,
-            PKind::Debris => Fx::Chunk,
-            PKind::Dust => Fx::Flat,
+            PKind::Debris => Fx::Rock,
+            PKind::Dust => Fx::DustPuff,
             PKind::Shock => Fx::Ring,
         };
-        for f in [Fx::Cube, Fx::Tetra, Fx::Spark, Fx::Chunk, Fx::Flat] {
+        for f in [Fx::Puff, Fx::Shard, Fx::Spark, Fx::Rock, Fx::DustPuff] {
             self.inst.clear();
             for (i, p) in g.parts.iter().enumerate() {
                 if shape(p.kind) != f || p.kind == PKind::Shock {
@@ -223,22 +541,19 @@ impl Scene {
                 let age = 1. - p.life / p.life0;
                 let (m, col, glow) = match p.kind {
                     PKind::Smoke | PKind::Dust => {
-                        // Fading by colour toward the fog and by shrinking, never by blending.
+                        // A puff swells as it ages, greys toward the fog, and dissolves pixel
+                        // by pixel through the dither. Never blending.
                         let t = clamp((age - 0.5) / 0.5, 0., 1.) * 0.8;
-                        let size = p.size
-                            * if age < 0.85 {
-                                1.
-                            } else {
-                                1. - (age - 0.85) / 0.15
-                            };
+                        let size = p.size * (0.7 + 0.6 * age);
+                        let solid = 1. - smooth((age - 0.55) / 0.45);
                         (
-                            inst_mat(p.p, age * 1.5 + i as f32, age * 0.8, size),
+                            inst_mat(p.p, age * 1.5 + i as f32, age * 0.8 + i as f32 * 0.9, size),
                             [
                                 lerp(p.col[0], fog[0], t),
                                 lerp(p.col[1], fog[1], t),
                                 lerp(p.col[2], fog[2], t),
                             ],
-                            0.45,
+                            dissolve(0.45, solid),
                         )
                     }
                     PKind::Fire | PKind::Flame => {
@@ -268,35 +583,35 @@ impl Scene {
             gl.draw_inst(fx_mesh(self, f), &inst);
             self.inst = inst;
         }
-        // Shockwaves: flat rings that race out and dither away.
-        gl.mode(Mode::Emissive);
+        // Shockwaves: flat rings that race out and dither away, each on its own dissolve.
         for p in g.parts.iter().filter(|p| p.kind == PKind::Shock) {
             let age = 1. - p.life / p.life0;
             let r = p.size * (0.15 + 0.85 * age);
-            gl.dither(1. - age);
-            gl.draw(
-                fx_mesh(self, Fx::Ring),
+            self.batch.fx(
+                Fx::Ring,
+                true,
                 &(M4::t(p.p.x, p.p.y, p.p.z) * M4::s(r, 1., r)),
                 p.col,
-                1.,
+                dissolve(1., 1. - age),
             );
         }
-        gl.dither(1.);
-        gl.mode(Mode::Lit);
+        self.flush(gl);
     }
     fn draw_debris(&mut self, gl: &mut Gl, g: &Game) {
         for d in &g.debris {
-            self.parts(gl, d.ch);
-            let p = self.parts[d.ch.i()].as_ref().unwrap();
-            let mesh = match d.part {
-                Part::Arm => &p.arm,
-                Part::ULeg => &p.uleg,
-                Part::LLeg => &p.lleg,
-                Part::Foot => &p.foot,
-                Part::Plate => &p.plate,
+            let k = self.ensure(gl, d.ch, d.team);
+            let slot = match d.part {
+                Part::Arm => Slot::Arm,
+                Part::ULeg => Slot::ULeg,
+                Part::LLeg => Slot::LLeg,
+                Part::Foot => Slot::Foot,
+                Part::Plate => Slot::Plate,
             };
-            gl.draw_plain(
-                mesh,
+            let far = hypot2(d.p.x - self.eye.x, d.p.z - self.eye.z) > LOD_FAR;
+            self.batch.part(
+                k,
+                far as usize,
+                slot,
                 &(M4::t(d.p.x, d.p.y, d.p.z)
                     * M4::ry(d.rot.y)
                     * M4::rx(d.rot.x)
@@ -305,72 +620,72 @@ impl Scene {
             );
         }
     }
-    fn draw_shots(&self, gl: &mut Gl, g: &Game) {
+    fn draw_shots(&mut self, g: &Game) {
+        let b = &mut self.batch;
         for s in &g.shots {
             let (d, dir) = (weapon(s.wpn), s.v.norm());
             if s.kind == WKind::Missile {
                 let m = M4::limb(s.p + dir * 0.7, s.p - dir * 0.7, v3(0., 1., 0.), 1.)
                     * M4::rx(PI / 2.)
                     * M4::s(0.5, 1., 0.5);
-                gl.draw(fx_mesh(self, Fx::Missile), &m, [0.75, 0.75, 0.72], 0.);
+                b.fx(Fx::Missile, false, &m, [0.75, 0.75, 0.72], 0.);
             } else if d.bolt {
-                gl.mode(Mode::Emissive);
-                gl.draw(
-                    fx_mesh(self, Fx::Bolt),
+                b.fx(
+                    Fx::Bolt,
+                    true,
                     &(M4::t(s.p.x, s.p.y, s.p.z) * M4::s1(1.1)),
                     d.col,
                     1.,
                 );
-                gl.mode(Mode::Lit);
             } else {
                 let (tl, tw) = (
                     if d.tl > 0. { d.tl } else { 2.5 },
                     if d.tw > 0. { d.tw } else { 0.3 },
                 );
-                gl.mode(Mode::Emissive);
-                gl.draw(
-                    fx_mesh(self, Fx::Beam),
+                b.fx(
+                    Fx::Beam,
+                    true,
                     &beam_mat(s.p - dir * tl, s.p, tw),
                     d.tracer.unwrap_or([1., 0.75, 0.35]),
                     1.,
                 );
-                gl.mode(Mode::Lit);
             }
         }
-        gl.mode(Mode::Emissive);
-        for b in &g.cbeams {
+        for cb in &g.cbeams {
             // Your own beams leave from just past the cockpit's arms, thinner: a wedge at the eye would fill the screen.
-            let (mut a, mut w) = (b.a, b.w);
+            let (mut a, mut w) = (cb.a, cb.w);
             if (a - g.eye).len() < 6. {
-                let d = b.b - b.a;
+                let d = cb.b - cb.a;
                 let l = d.len();
                 if l > 6. {
                     a += d * (2.5 / l);
                     w *= 0.6;
                 }
             }
-            gl.draw(fx_mesh(self, Fx::Beam), &beam_mat(a, b.b, w), b.col, 1.);
+            b.fx(Fx::Beam, true, &beam_mat(a, cb.b, w), cb.col, 1.);
         }
         for p in &g.pulses {
             // The fusion pulse: a bright knot travelling the beam.
             let at = p.a.mix(p.b, clamp(p.t / p.dur, 0., 1.));
-            gl.draw(
-                fx_mesh(self, Fx::Bolt),
+            b.fx(
+                Fx::Bolt,
+                true,
                 &(M4::t(at.x, at.y, at.z) * M4::s1(2.5)),
                 [0.9, 0.7, 1.],
                 1.,
             );
-            gl.draw(
-                fx_mesh(self, Fx::Beam),
+            b.fx(
+                Fx::Beam,
+                true,
                 &beam_mat(p.a, p.b, 0.12 + 0.1 * (p.seed + g.time * 50.).sin()),
                 weapon(Wpn::Fusion).col,
                 1.,
             );
         }
-        gl.mode(Mode::Lit);
     }
     fn draw_world(&mut self, gl: &mut Gl, g: &Game, eye: V3, fog_far: f32) {
         let half = g.ter.hx / TER_CHUNKS as f32;
+        gl.world(true);
         for (m, c) in &self.ground {
             let (dx, dz) = (
                 ((c.x - eye.x).abs() - half).max(0.),
@@ -390,14 +705,15 @@ impl Scene {
                 0.,
             );
         }
+        gl.world(false);
         for w in &g.wrecks {
-            self.parts(gl, w.ch);
+            let k = self.ensure(gl, w.ch, w.team);
             let sink = (1. - w.settle) * 0.8;
             let m = M4::t(w.x, w.y - sink * 0.3 + 0.2, w.z)
                 * M4::ry(w.yaw)
                 * M4::rz(w.roll * 0.5 + (w.t * 9.).sin() * (1. - w.settle) * 0.1)
                 * M4::s1(w.scale);
-            gl.draw_plain(&self.parts[w.ch.i()].as_ref().unwrap().wreck, &m);
+            self.batch.part(k, 0, Slot::Wreck, &m);
         }
     }
     /// The cockpit camera: the eye in the torso, dropped by the kick and the bob, jittered by the shake,
@@ -460,6 +776,7 @@ impl Scene {
         h: i32,
     ) -> M4 {
         let vp = M4::persp(fov, w as f32 / h as f32, 0.5, 2000.) * M4::look_at(eye, eye + dir, up);
+        self.eye = eye;
         self.right = dir.cross(up).norm();
         self.up = self.right.cross(dir).norm();
         let fog = fog_of(g);
@@ -467,6 +784,9 @@ impl Scene {
         gl.camera(&vp, eye);
         gl.light(g.pal.light, g.pal.shade, g.pal.hor, fog[0], fog[1]);
         gl.sky(g.pal.zen, g.pal.hor);
+        let (ramp, tone) = crate::look::look_for(g);
+        gl.look(self.cell, &ramp, tone);
+        gl.world(false);
         gl.mode(Mode::Sky);
         gl.depth(false, false);
         gl.draw_plain(&self.sky, &M4::ID);
@@ -497,6 +817,9 @@ impl Scene {
             if m.gone {
                 continue;
             }
+            if id == PLAYER && g.spectate {
+                continue; // parked off the field while you watch
+            }
             if id == PLAYER && cam.is_none() {
                 if g.guide.is_none() && m.alive {
                     self.draw_mech(gl, g, id, true);
@@ -508,7 +831,7 @@ impl Scene {
             }
         }
         self.draw_debris(gl, g);
-        self.draw_shots(gl, g);
+        self.draw_shots(g);
         let p = g.p();
         if let (Some(at), true) = (p.jet.at, p.jet.charge > 0. || p.jet.blasted) {
             // Where this blast comes down: a ring on the ground, white on a stomp.

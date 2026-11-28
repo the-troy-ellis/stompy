@@ -102,7 +102,11 @@ ELIMINATE is implemented.
 | `platform.rs` | SDL: a 3.3 core context with vsync, the pad (hidapi for the Deck, so paddles, trackpad touch and the gyro come through), keyboard and mouse, rumble (the strongest buzz wins until it runs out). |
 | `controls.rs` | `Raw` → `Input` and the menus' presses. Pure, with unit tests. The Deck layout is at its top. |
 | `audio.rs` | The synthesiser in SDL's audio callback: oscillator and filtered-noise voices for the one-shots (the reference's recipes), the sub-bass thump through a soft clipper, the loops (hum, jets, servo, beam, sizzle, fusion scan) on a bus that ducks under impacts. No samples yet. |
-| `gl.rs` | One shader through glow: a colour per vertex, one light, the palette's sky and fog, an ordered 4 by 4 dither, a 2D mode for the HUD. Meshes, instancing, screenshots. |
+| `gl.rs` | One shader through glow: a colour per vertex, one light, the palette's sky and fog, the ordered 4 by 4 dither that is the look (the ground, sky and fog onto the place's ramp; a mech's light in fifths; fog and fades by pixel), a 2D mode for the HUD. Meshes, instancing, screenshots. |
+| `models.rs` | Detailed models built on the box models' joints (BARRY so far), and the live pistons' anchors. |
+| `anim.rs` | Drawn-only motion with a profile per chassis: arm swing and lag, foot roll, live pistons, the antenna's whip, the pods' bounce, recoil. Springs carried frame to frame. |
+| `scene.rs`'s batch | A frame's drawing gathered by shape (each chassis's parts at two details, each effect lit or glowing) and flushed one instanced draw a shape; mechs past 120 m use their plain model. |
+| `look.rs` | The look's table: a ramp of nine colours for each place at each time of day, and the tone range that spreads a place over it. |
 | `mesh.rs` | The builder (cube, cylinder, sphere, tri), every chassis's parts ported from the reference's `mesh/mechParts.js`, the effect shapes, the terrain in 16 chunks, the sky dome, the wrecks. |
 | `scene.rs` | The cockpit camera (kick, bob, shake, wobble, heat sway, squash, sag, the fall; the volley's nose camera), the world, each mech posed from its planted feet by IK, the cockpit's own arms, debris, wrecks, shots, beams, particles instanced by shape, shockwaves dithered away, the jets' landing ring. |
 | `hud.rs`, `font.rs` | A 5 by 7 pixel font as quads, lines and arcs as quads; the ring (heat, jets, speed, the damage diagram), the weapons by category, the radar, the crosshair, the target's brackets, the compass, the messages, the dithered flashes. |
@@ -134,6 +138,10 @@ offline or on any failure it runs what it has (docs/deck-setup.md).
 - **`dt` is a fixed 1/60.** Nothing depends on frame count for timing.
 - **Everything visible is a polygon.** No textures, no blending; fades are
   shrink, colour toward the fog, or the dither.
+- **The dither is the look.** The ground, the sky and the fog are drawn in
+  the place's ramp only; mechs and effects in their own colours. Anything
+  new that is ground (a crater, a prop) is drawn as world; anything that
+  moves keeps its paint.
 - **Balance numbers change only in issues about balance.**
 
 ## Checks

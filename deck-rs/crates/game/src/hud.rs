@@ -17,6 +17,8 @@ pub const RED: Col = [1., 0.27, 0.27];
 pub const DIM: Col = [0.14, 0.42, 0.14];
 pub const WHITE: Col = [0.95, 1., 0.95];
 pub const BLACK: Col = [0.02, 0.03, 0.02];
+/// Behind the text: dark enough to hold the green off any palette.
+pub const SHADOW: Col = [0.01, 0.04, 0.02];
 
 #[derive(Default)]
 pub struct Hud {
@@ -99,14 +101,18 @@ impl Hud {
     pub fn text_w(px: f32, s: &str) -> f32 {
         s.chars().count() as f32 * 6. * px - px
     }
+    /// Text with a dark drop shadow one font pixel down and right, so the green reads on any
+    /// palette (the glacier's white, the desert's peach).
     pub fn text(&mut self, x: f32, y: f32, px: f32, s: &str, c: Col) {
-        for (k, ch) in s.chars().enumerate() {
-            let Some(g) = glyph(ch) else { continue };
-            let x0 = x + k as f32 * 6. * px;
-            for r in 0..7 {
-                for q in 0..5 {
-                    if g.get(r * 5 + q) == Some(&b'#') {
-                        self.rect(x0 + q as f32 * px, y + r as f32 * px, px, px, c);
+        for (dx, col) in [(px, SHADOW), (0., c)] {
+            for (k, ch) in s.chars().enumerate() {
+                let Some(g) = glyph(ch) else { continue };
+                let x0 = x + dx + k as f32 * 6. * px;
+                for r in 0..7 {
+                    for q in 0..5 {
+                        if g.get(r * 5 + q) == Some(&b'#') {
+                            self.rect(x0 + q as f32 * px, y + dx + r as f32 * px, px, px, col);
+                        }
                     }
                 }
             }
@@ -490,10 +496,17 @@ pub struct HudOpts {
     pub debug: bool,
     pub fps: f32,
     pub draws: usize,
+    /// Triangles drawn, and the sim's and the 3D drawing's ms a frame (CPU side).
+    pub tris: usize,
+    pub sim_ms: f32,
+    pub draw_ms: f32,
     pub pad: bool,
 }
 /// The instruments for a match in play.
 pub fn draw_hud(h: &mut Hud, gl: &mut Gl, g: &Game, vp: &M4, o: &HudOpts) {
+    if g.spectate {
+        return watch_hud(h, gl, g, o);
+    }
     let p = g.p();
     let s = (o.scale * h.h / 800.).max(0.5);
     let drop = (g.kick + g.bob.x) * 2.5 * s; // the HUD floats behind the camera's drop
@@ -600,6 +613,12 @@ pub fn draw_hud(h: &mut Hud, gl: &mut Gl, g: &Game, vp: &M4, o: &HudOpts) {
             if m.warn { AMBER } else { GREEN },
         );
     }
+    readout(h, g, o, s);
+    h.flush(gl, 1.);
+    flashes(h, gl, g, p.shutdown);
+}
+/// The debug readout (View held + Y, or F3): the frame's costs, for measuring battles.
+fn readout(h: &mut Hud, g: &Game, o: &HudOpts, s: f32) {
     if o.debug {
         let t = format!(
             "{:4.1} FPS  {} DRAWS  {} PARTS  {} SHOTS  {}",
@@ -610,9 +629,19 @@ pub fn draw_hud(h: &mut Hud, gl: &mut Gl, g: &Game, vp: &M4, o: &HudOpts) {
             if o.pad { "PAD" } else { "KEYS" }
         );
         h.text(16. * s, 70. * s, 1.5 * s, &t, DIM);
+        let alive = g.mechs.iter().filter(|m| m.alive).count();
+        let t = format!(
+            "{} MECHS  SIM {:.2} MS  DRAW {:.2} MS  {}K TRIS",
+            alive,
+            o.sim_ms,
+            o.draw_ms,
+            o.tris / 1000
+        );
+        h.text(16. * s, 84. * s, 1.5 * s, &t, DIM);
     }
-    h.flush(gl, 1.);
-    // The flashes: a dithered sheet of red or white, never a blend; dark under a shutdown.
+}
+/// The flashes: a dithered sheet of red or white, never a blend; dark under a shutdown.
+fn flashes(h: &mut Hud, gl: &mut Gl, g: &Game, shutdown: bool) {
     let (w, hh) = (h.w, h.h);
     if g.flash > 0.01 {
         h.rect(0., 0., w, hh, RED);
@@ -622,8 +651,25 @@ pub fn draw_hud(h: &mut Hud, gl: &mut Gl, g: &Game, vp: &M4, o: &HudOpts) {
         h.rect(0., 0., w, hh, WHITE);
         h.flush(gl, clamp(g.white_flash * 0.8, 0., 0.7));
     }
-    if p.shutdown {
+    if shutdown {
         h.rect(0., 0., w, hh, BLACK);
         h.flush(gl, 0.3);
     }
+}
+/// Watching a battle: no cockpit, only the two sides, the clock, the controls and the readout.
+fn watch_hud(h: &mut Hud, gl: &mut Gl, g: &Game, o: &HudOpts) {
+    let s = (o.scale * h.h / 800.).max(0.5);
+    h.text(16. * s, 14. * s, 2. * s, "WATCH", DIM);
+    let sides = format!("YOURS {}   THEIRS {}", g.allies_left(), g.enemies_left());
+    h.text(16. * s, 32. * s, 2. * s, &sides, GREEN);
+    let clock = format!("{}:{:02}", g.time as i32 / 60, g.time as i32 % 60);
+    h.text(16. * s, 50. * s, 2. * s, &clock, DIM);
+    let keys = if o.pad {
+        "LEFT STICK FLY   RIGHT STICK LOOK   A UP   B DOWN   RT FAST   X TO THE FIGHT"
+    } else {
+        "WASD FLY   MOUSE LOOK   SPACE UP   C DOWN   LEFT CLICK FAST   R TO THE FIGHT"
+    };
+    h.text_c(h.w / 2., h.h - 28. * s, 1.6 * s, keys, DIM);
+    readout(h, g, o, s);
+    h.flush(gl, 1.);
 }

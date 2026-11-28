@@ -1,9 +1,14 @@
 # Stompy for the Steam Deck: notes for agents
 
-This folder is the Rust rebuild of Stompy aimed at the Steam Deck. The
-repository around it is the browser version and the **reference
-implementation**: its `docs/` has the specs and its `src/data/` has every
-tuned number. Port numbers, never reinvent them. **The plan of record is in
+This folder is Stompy: the game, in Rust, for the Steam Deck. **Stompy is a
+base builder** with many mechs on the map, each of them pilotable from the
+cockpit (the owner, 2026-11-28). The browser version around this folder is
+**deprecated** and kept only as a reference: read its `docs/specs/`, `src/`
+and `test/` when bringing something across, and its `src/data/` for a tuned
+number to start from (don't reinvent a number it already tuned). Never change
+the browser version. Bringing a feature across follows
+`deck-rs/docs/parity.md`: a port spec that says what is kept, what is
+changed and why, and what to ask the owner, before any code. **The plan of record is in
 `deck-rs/docs/`**; start with `docs/README.md`.
 
 Rules that are easy to miss:
@@ -22,13 +27,17 @@ Rules that are easy to miss:
 - Keep the invariants in `docs/architecture.md`: feet never slide, ground
   queries match the mesh, melt belongs to the target, heat 100/45, the sim
   never includes the platform, `dt` is a fixed 1/60, everything visible is a
-  polygon (no textures, no blending; the dither is the one see-through).
+  polygon (no textures, no blending), and the ordered dither is the look:
+  the ground, sky and fog in the place's ramp (`crates/game/src/look.rs`,
+  `docs/specs/02-look.md`).
 - Names are the owner's: stable enum keys in code, display names only in
   `crates/sim/src/data/names.rs`, placeholders for anything new, a NAMING section on any
   PR that makes a new thing visible.
 - Text: board-book briefs, a flat cockpit voice, jokes after the fact, no
   exclamation marks, no references outside the game. `cargo test` checks it.
 - Balance numbers change only in issues about balance.
+- Bugs the owner reports go in `docs/bugs.md` and wait there. Don't fix one
+  until the owner picks it, even if it looks like a one-liner.
 - Every push to `main` that passes CI is published as the `deck-rs-latest`
   release, and the owner's Deck installs it on its next start
   (`tools/stompy-launch.sh`). Keep `main` playable.

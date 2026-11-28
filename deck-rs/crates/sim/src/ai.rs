@@ -28,16 +28,84 @@ fn in_map(g: &Game, x: f32, z: f32) -> (f32, f32) {
 // --- perception ------------------------------------------------------------------------------------
 /// Sees the player within the difficulty's sight (less in weather) after its react delay; shouts to
 /// allies; searches after losing contact for long enough. Returns where it believes the player is.
+/// The enemy this mech is fighting, or the player when it has none (the old single-enemy rule;
+/// callers check `has_foe` first where that matters).
+pub fn foe(g: &Game, id: MechId) -> MechId {
+    g.mechs[id].ai.target.unwrap_or(PLAYER)
+}
+fn foe_of<'a>(g: &'a Game, e: &Mech) -> &'a Mech {
+    &g.mechs[e.ai.target.unwrap_or(PLAYER)]
+}
+/// The nearest living enemy this mech can see, checking sight lines nearest first and only a
+/// few of them (the ground ray is the dear part).
+fn spot(g: &Game, id: MechId, sight: f32) -> Option<MechId> {
+    let e = &g.mechs[id];
+    let mut near: Vec<(f32, MechId)> = g
+        .mechs
+        .iter()
+        .enumerate()
+        .filter(|(i, o)| *i != id && g.targetable(*i) && o.team != e.team)
+        .map(|(i, o)| (hypot2(o.x - e.x, o.z - e.z), i))
+        .filter(|(d, _)| *d < sight)
+        .collect();
+    near.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let eye = eye_of(e);
+    near.iter()
+        .take(SPOT_CHECKS)
+        .map(|&(_, i)| i)
+        .find(|&i| !blocked(g, eye, center_of(&g.mechs[i])))
+}
+/// What it knows of its target: looks every so often, wakes after its react time, shouts to
+/// allies, keeps a belief when contact is lost. Returns where it thinks the target is.
 fn perceive(g: &mut Game, id: MechId) -> Option<(f32, f32)> {
     let (time, sight) = (g.time, diff(g).sight * WEATHER[g.weather.i()].radar);
+    if time >= g.mechs[id].ai.look_t {
+        // The target: the one it is on while it can still see it, else the nearest it can.
+        let cur = g.mechs[id].ai.target.filter(|&t| g.targetable(t));
+        let keep = cur.filter(|&t| {
+            let (e, o) = (&g.mechs[id], &g.mechs[t]);
+            hypot2(o.x - e.x, o.z - e.z) < sight && !blocked(g, eye_of(e), center_of(o))
+        });
+        let mut seen_t = keep.or_else(|| spot(g, id, sight));
+        if seen_t.is_none() && cur.is_none() && g.mechs[id].ai.aware {
+            // Told where the enemy is (a mission's aware foe): the nearest one, seen or not.
+            let e = &g.mechs[id];
+            seen_t = g
+                .mechs
+                .iter()
+                .enumerate()
+                .filter(|(i, o)| *i != id && g.targetable(*i) && o.team != e.team)
+                .min_by(|a, b| {
+                    hypot2(a.1.x - e.x, a.1.z - e.z).total_cmp(&hypot2(b.1.x - e.x, b.1.z - e.z))
+                })
+                .map(|(i, _)| i);
+        }
+        let a = &mut g.mechs[id].ai;
+        if let Some(t) = seen_t {
+            if a.target != Some(t) {
+                a.target = Some(t);
+                a.belief = None;
+            }
+        } else if cur.is_none() {
+            a.target = None;
+        }
+    }
+    let Some(tid) = g.mechs[id].ai.target else {
+        let a = &mut g.mechs[id].ai;
+        a.seen = false;
+        if a.state == AiState::Fight && a.aware && a.belief.is_none() {
+            a.aware = false; // nobody left to fight
+        }
+        return None;
+    };
     let (px, py, pz, palive, pyaw, pspeed) = {
-        let p = g.p();
+        let p = &g.mechs[tid];
         (p.x, p.y, p.z, p.alive, p.yaw, p.speed)
     };
     if time >= g.mechs[id].ai.look_t {
         let e = &g.mechs[id];
         let d = hypot2(px - e.x, pz - e.z);
-        let seen = palive && d < sight && !blocked(g, eye_of(e), center_of(g.p()));
+        let seen = palive && d < sight && !blocked(g, eye_of(e), center_of(&g.mechs[tid]));
         let react = diff(g).react;
         let a = &mut g.mechs[id].ai;
         a.look_t = time + LOOK_EVERY;
@@ -73,6 +141,7 @@ fn perceive(g: &mut Game, id: MechId) -> Option<(f32, f32)> {
         let (ex, ez, team) = (g.mechs[id].x, g.mechs[id].z, g.mechs[id].team);
         for (i, o) in g.mechs.iter_mut().enumerate() {
             if i != id
+                && i != PLAYER
                 && o.alive
                 && o.team == team
                 && !o.ai.aware
@@ -80,6 +149,7 @@ fn perceive(g: &mut Game, id: MechId) -> Option<(f32, f32)> {
             {
                 o.ai.aware = true;
                 o.ai.belief = a.belief;
+                o.ai.target = a.target;
             }
         }
     }
@@ -167,7 +237,7 @@ fn keep_range(e: &Mech, c: &Ctx, pref: f32, lo: f32, hi: f32) -> Option<Out> {
 }
 /// Hot or hurt: the nearest spot from which the target cannot be seen.
 fn find_cover(g: &Game, e: &Mech) -> Option<[f32; 2]> {
-    let tc = center_of(g.p());
+    let tc = center_of(foe_of(g, e));
     let mut best: Option<([f32; 2], f32)> = None;
     for d in COVER_DISTS {
         for k in 0..8 {
@@ -268,7 +338,7 @@ fn harass(g: &mut Game, id: MechId, c: &Ctx, stomp: bool) -> Option<Out> {
 }
 /// Snipers: a spot well above the target with a view of it.
 fn find_ridge(g: &Game, e: &Mech, avoid: Option<[f32; 2]>) -> Option<[f32; 2]> {
-    let t = g.p();
+    let t = foe_of(g, e);
     let (tc, base) = (center_of(t), g.ter.height(t.x, t.z));
     let mut best: Option<([f32; 2], f32)> = None;
     for r in RIDGE_RADII {
@@ -382,8 +452,8 @@ fn steer(g: &mut Game, id: MechId, c: &Ctx) -> Out {
 
 // --- fire discipline ---------------------------------------------------------------------------------
 /// HARD aims at the more damaged arm's side; the others at the centre.
-fn aim_point(g: &Game) -> V3 {
-    let p = g.p();
+fn aim_point(g: &Game, tid: MechId) -> V3 {
+    let p = &g.mechs[tid];
     let c = center_of(p);
     if !diff(g).sections || (p.hp[Sec::LA.i()] <= 0. && p.hp[Sec::RA.i()] <= 0.) {
         return c;
@@ -404,13 +474,13 @@ fn aim_point(g: &Game) -> V3 {
     c + v3(side * o * a.cos(), 0., -side * o * a.sin())
 }
 pub fn aim_error(g: &Game, e: &Mech, dist: f32) -> f32 {
-    let p = g.p();
+    let p = foe_of(g, e);
     dist * e.ch.acc0 * diff(g).aim_err * (1. + p.speed.abs() / 14.) * if p.air { 1.6 } else { 1. }
 }
 fn decide_fire(g: &mut Game, id: MechId, dist: f32, to_yaw: f32, dt: f32) {
-    let (cap, time) = (diff(g).heat_cap, g.time);
-    let palive = g.p().alive;
-    let pc = aim_point(g);
+    let (cap, time, tid) = (diff(g).heat_cap, g.time, foe(g, id));
+    let palive = g.mechs[tid].alive;
+    let pc = aim_point(g, tid);
     let err = aim_error(g, &g.mechs[id], dist);
     let cool = g.rng.range(1.5, 3.);
     let e = &mut g.mechs[id];
@@ -460,8 +530,9 @@ fn decide_fire(g: &mut Game, id: MechId, dist: f32, to_yaw: f32, dt: f32) {
     } else {
         FIRE_ALPHA_TORSO
     };
-    let alpha = g.p().hp[Sec::T.i()] < g.p().max[Sec::T.i()] * alpha_at;
-    let (pyaw, pspeed) = (g.p().yaw, g.p().speed);
+    let t = &g.mechs[tid];
+    let alpha = t.hp[Sec::T.i()] < t.max[Sec::T.i()] * alpha_at;
+    let (pyaw, pspeed) = (t.yaw, t.speed);
     for wi in 0..g.mechs[id].w.len() {
         let w = g.mechs[id].w[wi];
         let d = w.def;
@@ -490,7 +561,7 @@ fn decide_fire(g: &mut Game, id: MechId, dist: f32, to_yaw: f32, dt: f32) {
             r.range(-err, err) * 0.6,
             r.range(-err, err),
         );
-        if !fire(g, id, wi, aim, Some(PLAYER)) {
+        if !fire(g, id, wi, aim, Some(tid)) {
             continue;
         }
         g.mechs[id].ai.shots += 1; // the sniper counts them to know when to move
@@ -504,16 +575,17 @@ fn decide_fire(g: &mut Game, id: MechId, dist: f32, to_yaw: f32, dt: f32) {
 /// One enemy, one frame.
 pub fn think(g: &mut Game, id: MechId, dt: f32) {
     let belief = perceive(g, id);
+    let tid = foe(g, id);
     let e = &g.mechs[id];
     let seen = belief.is_some() && e.ai.seen;
-    let (tx, tz) = belief.unwrap_or((g.p().x, g.p().z));
+    let (tx, tz) = belief.unwrap_or((g.mechs[tid].x, g.mechs[tid].z));
     let (dx, dz) = (tx - e.x, tz - e.z);
     let (dist, to_yaw) = (hypot2(dx, dz), dx.atan2(dz));
     let (bx, bz) = (g.ter.bx, g.ter.bz);
     let (move_yaw, mut thr, mut jets);
     thr = 1.;
     jets = false;
-    if !e.ai.aware {
+    if !e.ai.aware || e.ai.target.is_none() {
         // A patrol between random waypoints.
         if e.ai.wp.is_none_or(|w| hypot2(w[0] - e.x, w[1] - e.z) < 30.) {
             let (ex, ez) = (e.x, e.z);
@@ -548,7 +620,7 @@ pub fn think(g: &mut Game, id: MechId, dt: f32) {
         thr = 0.7;
     } else {
         strafe_tick(g, id, dt);
-        let (e, p) = (&g.mechs[id], g.p());
+        let (e, p) = (&g.mechs[id], &g.mechs[tid]);
         let reach_p = melee_of(p).reach * p.ch.scale + e.radius();
         let reach_e = melee_of(e).reach * e.ch.scale + p.radius();
         let too_close = seen && dist < reach_p * AI_PUNCH_KEEP_OUT;
@@ -556,7 +628,7 @@ pub fn think(g: &mut Game, id: MechId, dt: f32) {
         let punchable = e.ai.profile != Profile::Sniper
             && p.alive
             && can_punch(g, id)
-            && melee_target(g, id) == Some(PLAYER);
+            && melee_target(g, id) == Some(tid);
         if p.shutdown && p.alive {
             // A shut-down player: walk up and shove them. Correct Stompy behaviour.
             move_yaw = to_yaw;
@@ -585,27 +657,27 @@ pub fn think(g: &mut Game, id: MechId, dt: f32) {
     let turn = e.ch.turn * dt;
     e.yaw += clamp(wrap(move_yaw - e.yaw), -turn, turn);
     e.throttle = thr;
-    if !e.ai.aware {
+    if !e.ai.aware || e.ai.target.is_none() {
         e.twist *= 1. - dt;
         return;
     }
     let want = clamp(wrap(to_yaw - e.yaw), -1.9, 1.9);
     e.twist += clamp(wrap(want - e.twist), -2. * dt, 2. * dt);
     let pc = if seen {
-        center_of(g.p())
+        center_of(&g.mechs[tid])
     } else {
-        v3(tx, g.ter.height(tx, tz) + 4.2 * g.p().ch.scale, tz)
+        v3(tx, g.ter.height(tx, tz) + 4.2 * g.mechs[tid].ch.scale, tz)
     };
     let e = &mut g.mechs[id];
     e.pitch = (pc.y - (e.y + 6. * e.ch.scale)).atan2(dist);
     // In reach and facing: the punch, by difficulty. No guns mid-swing.
     if e.ai.profile != Profile::Sniper
-        && g.p().alive
+        && g.mechs[tid].alive
         && can_punch(g, id)
-        && melee_target(g, id) == Some(PLAYER)
+        && melee_target(g, id) == Some(tid)
     {
         let p = AI_PUNCH_CHANCE[g.diff.i()];
-        if g.p().shutdown || g.rng.chance(1. - (1. - p).powf(dt)) {
+        if g.mechs[tid].shutdown || g.rng.chance(1. - (1. - p).powf(dt)) {
             melee_press(g, id);
         }
     }

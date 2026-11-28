@@ -18,9 +18,9 @@ cargo test --workspace            # the headless sim tests
   that updates it in Game mode), building it, the controller layout.
 - [docs/controls.md](docs/controls.md): the Deck layout.
 
-The repository around this folder is the browser version and the reference
-implementation: every tuned number here is ported from its `src/data/`.
-`../deck/` is a different thing: the browser version wrapped in Electron as a
-Deck app, with its own `deck-latest` release. This Rust rebuild uses its own
+The browser version around this folder is deprecated (2026-11-28) and kept
+as a reference: every tuned number here started in its `src/data/`.
+`../deck/` is the browser version wrapped in Electron as a Deck app, with its
+own `deck-latest` release; it is deprecated with it. This Rust rebuild uses its own
 names throughout (`deck-rs/`, the `deck-rs.yml` workflow, the `deck-rs-latest`
 release, `~/Games/stompy-rs`), so the two install side by side.

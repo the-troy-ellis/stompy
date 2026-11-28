@@ -11,7 +11,7 @@ use crate::terrain::Terrain;
 
 pub type MechId = usize;
 pub const PLAYER: MechId = 0;
-pub const MAX_MECHS: usize = 24;
+pub const MAX_MECHS: usize = 256;
 pub const MAX_SHOTS: usize = 256;
 pub const MAX_PARTS: usize = 4000;
 pub const MAX_DEBRIS: usize = 40;
@@ -229,7 +229,7 @@ pub struct Ai {
     pub hot: bool,
     pub wp: Option<[f32; 2]>,
     pub beam_aim: V3,
-    /// Where it believes the player is, and how fast they were going.
+    /// Where it believes its target is, and how fast it was going.
     pub belief: Option<(V3, [f32; 2], f32)>,
     pub last_seen: f32,
     pub look_t: f32,
@@ -247,6 +247,9 @@ pub struct Ai {
     pub flip_t: f32,
     pub shots: i32,
     pub shots_at: i32,
+    /// The enemy it is fighting: the nearest it has seen, or whoever last hit it. None: no
+    /// enemy yet (it patrols).
+    pub target: Option<MechId>,
 }
 
 #[derive(Clone, Debug)]
@@ -402,6 +405,8 @@ pub enum Part {
 pub struct Debris {
     pub part: Part,
     pub ch: Ch,
+    /// Whose it was (its paint is its side's).
+    pub team: u8,
     pub scale: f32,
     pub p: V3,
     pub v: V3,
@@ -419,6 +424,8 @@ pub struct Wreck {
     pub z: f32,
     pub yaw: f32,
     pub ch: Ch,
+    /// Whose it was (its paint is its side's).
+    pub team: u8,
     pub scale: f32,
     pub t: f32,
     pub roll: f32,
@@ -533,6 +540,9 @@ pub struct Game {
     pub bob_in: Spring,
     pub zoom: bool,
     pub reduced_motion: bool,
+    /// Watching, not playing: the player's mech is parked off the field, nobody targets it, and
+    /// the match ends when either side is gone (`state::spectate`).
+    pub spectate: bool,
     pub guide: Option<Guide>,
     pub m_down: bool,
     pub m_at: f32,
@@ -547,6 +557,8 @@ pub struct Game {
     pub weather: Weather,
     pub pal: Light,
     pub ramp: Option<(Light, Light, f32)>,
+    /// The times of day a ramp runs between (the renderer blends their palettes the same way).
+    pub ramp_tod: Option<(TimeOfDay, TimeOfDay)>,
     pub rng: Rng,
     pub events: Vec<Event>,
     pub input: Input,
@@ -600,5 +612,17 @@ impl Game {
     }
     pub fn enemies_left(&self) -> usize {
         self.mechs.iter().filter(|m| m.team != 0 && m.alive).count()
+    }
+    /// The player's side still standing, the player's own mech not counted.
+    pub fn allies_left(&self) -> usize {
+        self.mechs
+            .iter()
+            .enumerate()
+            .filter(|(i, m)| *i != PLAYER && m.team == 0 && m.alive)
+            .count()
+    }
+    /// Whether an AI may take this mech as its target (a parked spectator's is out of it).
+    pub fn targetable(&self, id: MechId) -> bool {
+        self.mechs[id].alive && !(self.spectate && id == PLAYER)
     }
 }
