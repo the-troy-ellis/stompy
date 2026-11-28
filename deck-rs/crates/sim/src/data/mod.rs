@@ -959,7 +959,7 @@ pub static CHASSIS: [Chassis; Ch::N] = [
         profile: Profile::Brawler,
         hp: [110., 50., 50., 60., 60.],
         col: [0.45, 0.22, 0.6],
-        acc: [0.95, 0.75, 0.2],
+        acc: [0.62, 0.3, 0.85],
         tons: 80.,
         frame: 57.,
         sinks: 0,

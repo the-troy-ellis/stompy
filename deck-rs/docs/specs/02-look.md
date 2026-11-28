@@ -78,7 +78,10 @@ fists) keeps its accent. Wrecks and debris keep their side's paint. Each
 chassis's models are built once a side. Rust red was tried for theirs
 first: it sank into the red and orange ground of the desert and the
 volcanic plain. Blue and yellow stand off all four ramps and stay apart for
-the common colour blindnesses. Open: PURPLE PUNCHER is no longer purple.
+the common colour blindnesses. PURPLE PUNCHER keeps purple fists and
+accents over its side's paint (the owner, 2026-11-28). Open: BARRY's,
+SLOWPOKE's and BIG TROUBLE's accents are yellows and oranges near their
+side's mustard, and LONG LARRY's is a blue near yours.
 
 ### Sprites (agreed in principle, not built)
 
