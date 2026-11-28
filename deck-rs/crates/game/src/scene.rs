@@ -20,6 +20,9 @@ pub struct Scene {
     batch: Batch,
     /// Where the camera is this frame (for the detail by distance).
     eye: V3,
+    /// The cockpit's own guns this frame: where the real muzzle is (the sim fires from it) and
+    /// where the drawn barrel's tip is, so your beams leave the barrels you see (bug 2).
+    cockpit_guns: Vec<(V3, V3)>,
     fx: Vec<Mesh>,
     sky: Mesh,
     ground: Vec<(Mesh, V3)>,
@@ -50,6 +53,10 @@ fn fx_mesh(s: &Scene, k: Fx) -> &Mesh {
 /// Past this distance a mech is drawn with its plain model and no drawn-only motion: at 120 m
 /// it is a few dozen pixels tall.
 const LOD_FAR: f32 = 120.;
+/// The cockpit's own arms: their scale, and where the shoulders sit from the eye (sideways,
+/// down, forward), so the barrels show low in the corners of the view.
+const COCKPIT_ARM: f32 = 0.5;
+const COCKPIT_SHOULDER: [f32; 3] = [1.45, -0.15, 1.3];
 /// A piece of a chassis, for the batch.
 #[derive(Clone, Copy)]
 enum Slot {
@@ -222,6 +229,7 @@ impl Scene {
             boxes: (0..SIDES * Ch::N).map(|_| None).collect(),
             batch: Batch::new(),
             eye: V3::ZERO,
+            cockpit_guns: Vec::with_capacity(2),
             fx: FX_ALL.iter().map(|&k| build_effect(gl, k)).collect(),
             sky: build_sky(gl),
             ground: vec![],
@@ -427,10 +435,37 @@ impl Scene {
             let sw = if swinging { arm_swing } else { 0. };
             let back = kick_of(Kicked::Arm(side));
             let a = if arms_only {
-                // The cockpit's own arms: drawn in and forward of the eye.
-                tb * M4::t(side * 2.4, geo.eye[1] - 0.9, geo.eye[2] + 1.9)
-                    * M4::rx(-1.25 - m.pitch * 0.5 + sw)
-                    * M4::s1(0.55)
+                // The cockpit's own arms, small and low at the edges of the view, each barrel
+                // aimed at the point under the crosshair so the two meet where your shots go.
+                let k = COCKPIT_ARM;
+                let up = v3(tb.0[4], tb.0[5], tb.0[6]).norm();
+                let shoulder = tb.apply(v3(
+                    side * COCKPIT_SHOULDER[0],
+                    geo.eye[1] + COCKPIT_SHOULDER[1],
+                    geo.eye[2] + COCKPIT_SHOULDER[2],
+                ));
+                let bore = shoulder + up * (-1.15 * k);
+                let z = (g.aim - bore).norm();
+                let x = up.cross(z).norm();
+                let y = z.cross(x);
+                M4([
+                    x.x * k,
+                    x.y * k,
+                    x.z * k,
+                    0.,
+                    y.x * k,
+                    y.y * k,
+                    y.z * k,
+                    0.,
+                    z.x * k,
+                    z.y * k,
+                    z.z * k,
+                    0.,
+                    shoulder.x,
+                    shoulder.y,
+                    shoulder.z,
+                    1.,
+                ]) * M4::rx(sw)
             } else {
                 let (swing, lag) = match an {
                     Some((pr, a)) => (anim::arm_swing(pr, m, side), a.lag.x),
@@ -445,7 +480,13 @@ impl Scene {
                 b.part(ch, lod, Slot::Fist, &a);
             }
             if p.barrel.is_some() && m.w.iter().any(|w| w.mount == sec && !w.dead) {
-                b.part(ch, lod, Slot::Barrel, &(a * M4::t(0., 0., -back)));
+                let gun = a * M4::t(0., 0., -back);
+                b.part(ch, lod, Slot::Barrel, &gun);
+                if arms_only {
+                    let real = tb.apply(v3(side * geo.arm_x, geo.arm_y - 1.2, 2.4));
+                    self.cockpit_guns
+                        .push((real, gun.apply(v3(0., -1.15, 2.6))));
+                }
             }
         }
         if arms_only {
@@ -652,15 +693,16 @@ impl Scene {
             }
         }
         for cb in &g.cbeams {
-            // Your own beams leave from just past the cockpit's arms, thinner: a wedge at the eye would fill the screen.
+            // Your own beams leave the tips of the barrels you see in the cockpit, thinner: the
+            // sim fires them from the real muzzles, below and out of view.
             let (mut a, mut w) = (cb.a, cb.w);
-            if (a - g.eye).len() < 6. {
-                let d = cb.b - cb.a;
-                let l = d.len();
-                if l > 6. {
-                    a += d * (2.5 / l);
-                    w *= 0.6;
-                }
+            let own = self
+                .cockpit_guns
+                .iter()
+                .min_by(|p, q| (p.0 - a).len().total_cmp(&(q.0 - a).len()));
+            if let Some(&(_, tip)) = own.filter(|g| (g.0 - a).len() < 4.) {
+                a = tip;
+                w *= 0.6;
             }
             b.fx(Fx::Beam, true, &beam_mat(a, cb.b, w), cb.col, 1.);
         }
@@ -777,6 +819,7 @@ impl Scene {
     ) -> M4 {
         let vp = M4::persp(fov, w as f32 / h as f32, 0.5, 2000.) * M4::look_at(eye, eye + dir, up);
         self.eye = eye;
+        self.cockpit_guns.clear();
         self.right = dir.cross(up).norm();
         self.up = self.right.cross(dir).norm();
         let fog = fog_of(g);
