@@ -574,6 +574,12 @@ fn decide_fire(g: &mut Game, id: MechId, dist: f32, to_yaw: f32, dt: f32) {
 
 /// One enemy, one frame.
 pub fn think(g: &mut Game, id: MechId, dt: f32) {
+    // Knocked down: it does nothing but mash (the update loop does that).
+    if g.mechs[id].down.is_some() {
+        let e = &mut g.mechs[id];
+        (e.throttle, e.jetting, e.beam_on) = (0., false, false);
+        return;
+    }
     let belief = perceive(g, id);
     let tid = foe(g, id);
     let e = &g.mechs[id];

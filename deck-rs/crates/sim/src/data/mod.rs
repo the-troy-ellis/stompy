@@ -748,6 +748,19 @@ pub static FIST_CHAIN: ChainDef = ChainDef {
 /// How far off the aim a mech may stand and still count as in a chained punch's line, for the
 /// HUD's PUNCH and the AI's decision (the ball itself hits only what it meets).
 pub const CHAIN_ARC: f32 = 10. * PI / 180.;
+/// Knockdown (specs/06-knockdown.md): the fall's time and how far over it ends (radians), how far
+/// the hips drop (by hip height), the presses of A from flat to up, how long after the last press
+/// the heaves start to sag back and how fast, how far the heaves lift the body before it rises,
+/// how long the rise takes, and the AI's presses a second by difficulty.
+pub const DOWN_FALL: f32 = 0.6;
+pub const DOWN_ANGLE: f32 = 1.35;
+pub const DOWN_DROP: f32 = 0.12;
+pub const MASH_PRESSES: f32 = 8.;
+pub const MASH_GRACE: f32 = 0.5;
+pub const MASH_SAG: f32 = 0.15;
+pub const DOWN_HEAVE: f32 = 0.35;
+pub const DOWN_RISE: f32 = 0.9;
+pub const AI_MASH: [f32; Diff::N] = [3., 4.5, 6.];
 /// While staggered: the share of the turn rate left, and how far the hips sag (metres, by scale).
 pub const STAGGER_TURN: f32 = 0.3;
 pub const STAGGER_SAG: f32 = 0.6;
@@ -1041,7 +1054,8 @@ pub const KNUCKLES_MULT: f32 = 1.5;
 // --- the feel table (docs/specs/01-thunk.md) ----------------------------------------------------
 keyed!(/// Every event that is felt.
     Feel { Step, NearStep, Blastoff, Land, FireAc, FireGauss, FireMg, FireBolt, Bolt, FireLrm, Hit, Shutdown, Restart,
-        SectionLost, Death, Explosion, Punch, Punched, Stomp, Whiff, Blast, FusionFire, Wrecked });
+        SectionLost, Death, Explosion, Punch, Punched, Stomp, Whiff, Blast, FusionFire, Wrecked,
+        Knocked, Heave, Up });
 /// One row: each column multiplied by the event's intensity.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FeelRow {
@@ -1134,6 +1148,12 @@ pub static FEEL: [FeelRow; Feel::N] = [
         sag: 0.,
         ..fr(1.8, 0., 1.2, 0.6, 0.55, 0.35, 1.8, 1.8, 1.0, 5., 320., 0.)
     },
+    // knocked: the body hitting the ground after a wrecking ball, the slam of a demigod going over.
+    fr(1.6, 0., 1.1, 0.3, 0., 0.4, 1.2, 1.6, 0.8, 6., 280., 0.),
+    // heave: one press of the mash, shoving part of the way up.
+    fr(0.35, 0., 0.15, 0., 0., 0.12, 0.3, 0.45, 0., 0.5, 60., 0.),
+    // up: on its feet again, the feet planting.
+    fr(0.7, 0., 0.3, 0., 0., 0.3, 0.5, 1.0, 0.2, 3., 120., 0.),
 ];
 pub fn feel_row(e: Feel) -> &'static FeelRow {
     &FEEL[e.i()]

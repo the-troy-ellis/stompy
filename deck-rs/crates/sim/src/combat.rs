@@ -152,6 +152,7 @@ fn begin_death(g: &mut Game, id: MechId) {
     let roll = g.rng.range(-0.6, 0.6);
     let m = &mut g.mechs[id];
     m.alive = false;
+    m.down = None;
     m.dying = Some(Dying {
         fall_yaw,
         roll,

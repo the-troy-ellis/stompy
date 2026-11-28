@@ -338,8 +338,9 @@ impl Scene {
         let (geo, sc) = (m.geo, m.ch.scale);
         let far = !arms_only && hypot2(m.x - self.eye.x, m.z - self.eye.z) > LOD_FAR;
         let lod = far as usize;
-        let base = if let Some(d) = m.dying {
-            // The legs buckle and the body topples about the ground under it.
+        let base = if let Some(d) = m.dying.or(m.down.map(|d| d.pose)) {
+            // The legs buckle and the body topples about the ground under it (dying, or
+            // knocked down: the same fall, without the dying).
             M4::t(m.x, m.y, m.z)
                 * M4::ry(d.fall_yaw)
                 * M4::rx(d.angle)
@@ -358,7 +359,9 @@ impl Scene {
         // The body's own walk on top (a bird's bob and sway, drawn only): the hips move, the
         // legs reach for the planted feet, and the feet stay put.
         let walk = match anim::profile(m.key()) {
-            Some(pr) if self.detail > 0 && m.dying.is_none() && !far => anim::body(pr, m),
+            Some(pr) if self.detail > 0 && m.dying.is_none() && m.down.is_none() && !far => {
+                anim::body(pr, m)
+            }
             _ => anim::Body::default(),
         };
         let base = base * M4::t(walk.sway, walk.bob, 0.) * M4::rz(walk.roll);
@@ -373,7 +376,7 @@ impl Scene {
             * M4::rx(m.wob_p.x - lean + m.torso_nod + m.run_lean)
             * M4::rz(m.wob_r.x);
         // The drawn-only motion: springs moved on, then read below.
-        let prof = if self.detail > 0 && m.dying.is_none() && !far {
+        let prof = if self.detail > 0 && m.dying.is_none() && m.down.is_none() && !far {
             anim::profile(m.key())
         } else {
             None
@@ -582,7 +585,7 @@ impl Scene {
                 continue;
             }
             let hp = base.apply(v3(l.hx, geo.hip, l.hz));
-            let ankle = if m.dying.is_some() {
+            let ankle = if m.dying.is_some() || m.down.is_some() {
                 base.apply(v3(l.fx, 0.2, l.fz))
             } else {
                 m.feet[i].pos + v3(0., geo.ankle * sc, 0.)
@@ -864,6 +867,20 @@ impl Scene {
                 p.yaw.cos() * lurch,
             );
         let mut roll = p.wob_r.x * wv * 0.6 + p.tilt_r.x * 0.5;
+        if let Some(d) = p.down {
+            // Knocked down: the view goes over with the body, the way it fell: back toward the
+            // sky, forward toward the ground, sideways onto its side.
+            let f = d.pose;
+            let rel = f.fall_yaw - p.view_yaw();
+            let (fwd, side) = (rel.cos(), rel.sin());
+            pitch -= f.angle * 0.85 * fwd;
+            roll += f.angle * 0.85 * side + f.roll * f.buckle * 0.5;
+            e.y -= f.drop + f.angle * 2.2 * p.ch.scale;
+            let (s, c) = (f.fall_yaw.sin(), f.fall_yaw.cos());
+            let out = f.angle.sin() * 2.5 * p.ch.scale;
+            e.x += s * out;
+            e.z += c * out;
+        }
         if let Some(f) = p.fallen.or(p.dying) {
             pitch -= f.angle * 0.9;
             roll += f.roll * 0.8 * f.buckle.max(if p.fallen.is_some() { 1. } else { 0. });

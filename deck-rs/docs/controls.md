@@ -16,7 +16,7 @@ here is in `crates/game/src/controls.rs` (pure, with unit tests) and
 | RB | Ballistic weapons, held. |
 | LT | Missiles. Tap to fire a volley; hold to fly it from the nose camera; let go to detonate. |
 | LB | OOPS BUTTON (the fusion cannon): hold the scan on one mech for three seconds. |
-| A | Jump jets: hold to charge, let go to blast off. Steer the flight with the left stick. |
+| A | Jump jets: hold to charge, let go to blast off. Steer the flight with the left stick. Knocked down: mash A to get up. |
 | B | Centre the torso over the legs. |
 | X | Next target (nearest first). |
 | Y | Zoom (toggle). |
@@ -76,7 +76,7 @@ Steam Input is set to turn the gyro into mouse motion instead (see
 | W, S | Throttle up and down. |
 | Mouse | Torso twist and pitch (relative mouse, captured while playing). |
 | Left button | Energy. Right button: ballistic. Middle button or F: missiles. G: OOPS BUTTON. |
-| Space | Jump jets (hold, let go). |
+| Space | Jump jets (hold, let go). Knocked down: mash Space to get up. |
 | E, mouse button 4 | Punch (PURPLE PUNCHER only). |
 | C | Centre torso. R: next target. Z: zoom. X: full stop. |
 | Escape | Pause; back in menus. Enter: pick. |

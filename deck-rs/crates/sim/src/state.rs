@@ -271,6 +271,7 @@ pub fn new_mech(g: &mut Game, ch: Ch, team: u8, x: f32, z: f32, yaw: f32) -> Opt
         scramble: 0.,
         flash: Flash::default(),
         dying: None,
+        down: None,
         fallen: None,
         ai,
     };

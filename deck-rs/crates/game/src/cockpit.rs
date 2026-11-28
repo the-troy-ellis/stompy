@@ -66,6 +66,8 @@ pub struct Reading {
     pub torso: f32,
     /// Shut down or dead: the iris twists shut and everything goes dark.
     pub off: bool,
+    /// Knocked down: the iris clamps.
+    pub down: bool,
 }
 impl Reading {
     pub fn of(m: &Mech) -> Reading {
@@ -75,6 +77,7 @@ impl Reading {
             fuel: m.fuel.clamp(0., 1.),
             torso: (m.hp[t] / m.max[t].max(1.)).clamp(0., 1.),
             off: !m.alive || m.shutdown,
+            down: m.down.is_some(),
         }
     }
     /// The tools' mockups: 0 cool, 1 hot, 2 critical, 3 shut down, 4 hurt; 5 on are moods (and 11,
@@ -92,6 +95,7 @@ impl Reading {
             fuel,
             torso,
             off,
+            down: false,
         }
     }
 }
@@ -196,7 +200,7 @@ pub fn dying(torso: f32) -> f32 {
 /// The mood, by priority: pain, then being close to destroyed (the strong ones), then a kill a
 /// beat ago (the joke comes after the fact), a fight, a lock, standing about.
 pub fn mood_for(r: &Reading, c: &Cue) -> Mood {
-    if c.struck {
+    if c.struck || r.down {
         Mood::Pain
     } else if r.torso < DYING {
         Mood::Worried

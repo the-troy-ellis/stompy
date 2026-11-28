@@ -938,3 +938,124 @@ fn a_wrecking_ball_on_you_is_the_hardest_feel_there_is() {
         assert!(row.haptic <= w.haptic && row.kick <= w.kick && row.bass <= w.bass);
     }
 }
+
+/// A PURPLE PUNCHER 30 m from the player, its ball thrown at it, run until it lands.
+fn wrecked_player(ch: Ch) -> Game {
+    let mut g = flat_game(ch, 9);
+    let e = foe(&mut g, Ch::Puncher, 0., 30., PI);
+    g.mechs[e].ai.target = Some(PLAYER);
+    g.mechs[e].ai.still = true; // it throws once and stands
+    g.mechs[e].hp[Sec::T.i()] = 500.;
+    g.pm().hp[Sec::T.i()] = 500.;
+    assert!(stompy_sim::melee::melee_press(&mut g, e));
+    for _ in 0..120 {
+        update(&mut g, &input(), DT);
+        if g.p().stagger > 0. {
+            break;
+        }
+    }
+    assert!(g.p().stagger > 0., "the ball lands");
+    g
+}
+#[test]
+fn a_wrecking_ball_knocks_two_legs_down_and_slowpoke_stands() {
+    let mut g = wrecked_player(Ch::Kestrel);
+    assert!(g.p().down.is_some(), "BARRY goes over");
+    steps(&mut g, &input(), 60);
+    let d = g.p().down.unwrap();
+    assert_eq!(d.phase, DownPhase::Lying, "on the ground");
+    assert!(stompy_sim::down::lie(g.p()) > 0.9 && g.p().top() < g.p().y + 6.);
+    let g = wrecked_player(Ch::Warden);
+    assert!(
+        g.p().down.is_none() && g.p().stagger > 0.9,
+        "SLOWPOKE: staggered, standing"
+    );
+}
+#[test]
+fn down_you_are_disabled_and_stay_down_without_mashing() {
+    let mut g = wrecked_player(Ch::Kestrel);
+    steps(&mut g, &input(), 60);
+    let (x, z, yaw) = (g.p().x, g.p().z, g.p().yaw);
+    let mut i = input();
+    (i.thr, i.turn, i.energy, i.ballistic, i.missile) = (1., 1., true, true, true);
+    g.events.clear();
+    steps(&mut g, &i, 300);
+    let p = g.p();
+    assert!(p.down.is_some(), "five seconds and still down");
+    assert!((p.yaw - yaw).abs() < 1e-4, "no turning");
+    // The knockback's slide settles; five seconds of a full stick would be 50 m and more.
+    assert!(hypot2(p.x - x, p.z - z) < 3., "no walking");
+    for k in ["laser", "cannon", "missile"] {
+        assert_eq!(sfx_count(&g, k), 0, "no {k}");
+    }
+}
+#[test]
+fn a_steady_mash_gets_you_up_and_a_slow_one_does_not() {
+    let mash = |every: usize, frames: usize| {
+        let mut g = wrecked_player(Ch::Kestrel);
+        steps(&mut g, &input(), 60);
+        for f in 0..frames {
+            let mut i = input();
+            i.jets = f % every < every / 2;
+            update(&mut g, &i, DT);
+            if g.p().down.is_none() {
+                return Some(f);
+            }
+        }
+        None
+    };
+    // Six presses a second: up in a couple of seconds.
+    let fast = mash(10, 300).expect("a steady mash gets up");
+    assert!(fast < 180, "up after {fast} frames");
+    // One press a second: three seconds of it, and still down.
+    assert!(mash(60, 180).is_none(), "a slow mash barely does");
+    // Holding A is one press.
+    let mut g = wrecked_player(Ch::Kestrel);
+    steps(&mut g, &input(), 60);
+    let mut i = input();
+    i.jets = true;
+    steps(&mut g, &i, 120);
+    assert!(g.p().down.unwrap().up <= 1. / MASH_PRESSES + 1e-4);
+}
+#[test]
+fn up_again_the_feet_plant_where_it_stands_and_it_walks() {
+    let mut g = wrecked_player(Ch::Kestrel);
+    steps(&mut g, &input(), 60);
+    for f in 0..300 {
+        let mut i = input();
+        i.jets = f % 8 < 4;
+        update(&mut g, &i, DT);
+        if g.p().down.is_none() {
+            break;
+        }
+    }
+    assert!(g.p().down.is_none(), "up");
+    let p = g.p();
+    for (k, f) in p.feet.iter().enumerate().take(p.geo.n_legs) {
+        assert!(
+            !f.lifted && hypot2(f.pos.x - p.x, f.pos.z - p.z) < 4. * p.ch.scale,
+            "foot {k}"
+        );
+    }
+    let mut i = input();
+    i.thr = 1.;
+    steps(&mut g, &i, 90);
+    assert!(g.p().speed > 1., "walking again");
+}
+#[test]
+fn a_knocked_down_ai_mashes_itself_up() {
+    let mut g = flat_game(Ch::Puncher, 9);
+    let j = foe(&mut g, Ch::Kestrel, 0., 30., PI);
+    g.mechs[j].hp[Sec::T.i()] = 500.;
+    g.mechs[j].ai.aware = true;
+    stompy_sim::down::knock_down(&mut g, j, [0., 1.]);
+    let mut up = None;
+    for f in 0..600 {
+        update(&mut g, &input(), DT);
+        if g.mechs[j].down.is_none() {
+            up = Some(f);
+            break;
+        }
+    }
+    assert!(up.is_some(), "it gets itself up");
+}

@@ -549,6 +549,16 @@ pub fn draw_hud(h: &mut Hud, gl: &mut Gl, g: &Game, vp: &M4, o: &HudOpts) {
         h.line(cx - k, cy - k, cx + k, cy + k, 2. * s, WHITE);
         h.line(cx - k, cy + k, cx + k, cy - k, 2. * s, WHITE);
     }
+    if let Some(d) = p.down {
+        // Knocked down: what to do, and how far the mashing has got.
+        h.text_c(cx, cy - 70. * s, 4. * s, "DOWN", RED);
+        if d.phase == DownPhase::Lying {
+            h.text_c(cx, cy + 40. * s, 2. * s, "MASH A TO GET UP", AMBER);
+            let (w, bh) = (180. * s, 8. * s);
+            h.rect(cx - w / 2., cy + 60. * s, w, bh, DIM);
+            h.rect(cx - w / 2., cy + 60. * s, w * d.up, bh, AMBER);
+        }
+    }
     if g.punch_ready {
         h.text_c(
             cx,

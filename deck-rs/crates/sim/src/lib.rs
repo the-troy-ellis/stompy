@@ -17,6 +17,7 @@ pub mod spring;
 pub mod ai;
 pub mod beams;
 pub mod combat;
+pub mod down;
 pub mod effects;
 pub mod feel;
 pub mod fusion;

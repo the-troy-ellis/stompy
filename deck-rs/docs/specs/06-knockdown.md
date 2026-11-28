@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Draft, asks open** (2026-11-28). Not built: the wrecking ball (#439) gets played on the Deck first. |
+| Status | **Built** (2026-11-28; the owner: "build now"). **Deck check: open.** |
 | Milestone | P1 (feel), after the wrecking ball has been played |
 | Depends on | `00-core.md` (melee, the stagger), `01-thunk.md`, `03-anim.md`, `05-cockpit.md` |
 
@@ -58,11 +58,37 @@ tiny robots under it.
 
 1. ~~What knocks a mech down?~~ **Answered:** only the wrecking ball, for now.
 2. ~~Getting up~~ **Answered:** you button-mash; it never gets up by itself.
-   Still to confirm: A (Space) as the button, and about eight presses.
+   Built with A (Space), eight presses from flat; to confirm on the Deck.
 3. ~~Down: helpless?~~ **Answered:** effectively disabled; nothing fires.
 4. ~~SLOWPOKE~~ **Answered:** a good thunk, never knocked down.
 5. **The other side.** Can you stomp a downed mech for extra (the honour of
-   the foot, at demigod scale)?
+   the foot, at demigod scale)? Built without: a downed mech is low, so a
+   stomp lands on it as on any mech, for the stomp's own damage.
+
+## As built
+
+- `sim/down.rs`. A wrecking ball that lands knocks down any two-legged mech
+  on the ground (`can_fall`); SLOWPOKE takes the stagger and stands.
+- **Falling** (0.6 s): the legs buckle and it goes over the way the ball
+  pushed it, to 1.35 rad (`DOWN_ANGLE`), drawn as a death's topple without
+  the dying; then the slam (the `knocked` row: an eye drop 1.6, the view
+  shaken, a deep thump, 280 ms of rumble, dust; a landing and a clang).
+- **Lying**: no walking, turning, aiming, punching, jets or guns; for the
+  player only A does anything. Each press (a hold counts once) heaves it an
+  eighth of the way up (`MASH_PRESSES`) with the `heave` row (a thump, a
+  lurch, a short rumble) and a footfall sound, and lifts the body a little;
+  half a second after the last press the heaves sag back at 0.15 a second.
+  The AI mashes 3, 4.5 or 6 times a second by difficulty, thinking or not.
+  It sits low: its top and its centre drop with the lean, so shots and
+  stomps meet it where it lies.
+- **Rising** (0.9 s): it comes back up, the feet plant afresh where it
+  stands (`init_feet`), the `up` row (a thump, the feet's dust) and a
+  landing. A death while down takes over.
+- **From inside**: the view goes over with the body (back toward the sky,
+  forward toward the ground, sideways onto its side), lowered and moved the
+  way it fell; the iris clamps (pain) while down; the HUD shows DOWN, MASH A
+  TO GET UP and a bar of the heaves. Getting up, it comes back level.
+- The demo pilot mashes too.
 
 ## Acceptance criteria
 

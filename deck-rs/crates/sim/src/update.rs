@@ -76,6 +76,12 @@ fn drive(g: &mut Game, i: &Input, dt: f32) {
         p.jetting = false;
         return;
     }
+    // Knocked down: nothing but the mash (A) to get back up.
+    if p.down.is_some() {
+        (p.throttle, p.jetting) = (0., false);
+        crate::down::mash_input(g, i.jets);
+        return;
+    }
     // The stick is the throttle: let go and it drops to zero (the owner, 2026-11-28); the legs'
     // own inertia still eases the speed in and out.
     let thr = clamp(i.thr, -1., 1.);
@@ -173,7 +179,8 @@ pub fn update(g: &mut Game, i: &Input, dt: f32) {
     }
     g.punch_ready =
         live && can_punch(g, PLAYER) && g.p().melee.is_none() && melee_target(g, PLAYER).is_some();
-    let armed = live && g.p().melee.is_none(); // no guns during a swing or its recovery
+    // No guns during a swing or its recovery, or while knocked down.
+    let armed = live && g.p().melee.is_none() && g.p().down.is_none();
     let guiding = g.guide.is_some();
     g.pm().beam_on = armed && i.energy && !guiding;
     fusion_tick(g, PLAYER, dt, armed && i.fusion && !guiding);
@@ -187,6 +194,10 @@ pub fn update(g: &mut Game, i: &Input, dt: f32) {
     steer_volley(g, dt);
 
     for id in 0..g.mechs.len() {
+        // A knocked-down AI mashes to get up, at a rate set by difficulty, thinking or not.
+        if id != PLAYER && g.mechs[id].down.is_some() && g.rng.chance(AI_MASH[g.diff.i()] * dt) {
+            crate::down::mash(g, id);
+        }
         // Every mech but the player's thinks, on either side.
         if id != PLAYER && g.mechs[id].alive {
             if g.mechs[id].ai.still {
@@ -199,6 +210,7 @@ pub fn update(g: &mut Game, i: &Input, dt: f32) {
         if g.mechs[id].alive {
             step_mech(g, id, dt);
             melee_tick(g, id, dt);
+            crate::down::down_tick(g, id, dt);
         }
         if g.mechs[id].alive && g.mechs[id].beam_on {
             let aim = if id == PLAYER {

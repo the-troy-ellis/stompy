@@ -167,6 +167,29 @@ pub enum SwingPhase {
     Windup,
     Recover,
 }
+/// Knocked down: falling, lying until mashed up, rising. `pose` is the body's lean, drawn like a
+/// death's topple (without the dying).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DownPhase {
+    #[default]
+    Falling,
+    Lying,
+    Rising,
+}
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Down {
+    pub phase: DownPhase,
+    pub t: f32,
+    pub pose: Dying,
+    pub buckle: f32,
+    /// How far the mashing has heaved it up, 0 to 1 (up).
+    pub up: f32,
+    pub last_press: f32,
+    /// The player's A last frame, so a hold counts once.
+    pub held: bool,
+    /// Rising, 0 to 1.
+    pub rise: f32,
+}
 /// A wrecking-ball fist on its chain: which arm, which way it flies, how far out it is, whether
 /// it is coming back, and where it is.
 #[derive(Clone, Copy, Debug)]
@@ -358,6 +381,8 @@ pub struct Mech {
     pub scramble: f32,
     pub flash: Flash,
     pub dying: Option<Dying>,
+    /// Knocked down (a wrecking ball): disabled until mashed back up.
+    pub down: Option<Down>,
     /// Your own view stays where the fall left it until the debrief.
     pub fallen: Option<Dying>,
     pub ai: Ai,
@@ -379,7 +404,9 @@ impl Mech {
         self.geo.radius * self.ch.scale
     }
     pub fn top(&self) -> f32 {
-        self.y + self.geo.height * self.ch.scale
+        // Lying down, it's low.
+        let lie = self.down.map_or(0., |d| d.pose.angle / DOWN_ANGLE);
+        self.y + self.geo.height * self.ch.scale * (1. - 0.65 * lie)
     }
 }
 

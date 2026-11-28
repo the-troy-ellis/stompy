@@ -106,7 +106,7 @@ pub fn step_mech(g: &mut Game, id: MechId, dt: f32) {
     }
     // A wrecking ball's stagger: the legs won't walk until it passes.
     m.stagger = (m.stagger - dt).max(0.);
-    let target = if !m.alive || m.shutdown || m.stagger > 0. {
+    let target = if !m.alive || m.shutdown || m.stagger > 0. || m.down.is_some() {
         0.
     } else {
         m.throttle * max_s

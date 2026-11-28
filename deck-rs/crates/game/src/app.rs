@@ -773,6 +773,11 @@ impl App {
 // --- the loop -------------------------------------------------------------------------------------------
 /// A pilot for the tools' screenshots: walks at the nearest foe, aims the torso at it, fires what's in range.
 fn demo_pilot(g: &mut Game, i: &mut Input) {
+    if g.p().down.is_some() {
+        // Knocked down: mash A, about six presses a second.
+        i.jets = (g.frame / 5).is_multiple_of(2);
+        return;
+    }
     let p = g.p();
     let Some((t, d)) = g
         .mechs

@@ -59,6 +59,7 @@ pub fn wrist(m: &Mech, arm: Sec) -> V3 {
 pub fn can_punch(g: &Game, id: MechId) -> bool {
     let m = &g.mechs[id];
     punches(m)
+        && m.down.is_none()
         && m.alive
         && !m.shutdown
         && m.melee.is_none()
@@ -244,6 +245,8 @@ fn wreck(g: &mut Game, id: MechId, t: MechId, at: V3, dir: V3, c: &ChainDef) {
     let v = knock(g, t, Some(id), def.knock, [nx, nz], true);
     g.mechs[id].heat += def.heat;
     g.mechs[t].stagger = g.mechs[t].stagger.max(c.stagger);
+    // Two legs go over; SLOWPOKE's four take it and stand.
+    crate::down::knock_down(g, t, [nx, nz]);
     let side = sign(nx * tyaw.cos() - nz * tyaw.sin());
     let side = if side == 0. { 1. } else { side };
     feel(

@@ -40,7 +40,7 @@ better on the way, not the same code.
 | Walking, torso twist, feet that never slide, gaits by body plan | specs 13, 16 | **built** | P1 (tune) |
 | Heat, sections, the four weapon kinds, OOPS BUTTON, missile locks | spec 06 | **built** | P1 (tune) |
 | Punch (PURPLE PUNCHER's wrecking balls, theirs alone), stomp; blast-off jets, the insta-stomp | specs 12, 26 | **built** | P1 (tune) |
-| Knockdown: falling over and getting up | (new) | **draft, asks open** (specs/06-knockdown.md) | P1, after the wrecking ball is played |
+| Knockdown: falling over and getting up (the wrecking ball; mash A to get up) | (new) | **built** (specs/06-knockdown.md) | P1 (tune) |
 | AI profiles, three difficulties; sides fight sides | spec 05 | **built** | P1 (tune) |
 | Thunk: feel table, camera, body, sub-bass, rumble | spec 13 | **built**, not yet tuned on the Deck | P1 |
 | Six combat demigods, eleven weapons | spec 06 | **built** | P1 |

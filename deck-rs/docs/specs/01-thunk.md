@@ -36,7 +36,8 @@ felt through the ground within 40 m), blastoff, land (k = the landing force),
 fireAc, fireGauss, fireMg, fireBolt, bolt, fireLrm, hit (k = damage / 10 by
 section: legs 1.2, torso 1, arms 0.7), shutdown (the sag), restart (the
 overshoot), sectionLost, death, explosion (by distance), punch, punched,
-stomp, whiff, blast (the push), fusionFire, wrecked.
+stomp, whiff, blast (the push), fusionFire, wrecked, knocked (the slam of a
+knockdown), heave (a press of the mash), up (on its feet again).
 
 ## The rumble
 
