@@ -24,8 +24,10 @@ const CHARGE: [f32; 3] = [0.45, 1., 0.85];
 
 /// The porthole: an oval window this wide and tall at this distance from the eye.
 const WIN: [f32; 3] = [0.88, 0.5, 1.0];
-/// The tag's hook, at the top of the window.
-const HOOK: [f32; 3] = [0.14, 0.64, 1.02];
+/// The tag's hook, at the top of the window, outside the eyelids: they close over it.
+const HOOK: [f32; 3] = [0.14, 0.62, 1.2];
+/// How far the tag may swing in toward the eye before it would touch the lids.
+const TAG_IN: f32 = 0.3;
 /// The eyelids slide just behind the lip, so the ring covers their edges.
 const LID_Z: f32 = 1.03;
 /// The heat coils: a row of fins across the bottom of the eye.
@@ -58,7 +60,8 @@ impl Reading {
             off: !m.alive || m.shutdown,
         }
     }
-    /// The tools' mockups: 0 cool, 1 hot, 2 critical, 3 shut down, 4 hurt; 5 on are moods, cool.
+    /// The tools' mockups: 0 cool, 1 hot, 2 critical, 3 shut down, 4 hurt; 5 on are moods (and 11,
+    /// 12 a blink), cool.
     pub fn pose(n: u8) -> Reading {
         let (heat, fuel, torso, off) = match n {
             1 => (0.72, 0.6, 1., false),
@@ -106,10 +109,10 @@ impl Mood {
         })
     }
 }
-/// The lids' shape. `top` and `bot` are how far each closes, 0 open to 1 at the middle of the eye
-/// (a blink takes the top lid a little past it to meet the bottom one). `tilt` turns the top
-/// lid's halves about their outer ends, inner ends down (a V) when positive; `smile` turns the
-/// bottom lid's halves, inner ends up (an arch) when positive.
+/// The lids' shape. `top` and `bot` are how far each closes, 0 open to 1 at the middle of the eye.
+/// `tilt` turns the top lid's halves: positive about their outer ends, the inner ends down (a V);
+/// negative about the middle, the outer ends down (a tent). `smile` turns the bottom lid's the
+/// same way: positive, the inner ends up (an arch); negative, the outer ends up.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Face {
     pub top: f32,
@@ -125,12 +128,12 @@ pub fn face(m: Mood) -> Face {
         smile,
     };
     match m {
-        Mood::Relaxed => f(0.2, 0.08, 0., 0.),
-        Mood::Glare => f(0.3, 0.18, 0.24, 0.),
-        Mood::Lock => f(0.24, 0.12, 0.13, 0.),
-        Mood::Worried => f(0.62, 0.14, -0.3, -0.06),
-        Mood::Pleased => f(0.22, 0.4, -0.04, 0.18),
-        Mood::Sleepy => f(0.54, 0.18, -0.08, 0.),
+        Mood::Relaxed => f(0.12, 0.06, 0., 0.),
+        Mood::Glare => f(0.22, 0.1, 0.2, 0.),
+        Mood::Lock => f(0.16, 0.08, 0.1, 0.),
+        Mood::Worried => f(0.16, 0.06, -0.24, 0.),
+        Mood::Pleased => f(0.14, 0.3, 0., 0.16),
+        Mood::Sleepy => f(0.34, 0.1, -0.07, 0.),
         Mood::Surprised => f(-0.06, -0.06, -0.04, 0.),
     }
 }
@@ -166,9 +169,9 @@ pub fn mood_for(r: &Reading, c: &Cue) -> Mood {
         Mood::Relaxed
     }
 }
-/// How far the heat squints the eye, 0 to 0.36, as it climbs past 55.
+/// How far the heat squints the eye, 0 to 0.3, as it climbs past 55.
 pub fn squint(heat: f32) -> f32 {
-    0.36 * smooth((heat - 0.55) / 0.42)
+    0.3 * smooth((heat - 0.55) / 0.42)
 }
 /// The lids for a reading and a mood: the mood's face, the heat's squint over it, and shut flat
 /// when the machine is off.
@@ -280,11 +283,11 @@ fn crack(b: &mut Builder, from: V3, dir: f32, steps: usize, seed: f32, branch: b
 }
 /// How near the middle of the eye a lid's lip may come outside a blink, so no face covers the
 /// crosshair.
-const CLEAR: f32 = 0.16;
-/// Where the lids' outer ends sit (top, bottom: heights in the window) and how far each pair's
-/// halves turn, for a face `[top, bot, tilt, smile]`. The turn is held back so the lips' inner
-/// ends stay `CLEAR` of the middle: a glare flattens as the heat squints the eye, rather than
-/// closing over what it glares at.
+const CLEAR: f32 = 0.24;
+/// Where the lids' hinged ends sit (top, bottom: heights in the window) and how far each pair's
+/// halves turn, for a face `[top, bot, tilt, smile]`. A V or an arch is held back so the lips'
+/// inner ends stay `CLEAR` of the middle: a glare flattens as the heat squints the eye, rather
+/// than closing over what it glares at. (A tent turns about the middle, which stays put.)
 pub fn lid_edges([top, bot, tilt, smile]: [f32; 4]) -> [f32; 4] {
     let open = WIN[1] * 1.04;
     let (top_y, bot_y) = (open * (1. - top), -open * (1. - bot));
@@ -304,12 +307,14 @@ pub fn lid_edges([top, bot, tilt, smile]: [f32; 4]) -> [f32; 4] {
         },
     ]
 }
-/// A blink's sweep, `t` seconds in: down and back up in 0.16 s, 0 outside it.
+/// A blink, `t` seconds in: a shutter, not a lid. It snaps shut in 0.05 s, holds, and opens in
+/// 0.1 s; 0 outside it.
 fn blink(t: f32) -> f32 {
-    if (0.0..0.16).contains(&t) {
-        1. - (t / 0.08 - 1.).abs()
-    } else {
-        0.
+    match t {
+        t if (0.0..0.05).contains(&t) => t / 0.05,
+        t if (0.05..0.08).contains(&t) => 1.,
+        t if (0.08..0.18).contains(&t) => 1. - (t - 0.08) / 0.1,
+        _ => 0.,
     }
 }
 impl Cockpit {
@@ -356,11 +361,21 @@ impl Cockpit {
         for s in [1., -1.] {
             for h in [1., -1.] {
                 b.bbox(
-                    M4::t(h * 0.45, s * 0.38, 0.),
-                    v3(1.1, 0.76, 0.03),
+                    M4::t(h * 0.5, s * 0.38, 0.),
+                    v3(1.0, 0.76, 0.03),
                     0.01,
                     1.,
                     STEEL,
+                );
+                // A slanted tail past the middle: when the halves tent (a blink, a worry), their
+                // inner edges lean apart, and the tails cover the gap.
+                b.tri(
+                    v3(0., 0., -0.012),
+                    v3(0., s * 0.76, -0.012),
+                    v3(h * -0.55, s * 0.76, -0.012),
+                    STEEL,
+                    Some(v3(0., 0., 5.)),
+                    false,
                 );
                 b.rod(
                     v3(h * -0.02, 0., -0.02),
@@ -467,24 +482,24 @@ impl Cockpit {
         crack(&mut b, v3(-0.1, 0.42, z), -1.3, 8, 11., true);
         let c3 = b.upload(gl);
 
-        // The tag: three links of chain down from the hook, then the plate, in the accent.
+        // The tag: six links of chain down from the hook, then the plate, in the accent.
         let acc = chassis(Ch::Kestrel).acc;
         let dk = [acc[0] * 0.5, acc[1] * 0.5, acc[2] * 0.5];
-        for k in 0..3 {
+        for k in 0..6 {
             let y = -0.025 - k as f32 * 0.045;
             let m = M4::t(0., y, 0.) * M4::ry(k as f32 * 1.57);
             b.bbox(m, v3(0.012, 0.04, 0.02), 0.003, 1., STEEL_LT);
         }
-        b.bbox(M4::t(0., -0.19, 0.), v3(0.075, 0.1, 0.008), 0.008, 1., acc);
+        b.bbox(M4::t(0., -0.33, 0.), v3(0.075, 0.1, 0.008), 0.008, 1., acc);
         b.bbox(
-            M4::t(0., -0.175, -0.006),
+            M4::t(0., -0.315, -0.006),
             v3(0.05, 0.008, 0.004),
             0.002,
             1.,
             dk,
         );
         b.bbox(
-            M4::t(0., -0.2, -0.006),
+            M4::t(0., -0.34, -0.006),
             v3(0.04, 0.008, 0.004),
             0.002,
             1.,
@@ -573,7 +588,7 @@ impl Cockpit {
             self.struck_till = time + 0.3;
         }
         let struck = self.struck_till > time;
-        if time >= self.blink_at + 0.16 {
+        if time >= self.blink_at + 0.18 {
             // The next blink, 2.5 to 6.5 seconds on.
             self.blinks += 1;
             let h = (self.blinks as f32 * 12.9898).sin() * 43758.547;
@@ -615,7 +630,7 @@ impl Cockpit {
             self.swing_z.v += lim(-acc.dot(up)).max(0.) * 0.006 * dt * sway;
             self.swing_x.step(dt, 0.);
             self.swing_z.step(dt, 0.);
-            self.swing_x.x = self.swing_x.x.clamp(-0.9, 0.9);
+            self.swing_x.x = self.swing_x.x.clamp(-0.9, TAG_IN);
             self.swing_z.x = self.swing_z.x.clamp(-0.9, 0.9);
             // The face: toward the mood's shape, with the heat's squint over it.
             let f = lids_for(&r, mood);
@@ -652,20 +667,25 @@ impl Cockpit {
         gl.draw_plain(&self.coils, &view);
         gl.draw_plain(&self.caps, &view);
         // The lids, from behind the ring toward the middle of the eye, each half turned about
-        // its outer end. A blink sweeps the top lid down past the middle to meet the bottom one.
-        let k = if pose.is_some() || r.off {
-            0.
-        } else {
-            blink(time - self.blink_at)
+        // its outer end (a V, an arch) or the middle (a tent). A blink is an aperture: both lids
+        // snap to the middle, their outer ends leading, so the eye closes as a shrinking diamond.
+        let k = match pose {
+            Some(11) => 0.5, // the tools' mockups: a blink half shut, nearly shut
+            Some(12) => 0.85,
+            Some(_) => 0.,
+            None if r.off => 0.,
+            None => blink(time - self.blink_at),
         };
         let [top_y, tilt, bot_y, smile] = lid_edges(self.face.map(|sp| sp.x));
-        let (top_y, bot_y) = (top_y + (-0.1 - top_y) * k, bot_y + (-0.1 - bot_y) * k);
-        let (tilt, smile) = (tilt * (1. - k), smile * (1. - k));
+        let (top_y, bot_y) = (top_y * (1. - k), bot_y * (1. - k));
+        let d = (k * 2.).min(1.);
+        let (tilt, smile) = (tilt + (-0.4 - tilt) * d, smile + (-0.4 - smile) * d);
+        let pivot = |a: f32, h: f32| if a > 0. { h } else { 0. };
         let halves = [
-            (top_y, 1., tilt, 0.),
-            (top_y, -1., -tilt, 0.004),
-            (bot_y, 1., -smile, 0.),
-            (bot_y, -1., smile, 0.004),
+            (top_y, pivot(tilt, 1.), tilt, 0.),
+            (top_y, pivot(tilt, -1.), -tilt, 0.004),
+            (bot_y, pivot(smile, 1.), -smile, 0.),
+            (bot_y, pivot(smile, -1.), smile, 0.004),
         ];
         for (mesh, (y, h, a, dz)) in self.lids.iter().zip(halves) {
             let at = view * M4::t(h, y, LID_Z + dz) * M4::rz(a) * M4::t(-h, 0., 0.);
@@ -749,10 +769,10 @@ mod tests {
             "a V and the other way"
         );
         assert!(
-            pleased.smile > 0.15 && pleased.bot > 0.3,
+            pleased.smile > 0.15 && pleased.bot > 0.25,
             "the bottom lid rises in an arch"
         );
-        assert!(face(Mood::Sleepy).top > 0.45, "a heavy droop");
+        assert!(face(Mood::Sleepy).top > 0.3, "a droop");
         assert!(
             face(Mood::Surprised).top < face(Mood::Relaxed).top,
             "wide open"
@@ -812,21 +832,25 @@ mod tests {
                 };
                 let f = lids_for(&r, m);
                 let [top_y, tilt, bot_y, smile] = lid_edges([f.top, f.bot, f.tilt, f.smile]);
-                // The lips' inner ends, one unit in from the hinges.
-                let (top_mid, bot_mid) = (top_y - tilt.sin(), bot_y + smile.sin());
+                // The lips' inner ends, one unit in from the hinges (a tent turns about them).
+                let (top_mid, bot_mid) = (top_y - tilt.max(0.).sin(), bot_y + smile.max(0.).sin());
                 assert!(
-                    top_mid > 0.12 && bot_mid < -0.12,
+                    top_mid > 0.2 && bot_mid < -0.2,
                     "{m:?} at {heat}: {top_mid} {bot_mid}"
                 );
             }
         }
     }
     #[test]
-    fn a_blink_closes_and_opens_in_a_sixth_of_a_second() {
+    fn a_blink_snaps_shut_holds_and_opens() {
         assert_eq!(blink(-0.01), 0.);
-        assert!(blink(0.08) > 0.99);
-        assert!(blink(0.04) > 0.4 && blink(0.12) > 0.4);
-        assert_eq!(blink(0.17), 0.);
+        assert!(
+            (blink(0.025) - 0.5).abs() < 0.01,
+            "shut in a twentieth of a second"
+        );
+        assert_eq!(blink(0.06), 1.);
+        assert!((blink(0.13) - 0.5).abs() < 0.01, "open again over a tenth");
+        assert_eq!(blink(0.19), 0.);
     }
     #[test]
     fn the_coils_go_from_cold_steel_through_red_and_orange_to_near_white() {

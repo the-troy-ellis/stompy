@@ -44,10 +44,17 @@ own; the mockups (window shapes for all six) came first.
 
   Over every face the heat squints the eye as it climbs past 55; shut down
   (or dead), the lids slam shut flat. A small hit flinches the lids for a
-  moment. A blink, top lid down to meet the bottom, every 2.5 to 6.5 s.
-  The faces move on springs. **No face covers the crosshair**: the lips'
-  inner ends stay 0.16 clear of the middle, so a glare flattens as the
-  heat squints the eye rather than closing over what it glares at (test).
+  moment. The faces move on springs, and are kept gentle (the owner,
+  2026-11-28: some blocked the view too much). **No face covers the
+  middle of the view**: the lips stay 0.24 clear of it however hot, so a
+  glare flattens as the heat squints the eye rather than closing over what
+  it glares at (test). A V or an arch turns each half about its outer end;
+  a tent turns it about the middle.
+- **The blink is an aperture**, not a human blink (the owner liked the
+  blink, and asked for it more like an aperture): every 2.5 to 6.5 s both
+  lids snap to the middle in 0.05 s, outer ends leading, so the eye closes
+  as a shrinking diamond; it holds a moment and opens over 0.1 s. Slanted
+  tails on the plates cover the middle as the halves tent.
 - **Heat coils**: a row of fins across the bottom of the eye: cold steel,
   then dull red, orange, and near white at shutdown, flickering when
   critical, with puffs of steam rising and thinning out. Shut down, they
@@ -58,12 +65,16 @@ own; the mockups (window shapes for all six) came first.
 - **Cracks** spread across the eye in three stages as the torso drops below
   three quarters, a half and a quarter.
 - **The maintenance tag** the tiny robots tied on, in BARRY's accent, on
-  three links of chain from a hook at the top of the eye. It swings on two
+  six links of chain from a hook at the top of the eye, outside the
+  eyelids, so they close over it (it never swings in far enough to touch
+  them). It swings on two
   springs, pushed by the head's jolts (sideways, fore and aft), by its turns
   and tips (the head rotates under the hook), and a little by each
   footfall's drop.
 - The cockpit's own arms (bug 2's fix) still reach in from the lower
-  corners and fire from their tips; the eye was sized so they show.
+  corners and fire from their tips; the eye was sized so they show. Only
+  the guns (or fists) are drawn from inside: the shoulder drums and upper
+  arms floated in view (the owner, 2026-11-28).
 - The green HUD stays on top of it all.
 
 ## The rest (next)
@@ -83,6 +94,7 @@ pilot's.
    through red and orange to near white (tests: `cockpit::tests`).
 2. Screenshots of the states (`--cockpit-pose 0` to `4`: cool, hot,
    critical, shut down, hurt) and the faces (`5` glare, `6` worried, `7`
-   pleased, `8` sleepy, `9` surprised, `10` locked), and a clip in the PR.
+   pleased, `8` sleepy, `9` surprised, `10` locked; `11` and `12` a blink
+   half and nearly shut), and a clip in the PR.
 3. On the Deck: it feels like being inside BARRY, the view is not cramped,
    and the face reads without getting in the way. **Deck check: open.**
