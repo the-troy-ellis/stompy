@@ -21,6 +21,10 @@ and the few words on screen keep the board-book voice.
   machinery. They call it summoning; it is manufacture. The reverence is
   theirs, and the deadpan is in the gap between the two.
 
+- **Giants fight giants; tiny robots are the crowd** (the owner). Battles
+  are demigod against demigod. The tiny robots are the cities' people and
+  workforce: they carry ore and salvage, cheer their own demigods and
+  scatter from the other city's, but they don't fight.
 - **The rite** (the owner, for its tone): **"Ore to ore."** and **"Smelt
   me into thy image."** The dead feed the living: salvage is smelted into the
   next demigod, literally, in the temple's smelter. The one place the flat
@@ -108,20 +112,16 @@ and dry: "Relic recovered. The faithful are pleased."
 
 ## Open
 
-1. **The battles:** demigod against demigod with the tiny robots as crowd
-   and workforce, or tiny robots fighting too, in armies underfoot? (It
-   sets the big-battle target: tens of giants and thousands of small ones,
-   or hundreds of giants.)
-2. **Your own tiny robots underfoot:** flattened if you're careless, or
+1. **Your own tiny robots underfoot:** flattened if you're careless, or
    always scrambling clear?
-3. **The construction machines:** is BIG SCOOPER a demigod of digging, with
+2. **The construction machines:** is BIG SCOOPER a demigod of digging, with
    the tiny robots doing the small work, or do tiny robots do it all?
-4. **Which needs become systems:** power (a Spark deep in the ground,
+3. **Which needs become systems:** power (a Spark deep in the ground,
    beside ore), memory (relics unlock demigods), protection (the loop
    itself)? The rest stays flavour.
-5. **Worship:** flavour only (the tiny robots' view of the factory), or
+4. **Worship:** flavour only (the tiny robots' view of the factory), or
    a resource (devotion, say, as how hard the tiny robots work)?
-6. **The tiny robots' manner:** beeping, squabbling characters of their
+5. **The tiny robots' manner:** beeping, squabbling characters of their
    own, or a simple crowd?
-7. **Salvage vs ore, one temple vs many, summoning time, summoning only at
+6. **Salvage vs ore, one temple vs many, summoning time, summoning only at
    home:** the proposals above.
