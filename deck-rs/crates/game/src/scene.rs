@@ -42,6 +42,8 @@ pub struct Scene {
     pub detail: u8,
     /// Each mech's drawn-only motion (`anim.rs`), by index.
     anims: Vec<Option<Anim>>,
+    /// Each knocked-down mech's ragdoll, from the blow until it has settled (drawn only).
+    rags: Vec<Option<anim::Rag>>,
 }
 /// A fixed camera instead of the cockpit (the menu's turntable).
 pub struct Cam {
@@ -274,6 +276,7 @@ impl Scene {
             cell: 2,
             detail: 2,
             anims: vec![],
+            rags: vec![],
         }
     }
     /// Builds a chassis's models the first time it is drawn: the full one and the plain one.
@@ -352,7 +355,7 @@ impl Scene {
         let lod = far as usize;
         // Knocked down: a boxer's fall and get-up, posed (anim::down_pose).
         let dp = if m.dying.is_none() {
-            anim::down_pose(m)
+            anim::down_pose(m, self.rags.get(id).and_then(|r| r.as_ref()))
         } else {
             None
         };
@@ -608,7 +611,7 @@ impl Scene {
             let ankle = if let Some(d) = &dp {
                 // Down: the feet where the pose puts them, on the ground.
                 let f = d.feet[i.min(1)];
-                down_frames(m, d).1.apply(v3(f[0], geo.ankle, f[1]))
+                down_frames(m, d).1.apply(v3(f[0], geo.ankle + f[1], f[2]))
             } else if m.dying.is_some() {
                 base.apply(v3(l.fx, 0.2, l.fz))
             } else {
@@ -899,7 +902,8 @@ impl Scene {
             roll += f.roll * 0.8 * f.buckle.max(if p.fallen.is_some() { 1. } else { 0. });
             e.y -= f.drop + if p.fallen.is_some() { f.angle * 2. } else { 0. };
         }
-        if let Some(d) = anim::down_pose(p).filter(|_| p.dying.is_none()) {
+        let rag = self.rags.get(PLAYER).and_then(|r| r.as_ref());
+        if let Some(d) = anim::down_pose(p, rag).filter(|_| p.dying.is_none()) {
             // Knocked down: the eye rides the body through the fall, the lying and the get-up,
             // shaken as usual.
             let (base, _) = down_frames(p, &d);
@@ -952,6 +956,22 @@ impl Scene {
         vp
     }
     /// The match, from the cockpit (or a fixed camera). Returns the view-projection, for the HUD.
+    /// A ragdoll for each mech just knocked down, stepped once a frame; gone when it's up.
+    fn step_rags(&mut self, g: &Game) {
+        if self.rags.len() < g.mechs.len() {
+            self.rags.resize_with(g.mechs.len(), || None);
+        }
+        for (id, m) in g.mechs.iter().enumerate() {
+            match (&mut self.rags[id], m.down) {
+                (slot @ None, Some(d)) if d.phase == DownPhase::Falling => {
+                    *slot = Some(anim::Rag::struck(g.time));
+                }
+                (Some(r), Some(_)) => r.step(m, g.time),
+                (slot, None) => *slot = None,
+                _ => {}
+            }
+        }
+    }
     pub fn render(
         &mut self,
         gl: &mut Gl,
@@ -961,6 +981,7 @@ impl Scene {
         h: i32,
         cam: Option<&Cam>,
     ) -> M4 {
+        self.step_rags(g);
         let (eye, dir, up, fov) = match cam {
             Some(c) => (c.eye, (c.at - c.eye).norm(), v3(0., 1., 0.), c.fov),
             None => self.cockpit(g, fov_deg),

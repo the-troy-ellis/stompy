@@ -330,7 +330,7 @@ pub fn body(p: &Profile, m: &Mech) -> Body {
 }
 /// A knocked-down mech's pose, drawn: where its hips are and how they're turned, the torso's lean,
 /// each foot, each arm. Hips: height as a share of the standing hip height, forward (metres),
-/// leaned back and rolled (radians). Feet: [x, z] on the ground in the mech's frame (metres; legs
+/// leaned back and rolled (radians). Feet: [x, height, z] in the mech's ground frame (metres; legs
 /// in order). Arms: the shoulder's swing, back positive (left, right).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DownPose {
@@ -339,7 +339,7 @@ pub struct DownPose {
     pub back: f32,
     pub roll: f32,
     pub lean: f32,
-    pub feet: [[f32; 2]; 2],
+    pub feet: [[f32; 3]; 2],
     pub arms: [f32; 2],
 }
 impl DownPose {
@@ -351,7 +351,7 @@ impl DownPose {
             back: l(a.back, b.back),
             roll: l(a.roll, b.roll),
             lean: l(a.lean, b.lean),
-            feet: [0, 1].map(|i| [l(a.feet[i][0], b.feet[i][0]), l(a.feet[i][1], b.feet[i][1])]),
+            feet: [0, 1].map(|i| [0, 1, 2].map(|k| l(a.feet[i][k], b.feet[i][k]))),
             arms: [l(a.arms[0], b.arms[0]), l(a.arms[1], b.arms[1])],
         }
     }
@@ -360,7 +360,7 @@ impl DownPose {
 /// lying with the legs out; sitting up, knees in, a fist planted behind; rolling onto a knee, a
 /// fist pushing off the ground in front; up on one knee, a fist on the other; standing, hunched.
 /// `hip` and `l` are the standing hip height and the leg's length; `fx` is a foot's rest x.
-fn getup_keys(hip: f32, l: f32, fx: f32, rest: [[f32; 2]; 2]) -> [(f32, DownPose); 5] {
+fn getup_keys(hip: f32, l: f32, fx: f32, rest: [[f32; 3]; 2]) -> [(f32, DownPose); 5] {
     let low = 0.14;
     [
         (
@@ -371,7 +371,7 @@ fn getup_keys(hip: f32, l: f32, fx: f32, rest: [[f32; 2]; 2]) -> [(f32, DownPose
                 back: 1.5,
                 roll: 0.,
                 lean: 0.,
-                feet: [[fx, 0.88 * l], [-fx, 0.88 * l]],
+                feet: [[fx, 0., 0.88 * l], [-fx, 0., 0.88 * l]],
                 arms: [0.5, 0.4],
             },
         ),
@@ -383,7 +383,7 @@ fn getup_keys(hip: f32, l: f32, fx: f32, rest: [[f32; 2]; 2]) -> [(f32, DownPose
                 back: 0.75,
                 roll: 0.08,
                 lean: 0.3,
-                feet: [[fx, 0.5 * l], [-fx * 1.2, 0.55 * l]],
+                feet: [[fx, 0., 0.5 * l], [-fx * 1.2, 0., 0.55 * l]],
                 arms: [-0.3, 1.15],
             },
         ),
@@ -395,7 +395,7 @@ fn getup_keys(hip: f32, l: f32, fx: f32, rest: [[f32; 2]; 2]) -> [(f32, DownPose
                 back: -0.35,
                 roll: 0.16,
                 lean: 0.25,
-                feet: [[fx, 0.42 * l], [-fx * 0.8, -0.34 * l]],
+                feet: [[fx, 0., 0.42 * l], [-fx * 0.8, 0., -0.34 * l]],
                 arms: [-0.6, -1.05],
             },
         ),
@@ -407,7 +407,7 @@ fn getup_keys(hip: f32, l: f32, fx: f32, rest: [[f32; 2]; 2]) -> [(f32, DownPose
                 back: -0.25,
                 roll: 0.,
                 lean: 0.15,
-                feet: [[fx, 0.4 * l], [-fx, -0.3 * l]],
+                feet: [[fx, 0., 0.4 * l], [-fx, 0., -0.3 * l]],
                 arms: [-0.75, -0.2],
             },
         ),
@@ -427,7 +427,7 @@ fn getup_keys(hip: f32, l: f32, fx: f32, rest: [[f32; 2]; 2]) -> [(f32, DownPose
 }
 /// A knocked-down mech's pose now, or None standing. Falling, it buckles and goes over on its
 /// back, the legs shooting out and the arms flung; then the get-up along `p`.
-pub fn down_pose(m: &Mech) -> Option<DownPose> {
+pub fn down_pose(m: &Mech, rag: Option<&Rag>) -> Option<DownPose> {
     let d = m.down?;
     let g = &m.geo;
     let legs = g.legs();
@@ -435,7 +435,7 @@ pub fn down_pose(m: &Mech) -> Option<DownPose> {
         return None;
     }
     let (l, fx) = (g.l1 + g.l2, legs[0].fx.abs());
-    let rest = [[legs[0].fx, legs[0].fz], [legs[1].fx, legs[1].fz]];
+    let rest = [[legs[0].fx, 0., legs[0].fz], [legs[1].fx, 0., legs[1].fz]];
     let keys = getup_keys(g.hip, l, fx, rest);
     let at = |p: f32| {
         let k = keys
@@ -447,6 +447,17 @@ pub fn down_pose(m: &Mech) -> Option<DownPose> {
         let (q1, b) = keys[k + 1];
         DownPose::lerp(&a, &b, smooth(((p - q0) / (q1 - q0)).clamp(0., 1.)))
     };
+    let keyed = at(d.p);
+    // The ragdoll carries it from the blow until it has settled on its back; then the get-up's
+    // poses take over, blended in.
+    if let Some(r) = rag {
+        let w = r.handoff(&d);
+        if w < 1. {
+            let f = r.pose(g, l, rest);
+            return Some(DownPose::lerp(&f, &keyed, smooth(w)));
+        }
+        return Some(keyed);
+    }
     Some(match d.phase {
         DownPhase::Falling => {
             // Standing to flat: the knees go first, then it tips back faster and faster.
@@ -458,8 +469,111 @@ pub fn down_pose(m: &Mech) -> Option<DownPose> {
             f.arms = [-0.9 * smooth(u), -0.7 * smooth(u)];
             f
         }
-        _ => at(d.p),
+        _ => keyed,
     })
+}
+/// A loose spring for the ragdoll's joints.
+#[derive(Clone, Copy, Debug, Default)]
+struct Joint {
+    x: f32,
+    v: f32,
+}
+impl Joint {
+    fn step(&mut self, dt: f32, to: f32, k: f32, zeta: f32) {
+        let c = 2. * k.sqrt() * zeta;
+        self.v += (-k * (self.x - to) - c * self.v) * dt;
+        self.x += self.v * dt;
+    }
+}
+/// The body flung by a wrecking ball, drawn only: the struck torso snaps back first and the
+/// rest follows. The body's tilt back spins freely in the air and topples the rest of the way on
+/// the ground, bouncing; the torso whips against the hips; the legs hang from the hips and lag
+/// the body, so the feet trail, then swing up and kick; the arms are flung forward and flail.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Rag {
+    t: f32,
+    back: Joint,
+    lean: Joint,
+    legs: Joint,
+    arms: [Joint; 2],
+    /// Seconds on the ground.
+    grounded: f32,
+}
+/// Flat on its back.
+const RAG_LIE: f32 = 1.5;
+impl Rag {
+    /// The blow: the body set spinning back, the torso whipped back, the arms flung forward.
+    pub fn struck(t: f32) -> Rag {
+        Rag {
+            t,
+            back: Joint { x: 0., v: 1.5 },
+            lean: Joint { x: 0., v: -5.5 },
+            legs: Joint::default(),
+            arms: [Joint { x: 0., v: -7. }, Joint { x: 0., v: -5.5 }],
+            grounded: 0.,
+        }
+    }
+    pub fn step(&mut self, m: &Mech, time: f32) {
+        let dt = (time - self.t).clamp(0., 0.05);
+        self.t = time;
+        if dt <= 0. {
+            return;
+        }
+        for _ in 0..4 {
+            let h = dt / 4.;
+            if m.air {
+                // In the air it spins freely, a little damped.
+                self.back.v *= 1. - 0.6 * h;
+                self.back.x += self.back.v * h;
+            } else {
+                // On the ground it topples on over onto its back, and bounces when it gets there.
+                self.grounded += h;
+                self.back.v += 9. * self.back.x.max(0.1).sin() * h;
+                self.back.x += self.back.v * h;
+            }
+            if self.back.x > RAG_LIE {
+                self.back.x = RAG_LIE;
+                self.back.v = if m.air { 0. } else { -self.back.v.abs() * 0.25 };
+            }
+            self.lean.step(h, 0., 70., 0.22);
+            // The legs lag the body: they follow its tilt on a loose spring and overshoot.
+            self.legs.step(h, self.back.x, 30., 0.18);
+            self.legs.x = self.legs.x.clamp(-0.4, 1.75);
+            for (k, a) in self.arms.iter_mut().enumerate() {
+                a.step(h, 0.45 - 0.1 * k as f32, 45., 0.15);
+            }
+        }
+    }
+    /// How far the get-up's poses have taken over: none until it has settled on the ground,
+    /// then quickly, and at once if the mashing has started to lift it.
+    fn handoff(&self, d: &stompy_sim::Down) -> f32 {
+        let settled = ((self.grounded - 0.6) / 0.4).clamp(0., 1.);
+        settled.max((d.p * 12.).min(1.))
+    }
+    /// The pose now, in the get-up's terms.
+    fn pose(&self, g: &stompy_sim::data::Geo, l: f32, rest: [[f32; 3]; 2]) -> DownPose {
+        let psi = self.legs.x;
+        let reach = 0.92 * l;
+        // The hips sit as high as the legs hold them, down to lying on the ground.
+        let hip_h = (psi.cos() * reach / g.hip).clamp(0.14, 1.);
+        let hip = hip_h * g.hip;
+        // The legs from the hips, swung forward by `psi`; the feet never below the ground.
+        let foot = |r: [f32; 3]| {
+            let x = r[0] * 0.8;
+            let y = (hip - psi.cos() * reach).max(0.);
+            let z = psi.sin() * reach;
+            [x, y, z + r[2] * (1. - psi.sin().abs())]
+        };
+        DownPose {
+            hip_h,
+            hip_z: 0.,
+            back: self.back.x,
+            roll: 0.,
+            lean: self.lean.x,
+            feet: [foot(rest[0]), foot(rest[1])],
+            arms: [self.arms[0].x, self.arms[1].x],
+        }
+    }
 }
 /// How big the step's gestures are: full at a walk, still there for a shuffle or a turn.
 fn step_k(m: &Mech) -> f32 {

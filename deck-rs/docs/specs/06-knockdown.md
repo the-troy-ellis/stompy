@@ -78,9 +78,8 @@ tiny robots under it.
   from 1.2 m), and skids: its feet slide with it, scraping dust, until the
   shove dies down (`SKID_MAX`), then plant. SLOWPOKE lands on its feet and
   skids; a mech going over lands on its back and slides.
-- **Falling** (0.6 s, in the air when thrown): the blow turns it as it goes, so it always lands on
-  its back; the knees go first, then it tips back faster and faster, the
-  legs shooting out and the arms flung; then, when it meets the ground, the slam (the `knocked` row: an eye drop 1.6, the view
+- **Falling** (0.6 s, in the air when thrown): the blow turns it as it goes,
+  so it always lands on its back; then, when it meets the ground, the slam (the `knocked` row: an eye drop 1.6, the view
   shaken, a deep thump, 280 ms of rumble, dust; a landing and a clang).
 - **Lying**: no walking, turning, aiming, punching, jets or guns; for the
   player only A does anything. Each press (a hold counts once) heaves it an
@@ -90,6 +89,17 @@ tiny robots under it.
   The AI mashes 3, 4.5 or 6 times a second by difficulty, thinking or not.
   It sits low: its top and its centre drop with the lean, so shots and
   stomps meet it where it lies.
+- **A ragdoll from the blow** (the owner, 2026-11-28: it looked like it was
+  lying down as it flew back; "the point of impact should fly back and the
+  rest of the body should follow. It should ragdoll a bit"). Drawn only
+  (`anim::Rag`), a few loose joints driven by the blow: the struck torso
+  whips back against the hips first and rocks; the body is set tipping back
+  and spins freely in the air, then topples the rest of the way onto its
+  back on the ground and bounces; the legs hang from the hips and lag the
+  body on a loose spring, so the feet trail, then swing up and kick; the
+  arms are flung forward and flail. The hips sit as high as the legs hold
+  them. Once it has lain a moment (or the mashing starts) the get-up's poses
+  take over, blended in.
 - **The get-up is a boxer's off the canvas**, not a hinge (the owner,
   2026-11-28: "it needs to get itself up in a realistic way like a boxer
   stumbling back onto its feet"). Drawn as poses the body moves through
