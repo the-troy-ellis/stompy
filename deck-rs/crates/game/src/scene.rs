@@ -108,7 +108,7 @@ fn rod_mat(a: V3, b: V3, d: f32) -> M4 {
 #[derive(Clone, Copy, PartialEq)]
 enum Kicked {
     Arm(f32),
-    Pods,
+    Pod(usize),
 }
 fn inst_mat(p: V3, yaw: f32, tumble: f32, size: f32) -> M4 {
     M4::t(p.x, p.y, p.z) * M4::ry(yaw) * M4::rx(tumble) * M4::s1(size)
@@ -212,10 +212,13 @@ impl Scene {
                 let k = anim::kick(pr, age, m.flash.big);
                 let at = |v: V3| (tb.apply(v) - m.flash.p).len();
                 let (ax, ay) = (geo.arm_x, geo.arm_y - 1.2);
-                let pods = at(v3(1.25, geo.rack_y, 0.6)).min(at(v3(-1.25, geo.rack_y, 0.6)));
+                let (pl, pr) = (
+                    at(v3(1.25, geo.rack_y, 0.6)),
+                    at(v3(-1.25, geo.rack_y, 0.6)),
+                );
                 let (l, r) = (at(v3(ax, ay, 2.4)), at(v3(-ax, ay, 2.4)));
-                let which = if pods < l.min(r) {
-                    Kicked::Pods
+                let which = if pl.min(pr) < l.min(r) {
+                    Kicked::Pod(if pl < pr { 0 } else { 1 })
                 } else if l < r {
                     Kicked::Arm(1.)
                 } else {
@@ -231,17 +234,22 @@ impl Scene {
             gl.draw_plain(&p.hip, &(base * M4::t(0., geo.hip, 0.) * M4::ry(m.hip_yaw)));
             gl.draw_plain(&p.torso, &tb);
             if let Some(pods) = &p.pods {
-                let (drop, h) = match an {
-                    Some((pr, a)) => (a.pod.x, pr.pod_hinge),
-                    None => (0., [0.; 3]),
-                };
-                let back = kick_of(Kicked::Pods);
-                gl.draw_plain(
-                    pods,
-                    &(tb * M4::t(h[0], h[1] + drop, h[2] - back * 0.5)
-                        * M4::rx(-drop * 1.2 - back * 0.5)
-                        * M4::t(-h[0], -h[1], -h[2])),
-                );
+                for (j, pod) in pods.iter().enumerate() {
+                    let sx = if j == 0 { 1. } else { -1. };
+                    let (drop, sway, h) = match an {
+                        Some((pr, a)) => (a.pod[j].x, a.sway[j].x, pr.pod_hinge),
+                        None => (0., 0., [0.; 3]),
+                    };
+                    let h = [h[0] * sx, h[1], h[2]];
+                    let back = kick_of(Kicked::Pod(j));
+                    gl.draw_plain(
+                        pod,
+                        &(tb * M4::t(h[0], h[1] + drop, h[2] - back * 0.5)
+                            * M4::rx(-drop * 1.2 - back * 0.5)
+                            * M4::rz(sway * sx)
+                            * M4::t(-h[0], -h[1], -h[2])),
+                    );
+                }
             }
             if let (Some(ant), Some((pr, a))) = (&p.antenna, an) {
                 let b = pr.ant_base;

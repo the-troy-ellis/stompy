@@ -330,7 +330,7 @@ pub struct MechParts {
     pub fist: Option<Mesh>,
     pub wreck: Mesh,
     /// Pieces that move on their own (`anim.rs`), and whether the pistons are drawn live.
-    pub pods: Option<Mesh>,
+    pub pods: Option<[Mesh; 2]>,
     pub antenna: Option<Mesh>,
     pub toe1: Option<Mesh>,
     pub toe2: Option<Mesh>,
@@ -380,8 +380,8 @@ pub fn build_mech_parts(gl: &Gl, ch: Ch, detail: u8) -> MechParts {
         if let Some(old) = p.barrel.replace(b.upload(gl)) {
             gl.free(old);
         }
-        let (mut pods, mut ant) = (d.pods, d.antenna);
-        p.pods = Some(pods.upload(gl));
+        let ([mut pl, mut pr], mut ant) = (d.pods, d.antenna);
+        p.pods = Some([pl.upload(gl), pr.upload(gl)]);
         p.antenna = Some(ant.upload(gl));
         let (mut t1, mut t2) = (d.toe1, d.toe2);
         p.toe1 = Some(t1.upload(gl));

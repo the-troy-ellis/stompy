@@ -27,15 +27,20 @@ pub struct Profile {
     pub ant_gain: f32,
     pub ant_k: f32,
     pub ant_zeta: f32,
-    /// The pods: how far a jolt drops them, and their spring.
+    /// The pods: how far a jolt drops them, and their spring. Each pod also sways sideways,
+    /// takes a knock when the foot on its side lands, and is tuned `pod_spread` apart from
+    /// the other (stiffness, damping, gain), so the two never move in step.
     pub pod_gain: f32,
     pub pod_k: f32,
     pub pod_zeta: f32,
+    pub pod_spread: f32,
+    pub pod_sway: f32,
+    pub pod_step: f32,
     /// How far a gun slides back when it fires (metres; double for a big gun).
     pub recoil: f32,
     /// Where the antenna stands on the torso.
     pub ant_base: [f32; 3],
-    /// Where the pods hinge on the torso.
+    /// Where the left pod hinges on the torso (the right is its mirror).
     pub pod_hinge: [f32; 3],
 }
 /// BARRY: steady and workmanlike. The swing is small and even, the antenna whips, the pods
@@ -51,12 +56,15 @@ pub const BARRY: Profile = Profile {
     ant_gain: 0.06,
     ant_k: 80.,
     ant_zeta: 0.12,
-    pod_gain: 0.12,
+    pod_gain: 0.07,
     pod_k: 170.,
     pod_zeta: 0.22,
+    pod_spread: 0.22,
+    pod_sway: 0.08,
+    pod_step: 0.9,
     recoil: 0.28,
     ant_base: [-0.6, 3.1, -0.4],
-    pod_hinge: [0., 2.4, -0.1],
+    pod_hinge: [1.75, 2.4, -0.1],
 };
 pub fn profile(ch: Ch) -> Option<&'static Profile> {
     match ch {
@@ -74,7 +82,9 @@ pub struct Anim {
     pub lag: Spring,
     pub ant_x: Spring,
     pub ant_z: Spring,
-    pub pod: Spring,
+    /// Each pod's drop and sideways sway, left (x > 0) then right.
+    pub pod: [Spring; 2],
+    pub sway: [Spring; 2],
     /// When each foot last came down, and whether it was up last frame.
     planted: [f32; 4],
     was_up: [bool; 4],
@@ -89,7 +99,14 @@ impl Anim {
             lag: Spring::new(60., 0.5),
             ant_x: Spring::new(p.ant_k, p.ant_zeta),
             ant_z: Spring::new(p.ant_k, p.ant_zeta),
-            pod: Spring::new(p.pod_k, p.pod_zeta),
+            pod: [0, 1].map(|j| {
+                let d = pod_detune(p, j);
+                Spring::new(p.pod_k * (1. + d), p.pod_zeta * (1. - d * 0.8))
+            }),
+            sway: [0, 1].map(|j| {
+                let d = pod_detune(p, j);
+                Spring::new(p.pod_k * 0.55 * (1. - d), p.pod_zeta * (1. + d))
+            }),
             planted: [-9.; 4],
             was_up: [false; 4],
         }
@@ -113,6 +130,12 @@ impl Anim {
         for (i, f) in m.feet.iter().enumerate().take(m.geo.n_legs) {
             if self.was_up[i] && !f.lifted {
                 self.planted[i] = time;
+                // The pod over this foot takes the knock; the other only the body's share.
+                let left = m.geo.legs()[i].hx > 0.;
+                let (j, k) = (if left { 0 } else { 1 }, p.pod_step * pace(m).min(1.));
+                self.pod[j].v -= k;
+                // and rocks outward over the foot that landed.
+                self.sway[j].v += k * 0.8;
             }
             self.was_up[i] = f.lifted;
         }
@@ -131,13 +154,28 @@ impl Anim {
         let lim = |a: f32| clamp(a, -60., 60.);
         self.ant_x.v -= lim(fore) * p.ant_gain * dt;
         self.ant_z.v += lim(side) * p.ant_gain * dt;
-        self.pod.v -= lim(acc.y) * p.pod_gain * dt;
+        for j in 0..2 {
+            let d = pod_detune(p, j);
+            self.pod[j].v -= lim(acc.y) * p.pod_gain * (1. + d * 0.6) * dt;
+            self.sway[j].v += lim(side) * p.pod_sway * (1. - d) * dt;
+            self.pod[j].step(dt, 0.);
+            self.sway[j].step(dt, 0.);
+            self.pod[j].x = clamp(self.pod[j].x, -0.2, 0.12);
+            self.sway[j].x = clamp(self.sway[j].x, -0.25, 0.25);
+        }
         self.ant_x.step(dt, 0.);
         self.ant_z.step(dt, 0.);
-        self.pod.step(dt, 0.);
         self.ant_x.x = clamp(self.ant_x.x, -0.6, 0.6);
         self.ant_z.x = clamp(self.ant_z.x, -0.6, 0.6);
-        self.pod.x = clamp(self.pod.x, -0.2, 0.12);
+    }
+}
+/// How far pod `j` is tuned from the middle: the left a little stiffer, the right a little
+/// looser and not by the same amount, so their rhythms never line up.
+fn pod_detune(p: &Profile, j: usize) -> f32 {
+    if j == 0 {
+        p.pod_spread
+    } else {
+        -p.pod_spread * 0.7
     }
 }
 fn wrap_angle(a: f32) -> f32 {
@@ -226,6 +264,20 @@ mod tests {
         assert!(kick(&BARRY, 10, false) < kick(&BARRY, 3, false));
         assert!(kick(&BARRY, 2, true) > kick(&BARRY, 2, false));
         assert_eq!(kick(&BARRY, 20, true), 0.);
+    }
+    #[test]
+    fn the_pods_take_the_same_jolt_out_of_step() {
+        let mut a = Anim::new(&BARRY, 0.);
+        a.pod[0].v = -1.;
+        a.pod[1].v = -1.;
+        let (mut apart, mut most) = (0f32, 0f32);
+        for _ in 0..40 {
+            a.pod[0].step(1. / 60., 0.);
+            a.pod[1].step(1. / 60., 0.);
+            apart = apart.max((a.pod[0].x - a.pod[1].x).abs());
+            most = most.max(a.pod[0].x.abs());
+        }
+        assert!(apart > 0.3 * most, "apart {apart}, most {most}");
     }
     #[test]
     fn toes_curl_in_the_air_reach_before_landing_and_lie_flat_down() {

@@ -48,8 +48,8 @@ pub struct Parts {
     pub torso: Builder,
     pub arm: Builder,
     pub barrel: Builder,
-    /// The shoulder pods, in the torso's frame, drawn on their hinge.
-    pub pods: Builder,
+    /// The shoulder pods, left (x > 0) then right, in the torso's frame, each on its hinge.
+    pub pods: [Builder; 2],
     /// The antenna, standing at its own origin; drawn at its socket.
     pub antenna: Builder,
     /// A toe's two segments, each standing at its own knuckle, pointing along z.
@@ -91,7 +91,8 @@ impl Parts {
     pub fn tris(&self) -> usize {
         self.hip.tris()
             + self.torso.tris()
-            + self.pods.tris()
+            + self.pods[0].tris()
+            + self.pods[1].tris()
             + self.antenna.tris()
             + 6 * (self.toe1.tris() + self.toe2.tris())
             + 2 * [&self.uleg, &self.lleg, &self.foot, &self.arm, &self.barrel]
@@ -326,9 +327,11 @@ pub fn barry(level: u8) -> Parts {
         1.,
         dark,
     );
-    // The pods ride on their own hinge, so they can bounce (anim.rs).
-    let mut pods = Builder::default();
-    for s in [1., -1.] {
+    // Each pod rides its own hinge, so they can bounce out of step (anim.rs). Left (x > 0)
+    // first.
+    let mut pods = [Builder::default(), Builder::default()];
+    for (k, s) in [1., -1.].into_iter().enumerate() {
+        let pods = &mut pods[k];
         let pod = t(s * 1.75, 3.0, -0.1);
         pods.bbox(pod, v3(1.25, 1.25, 1.45), 0.12, 1., acc);
         for i in 0..3 {

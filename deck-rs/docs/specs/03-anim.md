@@ -44,8 +44,12 @@ without one draws as before.
   `ANKLE`). The models carry the lugs they hang from.
 - **The antenna** is its own piece on a whippy spring, thrown by the
   torso's jolts sideways and fore and aft.
-- **The pods** ride their own hinge on a stiffer spring: each footfall
-  thumps them down and they settle, nodding.
+- **The pods** each ride their own hinge: the body's bounce drops them and
+  they settle, nodding. The owner (2026-11-28): not in unison. So each pod
+  is tuned apart from the other (stiffness, damping and gain, by different
+  amounts), takes its own knock when the foot on its side lands, and rocks
+  outward over that foot; they alternate with the stride and never line up.
+  A missile volley kicks only the pod it came from.
 - **Recoil**: the gun (or the pods) nearest the last shot's muzzle kicks
   back hard in 0.04 s and returns by 0.3 s, twice as far for a big gun; the
   arm rocks up a touch with it. The cockpit's own guns kick too.
