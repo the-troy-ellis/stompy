@@ -51,6 +51,8 @@ pub struct Profile {
     pub roll: f32,
     pub peck: f32,
     pub nod: f32,
+    /// The shoulders turning against the hips each stride, a heavyweight's swagger (radians).
+    pub swagger: f32,
 }
 /// BARRY: steady and workmanlike. The swing is small and even, the antenna whips, the pods
 /// thump down on each footfall and settle.
@@ -79,6 +81,7 @@ pub const BARRY: Profile = Profile {
     roll: 0.,
     peck: 0.,
     nod: 0.,
+    swagger: 0.,
 };
 /// SKEDADDLE: twitchy, and it walks like a bird (the owner, 2026-11-28: more bob and sway).
 /// The body dips at each footfall and rocks over the planted foot, the torso thrusts forward
@@ -109,11 +112,43 @@ pub const SKEDADDLE: Profile = Profile {
     roll: 0.07,
     peck: 0.4,
     nod: 0.08,
+    swagger: 0.,
+};
+/// PURPLE PUNCHER: a heavyweight's lumber. It rolls side to side over each planted foot, the
+/// shoulders turn against the hips with every stride, the big arms swing heavily and trail a
+/// turn, the feet come down flat and the stubby toes hardly curl. No pods, no antenna.
+pub const PURPLE_PUNCHER: Profile = Profile {
+    arm_swing: 0.2,
+    arm_lag: 0.15,
+    foot_roll: 0.1,
+    toe_curl: 0.25,
+    toe_open: 0.15,
+    toe_close: 0.15,
+    toe_grip: 0.2,
+    ant_gain: 0.,
+    ant_k: 80.,
+    ant_zeta: 0.2,
+    pod_gain: 0.,
+    pod_k: 170.,
+    pod_zeta: 0.22,
+    pod_spread: 0.,
+    pod_sway: 0.,
+    pod_step: 0.,
+    recoil: 0.3,
+    ant_base: [0.; 3],
+    pod_hinge: [0.; 3],
+    bob: 0.1,
+    sway: 0.24,
+    roll: 0.06,
+    peck: 0.,
+    nod: 0.,
+    swagger: 0.13,
 };
 pub fn profile(ch: Ch) -> Option<&'static Profile> {
     match ch {
         Ch::Kestrel => Some(&BARRY),
         Ch::Jackal => Some(&SKEDADDLE),
+        Ch::Puncher => Some(&PURPLE_PUNCHER),
         _ => None,
     }
 }
@@ -257,6 +292,8 @@ pub struct Body {
     pub roll: f32,
     pub peck: f32,
     pub nod: f32,
+    /// The shoulders' turn against the hips (radians, about y).
+    pub yaw: f32,
 }
 /// The body's walk for where a mech is in its stride. It dips as each foot lands and rises
 /// over the planted leg; it rocks over whichever foot is down; each step the torso thrusts
@@ -286,6 +323,8 @@ pub fn body(p: &Profile, m: &Mech) -> Body {
         roll: -p.roll * k * side * over,
         peck: p.peck * k * (smooth(thrust) - 0.5),
         nod: p.nod * k * (smooth(thrust) - 0.5),
+        // The shoulder over the planted foot swings back, the other forward.
+        yaw: p.swagger * k * side * over,
     }
 }
 /// How big the step's gestures are: full at a walk, still there for a shuffle or a turn.
@@ -388,6 +427,34 @@ mod tests {
         );
         assert!(fwd > 0.15 && back < -0.15, "a peck: {back}..{fwd}");
         assert_eq!(body(&BARRY, m), Body::default(), "BARRY walks as before");
+    }
+    #[test]
+    fn purple_puncher_swaggers_and_rolls_without_pecking() {
+        use stompy_sim::data::{Biome, Diff, TimeOfDay, Weather};
+        use stompy_sim::state::start_free_play;
+        let mut g = stompy_sim::Game::new(1);
+        start_free_play(
+            &mut g,
+            Biome::Dusk,
+            TimeOfDay::Dusk,
+            Weather::Clear,
+            1,
+            1,
+            Ch::Puncher,
+            Diff::Normal,
+            true,
+        );
+        let m = &mut g.mechs[0];
+        m.speed = m.max_speed;
+        let (mut turn, mut rock) = (0f32, 0f32);
+        for i in 0..100 {
+            m.cyc = i as f32 / 100.;
+            let b = body(&PURPLE_PUNCHER, m);
+            assert_eq!(b.peck, 0., "no peck");
+            assert!(b.yaw * b.sway >= 0., "the shoulders turn with the roll");
+            (turn, rock) = (turn.max(b.yaw.abs()), rock.max(b.sway.abs()));
+        }
+        assert!(turn > 0.1 && rock > 0.2, "{turn} {rock}");
     }
     #[test]
     fn the_pods_take_the_same_jolt_out_of_step() {

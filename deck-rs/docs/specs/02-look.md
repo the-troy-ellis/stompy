@@ -76,7 +76,17 @@ three-toed claws, splayed wide, and a spur behind; slim strut arms with the
 LIL ZAPPERs (a lens at the muzzle); two ears in a V. Level 1 about 4,300
 triangles, level 2 about 8,400 (a little under BARRY).
 
-Then the other four, and the ground's faces come with
+**PURPLE PUNCHER** (2026-11-28, `models::puncher`): a heavyweight, wider
+than tall. A barrel chest with pectoral plates, shoulders like fridges
+capped in its purple, a low flat head with an eye slit under a brow, a belt
+with a big purple buckle, exhaust stacks behind; the BIG BOOMER low in the
+chest and the FIRECRACKERS on the right shoulder; thick legs on broad flat
+feet with three stubby toes; short thick arms with elbow pistons; and two
+big purple fists bigger than the arms, a row of knuckles across the front,
+four fingers curled down it, the thumb tucked under. No arm guns, no
+antenna. Level 1 about 4,900 triangles, level 2 about 9,700.
+
+Then the other three, and the ground's faces come with
 the voxel ground (P2).
 
 ### Paint shows the side (built)

@@ -354,7 +354,7 @@ impl Scene {
         let tb = base
             * M4::t(0., geo.torso_y + m.torso_drop, 0.)
             * M4::s(1. + sq * 0.5, 1. - sq, 1. + sq * 0.5)
-            * M4::ry(m.twist)
+            * M4::ry(m.twist + walk.yaw)
             * M4::t(0., 0., lunge + walk.peck)
             * M4::rx(walk.nod)
             * M4::rx(m.wob_p.x - lean + m.torso_nod + m.run_lean)

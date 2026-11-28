@@ -374,6 +374,7 @@ pub fn build_mech_parts(gl: &Gl, ch: Ch, detail: u8, team: u8) -> MechParts {
     let model = match ch {
         Ch::Kestrel => Some(crate::models::barry as fn(u8, [f32; 3]) -> crate::models::Parts),
         Ch::Jackal => Some(crate::models::skedaddle as _),
+        Ch::Puncher => Some(crate::models::puncher as _),
         _ => None,
     };
     if let (true, Some(model)) = (detail > 0, model) {
@@ -388,12 +389,15 @@ pub fn build_mech_parts(gl: &Gl, ch: Ch, detail: u8, team: u8) -> MechParts {
         ] {
             gl.free(std::mem::replace(slot, b.upload(gl)));
         }
-        let mut b = d.barrel;
-        if let Some(old) = p.barrel.replace(b.upload(gl)) {
-            gl.free(old);
+        for (slot, part) in [(&mut p.barrel, d.barrel), (&mut p.fist, d.fist)] {
+            if let Some(mut b) = part {
+                if let Some(old) = slot.replace(b.upload(gl)) {
+                    gl.free(old);
+                }
+            }
         }
         p.pods = d.pods.map(|[mut l, mut r]| [l.upload(gl), r.upload(gl)]);
-        p.antenna = Some(d.antenna).map(|mut a| a.upload(gl));
+        p.antenna = d.antenna.map(|mut a| a.upload(gl));
         let (mut t1, mut t2) = (d.toe1, d.toe2);
         p.toe1 = Some(t1.upload(gl));
         p.toe2 = Some(t2.upload(gl));

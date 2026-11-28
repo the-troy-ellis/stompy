@@ -47,11 +47,13 @@ pub struct Parts {
     pub foot: Builder,
     pub torso: Builder,
     pub arm: Builder,
-    pub barrel: Builder,
+    /// The gun on the arm, or the fist (PURPLE PUNCHER's), each hung where the box's was.
+    pub barrel: Option<Builder>,
+    pub fist: Option<Builder>,
     /// The shoulder pods, left (x > 0) then right, in the torso's frame, each on its hinge.
     pub pods: Option<[Builder; 2]>,
     /// The antenna, standing at its own origin; drawn at its socket.
-    pub antenna: Builder,
+    pub antenna: Option<Builder>,
     /// A toe's two segments, each standing at its own knuckle, pointing along z.
     pub toe1: Builder,
     pub toe2: Builder,
@@ -98,11 +100,15 @@ impl Parts {
         self.hip.tris()
             + self.torso.tris()
             + self.pods.as_ref().map_or(0, |p| p[0].tris() + p[1].tris())
-            + self.antenna.tris()
+            + self.antenna.as_ref().map_or(0, |a| a.tris())
             + 2 * self.toes.len() * (self.toe1.tris() + self.toe2.tris())
-            + 2 * [&self.uleg, &self.lleg, &self.foot, &self.arm, &self.barrel]
+            + 2 * [&self.uleg, &self.lleg, &self.foot, &self.arm]
                 .iter()
                 .map(|b| b.tris())
+                .sum::<usize>()
+            + 2 * [&self.barrel, &self.fist]
+                .iter()
+                .map(|b| b.as_ref().map_or(0, |b| b.tris()))
                 .sum::<usize>()
     }
 }
@@ -427,9 +433,10 @@ pub fn barry(level: u8, paint: [f32; 3]) -> Parts {
         foot,
         torso,
         arm,
-        barrel,
+        barrel: Some(barrel),
+        fist: None,
         pods: Some(pods),
-        antenna,
+        antenna: Some(antenna),
         toe1,
         toe2,
         toes: &TOES,
@@ -742,15 +749,380 @@ pub fn skedaddle(level: u8, paint: [f32; 3]) -> Parts {
         foot,
         torso,
         arm,
-        barrel,
+        barrel: Some(barrel),
+        fist: None,
         pods: None,
-        antenna,
+        antenna: Some(antenna),
         toe1,
         toe2,
         toes: &SKED_TOES,
         toe_len: SKED_TOE_1,
         knee: SKED_KNEE,
         ankle: SKED_ANKLE,
+    }
+}
+
+/// PURPLE PUNCHER's toes: three short thick ones on a broad foot. It stomps; it doesn't grab.
+pub const PUNCH_TOES: [[f32; 4]; 3] = [
+    [-0.58, -0.3, 0.86, -0.22],
+    [0., -0.3, 0.92, 0.],
+    [0.58, -0.3, 0.86, 0.22],
+];
+pub const PUNCH_TOE_1: f32 = 0.42;
+/// PURPLE PUNCHER's: BARRY's layout, thicker, for its girth.
+pub const PUNCH_KNEE: Piston = Piston {
+    from: [0., -0.55, -0.84],
+    to: [0., -0.75, -0.8],
+    d: 0.36,
+    fat: 1.1,
+};
+pub const PUNCH_ANKLE: Piston = Piston {
+    from: [0., -1.2, -0.84],
+    to: [0., -0.02, -0.72],
+    d: 0.3,
+    fat: 0.7,
+};
+
+/// PURPLE PUNCHER: a heavyweight. A barrel chest under huge rounded shoulders, a low flat head
+/// with an eye slit under a brow, a belt with a big buckle, thick legs on broad flat feet,
+/// short thick arms, and two big fists in its purple. The BIG BOOMER sits low in the chest,
+/// the FIRECRACKERS on the right shoulder. Wider than tall.
+pub fn puncher(level: u8, paint: [f32; 3]) -> Parts {
+    let c = chassis(Ch::Puncher);
+    let g = geo_for(Ch::Puncher);
+    let (col, dark, acc) = (paint, mulc(paint, 0.55), c.acc);
+    let acc_dk = mulc(acc, 0.65);
+    let hi = level >= 2;
+    let n = if hi { 16 } else { 8 };
+    let (l1, l2, w) = (g.l1, g.l2, g.girth);
+
+    // The pelvis: a broad block, the belt round it with its buckle, armour skirts.
+    let mut hip = Builder::default();
+    hip.bbox(M4::ID, v3(2.3 * w, 0.9 * w, 1.5 * w), 0.16, 1., dark);
+    hip.bbox(t(0., 0.15, 0.), v3(2.45 * w, 0.42, 1.62 * w), 0.08, 1., col);
+    hip.bbox(t(0., 0.15, 0.84 * w), v3(0.9, 0.62, 0.18), 0.06, 1., acc);
+    for s in [1., -1.] {
+        hip.rod(
+            v3(s * 1.15 * w, 0., 0.),
+            v3(s * 1.35 * w, 0., 0.),
+            0.75 * w,
+            n,
+            STEEL,
+        );
+    }
+    if hi {
+        hip.bbox(t(0., 0.15, 0.95 * w), v3(0.5, 0.3, 0.08), 0.03, 1., acc_dk);
+        for s in [1., -1.] {
+            hip.bbox(
+                t(s * 0.85 * w, -0.45, 0.62 * w) * M4::rz(s * 0.1) * M4::rx(0.1),
+                v3(0.8, 0.6, 0.18),
+                0.05,
+                1.,
+                col,
+            );
+        }
+        vent(
+            &mut hip,
+            t(0., 0., -0.78 * w) * M4::ry(PI),
+            1.6,
+            0.5,
+            4,
+            dark,
+        );
+    }
+
+    // The thigh: massive, an armour plate down the front, rivets, the knee drum.
+    let mut uleg = Builder::default();
+    uleg.bbox(
+        t(0., -l1 / 2., 0.),
+        v3(1.0 * w, l1 + 0.2, 1.2 * w),
+        0.16,
+        0.9,
+        col,
+    );
+    uleg.bbox(
+        t(0., -l1 * 0.42, 0.66 * w) * M4::rx(-0.06),
+        v3(1.1 * w, l1 * 0.74, 0.26),
+        0.08,
+        1.05,
+        col,
+    );
+    uleg.sphere(M4::s1(1.3 * w), dark, n, n / 2);
+    drum(
+        &mut uleg,
+        v3(0., -l1, 0.05),
+        1.35 * w,
+        1.2 * w,
+        n,
+        dark,
+        STEEL,
+    );
+    uleg.bbox(
+        t(0., -l1 + 0.05, 0.74 * w),
+        v3(0.8 * w, 0.62, 0.34),
+        0.1,
+        0.8,
+        col,
+    );
+    uleg.bbox(t(0., -0.55, -0.82), v3(0.44, 0.44, 0.36), 0.07, 1., dark);
+    if hi {
+        for k in 0..3 {
+            for s in [1., -1.] {
+                uleg.sphere(
+                    t(s * 0.4 * w, -0.5 - k as f32 * 0.6, 0.82 * w) * M4::s1(0.07),
+                    STEEL,
+                    6,
+                    3,
+                );
+            }
+        }
+        for s in [1., -1.] {
+            uleg.bbox(
+                t(s * 0.52 * w, -l1 * 0.5, 0.),
+                v3(0.08, l1 * 0.6, 0.9 * w),
+                0.02,
+                1.,
+                dark,
+            );
+        }
+    }
+
+    // The shin: a thick column, a guard in front, the calf, the ankle ball.
+    let mut lleg = Builder::default();
+    lleg.bbox(
+        t(0., -l2 / 2., -0.1),
+        v3(0.85 * w, l2, 1.1 * w),
+        0.14,
+        1.12,
+        col,
+    );
+    lleg.bbox(
+        t(0., -l2 * 0.42, 0.5 * w) * M4::rx(0.08),
+        v3(0.95 * w, l2 * 0.78, 0.3),
+        0.09,
+        0.9,
+        col,
+    );
+    lleg.bbox(t(0., -0.75, -0.8), v3(0.42, 0.42, 0.36), 0.07, 1., dark);
+    lleg.bbox(t(0., -1.2, -0.84), v3(0.4, 0.4, 0.36), 0.07, 1., dark);
+    lleg.sphere(t(0., -l2, -0.05) * M4::s1(1.0 * w), dark, n, n / 2);
+    if hi {
+        vent(
+            &mut lleg,
+            t(0., -l2 * 0.4, -0.7 * w) * M4::ry(PI),
+            0.6,
+            0.8,
+            3,
+            dark,
+        );
+        lleg.bbox(t(0., -0.25, 0.3), v3(0.9 * w, 0.4, 0.7), 0.08, 1., dark);
+    }
+
+    // The foot: broad and flat, the knuckles of three stubby toes, a heel block.
+    let mut foot = Builder::default();
+    foot.rod(v3(0., 0.12, 0.), v3(0., -0.2, 0.), 1.0 * w, n, col);
+    foot.bbox(t(0., -0.25, 0.1), v3(1.35 * w, 0.38, 1.55), 0.1, 0.92, dark);
+    for h in PUNCH_TOES {
+        foot.rod(
+            v3(h[0] - 0.26, h[1] + 0.02, h[2]),
+            v3(h[0] + 0.26, h[1] + 0.02, h[2]),
+            0.34,
+            if hi { 10 } else { 8 },
+            STEEL,
+        );
+    }
+    foot.bbox(t(0., -0.28, -0.82), v3(1.0, 0.34, 0.6), 0.08, 0.85, dark);
+    foot.bbox(t(0., -0.02, -0.7), v3(0.38, 0.38, 0.36), 0.07, 1., dark);
+    let mut toe1 = Builder::default();
+    toe1.bbox(
+        t(0., 0., PUNCH_TOE_1 * 0.5),
+        v3(0.5, 0.34, PUNCH_TOE_1 + 0.08),
+        0.08,
+        0.9,
+        dark,
+    );
+    toe1.rod(
+        v3(-0.22, 0., PUNCH_TOE_1),
+        v3(0.22, 0., PUNCH_TOE_1),
+        0.28,
+        if hi { 10 } else { 8 },
+        STEEL,
+    );
+    let mut toe2 = Builder::default();
+    toe2.bbox(t(0., -0.02, 0.18), v3(0.46, 0.3, 0.4), 0.07, 0.8, dark);
+    toe2.bbox(
+        t(0., -0.08, 0.4) * M4::rx(0.3),
+        v3(0.4, 0.2, 0.2),
+        0.05,
+        0.7,
+        STEEL,
+    );
+
+    // The torso: a barrel chest, shoulders like fridges, a low flat head with its slit and
+    // brow, the BIG BOOMER in the chest, the FIRECRACKERS on the right shoulder.
+    let mut torso = Builder::default();
+    torso.rod(v3(0., -0.2, -0.1), v3(0., 0.3, -0.1), 2.6, n, dark);
+    torso.bbox(t(0., 1.2, 0.), v3(4.2, 2.4, 2.9), 0.32, 0.9, col);
+    torso.bbox(
+        t(0., 1.35, 1.4) * M4::rx(-0.1),
+        v3(3.0, 1.6, 0.3),
+        0.1,
+        0.9,
+        col,
+    );
+    for s in [1., -1.] {
+        // The shoulders: a big rounded mass, a cap of armour over it.
+        let at = t(s * 2.35, 1.85, -0.05);
+        torso.bbox(at, v3(1.7, 1.8, 2.3), 0.4, 0.9, dark);
+        torso.bbox(
+            at * t(s * 0.1, 0.35, 0.) * M4::rz(s * -0.2),
+            v3(1.7, 0.6, 2.5),
+            0.2,
+            0.85,
+            col,
+        );
+        torso.bbox(
+            at * t(s * 0.15, 0.68, 0.) * M4::rz(s * -0.2),
+            v3(1.2, 0.16, 2.0),
+            0.05,
+            0.9,
+            acc,
+        );
+    }
+    // The head: low and flat, sunk between the shoulders.
+    torso.bbox(t(0., 2.55, 0.25), v3(1.9, 0.6, 1.7), 0.16, 0.85, col);
+    torso.bbox(t(0., 2.0, 1.25), v3(2.2, 0.7, 0.6), 0.12, 0.9, col);
+    torso.bbox(t(0., 1.8, 1.53), v3(2.3, 0.24, 0.08), 0.02, 1., GLASS);
+    torso.bbox(
+        t(0., 2.03, 1.56) * M4::rx(-0.25),
+        v3(2.5, 0.16, 0.3),
+        0.05,
+        1.,
+        dark,
+    );
+    // The BIG BOOMER: a housing in the chest, a short fat barrel, a muzzle.
+    torso.bbox(t(-0.9, 0.9, 1.45), v3(0.7, 0.7, 0.4), 0.08, 1., dark);
+    torso.rod(v3(-0.9, 0.9, 1.5), v3(-0.9, 0.9, 2.2), 0.42, n, STEEL);
+    torso.rod(v3(-0.9, 0.9, 2.2), v3(-0.9, 0.9, 2.35), 0.56, n, dark);
+    // The FIRECRACKERS: a box on the right shoulder, six tubes.
+    torso.bbox(t(-1.25, 2.55, 0.1), v3(1.0, 0.7, 1.2), 0.08, 1., acc);
+    for i in 0..3 {
+        for j in 0..2 {
+            let at = v3(-1.25 + (i as f32 - 1.) * 0.28, 2.42 + j as f32 * 0.28, 0.72);
+            torso.rod(at - v3(0., 0., 0.1), at + v3(0., 0., 0.04), 0.18, 6, TUBE);
+        }
+    }
+    torso.bbox(t(0., 0.95, -1.62), v3(2.8, 1.6, 0.5), 0.12, 1., dark);
+    if hi {
+        vent(
+            &mut torso,
+            t(0., 0.95, -1.9) * M4::ry(PI),
+            2.2,
+            1.2,
+            6,
+            dark,
+        );
+        for s in [1., -1.] {
+            // Exhaust stacks behind the shoulders.
+            torso.rod(
+                v3(s * 1.1, 1.8, -1.45),
+                v3(s * 1.1, 3.0, -1.6),
+                0.36,
+                n,
+                STEEL,
+            );
+            torso.rod(
+                v3(s * 1.1, 2.95, -1.59),
+                v3(s * 1.1, 3.1, -1.61),
+                0.42,
+                n,
+                dark,
+            );
+            // Pectoral plates and their bolts.
+            torso.bbox(
+                t(s * 0.95, 1.1, 1.58) * M4::ry(s * 0.12),
+                v3(1.2, 0.9, 0.12),
+                0.04,
+                0.9,
+                col,
+            );
+            for k in 0..2 {
+                torso.sphere(
+                    t(s * (0.55 + k as f32 * 0.8), 1.5, 1.66) * M4::s1(0.07),
+                    STEEL,
+                    6,
+                    3,
+                );
+            }
+        }
+        torso.bbox(t(-1.25, 2.95, 0.1), v3(0.8, 0.08, 1.0), 0.02, 1., acc_dk);
+    }
+
+    // The arm: a big shoulder drum, a short thick upper arm, an elbow, a forearm into the wrist.
+    let mut arm = Builder::default();
+    drum(&mut arm, v3(0., 0.15, 0.), 1.75, 1.5, n, dark, STEEL);
+    arm.bbox(t(0., -0.45, 0.1), v3(1.3, 1.2, 1.4), 0.16, 0.92, col);
+    arm.sphere(t(0., -0.95, 0.15) * M4::s1(1.05), dark, n, n / 2);
+    arm.bbox(t(0., -0.95, 0.2), v3(1.25, 0.5, 1.35), 0.12, 1., col);
+    if hi {
+        for s in [1., -1.] {
+            arm.rod(
+                v3(s * 0.6, -0.2, -0.45),
+                v3(s * 0.55, -0.95, -0.45),
+                0.16,
+                8,
+                STEEL,
+            );
+        }
+        arm.bbox(t(0., 0.6, 0.05), v3(1.55, 0.45, 1.6), 0.12, 0.85, col);
+    }
+
+    // The fist, in the accent and bigger than the arm: a cuff, the hand, a row of knuckles
+    // across the top of the front (the punching face), four fingers curled down it, the thumb
+    // tucked under.
+    let mut fist = Builder::default();
+    fist.rod(v3(0., -1.0, 0.3), v3(0., -1.3, 0.3), 1.2, n, dark);
+    fist.bbox(t(0., -2.2, 0.3), v3(1.6, 1.95, 1.6), 0.3, 0.92, acc);
+    for i in 0..4 {
+        let x = (i as f32 - 1.5) * 0.37;
+        fist.sphere(
+            t(x, -1.55, 1.02) * M4::s(0.2, 0.22, 0.2),
+            acc,
+            if hi { 10 } else { 6 },
+            if hi { 5 } else { 3 },
+        );
+        fist.bbox(t(x, -2.2, 1.12), v3(0.33, 1.0, 0.14), 0.05, 1., acc_dk);
+    }
+    fist.bbox(
+        t(0., -2.95, 0.85) * M4::rx(0.35),
+        v3(1.0, 0.34, 0.5),
+        0.1,
+        0.9,
+        acc_dk,
+    );
+    if hi {
+        fist.bbox(t(0., -1.3, 0.3), v3(1.35, 0.14, 1.45), 0.04, 1., dark);
+        for s in [1., -1.] {
+            fist.bbox(t(s * 0.81, -2.2, 0.3), v3(0.06, 1.1, 1.1), 0.02, 1., acc_dk);
+        }
+    }
+    Parts {
+        hip,
+        uleg,
+        lleg,
+        foot,
+        torso,
+        arm,
+        barrel: None,
+        fist: Some(fist),
+        pods: None,
+        antenna: None,
+        toe1,
+        toe2,
+        toes: &PUNCH_TOES,
+        toe_len: PUNCH_TOE_1,
+        knee: PUNCH_KNEE,
+        ankle: PUNCH_ANKLE,
     }
 }
 
@@ -767,6 +1139,16 @@ mod tests {
         assert!((2500..6000).contains(&a), "level 1: {a}");
         assert!((6000..12000).contains(&b), "level 2: {b}");
         assert!(b > a * 3 / 2);
+    }
+    #[test]
+    fn purple_puncher_is_on_budget_with_fists_and_no_guns() {
+        let c = chassis(Ch::Puncher);
+        let (a, b) = (puncher(1, c.col), puncher(2, c.col));
+        let (ta, tb) = (a.tris(), b.tris());
+        println!("PURPLE PUNCHER drawn: level 1 {ta} triangles, level 2 {tb}");
+        assert!((2500..6000).contains(&ta), "level 1: {ta}");
+        assert!((6000..12000).contains(&tb), "level 2: {tb}");
+        assert!(b.fist.is_some() && b.barrel.is_none() && b.antenna.is_none());
     }
     #[test]
     fn skedaddle_is_on_budget_and_lighter_than_barry() {
