@@ -101,8 +101,13 @@ tiny robots under it.
   links, and a leg can't fold up into the hips. The blow goes in as speed:
   the struck upper body most, the hips less, the feet backward (they had the
   ground), balanced to nothing net, so the body turns and the impact leads
-  while the whole still goes where the sim's shove takes it. Held loosely to
-  the sim's place. Read back as the get-up's pose (hips' place, heading,
+  while the whole still goes where the sim's shove takes it. Never square on
+  (the owner: the limbs moved in unison): one shoulder takes more than the
+  other, so the body twists and rolls, and each knee, foot and hand gets its
+  own kick, different every blow. Drawn, a foot is never past the leg's reach
+  from the hip, and off the ground it hangs off the shin (the owner: the feet
+  looked disconnected); on the ground it lies flat. Held loosely to the
+  sim's place. Read back as the get-up's pose (hips' place, heading,
   tilt back, roll, the torso's lean, feet, arms), so the drawing, the
   cockpit's eye and the hand-over to the get-up are unchanged: once it has
   lain still a moment, or the mashing starts, the get-up's poses blend in.
