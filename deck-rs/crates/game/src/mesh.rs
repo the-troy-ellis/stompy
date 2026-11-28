@@ -329,12 +329,17 @@ pub struct MechParts {
     pub barrel: Option<Mesh>,
     pub fist: Option<Mesh>,
     pub wreck: Mesh,
-    /// Pieces that move on their own (`anim.rs`), and whether the pistons are drawn live.
+    /// Pieces that move on their own (`anim.rs`), and the pistons drawn live.
     pub pods: Option<[Mesh; 2]>,
     pub antenna: Option<Mesh>,
     pub toe1: Option<Mesh>,
     pub toe2: Option<Mesh>,
-    pub pistons: bool,
+    /// Where each toe's knuckle sits on the foot and which way it points; the near segment's
+    /// length.
+    pub toes: &'static [[f32; 4]],
+    pub toe_len: f32,
+    pub knee: Option<crate::models::Piston>,
+    pub ankle: Option<crate::models::Piston>,
 }
 fn t(x: f32, y: f32, z: f32) -> M4 {
     M4::t(x, y, z)
@@ -366,8 +371,14 @@ fn ball(b: &mut Builder, at: V3, d: f32, col: [f32; 3]) {
 pub fn build_mech_parts(gl: &Gl, ch: Ch, detail: u8, team: u8) -> MechParts {
     let paint = crate::look::paint(team);
     let mut p = build_box_parts(gl, ch, paint);
-    if detail > 0 && ch == Ch::Kestrel {
-        let d = crate::models::barry(detail, paint);
+    let model = match ch {
+        Ch::Kestrel => Some(crate::models::barry as fn(u8, [f32; 3]) -> crate::models::Parts),
+        Ch::Jackal => Some(crate::models::skedaddle as _),
+        Ch::Puncher => Some(crate::models::puncher as _),
+        _ => None,
+    };
+    if let (true, Some(model)) = (detail > 0, model) {
+        let d = model(detail, paint);
         for (slot, mut b) in [
             (&mut p.hip, d.hip),
             (&mut p.uleg, d.uleg),
@@ -378,17 +389,19 @@ pub fn build_mech_parts(gl: &Gl, ch: Ch, detail: u8, team: u8) -> MechParts {
         ] {
             gl.free(std::mem::replace(slot, b.upload(gl)));
         }
-        let mut b = d.barrel;
-        if let Some(old) = p.barrel.replace(b.upload(gl)) {
-            gl.free(old);
+        for (slot, part) in [(&mut p.barrel, d.barrel), (&mut p.fist, d.fist)] {
+            if let Some(mut b) = part {
+                if let Some(old) = slot.replace(b.upload(gl)) {
+                    gl.free(old);
+                }
+            }
         }
-        let ([mut pl, mut pr], mut ant) = (d.pods, d.antenna);
-        p.pods = Some([pl.upload(gl), pr.upload(gl)]);
-        p.antenna = Some(ant.upload(gl));
+        p.pods = d.pods.map(|[mut l, mut r]| [l.upload(gl), r.upload(gl)]);
+        p.antenna = d.antenna.map(|mut a| a.upload(gl));
         let (mut t1, mut t2) = (d.toe1, d.toe2);
         p.toe1 = Some(t1.upload(gl));
         p.toe2 = Some(t2.upload(gl));
-        p.pistons = true;
+        (p.toes, p.toe_len, p.knee, p.ankle) = (d.toes, d.toe_len, Some(d.knee), Some(d.ankle));
     }
     p
 }
@@ -638,7 +651,10 @@ fn build_box_parts(gl: &Gl, ch: Ch, paint: [f32; 3]) -> MechParts {
         antenna: None,
         toe1: None,
         toe2: None,
-        pistons: false,
+        toes: &[],
+        toe_len: 0.,
+        knee: None,
+        ankle: None,
     }
 }
 

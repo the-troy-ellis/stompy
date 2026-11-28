@@ -11,7 +11,7 @@ use crate::geom::{center_of, eye_of, ray_hit};
 use crate::jets::{air_steer, jet_lock};
 use crate::math::*;
 use crate::mech::step_mech;
-use crate::melee::{melee_press, melee_target, melee_tick};
+use crate::melee::{can_punch, melee_press, melee_target, melee_tick};
 use crate::missiles::{cycle_target, fire_cat, missile_trigger, steer_volley};
 use crate::state::blend_pal;
 use crate::voice::voice;
@@ -62,6 +62,12 @@ fn tick_objectives(g: &mut Game) {
     g.end_t = 3.2;
     voice(g, Vo::Complete, None, true, 400.);
 }
+/// How far back the stick drives the throttle (reverse is slow).
+pub const REVERSE: f32 = 0.35;
+/// Walking forward with the torso left alone this long, it swings back over the legs.
+pub const RECENTRE_AFTER: f32 = 0.6;
+/// How fast it swings back, a share of the twist a second (gentler than the centre button's 6).
+pub const RECENTRE_RATE: f32 = 1.8;
 /// The player's controls into the mech.
 fn drive(g: &mut Game, i: &Input, dt: f32) {
     let guiding = g.guide.is_some();
@@ -70,16 +76,26 @@ fn drive(g: &mut Game, i: &Input, dt: f32) {
         p.jetting = false;
         return;
     }
-    if i.thr != 0. {
-        p.throttle = clamp(p.throttle + clamp(i.thr, -1., 1.) * dt * 0.9, -0.35, 1.);
+    // Knocked down: nothing but the mash (A) to get back up.
+    if p.down.is_some() {
+        (p.throttle, p.jetting) = (0., false);
+        crate::down::mash_input(g, i.jets);
+        return;
     }
+    // The stick is the throttle: let go and it drops to zero (the owner, 2026-11-28); the legs'
+    // own inertia still eases the speed in and out.
+    let thr = clamp(i.thr, -1., 1.);
+    p.throttle = if thr >= 0. { thr } else { thr * REVERSE };
     if i.stop {
         p.throttle = 0.;
     }
     // Half the turn rate on one leg, and mid-swing.
     let both = p.hp[Sec::LL.i()] > 0. && p.hp[Sec::RL.i()] > 0.;
-    let leg_rate =
-        p.ch.turn * dt * if both { 1. } else { 0.5 } * if p.melee.is_some() { 0.5 } else { 1. };
+    let leg_rate = p.ch.turn
+        * dt
+        * if both { 1. } else { 0.5 }
+        * if p.melee.is_some() { 0.5 } else { 1. }
+        * if p.stagger > 0. { STAGGER_TURN } else { 1. };
     p.yaw += clamp(i.turn, -1., 1.) * leg_rate;
     if guiding {
         let gd = g.guide.as_mut().unwrap();
@@ -92,6 +108,16 @@ fn drive(g: &mut Game, i: &Input, dt: f32) {
     let p = g.pm();
     if i.twist != 0. || i.twist_by != 0. {
         p.centring = false;
+    }
+    // Walking forward with the torso left alone, it swings back over the legs. A light touch
+    // (the gyro's tremor) doesn't count as twisting; aiming does, and holds it off a moment.
+    if i.twist.abs() > 0.05 || i.twist_by.abs() > 0.0015 {
+        p.twist_quiet = 0.;
+    } else {
+        p.twist_quiet += dt;
+    }
+    if !guiding && p.throttle > 0.05 && p.twist_quiet > RECENTRE_AFTER {
+        p.twist *= (1. - RECENTRE_RATE * dt).max(0.);
     }
     if i.centre || p.centring {
         p.twist *= (1. - 6. * dt).max(0.);
@@ -151,8 +177,10 @@ pub fn update(g: &mut Game, i: &Input, dt: f32) {
     if live && i.punch {
         melee_press(g, PLAYER);
     }
-    g.punch_ready = live && g.p().melee.is_none() && melee_target(g, PLAYER).is_some();
-    let armed = live && g.p().melee.is_none(); // no guns during a swing or its recovery
+    g.punch_ready =
+        live && can_punch(g, PLAYER) && g.p().melee.is_none() && melee_target(g, PLAYER).is_some();
+    // No guns during a swing or its recovery, or while knocked down.
+    let armed = live && g.p().melee.is_none() && g.p().down.is_none();
     let guiding = g.guide.is_some();
     g.pm().beam_on = armed && i.energy && !guiding;
     fusion_tick(g, PLAYER, dt, armed && i.fusion && !guiding);
@@ -166,6 +194,10 @@ pub fn update(g: &mut Game, i: &Input, dt: f32) {
     steer_volley(g, dt);
 
     for id in 0..g.mechs.len() {
+        // A knocked-down AI mashes to get up, at a rate set by difficulty, thinking or not.
+        if id != PLAYER && g.mechs[id].down.is_some() && g.rng.chance(AI_MASH[g.diff.i()] * dt) {
+            crate::down::mash(g, id);
+        }
         // Every mech but the player's thinks, on either side.
         if id != PLAYER && g.mechs[id].alive {
             if g.mechs[id].ai.still {
@@ -178,6 +210,7 @@ pub fn update(g: &mut Game, i: &Input, dt: f32) {
         if g.mechs[id].alive {
             step_mech(g, id, dt);
             melee_tick(g, id, dt);
+            crate::down::down_tick(g, id, dt);
         }
         if g.mechs[id].alive && g.mechs[id].beam_on {
             let aim = if id == PLAYER {

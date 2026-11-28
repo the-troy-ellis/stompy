@@ -549,6 +549,16 @@ pub fn draw_hud(h: &mut Hud, gl: &mut Gl, g: &Game, vp: &M4, o: &HudOpts) {
         h.line(cx - k, cy - k, cx + k, cy + k, 2. * s, WHITE);
         h.line(cx - k, cy + k, cx + k, cy - k, 2. * s, WHITE);
     }
+    if let Some(d) = p.down {
+        // Knocked down: what to do, and how far the mashing has got.
+        h.text_c(cx, cy - 70. * s, 4. * s, "DOWN", RED);
+        if d.phase == DownPhase::Lying {
+            h.text_c(cx, cy + 40. * s, 2. * s, "MASH A TO GET UP", AMBER);
+            let (w, bh) = (180. * s, 8. * s);
+            h.rect(cx - w / 2., cy + 60. * s, w, bh, DIM);
+            h.rect(cx - w / 2., cy + 60. * s, w * d.up, bh, AMBER);
+        }
+    }
     if g.punch_ready {
         h.text_c(
             cx,
@@ -614,8 +624,40 @@ pub fn draw_hud(h: &mut Hud, gl: &mut Gl, g: &Game, vp: &M4, o: &HudOpts) {
         );
     }
     readout(h, g, o, s);
+    static_after_a_wreck(h, g, s);
     h.flush(gl, 1.);
     flashes(h, gl, g, p.shutdown);
+}
+/// Staggered by a wrecking ball, the readout takes the blow too: it jumps about, drops out on
+/// some frames, and bars of static run across it, all fading as the stagger passes.
+fn static_after_a_wreck(h: &mut Hud, g: &Game, s: f32) {
+    let k = (g.p().stagger / FIST_CHAIN.stagger).clamp(0., 1.);
+    if k <= 0. {
+        return;
+    }
+    let n = |i: u64| {
+        let x = ((g.frame.wrapping_mul(2654435761) ^ i.wrapping_mul(40503)) % 10007) as f32;
+        x / 10007.
+    };
+    if n(1) < 0.35 * k {
+        h.b.clear(); // a frame the readout drops out
+    } else {
+        let (dx, dy) = ((n(2) - 0.5) * 24. * s * k, (n(3) - 0.5) * 14. * s * k);
+        for v in h.b.chunks_mut(9) {
+            v[0] += dx;
+            v[1] += dy;
+        }
+    }
+    for i in 0..(14. * k) as u64 {
+        let y = n(10 + i) * h.h;
+        let (x, w) = (n(40 + i) * h.w * 0.6, h.w * (0.2 + 0.6 * n(70 + i)));
+        let c = if n(100 + i) < 0.5 {
+            DIM
+        } else {
+            [0.5, 0.55, 0.5]
+        };
+        h.rect(x, y, w, (1. + 3. * n(130 + i)) * s, c);
+    }
 }
 /// The debug readout (View held + Y, or F3): the frame's costs, for measuring battles.
 fn readout(h: &mut Hud, g: &Game, o: &HudOpts, s: f32) {

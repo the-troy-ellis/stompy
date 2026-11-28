@@ -688,8 +688,11 @@ pub struct MeleeDef {
     pub stomp_knock: f32,
     pub stomp_air: f32,
     pub fists: bool,
+    pub chain: Option<&'static ChainDef>,
 }
-/// Everyone can shove. Reach is metres times the chassis's scale.
+/// What every chassis has without fists: the stomp. It doesn't punch or shove (punching is
+/// PURPLE PUNCHER's alone, the owner 2026-11-28); its punch numbers are unused. Reach is metres
+/// times the chassis's scale.
 pub static DEFAULT_MELEE: MeleeDef = MeleeDef {
     dmg: 8.,
     reach: 9.,
@@ -703,6 +706,7 @@ pub static DEFAULT_MELEE: MeleeDef = MeleeDef {
     stomp_knock: 6.,
     stomp_air: 0.6,
     fists: false,
+    chain: None,
 };
 /// PURPLE PUNCHER's fists: the real punch.
 pub static FIST_MELEE: MeleeDef = MeleeDef {
@@ -718,7 +722,63 @@ pub static FIST_MELEE: MeleeDef = MeleeDef {
     stomp_knock: 14.,
     stomp_air: 0.6,
     fists: true,
+    chain: Some(&FIST_CHAIN),
 };
+/// PURPLE PUNCHER's fists are wrecking balls on chains (the owner, 2026-11-28): launched down
+/// the aim, they hit the first mech in their path and are reeled back in. Reach and the ball's
+/// size are metres times the chassis's scale.
+#[derive(Clone, Copy, Debug)]
+pub struct ChainDef {
+    /// How far the chain pays out, how fast the ball flies out and is reeled back (m/s).
+    pub reach: f32,
+    pub out: f32,
+    pub back: f32,
+    /// The ball's radius, for what it hits.
+    pub ball: f32,
+    /// How long a mech it hits staggers: its legs buckle, it can't walk, it turns slowly.
+    pub stagger: f32,
+}
+pub static FIST_CHAIN: ChainDef = ChainDef {
+    reach: 34.,
+    out: 75.,
+    back: 40.,
+    ball: 1.4,
+    stagger: 1.0,
+};
+/// How far off the aim a mech may stand and still count as in a chained punch's line, for the
+/// HUD's PUNCH and the AI's decision (the ball itself hits only what it meets).
+pub const CHAIN_ARC: f32 = 10. * PI / 180.;
+/// Knockdown (specs/06-knockdown.md): the fall's time and how far over it ends (radians), how far
+/// the hips drop (by hip height), the presses of A from flat to up, how long after the last press
+/// the heaves start to sag back and how fast, how long the rise takes, and the AI's presses a
+/// second by difficulty.
+pub const DOWN_FALL: f32 = 0.6;
+pub const DOWN_ANGLE: f32 = 1.35;
+pub const DOWN_DROP: f32 = 0.12;
+pub const MASH_PRESSES: f32 = 8.;
+pub const MASH_GRACE: f32 = 0.5;
+pub const MASH_SAG: f32 = 0.15;
+pub const DOWN_RISE: f32 = 0.9;
+pub const AI_MASH: [f32; Diff::N] = [3., 4.5, 6.];
+/// How far through the get-up the heaves take it (on one knee); the rest is the rise. How fast
+/// the drawn get-up follows the heaves (a second's worth, up and back down).
+pub const KNEEL_P: f32 = 0.8;
+pub const GETUP_RATE: f32 = 1.6;
+pub const GETUP_SAG: f32 = 0.6;
+/// Up again, it stumbles: a shove back that its legs step out of, a wobble, and weak legs for a
+/// moment (m/s by scale, seconds of stagger).
+pub const STUMBLE: f32 = 4.;
+pub const STUMBLE_STAGGER: f32 = 0.6;
+/// A wrecking ball throws what it hits off the ground (the owner, 2026-11-28: lifted a bit in
+/// the air, sliding a bit when it lands): the lift (m/s up) for the lightest and the heaviest by
+/// the blow's mass ratio, how much of the shove the air keeps (its decay a second, against the
+/// ground's), and the longest the landing's skid lasts.
+pub const THROW_LIFT: [f32; 2] = [5., 9.];
+pub const AIR_DECAY: f32 = 0.5;
+pub const SKID_MAX: f32 = 1.2;
+/// While staggered: the share of the turn rate left, and how far the hips sag (metres, by scale).
+pub const STAGGER_TURN: f32 = 0.3;
+pub const STAGGER_SAG: f32 = 0.6;
 /// The AI's taste for punching: the chance per second of opportunity, by difficulty, and how far outside the player's reach it keeps.
 pub const AI_PUNCH_CHANCE: [f32; Diff::N] = [0.3, 0.6, 0.9];
 pub const AI_PUNCH_KEEP_OUT: f32 = 1.3;
@@ -1009,7 +1069,8 @@ pub const KNUCKLES_MULT: f32 = 1.5;
 // --- the feel table (docs/specs/01-thunk.md) ----------------------------------------------------
 keyed!(/// Every event that is felt.
     Feel { Step, NearStep, Blastoff, Land, FireAc, FireGauss, FireMg, FireBolt, Bolt, FireLrm, Hit, Shutdown, Restart,
-        SectionLost, Death, Explosion, Punch, Punched, Stomp, Whiff, Blast, FusionFire });
+        SectionLost, Death, Explosion, Punch, Punched, Stomp, Whiff, Blast, FusionFire, Wrecked,
+        Knocked, Heave, Up });
 /// One row: each column multiplied by the event's intensity.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FeelRow {
@@ -1095,6 +1156,19 @@ pub static FEEL: [FeelRow; Feel::N] = [
     fr(0.3, 0., 0., 0., 0., 0., 0.2, 0., 0., 0., 0., 0.),    // whiff
     fr(0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 4.),      // blast: a missile blast's shove
     fr(0.6, 0., 1.2, 0.4, 0.7, 0.1, 0.8, 1.2, 1.0, 0., 80., 0.), // fusionFire
+    // wrecked: a wrecking ball, on the mech it hits. The top of every column: the eye slammed
+    // down, the view shaken to its cap, red and white, the body crushed and rocked, the deepest
+    // thump, the music gone, dust, the longest rumble. It should feel debilitating from inside.
+    FeelRow {
+        sag: 0.,
+        ..fr(1.8, 0., 1.2, 0.6, 0.55, 0.35, 1.8, 1.8, 1.0, 5., 320., 0.)
+    },
+    // knocked: the body hitting the ground after a wrecking ball, the slam of a demigod going over.
+    fr(1.6, 0., 1.1, 0.3, 0., 0.4, 1.2, 1.6, 0.8, 6., 280., 0.),
+    // heave: one press of the mash, shoving part of the way up.
+    fr(0.35, 0., 0.15, 0., 0., 0.12, 0.3, 0.45, 0., 0.5, 60., 0.),
+    // up: on its feet again, the feet planting.
+    fr(0.7, 0., 0.3, 0., 0., 0.3, 0.5, 1.0, 0.2, 3., 120., 0.),
 ];
 pub fn feel_row(e: Feel) -> &'static FeelRow {
     &FEEL[e.i()]

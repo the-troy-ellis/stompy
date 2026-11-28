@@ -32,6 +32,7 @@ mod look;
 mod mesh;
 mod models;
 mod platform;
+mod ragdoll;
 mod scene;
 
 use app::{App, Args, Screen};
@@ -57,6 +58,7 @@ fn main() {
         spectate: false,
         follow: false,
         cockpit_pose: None,
+        foe_near: None,
     };
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut it = args.iter();
@@ -71,6 +73,10 @@ fn main() {
             "--spectate" => a.spectate = true,
             "--follow-fight" => a.follow = true,
             "--cockpit-pose" => a.cockpit_pose = Some(num(it.next()) as u8),
+            "--foe-near" => {
+                let (k, d) = (num(it.next()) as usize, num(it.next()) as f32);
+                a.foe_near = Some((k, d));
+            }
             "--battle" => {
                 let (al, fo) = (num(it.next()) as usize, num(it.next()) as usize);
                 a.battle = Some((al, fo));

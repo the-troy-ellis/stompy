@@ -367,6 +367,7 @@ impl Audio {
             Sfx::Step { .. } => 12.,
             Sfx::Fusion => 120.,
             Sfx::Bonker => 80.,
+            Sfx::Wreck => 100.,
             _ => 35.,
         };
         let Some((g, pan)) = self.spatial(at, reach) else {
@@ -459,6 +460,31 @@ impl Audio {
                 ns.push((0.2, 0.3, 600., 100., Low, 0.));
             }
             Sfx::Punch { hit: false } => ns.push((0.25, 0.08, 1200., 300., Band, 0.)),
+            // The chain: a rattle of links paying out with a whoosh, or reeling in, slower.
+            Sfx::Chain { back } => {
+                let (n, gap) = if back { (10, 0.06) } else { (8, 0.035) };
+                for k in 0..n {
+                    let f = if back { 2600. } else { 3300. };
+                    ns.push((0.03, 0.2, f, f * 0.75, Band, k as f32 * gap));
+                }
+                if !back {
+                    ns.push((0.3, 0.12, 1500., 350., Band, 0.));
+                }
+            }
+            // A wrecking ball landing: the deepest thump, a crunch, and the metal ringing.
+            Sfx::Wreck => {
+                os.push((Sine, 62., 20., 1.1, 0.6, 0.));
+                os.push((Square, 170., 80., 0.16, 0.16, 0.));
+                ns.push((0.55, 0.6, 2200., 70., Low, 0.));
+                ns.push((0.22, 0.32, 5200., 1800., Band, 0.));
+                os.push((Sine, 740., 732., 1.0, 0.07, 0.02));
+                os.push((Sine, 1133., 1121., 0.8, 0.05, 0.02));
+            }
+            // Your own head ringing after one: a thin high whine and static, fading.
+            Sfx::Ring => {
+                os.push((Sine, 2900., 2830., 1.9, 0.06, 0.08));
+                ns.push((0.7, 0.07, 6500., 3000., Band, 0.05));
+            }
             Sfx::Whine => os.extend([
                 (Saw, 320., 1500., 0.26, 0.05, 0.),
                 (Sine, 160., 900., 0.26, 0.06, 0.),

@@ -81,10 +81,13 @@ own; the mockups (window shapes for all six) came first.
   springs, pushed by the head's jolts (sideways, fore and aft), by its turns
   and tips (the head rotates under the hook), and a little by each
   footfall's drop.
-- The cockpit's own arms (bug 2's fix) still reach in from the lower
-  corners and fire from their tips; the eye was sized so they show. Only
-  the guns (or fists) are drawn from inside: the shoulder drums and upper
-  arms floated in view (the owner, 2026-11-28).
+- The cockpit's own guns (bug 2's fix) reach in from behind the frame at
+  the sides of the view, each barrel aimed down the crosshair's line so
+  they meet where your shots go, and fire from their tips. Only the guns
+  (or fists) are drawn from inside, and they hang from the head, not the
+  torso, so they stay put against the frame while the head bobs; their
+  back ends are always behind the frame (the owner, 2026-11-28: the arms
+  floated, attached to nothing).
 - The green HUD stays on top of it all.
 
 ## The rest (next)

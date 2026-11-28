@@ -54,6 +54,34 @@ without one draws as before.
   back hard in 0.04 s and returns by 0.3 s, twice as far for a big gun; the
   arm rocks up a touch with it. The cockpit's own guns kick too.
 
+**SKEDADDLE** (2026-11-28) has its own profile (`anim::SKEDADDLE`),
+twitchy where BARRY is steady: the arms pump harder (0.17) and trail a turn
+more, the feet snap off the ground, the long toes grab harder, the two ears
+flick at every jolt on a quick spring; no pods. It walks like a bird (the
+owner, 2026-11-28: more bob and sway, birdlike): on top of the sim's body,
+drawn only, the hips dip at every footfall (0.24 m at full pace) and rise
+over the planted leg, rock over whichever foot is down (0.3 m, leaning 0.07
+rad into it), and each step the torso thrusts forward fast and eases back
+while the body catches up, nodding with it (0.4 m, 0.08 rad), as a bird's
+head does (`anim::body`). The legs reach for the planted feet, so the feet
+still never slide. BARRY's body walk is zero: it walks as before.
+
+**Ragdolls** (2026-11-28): a thrown or dying two-legged mech is a small
+point-and-stick ragdoll while it falls (`ragdoll.rs`, `06-knockdown.md`).
+The owner asked whether physics beat hand tuning: for passive motion
+(thrown, falling, dying) it does; walking and getting up stay authored.
+
+**PURPLE PUNCHER** (2026-11-28, `anim::PURPLE_PUNCHER`): a heavyweight's
+lumber. It rolls over each planted foot (0.24 m, leaning 0.06 rad), bobs a
+little (0.1 m), and its shoulders turn against the hips with every stride
+(a swagger, 0.13 rad); the big arms swing heavily (0.2) and trail a turn,
+the feet come down flat and the stubby toes hardly curl. No peck, no pods,
+no antenna. The fists are the model's own (`Parts::fist`); the punch is the
+sim's swing, as before. Its pistons: a knee ram in
+front of the backward knee, an ankle ram down the back of the shin to the
+heel (`models::SKED_KNEE`, `SKED_ANKLE`). Every chassis's toes and pistons
+now come with its model.
+
 Clips: `--watch` (or `--watch-from A`) films your own mech from outside,
 `--record N K dir` saves the frames.
 

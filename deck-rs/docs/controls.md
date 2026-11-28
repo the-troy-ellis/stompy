@@ -9,18 +9,18 @@ here is in `crates/game/src/controls.rs` (pure, with unit tests) and
 | Control | Does |
 |---|---|
 | Left stick, sideways | Turns the legs, at the chassis's turn rate. |
-| Left stick, up and down | Nudges the throttle setting (it holds; the HUD's amber notch is the setting). |
+| Left stick, up and down | The throttle: as far as the stick is pushed, and back to zero when you let go (back is a slow reverse). Walking forward with the torso left alone for a moment, it swings back over the legs. |
 | Right stick | Twists and pitches the torso. Fine control near the centre, speed at the edge. Steers a guided volley. |
 | Gyro | Fine aim, added to the torso, while a finger rests on the **right trackpad** (GYRO: RIGHT PAD, the default). GYRO: ALWAYS and OFF are in SETTINGS. |
 | RT | Energy weapons, held (beams stay on; bolts refire). |
 | RB | Ballistic weapons, held. |
 | LT | Missiles. Tap to fire a volley; hold to fly it from the nose camera; let go to detonate. |
 | LB | OOPS BUTTON (the fusion cannon): hold the scan on one mech for three seconds. |
-| A | Jump jets: hold to charge, let go to blast off. Steer the flight with the left stick. |
+| A | Jump jets: hold to charge, let go to blast off. Steer the flight with the left stick. Knocked down: mash A to get up. |
 | B | Centre the torso over the legs. |
 | X | Next target (nearest first). |
 | Y | Zoom (toggle). |
-| Right stick click, R4, L4 | Punch. |
+| Right stick click, R4, L4 | Punch (PURPLE PUNCHER only: punching is its own). |
 | R5 | Centre the torso (so the right thumb never leaves the stick). |
 | L5, D-pad down | Full stop. |
 | Start, View | Pause. |
@@ -44,12 +44,20 @@ change a value.
 Your own mech is parked off the field and nobody targets it; the battle ends
 when either side is gone.
 
-### Why the throttle holds
+### The throttle is the stick
 
-A mech sim's throttle is a setting, not a pedal: you set a speed and your
-thumb goes back to turning. The stick nudges the setting up and down, the
-D-pad and L5 stop. A DIRECT mode (stick position is the throttle) is an open
-question for the first Deck playtest ([roadmap.md](roadmap.md) M1).
+The owner (2026-11-28): the throttle drops back to zero when the stick isn't
+pushed forward. So the stick's position is the throttle, like a pedal (the
+legs' own inertia still eases the speed in and out), and W and S do the same.
+The first build held a setting instead; this was the open question for the
+first Deck playtest.
+
+### The torso recentres as you walk
+
+The owner (2026-11-28): walking forward without twisting, the torso comes
+back over the legs. After 0.6 s with the twist left alone (a light touch on
+the gyro doesn't count; aiming does), it swings back, gently (a share of 1.8
+a second, softer than B's snap). Standing still, it stays where you put it.
 
 ### The gyro
 
@@ -68,7 +76,7 @@ Steam Input is set to turn the gyro into mouse motion instead (see
 | W, S | Throttle up and down. |
 | Mouse | Torso twist and pitch (relative mouse, captured while playing). |
 | Left button | Energy. Right button: ballistic. Middle button or F: missiles. G: OOPS BUTTON. |
-| Space | Jump jets (hold, let go). |
-| E, mouse button 4 | Punch. |
+| Space | Jump jets (hold, let go). Knocked down: mash Space to get up. |
+| E, mouse button 4 | Punch (PURPLE PUNCHER only). |
 | C | Centre torso. R: next target. Z: zoom. X: full stop. |
 | Escape | Pause; back in menus. Enter: pick. |

@@ -66,7 +66,31 @@ Counted for a whole mech, both legs and arms (test: `models::tests`):
   antenna light and a coolant line on the gun.
 
 `--detail N` (0 the boxes, 1, 2) picks for a tools run. **The owner picked
-level 2** (2026-11-27), the default. Then the other five, and the ground's faces come with
+level 2** (2026-11-27), the default.
+
+**SKEDADDLE** (2026-11-28, `models::skedaddle`): a lean sprinter on bird
+legs. A forward-leaning hull, a glass canopy dome with a frame over it,
+gulping side intakes, raked cooling fins; a counterweight behind the
+pelvis (it had a raptor's tail; the owner: too much); thick armoured thighs over slim open-frame shins; long
+three-toed claws, splayed wide, and a spur behind; slim strut arms with the
+LIL ZAPPERs (a lens at the muzzle); two ears in a V. Level 1 about 4,300
+triangles, level 2 about 8,400 (a little under BARRY).
+
+**PURPLE PUNCHER** (2026-11-28, `models::puncher`): a heavyweight, wider
+than tall. A barrel chest with pectoral plates, shoulders like fridges
+capped in its purple, a low flat head with an eye slit under a brow, a belt
+with a big purple buckle, exhaust stacks behind; the BIG BOOMER low in the
+chest and the FIRECRACKERS on the right shoulder; thick legs on broad flat
+feet with three stubby toes; short thick arms with elbow pistons; and two
+big purple fists bigger than the arms, a row of knuckles across the front,
+four fingers curled down it, the thumb tucked under; then, the owner
+asking for wrecking balls on chains, two big purple wrecking balls with
+knuckle studs across the face, a bolted steel band and a shackle, docked in
+a socket at each wrist. Out on its chain, the ball faces the way it flies
+and the links (alternately fat and thin) run back to the wrist. No arm
+guns, no antenna. Level 1 about 4,900 triangles, level 2 about 9,700.
+
+Then the other three, and the ground's faces come with
 the voxel ground (P2).
 
 ### Paint shows the side (built)

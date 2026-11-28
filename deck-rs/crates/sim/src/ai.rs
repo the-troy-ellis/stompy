@@ -6,7 +6,7 @@ use crate::game::*;
 use crate::geom::{blocked, center_of, eye_of};
 use crate::math::*;
 use crate::mech::{grade_factor, grips};
-use crate::melee::{can_punch, melee_of, melee_press, melee_target};
+use crate::melee::{can_punch, melee_press, melee_target, punch_reach, punches};
 
 fn diff(g: &Game) -> &'static DiffDef {
     &DIFFS[g.diff.i()]
@@ -574,6 +574,12 @@ fn decide_fire(g: &mut Game, id: MechId, dist: f32, to_yaw: f32, dt: f32) {
 
 /// One enemy, one frame.
 pub fn think(g: &mut Game, id: MechId, dt: f32) {
+    // Knocked down: it does nothing but mash (the update loop does that).
+    if g.mechs[id].down.is_some() {
+        let e = &mut g.mechs[id];
+        (e.throttle, e.jetting, e.beam_on) = (0., false, false);
+        return;
+    }
     let belief = perceive(g, id);
     let tid = foe(g, id);
     let e = &g.mechs[id];
@@ -621,16 +627,16 @@ pub fn think(g: &mut Game, id: MechId, dt: f32) {
     } else {
         strafe_tick(g, id, dt);
         let (e, p) = (&g.mechs[id], &g.mechs[tid]);
-        let reach_p = melee_of(p).reach * p.ch.scale + e.radius();
-        let reach_e = melee_of(e).reach * e.ch.scale + p.radius();
-        let too_close = seen && dist < reach_p * AI_PUNCH_KEEP_OUT;
+        let reach_p = punch_reach(p) + e.radius();
+        let reach_e = punch_reach(e) + p.radius();
+        let too_close = seen && punches(p) && dist < reach_p * AI_PUNCH_KEEP_OUT;
         let brawling = e.ai.profile == Profile::Brawler;
         let punchable = e.ai.profile != Profile::Sniper
             && p.alive
             && can_punch(g, id)
             && melee_target(g, id) == Some(tid);
-        if p.shutdown && p.alive {
-            // A shut-down player: walk up and shove them. Correct Stompy behaviour.
+        if p.shutdown && p.alive && punches(e) {
+            // A shut-down player: walk up and punch them. Correct Stompy behaviour.
             move_yaw = to_yaw;
             thr = if dist < reach_p * 0.6 { 0. } else { 1. };
         } else if punchable || e.melee.is_some() {
@@ -654,7 +660,7 @@ pub fn think(g: &mut Game, id: MechId, dt: f32) {
         g.mechs[id].jetting = jets;
     }
     let e = &mut g.mechs[id];
-    let turn = e.ch.turn * dt;
+    let turn = e.ch.turn * dt * if e.stagger > 0. { STAGGER_TURN } else { 1. };
     e.yaw += clamp(wrap(move_yaw - e.yaw), -turn, turn);
     e.throttle = thr;
     if !e.ai.aware || e.ai.target.is_none() {

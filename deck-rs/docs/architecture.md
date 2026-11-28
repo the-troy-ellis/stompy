@@ -127,6 +127,9 @@ offline or on any failure it runs what it has (docs/deck-setup.md).
 - **Feet never slide.** A planted foot's world position is fixed until it
   lifts; swings land where the rest spot will be at touchdown. The gait
   clock is distance, not time. A test walks every chassis and checks it.
+  **One exception, the owner's** (2026-11-28): a mech thrown by a wrecking
+  ball skids when it lands, and its feet slide with it until the shove dies
+  down (`Mech::skid`); then they plant again.
 - **Ground queries match the mesh.** `Terrain::height` and
   `build_terrain_chunk` use the same triangle split.
 - **Mechs are vertical cylinders** for hits. Sections are routed by height

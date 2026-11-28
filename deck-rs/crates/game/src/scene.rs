@@ -42,6 +42,8 @@ pub struct Scene {
     pub detail: u8,
     /// Each mech's drawn-only motion (`anim.rs`), by index.
     anims: Vec<Option<Anim>>,
+    /// Each thrown or dying mech's ragdoll (drawn only).
+    rags: Vec<Option<crate::ragdoll::Ragdoll>>,
 }
 /// A fixed camera instead of the cockpit (the menu's turntable).
 pub struct Cam {
@@ -58,10 +60,11 @@ fn fx_mesh(s: &Scene, k: Fx) -> &Mesh {
 /// Past this distance a mech is drawn with its plain model and no drawn-only motion: at 120 m
 /// it is a few dozen pixels tall.
 const LOD_FAR: f32 = 120.;
-/// The cockpit's own arms: their scale, and where the shoulders sit from the eye (sideways,
-/// down, forward), so the barrels show low in the corners of the view.
-const COCKPIT_ARM: f32 = 0.5;
-const COCKPIT_SHOULDER: [f32; 3] = [1.9, -0.15, 1.8];
+/// The cockpit's own guns: their scale, and where the shoulders sit from the eye (sideways, up,
+/// forward): outside the window, so each barrel reaches in from behind the frame and its back end
+/// never shows (the owner, 2026-11-28: the arms floated, attached to nothing).
+const COCKPIT_ARM: f32 = 0.55;
+const COCKPIT_SHOULDER: [f32; 3] = [2.1, 0.22, 1.3];
 /// A piece of a chassis, for the batch.
 #[derive(Clone, Copy)]
 enum Slot {
@@ -151,6 +154,32 @@ fn piston(b: &mut Batch, a: V3, z: V3, pi: &crate::models::Piston, sc: f32, dark
         [0.3, 0.31, 0.34],
         0.,
     );
+}
+/// A knocked-down mech's frames, from its pose: the hips' frame (what `base` is standing: the
+/// hips drawn at its hip height) and the ground frame its feet are placed in.
+fn down_frames(m: &Mech, d: &anim::DownPose) -> (M4, M4) {
+    let g = &m.geo;
+    let ground = M4::t(m.x, m.y, m.z) * M4::ry(m.yaw) * M4::s1(m.ch.scale);
+    let base = ground
+        * M4::t(d.hip_x, d.hip_h * g.hip, d.hip_z)
+        * M4::ry(d.turn)
+        * M4::rz(d.roll)
+        * M4::rx(-d.back)
+        * M4::t(0., -g.hip, 0.);
+    (base, ground)
+}
+/// A chain from `a` to `b`: links half a metre long (by scale), every other one fatter, so it
+/// reads as links and not a rod.
+fn chain(b: &mut Batch, a: V3, z: V3, sc: f32) {
+    let len = (z - a).len();
+    let link = 0.5 * sc;
+    let n = (len / link).ceil().max(1.) as usize;
+    for i in 0..n {
+        let (u0, u1) = (i as f32 / n as f32, (i as f32 + 0.85) / n as f32);
+        let (p0, p1) = (a + (z - a) * u0, a + (z - a) * u1.min(1.));
+        let d = if i % 2 == 0 { 0.26 } else { 0.16 } * sc;
+        b.fx(Fx::Rod, false, &rod_mat(p0, p1, d), [0.3, 0.31, 0.34], 0.);
+    }
 }
 /// A box from `a` to `b`, `w` across: the beams and the tracers.
 fn beam_mat(a: V3, b: V3, w: f32) -> M4 {
@@ -248,6 +277,7 @@ impl Scene {
             cell: 2,
             detail: 2,
             anims: vec![],
+            rags: vec![],
         }
     }
     /// Builds a chassis's models the first time it is drawn: the full one and the plain one.
@@ -324,7 +354,11 @@ impl Scene {
         let (geo, sc) = (m.geo, m.ch.scale);
         let far = !arms_only && hypot2(m.x - self.eye.x, m.z - self.eye.z) > LOD_FAR;
         let lod = far as usize;
-        let base = if let Some(d) = m.dying {
+        // Knocked down: a boxer's fall and get-up, posed (anim::down_pose).
+        let dp = self.posed(m, id);
+        let base = if let Some(d) = &dp {
+            down_frames(m, d).0
+        } else if let Some(d) = m.dying {
             // The legs buckle and the body topples about the ground under it.
             M4::t(m.x, m.y, m.z)
                 * M4::ry(d.fall_yaw)
@@ -341,17 +375,27 @@ impl Scene {
                 * M4::rz(m.lean + m.tilt_r.x)
                 * M4::t(m.sway, 0., m.surge)
         };
+        // The body's own walk on top (a bird's bob and sway, drawn only): the hips move, the
+        // legs reach for the planted feet, and the feet stay put.
+        let walk = match anim::profile(m.key()) {
+            Some(pr) if self.detail > 0 && m.dying.is_none() && m.down.is_none() && !far => {
+                anim::body(pr, m)
+            }
+            _ => anim::Body::default(),
+        };
+        let base = base * M4::t(walk.sway, walk.bob, 0.) * M4::rz(walk.roll);
         let sq = m.squash.x + m.jet.charge * 0.14;
         let (lean, arm_swing, lunge) = melee_pose(m);
         let tb = base
             * M4::t(0., geo.torso_y + m.torso_drop, 0.)
             * M4::s(1. + sq * 0.5, 1. - sq, 1. + sq * 0.5)
-            * M4::ry(m.twist)
-            * M4::t(0., 0., lunge)
-            * M4::rx(m.wob_p.x - lean + m.torso_nod + m.run_lean)
+            * M4::ry(m.twist + walk.yaw)
+            * M4::t(0., 0., lunge + walk.peck)
+            * M4::rx(walk.nod)
+            * M4::rx(m.wob_p.x - lean + m.torso_nod + m.run_lean + dp.map_or(0., |d| d.lean))
             * M4::rz(m.wob_r.x);
         // The drawn-only motion: springs moved on, then read below.
-        let prof = if self.detail > 0 && m.dying.is_none() && !far {
+        let prof = if self.detail > 0 && m.dying.is_none() && m.down.is_none() && !far {
             anim::profile(m.key())
         } else {
             None
@@ -442,17 +486,28 @@ impl Scene {
             let sw = if swinging { arm_swing } else { 0. };
             let back = kick_of(Kicked::Arm(side));
             let a = if arms_only {
-                // The cockpit's own arms, small and low at the edges of the view, each barrel
-                // aimed at the point under the crosshair so the two meet where your shots go.
+                // The cockpit's own guns, reaching in from behind the frame at the sides of the
+                // view, each barrel aimed down the crosshair's line so the two meet where your
+                // shots go. Never at a point nearer than 80 m: close ground under the crosshair
+                // would swing them down out of the frame.
                 let k = COCKPIT_ARM;
-                let up = v3(tb.0[4], tb.0[5], tb.0[6]).norm();
-                let shoulder = tb.apply(v3(
-                    side * COCKPIT_SHOULDER[0],
-                    geo.eye[1] + COCKPIT_SHOULDER[1],
-                    geo.eye[2] + COCKPIT_SHOULDER[2],
-                ));
+                let far = g.aim - g.eye;
+                let aim = g.eye + far * (far.len().max(80.) / far.len().max(1e-3));
+                // Hung from the head (the camera), not the torso, so they stay put against the
+                // frame while the head bobs and sways.
+                let up = self.up;
+                let ahead = up.cross(self.right);
+                let lat = if v3(tb.0[0], tb.0[1], tb.0[2]).dot(self.right) >= 0. {
+                    self.right
+                } else {
+                    -self.right
+                };
+                let shoulder = self.eye
+                    + lat * (side * COCKPIT_SHOULDER[0])
+                    + up * COCKPIT_SHOULDER[1]
+                    + ahead * COCKPIT_SHOULDER[2];
                 let bore = shoulder + up * (-1.15 * k);
-                let z = (g.aim - bore).norm();
+                let z = (aim - bore).norm();
                 let x = up.cross(z).norm();
                 let y = z.cross(x);
                 M4([
@@ -478,9 +533,10 @@ impl Scene {
                     Some((pr, a)) => (anim::arm_swing(pr, m, side), a.lag.x),
                     None => (0., 0.),
                 };
+                let reach = dp.map_or(-m.pitch, |d| d.arms[if side > 0. { 0 } else { 1 }]);
                 tb * M4::t(side * geo.arm_x, geo.arm_y, 0.)
                     * M4::ry(lag)
-                    * M4::rx(-m.pitch + sw + swing + back * 0.25)
+                    * M4::rx(reach + sw + swing + back * 0.25)
             };
             // From inside, only the gun (or fist) reaches into view: the shoulder drum and upper
             // arm stay out of the eye.
@@ -488,7 +544,44 @@ impl Scene {
                 b.part(ch, lod, Slot::Arm, &a);
             }
             if p.fist.is_some() {
-                b.part(ch, lod, Slot::Fist, &a);
+                match m.flail.filter(|f| f.arm == sec) {
+                    // Out on its chain: the ball where the sim has it, facing the way it flies,
+                    // and the links back to the wrist.
+                    Some(f) => {
+                        use crate::models::{BALL, BALL_R};
+                        let z = f.dir;
+                        let up = if z.y.abs() < 0.9 {
+                            v3(0., 1., 0.)
+                        } else {
+                            v3(1., 0., 0.)
+                        };
+                        let x = up.cross(z).norm();
+                        let y = z.cross(x);
+                        let ball = M4([
+                            x.x * sc,
+                            x.y * sc,
+                            x.z * sc,
+                            0.,
+                            y.x * sc,
+                            y.y * sc,
+                            y.z * sc,
+                            0.,
+                            z.x * sc,
+                            z.y * sc,
+                            z.z * sc,
+                            0.,
+                            f.at.x,
+                            f.at.y,
+                            f.at.z,
+                            1.,
+                        ]) * M4::t(-BALL[0], -BALL[1], -BALL[2]);
+                        b.part(ch, lod, Slot::Fist, &ball);
+                        let from = a.apply(v3(0., -1.3, 0.3));
+                        let to = f.at - z * (BALL_R * sc);
+                        chain(b, from, to, sc);
+                    }
+                    None => b.part(ch, lod, Slot::Fist, &a),
+                }
             }
             if p.barrel.is_some() && m.w.iter().any(|w| w.mount == sec && !w.dead) {
                 let gun = a * M4::t(0., 0., -back);
@@ -512,57 +605,88 @@ impl Scene {
                 continue;
             }
             let hp = base.apply(v3(l.hx, geo.hip, l.hz));
-            let ankle = if m.dying.is_some() {
+            let ankle = if let Some(d) = &dp {
+                // Down: the feet where the pose (or the ragdoll) puts them, never past the leg's
+                // reach from the hip as drawn, so the foot stays on the shin.
+                let f = d.feet[i.min(1)];
+                let a = down_frames(m, d).1.apply(v3(f[0], geo.ankle + f[1], f[2]));
+                let (reach, off) = ((geo.l1 + geo.l2) * sc * 0.98, a - hp);
+                if off.len() > reach {
+                    hp + off.norm() * reach
+                } else {
+                    a
+                }
+            } else if m.dying.is_some() {
                 base.apply(v3(l.fx, 0.2, l.fz))
             } else {
                 m.feet[i].pos + v3(0., geo.ankle * sc, 0.)
             };
+            // Down, the knees bend up as well as their own way.
+            let lift = if dp.is_some() { 0.8 } else { 0. };
             let pole = match geo.knee {
-                Knee::Back => v3(-sn, 0., -c),
+                Knee::Back => v3(-sn, lift, -c).norm(),
                 Knee::Out => v3(c * l.hx + sn * l.hz, 0., -sn * l.hx + c * l.hz).norm(),
-                Knee::Forward => v3(sn, 0., c),
+                Knee::Forward => v3(sn, lift, c).norm(),
             };
             let k = solve_knee(hp, ankle, pole, geo.l1 * sc, geo.l2 * sc);
             let (mt, ms) = (M4::limb(hp, k, pole, sc), M4::limb(k, ankle, pole, sc));
             let roll = an.map_or(0., |(pr, _)| anim::foot_roll(pr, m, i));
-            let mf = M4::t(ankle.x, ankle.y - geo.ankle * sc + 0.2 * sc, ankle.z)
-                * M4::ry(m.feet[i].yaw)
-                * M4::rx(roll)
-                * M4::s1(sc);
+            let mf = match &dp {
+                // Down and off the ground, the foot hangs off the shin; on the ground, flat.
+                Some(d) => {
+                    let lift = smooth(d.feet[i.min(1)][1] / 1.2);
+                    let shin = (k - ankle).norm();
+                    let up = (v3(0., 1., 0.) + (shin - v3(0., 1., 0.)) * lift).norm();
+                    let fwd = v3(sn, 0., c);
+                    let z = (fwd - up * fwd.dot(up)).norm();
+                    let x = up.cross(z);
+                    let at = ankle - up * ((geo.ankle - 0.2) * sc);
+                    M4([
+                        x.x * sc,
+                        x.y * sc,
+                        x.z * sc,
+                        0.,
+                        up.x * sc,
+                        up.y * sc,
+                        up.z * sc,
+                        0.,
+                        z.x * sc,
+                        z.y * sc,
+                        z.z * sc,
+                        0.,
+                        at.x,
+                        at.y,
+                        at.z,
+                        1.,
+                    ])
+                }
+                None => {
+                    M4::t(ankle.x, ankle.y - geo.ankle * sc + 0.2 * sc, ankle.z)
+                        * M4::ry(m.feet[i].yaw)
+                        * M4::rx(roll)
+                        * M4::s1(sc)
+                }
+            };
             b.part(ch, lod, Slot::ULeg, &mt);
             b.part(ch, lod, Slot::LLeg, &ms);
             b.part(ch, lod, Slot::Foot, &mf);
             if p.toe1.is_some() {
-                use crate::models::{TOES, TOE_1};
                 let (curl, spread) =
                     an.map_or((0., 1.), |(pr, a)| anim::toe_pose(pr, m, a, i, g.time));
-                for h in TOES {
+                for h in p.toes {
                     let near =
                         mf * M4::t(h[0], h[1], h[2]) * M4::ry(h[3] * spread) * M4::rx(curl * 0.55);
                     b.part(ch, lod, Slot::Toe1, &near);
-                    let tip = near * M4::t(0., 0., TOE_1) * M4::rx(curl * 0.75);
+                    let tip = near * M4::t(0., 0., p.toe_len) * M4::rx(curl * 0.75);
                     b.part(ch, lod, Slot::Toe2, &tip);
                 }
             }
-            if p.pistons {
-                use crate::models::{ANKLE, KNEE};
-                let v = |a: [f32; 3]| v3(a[0], a[1], a[2]);
-                piston(
-                    b,
-                    mt.apply(v(KNEE.from)),
-                    ms.apply(v(KNEE.to)),
-                    &KNEE,
-                    sc,
-                    dark,
-                );
-                piston(
-                    b,
-                    ms.apply(v(ANKLE.from)),
-                    mf.apply(v(ANKLE.to)),
-                    &ANKLE,
-                    sc,
-                    dark,
-                );
+            let v = |a: [f32; 3]| v3(a[0], a[1], a[2]);
+            if let Some(kn) = &p.knee {
+                piston(b, mt.apply(v(kn.from)), ms.apply(v(kn.to)), kn, sc, dark);
+            }
+            if let Some(an) = &p.ankle {
+                piston(b, ms.apply(v(an.from)), mf.apply(v(an.to)), an, sc, dark);
             }
         }
         if m.flash.frame + 1 >= g.frame {
@@ -813,6 +937,23 @@ impl Scene {
             roll += f.roll * 0.8 * f.buckle.max(if p.fallen.is_some() { 1. } else { 0. });
             e.y -= f.drop + if p.fallen.is_some() { f.angle * 2. } else { 0. };
         }
+        if let Some(d) = self.posed(p, PLAYER).filter(|_| p.dying.is_none()) {
+            // Knocked down: the eye rides the body through the fall, the lying and the get-up,
+            // shaken as usual.
+            let (base, _) = down_frames(p, &d);
+            let tb = base
+                * M4::t(0., p.geo.torso_y, 0.)
+                * M4::ry(p.twist)
+                * M4::rx(d.lean + p.wob_p.x * wv)
+                * M4::rz(p.wob_r.x * wv);
+            let col = |k: usize| v3(tb.0[k], tb.0[k + 1], tb.0[k + 2]).norm();
+            let eye = tb.apply(v3(p.geo.eye[0], p.geo.eye[1], p.geo.eye[2]));
+            let (dir, up) = (col(8), col(4));
+            let right = dir.cross(up);
+            let mut e = eye + right * jx * 30. + up * (jy * 30. - drop * 0.35);
+            e.y = e.y.max(g.ter.height(e.x, e.z) + 0.6);
+            return (e, dir, up, fov);
+        }
         e.y = e.y.max(g.ter.height(e.x, e.z) + 0.6);
         let up = v3(roll.sin() * yaw.cos(), roll.cos(), -roll.sin() * yaw.sin());
         (e, dir_of(yaw, pitch - drop * 0.016), up, fov)
@@ -849,6 +990,55 @@ impl Scene {
         vp
     }
     /// The match, from the cockpit (or a fixed camera). Returns the view-projection, for the HUD.
+    /// A ragdoll for each mech just thrown (knocked down) or going down dead, stepped once a
+    /// frame; gone when it's up again.
+    fn step_rags(&mut self, g: &Game) {
+        use crate::ragdoll::Ragdoll;
+        if self.rags.len() < g.mechs.len() {
+            self.rags.resize_with(g.mechs.len(), || None);
+        }
+        for (id, m) in g.mechs.iter().enumerate() {
+            let slot = &mut self.rags[id];
+            let dying = m.dying.is_some_and(|d| d.exploded) && !m.gone;
+            let thrown = m.down.is_some_and(|d| d.phase == DownPhase::Falling);
+            if slot.is_none() && (thrown || dying) && self.detail > 0 {
+                *slot = Ragdoll::of(m, g.time).map(|mut r| {
+                    r.carry(v3(m.push[0], m.vy, m.push[1]));
+                    if let Some(d) = m.down {
+                        // The blow, along the shove: the struck torso leads.
+                        let f = d.pose.fall_yaw;
+                        let seed = (g.time * 997.) as u32 ^ (id as u32).wrapping_mul(7919);
+                        r.strike(v3(f.sin(), 0., f.cos()), 6. * m.ch.scale, seed);
+                    } else if let Some(d) = m.dying {
+                        // Dead: the legs go, and it falls the way it was leaning.
+                        let f = d.fall_yaw;
+                        let seed = (g.time * 991.) as u32 ^ (id as u32).wrapping_mul(104_729);
+                        r.strike(v3(f.sin(), 0., f.cos()), 3. * m.ch.scale, seed);
+                    }
+                    r
+                });
+            }
+            match slot {
+                Some(r) if m.down.is_some() || dying => r.step(g, m),
+                Some(_) => *slot = None,
+                None => {}
+            }
+        }
+    }
+    /// A knocked-down or dying mech's pose: the ragdoll's while it falls and lies, handing over
+    /// to the get-up's once it has lain still a moment or the mashing has started.
+    fn posed(&self, m: &Mech, id: MechId) -> Option<anim::DownPose> {
+        let rag = self.rags.get(id).and_then(|r| r.as_ref());
+        if m.dying.is_some() {
+            return rag.map(|r| r.pose(m));
+        }
+        let d = m.down?;
+        let rag = rag.map(|r| {
+            let settled = ((r.still() - 0.3) / 0.4).clamp(0., 1.);
+            (r.pose(m), settled.max((d.p * 12.).min(1.)))
+        });
+        anim::down_pose(m, rag)
+    }
     pub fn render(
         &mut self,
         gl: &mut Gl,
@@ -858,6 +1048,7 @@ impl Scene {
         h: i32,
         cam: Option<&Cam>,
     ) -> M4 {
+        self.step_rags(g);
         let (eye, dir, up, fov) = match cam {
             Some(c) => (c.eye, (c.at - c.eye).norm(), v3(0., 1., 0.), c.fov),
             None => self.cockpit(g, fov_deg),

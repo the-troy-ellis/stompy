@@ -19,9 +19,11 @@ missions. Everything in the sim is the reference's, number for number.
 
 ### Legs and torso (`sim/gait.rs`, `sim/mech.rs`)
 
-The left stick turns the legs (`yaw`) at the chassis's turn rate and nudges
-a throttle that holds. The right stick (and the gyro, and the mouse) twists
-and pitches the torso within ±1.9 and -0.4..0.45 rad. Speed follows the
+The left stick turns the legs (`yaw`) at the chassis's turn rate, and its
+push is the throttle (zero when let go; back is a slow reverse, 0.35). The
+right stick (and the gyro, and the mouse) twists and pitches the torso
+within ±1.9 and -0.4..0.45 rad; walking forward with the twist left alone
+for 0.6 s, the torso swings back over the legs (`docs/controls.md`). Speed follows the
 throttle slowly (7 m/s² up, 11 down), a climb slows a walker (a 20% grade
 halves it; quads keep their grip), heat over 85 slows everything to 65%.
 
@@ -62,9 +64,20 @@ torso.
 
 ### Melee (`sim/melee.rs`)
 
-Everyone shoves (8 damage, 9 m reach, a 10 m/s impulse); PURPLE PUNCHER
-punches (30, 14 m, 22) with whichever fist it still has, and shoves with
-none. A press starts a wind-up, the hit frame takes the nearest mech within
+Only PURPLE PUNCHER punches (the owner, 2026-11-28: punching is its unique
+mechanic; it was everyone's shove), with whichever fist it still has, and
+nothing once both are gone. Its fists are **wrecking balls on chains** (the
+owner: "launched on a chain and then retracted ... more formidable"): after
+the wind-up (0.45 s) the ball leaves the wrist down the aim (the player's
+crosshair, the AI's target) at 75 m/s by scale, pays out to 34 m by scale
+(44 m), hits the first mech it meets (the ball 1.4 m by scale) for the
+punch's 30 and knock 22 and a one-second stagger (the legs buckle, no
+walking, 30% turning), stops at the ground, and is reeled back at 40 m/s
+by scale; the recovery lasts until it is home. A flight you can dodge, and
+a miss reels in empty. PUNCH shows (and the AI throws) with a mech within
+the reach and 10° of the aim (`data::FIST_CHAIN`, `CHAIN_ARC`). Every mech stomps.
+The AI punches only with it, keeps out of its reach only, and walks up to
+a shut-down player only to punch. A press starts a wind-up, the hit frame takes the nearest mech within
 reach and arc, then a recovery with no guns and half turn rate. Knockback is
 scaled by mass (scale³), clamped 0.3..2.5×, with a fifth of it back on the
 attacker. Landing on a mech after 0.6 s in the air is a stomp; from a high
@@ -117,7 +130,7 @@ jets up the right with the charge inside it, speed along the bottom with a
 zero tick and the throttle's notch; the damage diagram in the middle, KPH
 under it. The weapons by category with their buttons, ammo and recharge
 bars; OOPS BUTTON's scan and recharge. The crosshair with a hit-stop and an
-X on a hit, PUNCH when a mech is in reach, STOMP when a charge is aimed. The
+X on a hit, PUNCH when a mech is in PURPLE PUNCHER's reach, STOMP when a charge is aimed. The
 target's brackets, a diamond on a lock, coloured by its torso and flashing
 under 15%, the distance under it, the shell's lead diamond. The radar. The
 compass with the target's bearing. The messages. Everything dark under a
@@ -137,7 +150,9 @@ All of `crates/`. The tests in `crates/sim/tests/`.
    melt; the beams off, it is cold in two seconds (test).
 4. An arm at zero kills its weapon and sheds debris; both legs sit the mech;
    the torso at zero gives the beat, the blast, the wreck, the win (test).
-5. A BARRY shoves a SKEDADDLE 6 m in a second and a SLOWPOKE under 3 (test).
+5. PURPLE PUNCHER punches a SKEDADDLE 6 m in a second and a SLOWPOKE under
+   half as far; no other mech punches or shoves, nor does the AI with one
+   (tests).
 6. A fall of 0.6 s onto a mech stomps it; a hop does not (test).
 7. A three-second scan kills the target and costs the shooter 140 heat, the
    shutdown and 35% of its torso; a slip pauses, a switch restarts (test).

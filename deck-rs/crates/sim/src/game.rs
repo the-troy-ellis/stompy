@@ -66,6 +66,13 @@ pub enum Sfx {
     Punch {
         hit: bool,
     },
+    /// The chain paying out or reeling in; the wrecking ball landing; the ring in your own head
+    /// after one lands on you.
+    Chain {
+        back: bool,
+    },
+    Wreck,
+    Ring,
     Whine,
     Powerdown,
     Powerup,
@@ -90,6 +97,9 @@ impl Sfx {
             Sfx::Land(_) => "land",
             Sfx::Blastoff(_) => "blastoff",
             Sfx::Punch { .. } => "punch",
+            Sfx::Chain { .. } => "chain",
+            Sfx::Wreck => "wreck",
+            Sfx::Ring => "ring",
             Sfx::Whine => "whine",
             Sfx::Powerdown => "powerdown",
             Sfx::Powerup => "powerup",
@@ -156,6 +166,45 @@ pub enum HitBy {
 pub enum SwingPhase {
     Windup,
     Recover,
+}
+/// Knocked down: falling, lying until mashed up, rising. `pose` is the body's lean, drawn like a
+/// death's topple (without the dying).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DownPhase {
+    #[default]
+    Falling,
+    Lying,
+    Rising,
+}
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Down {
+    pub phase: DownPhase,
+    pub t: f32,
+    pub pose: Dying,
+    pub buckle: f32,
+    /// How far the mashing has heaved it up, 0 to 1 (up).
+    pub up: f32,
+    pub last_press: f32,
+    /// The player's A last frame, so a hold counts once.
+    pub held: bool,
+    /// Rising, 0 to 1.
+    pub rise: f32,
+    /// The get-up as drawn, 0 flat on its back to 1 standing: it follows the heaves (up to on one
+    /// knee) and then the rise, smoothly, so each press visibly shoves it on and it sinks back
+    /// when the presses stop.
+    pub p: f32,
+    /// The heading it falls backward from: the blow turns it as it goes over.
+    pub yaw_to: f32,
+}
+/// A wrecking-ball fist on its chain: which arm, which way it flies, how far out it is, whether
+/// it is coming back, and where it is.
+#[derive(Clone, Copy, Debug)]
+pub struct Flail {
+    pub arm: Sec,
+    pub dir: V3,
+    pub out: f32,
+    pub back: bool,
+    pub at: V3,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct Swing {
@@ -277,6 +326,8 @@ pub struct Mech {
     pub shutdown: bool,
     pub was_air: bool,
     pub centring: bool,
+    /// Seconds since the torso was last twisted by hand (the player's walking recentre).
+    pub twist_quiet: f32,
     pub air_t: f32,
     pub hp: [f32; Sec::N],
     pub max: [f32; Sec::N],
@@ -318,6 +369,15 @@ pub struct Mech {
     pub fusion: FusionScan,
     pub melee: Option<Swing>,
     pub melee_cd: f32,
+    /// A wrecking-ball fist out on its chain.
+    pub flail: Option<Flail>,
+    /// Seconds left staggering from a wrecking ball: legs buckled, no walking, slow turns.
+    pub stagger: f32,
+    /// Thrown off its feet by a wrecking ball: in the air until it meets the ground itself (not
+    /// the terrain-following snap), then a skid.
+    pub thrown: bool,
+    /// Seconds left skidding: its feet slide with it, scraping, until the shove dies down.
+    pub skid: f32,
     pub last_arm: Sec,
     pub last_hit: Option<HitBy>,
     pub jet: JetState,
@@ -332,6 +392,8 @@ pub struct Mech {
     pub scramble: f32,
     pub flash: Flash,
     pub dying: Option<Dying>,
+    /// Knocked down (a wrecking ball): disabled until mashed back up.
+    pub down: Option<Down>,
     /// Your own view stays where the fall left it until the debrief.
     pub fallen: Option<Dying>,
     pub ai: Ai,
@@ -353,7 +415,9 @@ impl Mech {
         self.geo.radius * self.ch.scale
     }
     pub fn top(&self) -> f32 {
-        self.y + self.geo.height * self.ch.scale
+        // Lying down, it's low.
+        let lie = self.down.map_or(0., |d| d.pose.angle / DOWN_ANGLE);
+        self.y + self.geo.height * self.ch.scale * (1. - 0.65 * lie)
     }
 }
 

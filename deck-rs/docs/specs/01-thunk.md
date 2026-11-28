@@ -36,7 +36,8 @@ felt through the ground within 40 m), blastoff, land (k = the landing force),
 fireAc, fireGauss, fireMg, fireBolt, bolt, fireLrm, hit (k = damage / 10 by
 section: legs 1.2, torso 1, arms 0.7), shutdown (the sag), restart (the
 overshoot), sectionLost, death, explosion (by distance), punch, punched,
-stomp, whiff, blast (the push), fusionFire.
+stomp, whiff, blast (the push), fusionFire, wrecked, knocked (the slam of a
+knockdown), heave (a press of the mash), up (on its feet again).
 
 ## The rumble
 
@@ -58,6 +59,23 @@ columns to 30%; the mech still wobbles.
   (arms ring, legs thud, the torso is dull); beams sizzle instead of jolting.
 - **Knockback.** Mass-scaled (scale³); the feet shuffle because the gait is
   distance-driven; dust streaks while the push is strong; the aim jolts.
+- **Wrecked** (2026-11-28; the owner: "it should feel like a debilitating hit
+  from inside the cockpit"). A PURPLE PUNCHER's wrecking ball, on the mech it
+  hits, is the hardest feel there is (test: no row beats it on kick, bass or
+  rumble):
+  - The row (`wrecked`): the eye slammed down (1.8), the view shaken to its
+    cap, red and white, the body crushed and rocked toward the blow, the
+    deepest thump, the music ducked right out, dust, 320 ms of rumble.
+  - A stagger for a second, in the sim: the legs buckle (the hips sag 0.6 m
+    by scale), it can't walk, it turns at 30%, and the knock throws its aim.
+  - From inside, drawn: BARRY's head is knocked about the eye on loose
+    springs and rattles back, shaking while the stagger lasts; the iris
+    clamps in pain; the HUD jumps about, drops out on some frames and runs
+    with bars of static, fading with the stagger.
+  - Heard: the wreck (a deep thump, a crunch, metal ringing) and, in your
+    own head, a thin high ring and static fading over two seconds.
+  - The thrower: a heave as the ball goes and the chain rattles out, a yank
+    when it lands, a hit-stop of two beats; the chain rattles back.
 - **Shutdown.** The hips sag 0.4 m, the HUD goes dark, the power-down whine,
   the voice. The restart snaps up with an overshoot.
 - **Section loss.** The part comes off as debris (an arm whole; a leg as

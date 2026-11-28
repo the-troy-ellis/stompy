@@ -39,12 +39,13 @@ better on the way, not the same code.
 |---|---|---|---|
 | Walking, torso twist, feet that never slide, gaits by body plan | specs 13, 16 | **built** | P1 (tune) |
 | Heat, sections, the four weapon kinds, OOPS BUTTON, missile locks | spec 06 | **built** | P1 (tune) |
-| Punch, shove, stomp; blast-off jets, the insta-stomp | specs 12, 26 | **built** | P1 (tune) |
+| Punch (PURPLE PUNCHER's wrecking balls, theirs alone), stomp; blast-off jets, the insta-stomp | specs 12, 26 | **built** | P1 (tune) |
+| Knockdown: falling over and getting up (the wrecking ball; mash A to get up) | (new) | **built** (specs/06-knockdown.md) | P1 (tune) |
 | AI profiles, three difficulties; sides fight sides | spec 05 | **built** | P1 (tune) |
 | Thunk: feel table, camera, body, sub-bass, rumble | spec 13 | **built**, not yet tuned on the Deck | P1 |
 | Six combat demigods, eleven weapons | spec 06 | **built** | P1 |
 | The look: dither, ramps, side paint, lumps for effects | spec 14 | **built** (specs/02-look.md) | P3 (more) |
-| BARRY remodelled and animated (layer 1, toes, pods) | (new) | **built** (specs/03-anim.md) | P3 (the rest) |
+| BARRY remodelled and animated (layer 1, toes, pods); SKEDADDLE and PURPLE PUNCHER remodelled and animated | (new) | **built** (specs/02-look.md, 03-anim.md) | P3 (the other three) |
 | Big battles: batches, distance detail, readout, WATCH | spec 34 | **built**, the number to measure on the Deck (specs/04-big-battles.md) | P2 |
 | Debug page, test range, cheats, live tuning | spec 19 | a readout (View + Y) | P1 |
 | The crowd: tiny robots by the thousand, honoured underfoot | (new) | not yet | P2 |
@@ -140,4 +141,7 @@ port spec's "Changed" list is approved.
 | 2026-11-28 | Mechs on a map | up to about 20 (MAX_MECHS 24) | the sim allows 256; the playable number is what the Deck holds at 60 | the owner: eight is not enough |
 | 2026-11-28 | The world | (none: a mech sim) | robots, no humans; demigods (the mechs) fight demigods; cities of tiny robots gather ore and are stomped (an honour, at a cost); temples are factories (world.md) | the owner |
 | 2026-11-28 | The order | P2 engine, P3 base builder by hand, P4 from above, P5 world | P2 engine for this world (battles, crowd, voxel ground, two-scale buildings), P3 the demigods' look and feel, P4 the loop by hand, P5 the god above, P6 the world | the world sets what the engine must carry |
+| 2026-11-28 | Throttle and twist | the throttle is a setting the stick nudges; the torso stays twisted | the stick is the throttle (back to zero when let go); walking forward, a torso left alone swings back over the legs (docs/controls.md) | the owner |
+| 2026-11-28 | Punching | everyone shoves, PURPLE PUNCHER punches | only PURPLE PUNCHER punches; everyone stomps (specs/00-core.md) | the owner: punching is a mechanic unique to PURPLE PUNCHER |
+| 2026-11-28 | PURPLE PUNCHER's punch | a fist at 18 m, instant | a wrecking ball on a chain to 44 m, a flight you can dodge; a hit staggers, and is the hardest feel there is (specs/00-core.md, 01-thunk.md) | the owner: wrecking balls launched on chains; a debilitating hit from inside the cockpit |
 | 2026-11-27 | Rust version | (n/a) | pinned in `rust-toolchain.toml` | fmt and clippy don't drift between builds |

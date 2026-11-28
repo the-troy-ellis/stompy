@@ -263,36 +263,35 @@ fn the_autocannon_hits_for_its_damage_uses_ammo_and_kicks() {
 }
 
 #[test]
-fn a_shove_moves_light_mechs_far_and_heavy_ones_little() {
-    let mut g = flat_game(Ch::Kestrel, 9);
-    let j = foe(&mut g, Ch::Jackal, 0., 8., PI);
+fn a_punch_moves_light_mechs_far_and_heavy_ones_little() {
+    let mut g = flat_game(Ch::Puncher, 9);
+    let j = foe(&mut g, Ch::Jackal, 0., 12., PI);
+    // Sturdy enough to take the blow and fly, rather than fall.
+    g.mechs[j].hp[Sec::T.i()] = 500.;
     let mut i = input();
     i.punch = true;
     update(&mut g, &i, DT);
     assert!(g.p().melee.is_some());
     let jz = g.mechs[j].z;
-    steps(&mut g, &input(), 60);
-    assert!(
-        g.mechs[j].z - jz >= 6.,
-        "a SKEDADDLE moved {} m",
-        g.mechs[j].z - jz
-    );
-    assert!(g.p().z < 0., "the shover recoils");
+    steps(&mut g, &input(), 90);
+    let light = g.mechs[j].z - jz;
+    assert!(light >= 6., "a SKEDADDLE moved {light} m");
+    assert!(g.p().z < 0., "the puncher recoils");
     assert!(g.farthest_shove > 0. && sfx_count(&g, "punch") == 1);
-    let mut g = flat_game(Ch::Kestrel, 9);
-    let w = foe(&mut g, Ch::Warden, 0., 10., PI);
+    let mut g = flat_game(Ch::Puncher, 9);
+    let w = foe(&mut g, Ch::Warden, 0., 14., PI);
     update(&mut g, &i, DT);
     let wz = g.mechs[w].z;
-    steps(&mut g, &input(), 60);
+    steps(&mut g, &input(), 90);
+    let heavy = g.mechs[w].z - wz;
     assert!(
-        g.mechs[w].z - wz < 3.,
-        "a SLOWPOKE moved {} m",
-        g.mechs[w].z - wz
+        heavy > 0. && heavy < light * 0.5,
+        "a SLOWPOKE moved {heavy} m, a SKEDADDLE {light}"
     );
 }
 #[test]
 fn no_punch_while_shut_down_or_mid_swing() {
-    let mut g = flat_game(Ch::Kestrel, 9);
+    let mut g = flat_game(Ch::Puncher, 9);
     g.pm().shutdown = true;
     assert!(!melee_press(&mut g, PLAYER));
     g.pm().shutdown = false;
@@ -303,10 +302,10 @@ fn no_punch_while_shut_down_or_mid_swing() {
         g.p().melee.is_some() && !melee_press(&mut g, PLAYER),
         "not during the recovery"
     );
-    steps(&mut g, &input(), 60);
+    steps(&mut g, &input(), 150);
     assert!(
-        g.p().melee.is_none() && sfx_count(&g, "punch") == 1,
-        "a whiff"
+        g.p().melee.is_none() && g.p().flail.is_none() && sfx_count(&g, "chain") >= 1,
+        "a whiff: out to the chain's end and home"
     );
 }
 #[test]
@@ -317,9 +316,29 @@ fn purple_puncher_punches_with_whichever_fist_it_has() {
     assert!(std::ptr::eq(melee_of(g.p()), &FIST_MELEE) && punch_arm(g.p()) == Some(Sec::RA));
     g.pm().hp[Sec::RA.i()] = 0.;
     assert!(
-        std::ptr::eq(melee_of(g.p()), &DEFAULT_MELEE),
-        "no fists: it shoves"
+        std::ptr::eq(melee_of(g.p()), &DEFAULT_MELEE) && !melee_press(&mut g, PLAYER),
+        "no fists, no punch"
     );
+}
+#[test]
+fn only_purple_puncher_punches() {
+    for ch in [Ch::Kestrel, Ch::Jackal, Ch::Warden, Ch::Light1, Ch::Sniper1] {
+        let mut g = flat_game(ch, 9);
+        let j = foe(&mut g, Ch::Jackal, 0., 8., PI);
+        let mut i = input();
+        i.punch = true;
+        update(&mut g, &i, DT);
+        assert!(!g.punch_ready, "{ch:?}: no PUNCH on the HUD");
+        assert!(g.p().melee.is_none(), "{ch:?} doesn't punch");
+        let jz = g.mechs[j].z;
+        steps(&mut g, &input(), 60);
+        assert!((g.mechs[j].z - jz).abs() < 0.5, "{ch:?} doesn't shove");
+        assert_eq!(sfx_count(&g, "punch"), 0);
+    }
+    let mut g = flat_game(Ch::Puncher, 9);
+    foe(&mut g, Ch::Jackal, 0., 12., PI);
+    update(&mut g, &input(), DT);
+    assert!(g.punch_ready, "PURPLE PUNCHER: PUNCH on the HUD");
 }
 #[test]
 fn a_fall_onto_a_mech_stomps_it_and_a_hop_does_not() {
@@ -592,7 +611,7 @@ fn heavies_hold_the_line_and_harassers_flip_when_hit() {
     assert_eq!(g.mechs[j].ai.strafe, -s0);
 }
 #[test]
-fn an_adjacent_enemy_punches_on_hard() {
+fn an_adjacent_purple_puncher_punches_on_hard_and_nothing_else_does() {
     let mut g = Game::new(29);
     start_free_play(
         &mut g,
@@ -605,7 +624,7 @@ fn an_adjacent_enemy_punches_on_hard() {
         Diff::Hard,
         true,
     );
-    let j = new_mech(&mut g, Ch::Jackal, 1, 0., 7., PI).unwrap();
+    let j = new_mech(&mut g, Ch::Puncher, 1, 0., 10., PI).unwrap();
     g.mechs[j].ai.aware = true;
     let mut punched = false;
     for _ in 0..180 {
@@ -613,6 +632,27 @@ fn an_adjacent_enemy_punches_on_hard() {
         punched |= g.mechs[j].melee.is_some();
     }
     assert!(punched);
+    // Nothing else does, however close.
+    for ch in [Ch::Kestrel, Ch::Jackal, Ch::Warden, Ch::Light1, Ch::Sniper1] {
+        let mut g = Game::new(29);
+        start_free_play(
+            &mut g,
+            Biome::Dusk,
+            TimeOfDay::Dusk,
+            Weather::Clear,
+            0,
+            29,
+            Ch::Kestrel,
+            Diff::Hard,
+            true,
+        );
+        let j = new_mech(&mut g, ch, 1, 0., 7., PI).unwrap();
+        g.mechs[j].ai.aware = true;
+        for _ in 0..180 {
+            update(&mut g, &input(), DT);
+            assert!(g.mechs[j].melee.is_none(), "{ch:?} punched");
+        }
+    }
 }
 #[test]
 fn missions_start_with_their_foes() {
@@ -729,4 +769,361 @@ fn watching_a_battle_nobody_targets_you_and_it_ends_when_a_side_is_gone() {
     assert_eq!(g.state, State::Over, "the battle ended ({t} s)");
     assert!(g.allies_left() == 0 || g.enemies_left() == 0);
     assert_eq!(g.won, g.enemies_left() == 0);
+}
+
+#[test]
+fn the_throttle_follows_the_stick_and_drops_to_zero_when_let_go() {
+    let mut g = flat_game(Ch::Kestrel, 21);
+    let mut i = input();
+    i.thr = 1.;
+    steps(&mut g, &i, 120);
+    assert_eq!(g.p().throttle, 1.);
+    let fast = g.p().speed;
+    assert!(fast > 5., "walking: {fast}");
+    i.thr = 0.5;
+    steps(&mut g, &i, 1);
+    assert_eq!(g.p().throttle, 0.5, "half the stick, half the throttle");
+    i.thr = 0.;
+    steps(&mut g, &i, 1);
+    assert_eq!(g.p().throttle, 0., "let go, and it drops to zero");
+    let coasting = g.p().speed;
+    assert!(coasting > 0., "the legs ease out, not stop dead");
+    steps(&mut g, &i, 120);
+    assert!(g.p().speed.abs() < 0.01, "then stand");
+    i.thr = -1.;
+    steps(&mut g, &i, 1);
+    assert_eq!(g.p().throttle, -stompy_sim::update::REVERSE, "back is slow");
+}
+#[test]
+fn walking_forward_recentres_the_torso_when_it_is_left_alone() {
+    let mut g = flat_game(Ch::Kestrel, 22);
+    let mut i = input();
+    g.pm().twist = 1.2;
+    // Standing still, the torso stays where it was put.
+    steps(&mut g, &i, 120);
+    assert_eq!(g.p().twist, 1.2);
+    // Walking and aiming, it stays where it is aimed.
+    i.thr = 1.;
+    i.twist = 0.3;
+    steps(&mut g, &i, 60);
+    let aimed = g.p().twist;
+    assert!(aimed > 1.2);
+    // Let go of the aim: a moment's grace, then it swings back over the legs.
+    i.twist = 0.;
+    steps(&mut g, &i, 20);
+    assert_eq!(g.p().twist, aimed, "not at once");
+    steps(&mut g, &i, 180);
+    assert!(
+        g.p().twist.abs() < 0.05,
+        "back over the legs: {}",
+        g.p().twist
+    );
+    // The gyro's tremor isn't aiming; a real turn of the wrist is.
+    g.pm().twist = 0.8;
+    i.twist_by = 0.0005;
+    steps(&mut g, &i, 120);
+    assert!(g.p().twist < 0.4, "a tremor doesn't hold it");
+    g.pm().twist = 0.8;
+    i.twist_by = 0.01;
+    steps(&mut g, &i, 60);
+    assert!(g.p().twist > 0.8, "aiming holds it");
+}
+
+fn wreck_setup(dist: f32) -> (Game, MechId) {
+    let mut g = flat_game(Ch::Puncher, 9);
+    let j = foe(&mut g, Ch::Jackal, 0., dist, PI);
+    g.mechs[j].hp[Sec::T.i()] = 500.;
+    (g, j)
+}
+#[test]
+fn a_wrecking_ball_reaches_far_hits_staggers_and_comes_home() {
+    // 35 m: three times the old punch's reach.
+    let (mut g, j) = wreck_setup(35.);
+    let mut i = input();
+    i.punch = true;
+    update(&mut g, &i, DT);
+    assert!(g.p().melee.is_some());
+    let total = |g: &Game| g.mechs[j].hp.iter().sum::<f32>();
+    let (t0, mut hit_at, mut out) = (total(&g), None, 0f32);
+    for k in 0..300 {
+        update(&mut g, &input(), DT);
+        if let Some(f) = g.p().flail {
+            out = out.max(f.out);
+        }
+        if hit_at.is_none() && total(&g) < t0 {
+            hit_at = Some(k);
+            assert!(g.mechs[j].stagger > 0.9, "it staggers");
+            assert_eq!(sfx_count(&g, "wreck"), 1);
+        }
+    }
+    let k = hit_at.expect("the ball lands");
+    // The wind-up, then a flight you could dodge: not instant.
+    assert!(k > 30 && k < 60, "landed at frame {k}");
+    assert!(out > 25., "out {out} m on its chain");
+    assert!(g.p().flail.is_none() && g.p().melee.is_none(), "home again");
+    assert!(
+        t0 - total(&g) >= FIST_MELEE.dmg - 0.01,
+        "the punch's damage"
+    );
+}
+#[test]
+fn a_wrecking_ball_aimed_away_misses_and_reels_in() {
+    let (mut g, j) = wreck_setup(30.);
+    g.pm().twist = 1.2;
+    let t0 = g.mechs[j].hp[Sec::T.i()];
+    let mut i = input();
+    i.punch = true;
+    update(&mut g, &i, DT);
+    let mut out = 0f32;
+    for _ in 0..240 {
+        update(&mut g, &input(), DT);
+        if let Some(f) = g.p().flail {
+            out = out.max(f.out);
+        }
+    }
+    assert_eq!(g.mechs[j].hp[Sec::T.i()], t0, "a miss");
+    assert_eq!(sfx_count(&g, "wreck"), 0);
+    assert!(out > 0. && g.p().flail.is_none(), "out and home");
+}
+#[test]
+fn a_staggered_mech_cannot_walk_and_its_legs_buckle() {
+    let mut g = flat_game(Ch::Kestrel, 9);
+    g.pm().stagger = FIST_CHAIN.stagger;
+    let mut i = input();
+    i.thr = 1.;
+    i.turn = 1.;
+    let yaw0 = g.p().yaw;
+    steps(&mut g, &i, 30);
+    assert!(g.p().speed.abs() < 0.01, "no walking");
+    assert!(g.p().sag.x > 0.2, "the legs buckle: {}", g.p().sag.x);
+    let turned = (g.p().yaw - yaw0).abs();
+    assert!(
+        turned < g.p().ch.turn * 0.5 * STAGGER_TURN * 1.5,
+        "a slow turn: {turned}"
+    );
+    steps(&mut g, &i, 60);
+    assert!(
+        g.p().stagger == 0. && g.p().speed > 0.5,
+        "then it walks again"
+    );
+}
+#[test]
+fn a_wrecking_ball_on_you_is_the_hardest_feel_there_is() {
+    let mut g = flat_game(Ch::Kestrel, 9);
+    let e = foe(&mut g, Ch::Puncher, 0., 30., PI);
+    g.mechs[e].ai.target = Some(PLAYER);
+    g.mechs[e].hp[Sec::T.i()] = 500.;
+    assert!(stompy_sim::melee::melee_press(&mut g, e));
+    let mut thump = 0f32;
+    let mut rang = false;
+    for _ in 0..120 {
+        g.events.clear();
+        update(&mut g, &input(), DT);
+        for ev in &g.events {
+            if let Event::Thump { haptic, .. } = ev {
+                thump = thump.max(*haptic);
+            }
+        }
+        rang |= sfx_count(&g, "ring") > 0;
+        if rang {
+            break;
+        }
+    }
+    assert!(rang, "your head rings");
+    assert!(thump >= 300., "the longest rumble: {thump} ms");
+    assert!(g.p().stagger > 0.9 && g.shake > 0.8, "staggered and shaken");
+    // Nothing else in the table hits as hard.
+    let w = stompy_sim::data::feel_row(Feel::Wrecked);
+    for row in stompy_sim::data::FEEL.iter() {
+        assert!(row.haptic <= w.haptic && row.kick <= w.kick && row.bass <= w.bass);
+    }
+}
+
+/// A PURPLE PUNCHER 30 m from the player, its ball thrown at it, run until it lands.
+fn wrecked_player(ch: Ch) -> Game {
+    let mut g = flat_game(ch, 9);
+    let e = foe(&mut g, Ch::Puncher, 0., 30., PI);
+    g.mechs[e].ai.target = Some(PLAYER);
+    g.mechs[e].ai.still = true; // it throws once and stands
+    g.mechs[e].hp[Sec::T.i()] = 500.;
+    g.pm().hp[Sec::T.i()] = 500.;
+    assert!(stompy_sim::melee::melee_press(&mut g, e));
+    for _ in 0..120 {
+        update(&mut g, &input(), DT);
+        if g.p().stagger > 0. {
+            break;
+        }
+    }
+    assert!(g.p().stagger > 0., "the ball lands");
+    g
+}
+#[test]
+fn a_wrecking_ball_knocks_two_legs_down_and_slowpoke_stands() {
+    let mut g = wrecked_player(Ch::Kestrel);
+    assert!(g.p().down.is_some(), "BARRY goes over");
+    steps(&mut g, &input(), 60);
+    let d = g.p().down.unwrap();
+    assert_eq!(d.phase, DownPhase::Lying, "on the ground");
+    assert!(stompy_sim::down::lie(g.p()) > 0.9 && g.p().top() < g.p().y + 6.);
+    let g = wrecked_player(Ch::Warden);
+    assert!(
+        g.p().down.is_none() && g.p().stagger > 0.9,
+        "SLOWPOKE: staggered, standing"
+    );
+}
+#[test]
+fn down_you_are_disabled_and_stay_down_without_mashing() {
+    let mut g = wrecked_player(Ch::Kestrel);
+    // Thrown, landed, slid to a stop.
+    steps(&mut g, &input(), 150);
+    let (x, z, yaw) = (g.p().x, g.p().z, g.p().yaw);
+    let mut i = input();
+    (i.thr, i.turn, i.energy, i.ballistic, i.missile) = (1., 1., true, true, true);
+    g.events.clear();
+    steps(&mut g, &i, 300);
+    let p = g.p();
+    assert!(p.down.is_some(), "five seconds and still down");
+    assert!((p.yaw - yaw).abs() < 1e-4, "no turning");
+    // The knockback's slide settles; five seconds of a full stick would be 50 m and more.
+    assert!(hypot2(p.x - x, p.z - z) < 3., "no walking");
+    for k in ["laser", "cannon", "missile"] {
+        assert_eq!(sfx_count(&g, k), 0, "no {k}");
+    }
+}
+#[test]
+fn a_steady_mash_gets_you_up_and_a_slow_one_does_not() {
+    let mash = |every: usize, frames: usize| {
+        let mut g = wrecked_player(Ch::Kestrel);
+        steps(&mut g, &input(), 60);
+        for f in 0..frames {
+            let mut i = input();
+            i.jets = f % every < every / 2;
+            update(&mut g, &i, DT);
+            if g.p().down.is_none() {
+                return Some(f);
+            }
+        }
+        None
+    };
+    // Six presses a second: up in a couple of seconds.
+    let fast = mash(10, 300).expect("a steady mash gets up");
+    assert!(fast < 180, "up after {fast} frames");
+    // One press a second: three seconds of it, and still down.
+    assert!(mash(60, 180).is_none(), "a slow mash barely does");
+    // Holding A is one press.
+    let mut g = wrecked_player(Ch::Kestrel);
+    steps(&mut g, &input(), 60);
+    let mut i = input();
+    i.jets = true;
+    steps(&mut g, &i, 120);
+    assert!(g.p().down.unwrap().up <= 1. / MASH_PRESSES + 1e-4);
+}
+#[test]
+fn up_again_the_feet_plant_where_it_stands_and_it_walks() {
+    let mut g = wrecked_player(Ch::Kestrel);
+    steps(&mut g, &input(), 60);
+    for f in 0..300 {
+        let mut i = input();
+        i.jets = f % 8 < 4;
+        update(&mut g, &i, DT);
+        if g.p().down.is_none() {
+            break;
+        }
+    }
+    assert!(g.p().down.is_none(), "up");
+    let p = g.p();
+    for (k, f) in p.feet.iter().enumerate().take(p.geo.n_legs) {
+        assert!(
+            !f.lifted && hypot2(f.pos.x - p.x, f.pos.z - p.z) < 4. * p.ch.scale,
+            "foot {k}"
+        );
+    }
+    let mut i = input();
+    i.thr = 1.;
+    steps(&mut g, &i, 90);
+    assert!(g.p().speed > 1., "walking again");
+}
+#[test]
+fn a_knocked_down_ai_mashes_itself_up() {
+    let mut g = flat_game(Ch::Puncher, 9);
+    let j = foe(&mut g, Ch::Kestrel, 0., 30., PI);
+    g.mechs[j].hp[Sec::T.i()] = 500.;
+    g.mechs[j].ai.aware = true;
+    stompy_sim::down::knock_down(&mut g, j, [0., 1.]);
+    let mut up = None;
+    for f in 0..600 {
+        update(&mut g, &input(), DT);
+        if g.mechs[j].down.is_none() {
+            up = Some(f);
+            break;
+        }
+    }
+    assert!(up.is_some(), "it gets itself up");
+}
+#[test]
+fn a_wrecking_ball_throws_you_off_the_ground_and_you_land_and_slide() {
+    let mut g = wrecked_player(Ch::Kestrel);
+    let (ground, x0, z0) = (g.p().y, g.p().x, g.p().z);
+    let (mut peak, mut landed_at, mut slammed_in_air) = (0f32, None, false);
+    for f in 0..240 {
+        update(&mut g, &input(), DT);
+        let p = g.p();
+        peak = peak.max(p.y - ground);
+        if p.air && p.down.is_some_and(|d| d.phase == DownPhase::Lying) {
+            slammed_in_air = true;
+        }
+        if landed_at.is_none() && !p.air && f > 2 {
+            landed_at = Some((f, p.x, p.z));
+        }
+    }
+    assert!(peak > 1., "lifted off the ground: {peak} m");
+    assert!(!slammed_in_air, "the slam waits for the ground");
+    let (f, lx, lz) = landed_at.expect("it lands");
+    assert!(f > 20, "a flight, not a hop: landed at frame {f}");
+    assert!(hypot2(lx - x0, lz - z0) > 2., "thrown back");
+    let p = g.p();
+    assert!(hypot2(p.x - lx, p.z - lz) > 1., "and slides on");
+    assert!(!p.thrown && p.skid <= 0. && p.down.is_some());
+}
+#[test]
+fn slowpoke_is_lifted_less_lands_on_its_feet_and_its_feet_slide_with_it() {
+    let barry_peak = {
+        let mut g = wrecked_player(Ch::Kestrel);
+        let ground = g.p().y;
+        let mut peak = 0f32;
+        for _ in 0..120 {
+            update(&mut g, &input(), DT);
+            peak = peak.max(g.p().y - ground);
+        }
+        peak
+    };
+    let mut g = wrecked_player(Ch::Warden);
+    let ground = g.p().y;
+    let mut peak = 0f32;
+    let mut skidding = None;
+    for _ in 0..120 {
+        update(&mut g, &input(), DT);
+        let p = g.p();
+        peak = peak.max(p.y - ground);
+        if p.skid > 0. && skidding.is_none() {
+            skidding = Some((p.x, p.z, p.feet[0].pos));
+        }
+    }
+    assert!(
+        peak > 0.3 && peak < barry_peak,
+        "a hop: {peak} m to BARRY's {barry_peak}"
+    );
+    assert!(g.p().down.is_none(), "on its feet");
+    let (x, z, f) = skidding.expect("it skids on landing");
+    // The skid carried the feet as far as the body.
+    let p = g.p();
+    let (body, foot) = (
+        hypot2(p.x - x, p.z - z),
+        hypot2(p.feet[0].pos.x - f.x, p.feet[0].pos.z - f.z),
+    );
+    assert!(body > 0.5, "it slid: {body} m");
+    assert!(
+        foot > body * 0.5,
+        "its feet slid with it: {foot} m to {body} m"
+    );
 }

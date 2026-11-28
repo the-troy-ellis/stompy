@@ -210,6 +210,8 @@ pub struct Args {
     pub follow: bool,
     /// Force what the cockpit shows (tools: mockups of its states).
     pub cockpit_pose: Option<u8>,
+    /// An aware foe of this chassis (selector order), this many metres in front of you (tools).
+    pub foe_near: Option<(usize, f32)>,
 }
 /// A line the cockpit voice will say, and when.
 struct Line {
@@ -771,6 +773,11 @@ impl App {
 // --- the loop -------------------------------------------------------------------------------------------
 /// A pilot for the tools' screenshots: walks at the nearest foe, aims the torso at it, fires what's in range.
 fn demo_pilot(g: &mut Game, i: &mut Input) {
+    if g.p().down.is_some() {
+        // Knocked down: mash A, about six presses a second.
+        i.jets = (g.frame / 5).is_multiple_of(2);
+        return;
+    }
     let p = g.p();
     let Some((t, d)) = g
         .mechs
@@ -890,6 +897,18 @@ impl App {
                     app.prefs.diff,
                     false,
                 );
+            }
+            if let Some((k, d)) = a.foe_near {
+                let p = app.g.p();
+                let (yaw, x, z) = (p.yaw, p.x, p.z);
+                let ch = MECH_ORDER[k.min(MECH_ORDER.len() - 1)];
+                let at = (x + yaw.sin() * d, z + yaw.cos() * d);
+                if let Some(e) =
+                    stompy_sim::state::new_mech(&mut app.g, ch, 1, at.0, at.1, yaw + PI)
+                {
+                    app.g.mechs[e].ai.aware = true;
+                    app.g.mechs[e].ai.target = Some(PLAYER);
+                }
             }
             app.screen = Screen::Play;
             let mut t = 0.;

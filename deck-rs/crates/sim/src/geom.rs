@@ -12,7 +12,8 @@ pub fn torso_frame(m: &Mech) -> M4 {
     frame_of(m) * M4::t(0., m.geo.torso_y + m.torso_drop, 0.) * M4::ry(m.twist)
 }
 pub fn center_of(m: &Mech) -> V3 {
-    v3(m.x, m.y + 4.2 * m.ch.scale, m.z)
+    let lie = m.down.map_or(0., |d| d.pose.angle / DOWN_ANGLE);
+    v3(m.x, m.y + 4.2 * m.ch.scale * (1. - 0.6 * lie), m.z)
 }
 pub fn muzzle_of(m: &Mech, w: &Weapon) -> V3 {
     let tf = torso_frame(m);

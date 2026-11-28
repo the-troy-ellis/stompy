@@ -4,10 +4,11 @@
 //! where a mech is, where its feet are and what it hits never change (`docs/specs/03-anim.md`).
 //! Each chassis has a profile; one without draws as before.
 use stompy_sim::data::Ch;
+use stompy_sim::data::{DOWN_FALL, KNEEL_P};
 use stompy_sim::gait::swing_now;
 use stompy_sim::math::*;
 use stompy_sim::spring::Spring;
-use stompy_sim::Mech;
+use stompy_sim::{DownPhase, Mech};
 
 /// How a chassis carries itself. Layer 3 (personality) grows this table.
 pub struct Profile {
@@ -42,6 +43,17 @@ pub struct Profile {
     pub ant_base: [f32; 3],
     /// Where the left pod hinges on the torso (the right is its mirror).
     pub pod_hinge: [f32; 3],
+    /// The body's walk, on top of the sim's: how far it dips at each footfall (metres), rocks
+    /// over the planted foot (metres, and a lean in radians), and how far the torso thrusts
+    /// forward each step and nods with it, a bird's head-bob (metres, radians). All at full
+    /// pace; standing, none.
+    pub bob: f32,
+    pub sway: f32,
+    pub roll: f32,
+    pub peck: f32,
+    pub nod: f32,
+    /// The shoulders turning against the hips each stride, a heavyweight's swagger (radians).
+    pub swagger: f32,
 }
 /// BARRY: steady and workmanlike. The swing is small and even, the antenna whips, the pods
 /// thump down on each footfall and settle.
@@ -65,10 +77,79 @@ pub const BARRY: Profile = Profile {
     recoil: 0.28,
     ant_base: [-0.6, 3.1, -0.4],
     pod_hinge: [1.75, 2.4, -0.1],
+    bob: 0.,
+    sway: 0.,
+    roll: 0.,
+    peck: 0.,
+    nod: 0.,
+    swagger: 0.,
+};
+/// SKEDADDLE: twitchy, and it walks like a bird (the owner, 2026-11-28: more bob and sway).
+/// The body dips at each footfall and rocks over the planted foot, the torso thrusts forward
+/// each step and eases back, the arms pump hard and trail a turn, the feet snap off the
+/// ground and the long toes grab, the ears flick at every jolt. No pods.
+pub const SKEDADDLE: Profile = Profile {
+    arm_swing: 0.17,
+    arm_lag: 0.2,
+    foot_roll: 0.26,
+    toe_curl: 0.75,
+    toe_open: 0.45,
+    toe_close: 0.6,
+    toe_grip: 0.38,
+    ant_gain: 0.11,
+    ant_k: 150.,
+    ant_zeta: 0.1,
+    pod_gain: 0.,
+    pod_k: 170.,
+    pod_zeta: 0.22,
+    pod_spread: 0.,
+    pod_sway: 0.,
+    pod_step: 0.,
+    recoil: 0.16,
+    ant_base: [0., 2.5, -0.3],
+    pod_hinge: [0.; 3],
+    bob: 0.24,
+    sway: 0.3,
+    roll: 0.07,
+    peck: 0.4,
+    nod: 0.08,
+    swagger: 0.,
+};
+/// PURPLE PUNCHER: a heavyweight's lumber. It rolls side to side over each planted foot, the
+/// shoulders turn against the hips with every stride, the big arms swing heavily and trail a
+/// turn, the feet come down flat and the stubby toes hardly curl. No pods, no antenna.
+pub const PURPLE_PUNCHER: Profile = Profile {
+    arm_swing: 0.2,
+    arm_lag: 0.15,
+    foot_roll: 0.1,
+    toe_curl: 0.25,
+    toe_open: 0.15,
+    toe_close: 0.15,
+    toe_grip: 0.2,
+    ant_gain: 0.,
+    ant_k: 80.,
+    ant_zeta: 0.2,
+    pod_gain: 0.,
+    pod_k: 170.,
+    pod_zeta: 0.22,
+    pod_spread: 0.,
+    pod_sway: 0.,
+    pod_step: 0.,
+    recoil: 0.3,
+    ant_base: [0.; 3],
+    pod_hinge: [0.; 3],
+    bob: 0.1,
+    sway: 0.24,
+    roll: 0.06,
+    peck: 0.,
+    nod: 0.,
+    swagger: 0.13,
 };
 pub fn profile(ch: Ch) -> Option<&'static Profile> {
     match ch {
         Ch::Kestrel => Some(&BARRY),
+        Ch::Jackal => Some(&SKEDADDLE),
+        Ch::Puncher => Some(&PURPLE_PUNCHER),
         _ => None,
     }
 }
@@ -202,6 +283,206 @@ fn swing_u(m: &Mech, i: usize) -> Option<f32> {
     let u = (m.cyc - m.geo.legs()[i].ph).rem_euclid(1.) / sw;
     (u < 1.).then_some(u)
 }
+/// The body's walk now, on top of the sim's (drawn only).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Body {
+    /// Up (metres); sideways, toward +x (metres), and the lean that goes with it (radians,
+    /// about z); the torso's thrust forward (metres) and its nod (radians, forward).
+    pub bob: f32,
+    pub sway: f32,
+    pub roll: f32,
+    pub peck: f32,
+    pub nod: f32,
+    /// The shoulders' turn against the hips (radians, about y).
+    pub yaw: f32,
+}
+/// The body's walk for where a mech is in its stride. It dips as each foot lands and rises
+/// over the planted leg; it rocks over whichever foot is down; each step the torso thrusts
+/// forward fast and eases back while the body catches up, as a bird's head does.
+pub fn body(p: &Profile, m: &Mech) -> Body {
+    let k = pace(m).min(1.2);
+    let legs = m.geo.legs();
+    if k < 0.02 || m.air || legs.len() != 2 {
+        return Body::default();
+    }
+    let (ph, side) = (legs[0].ph, legs[0].hx.signum());
+    let sw = swing_now(m, pace(m));
+    // Steps since the first foot last landed: a footfall at every whole and half.
+    let since = m.cyc - ph - sw;
+    let bob = -p.bob * k * (TAU * 2. * since).cos();
+    // Over the first foot halfway through its stance, over the other half a stride later.
+    let over = (TAU * (since - (1. - sw) * 0.5)).cos();
+    let f = (2. * since).rem_euclid(1.);
+    let thrust = if f < 0.22 {
+        f / 0.22
+    } else {
+        1. - (f - 0.22) / 0.78
+    };
+    Body {
+        bob,
+        sway: p.sway * k * side * over,
+        roll: -p.roll * k * side * over,
+        peck: p.peck * k * (smooth(thrust) - 0.5),
+        nod: p.nod * k * (smooth(thrust) - 0.5),
+        // The shoulder over the planted foot swings back, the other forward.
+        yaw: p.swagger * k * side * over,
+    }
+}
+/// A knocked-down mech's pose, drawn: where its hips are and how they're turned, the torso's lean,
+/// each foot, each arm. Hips: height as a share of the standing hip height, forward (metres),
+/// leaned back and rolled (radians). Feet: [x, height, z] in the mech's ground frame (metres; legs
+/// in order). Arms: the shoulder's swing, back positive (left, right).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DownPose {
+    pub hip_x: f32,
+    pub hip_h: f32,
+    pub hip_z: f32,
+    /// The body's heading against the mech's (radians, about y).
+    pub turn: f32,
+    pub back: f32,
+    pub roll: f32,
+    pub lean: f32,
+    pub feet: [[f32; 3]; 2],
+    pub arms: [f32; 2],
+}
+impl DownPose {
+    fn lerp(a: &DownPose, b: &DownPose, t: f32) -> DownPose {
+        let l = |x: f32, y: f32| x + (y - x) * t;
+        DownPose {
+            hip_x: l(a.hip_x, b.hip_x),
+            hip_h: l(a.hip_h, b.hip_h),
+            hip_z: l(a.hip_z, b.hip_z),
+            turn: a.turn + wrap_angle(b.turn - a.turn) * t,
+            back: l(a.back, b.back),
+            roll: l(a.roll, b.roll),
+            lean: l(a.lean, b.lean),
+            feet: [0, 1].map(|i| [0, 1, 2].map(|k| l(a.feet[i][k], b.feet[i][k]))),
+            arms: [l(a.arms[0], b.arms[0]), l(a.arms[1], b.arms[1])],
+        }
+    }
+}
+/// The get-up, a boxer's off the canvas, as poses along `p` (0 flat on its back, 1 standing):
+/// lying with the legs out; sitting up, knees in, a fist planted behind; rolling onto a knee, a
+/// fist pushing off the ground in front; up on one knee, a fist on the other; standing, hunched.
+/// `hip` and `l` are the standing hip height and the leg's length; `fx` is a foot's rest x.
+fn getup_keys(hip: f32, l: f32, fx: f32, rest: [[f32; 3]; 2]) -> [(f32, DownPose); 5] {
+    let low = 0.14;
+    [
+        (
+            0.,
+            DownPose {
+                hip_x: 0.,
+                turn: 0.,
+                hip_h: low,
+                hip_z: 0.,
+                back: 1.5,
+                roll: 0.,
+                lean: 0.,
+                feet: [[fx, 0., 0.88 * l], [-fx, 0., 0.88 * l]],
+                arms: [0.5, 0.4],
+            },
+        ),
+        (
+            0.3,
+            DownPose {
+                hip_x: 0.,
+                turn: 0.,
+                hip_h: low,
+                hip_z: -0.1 * hip,
+                back: 0.75,
+                roll: 0.08,
+                lean: 0.3,
+                feet: [[fx, 0., 0.5 * l], [-fx * 1.2, 0., 0.55 * l]],
+                arms: [-0.3, 1.15],
+            },
+        ),
+        (
+            0.55,
+            DownPose {
+                hip_x: 0.,
+                turn: 0.,
+                hip_h: 0.34,
+                hip_z: 0.,
+                back: -0.35,
+                roll: 0.16,
+                lean: 0.25,
+                feet: [[fx, 0., 0.42 * l], [-fx * 0.8, 0., -0.34 * l]],
+                arms: [-0.6, -1.05],
+            },
+        ),
+        (
+            KNEEL_P,
+            DownPose {
+                hip_x: 0.,
+                turn: 0.,
+                hip_h: 0.52,
+                hip_z: 0.05 * hip,
+                back: -0.25,
+                roll: 0.,
+                lean: 0.15,
+                feet: [[fx, 0., 0.4 * l], [-fx, 0., -0.3 * l]],
+                arms: [-0.75, -0.2],
+            },
+        ),
+        (
+            1.,
+            DownPose {
+                hip_x: 0.,
+                turn: 0.,
+                hip_h: 1.,
+                hip_z: 0.,
+                back: -0.12,
+                roll: 0.,
+                lean: 0.1,
+                feet: rest,
+                arms: [-0.15, -0.15],
+            },
+        ),
+    ]
+}
+/// A knocked-down mech's pose now, or None standing. Falling, it buckles and goes over on its
+/// back, the legs shooting out and the arms flung; then the get-up along `p`.
+/// `rag` is the ragdoll's pose and how far the get-up has taken over from it (0 to 1).
+pub fn down_pose(m: &Mech, rag: Option<(DownPose, f32)>) -> Option<DownPose> {
+    let d = m.down?;
+    let g = &m.geo;
+    let legs = g.legs();
+    if legs.len() != 2 {
+        return None;
+    }
+    let (l, fx) = (g.l1 + g.l2, legs[0].fx.abs());
+    let rest = [[legs[0].fx, 0., legs[0].fz], [legs[1].fx, 0., legs[1].fz]];
+    let keys = getup_keys(g.hip, l, fx, rest);
+    let at = |p: f32| {
+        let k = keys
+            .iter()
+            .rposition(|(q, _)| *q <= p)
+            .unwrap_or(0)
+            .min(keys.len() - 2);
+        let (q0, a) = keys[k];
+        let (q1, b) = keys[k + 1];
+        DownPose::lerp(&a, &b, smooth(((p - q0) / (q1 - q0)).clamp(0., 1.)))
+    };
+    let keyed = at(d.p);
+    // The ragdoll carries it from the blow until it has settled on its back; then the get-up's
+    // poses take over, blended in.
+    if let Some((f, w)) = rag {
+        return Some(DownPose::lerp(&f, &keyed, smooth(w.clamp(0., 1.))));
+    }
+    Some(match d.phase {
+        DownPhase::Falling => {
+            // Standing to flat: the knees go first, then it tips back faster and faster.
+            let u = (d.t / DOWN_FALL).min(1.);
+            let (stand, flat) = (keys[4].1, keys[0].1);
+            let mut f = DownPose::lerp(&stand, &flat, smooth(u));
+            f.hip_h = stand.hip_h + (flat.hip_h - stand.hip_h) * (u * 1.6).min(1.).powf(0.8);
+            f.back = flat.back * u * u;
+            f.arms = [-0.9 * smooth(u), -0.7 * smooth(u)];
+            f
+        }
+        _ => keyed,
+    })
+}
 /// How big the step's gestures are: full at a walk, still there for a shuffle or a turn.
 fn step_k(m: &Mech) -> f32 {
     (pace(m) * 2.).clamp(0.5, 1.)
@@ -264,6 +545,72 @@ mod tests {
         assert!(kick(&BARRY, 10, false) < kick(&BARRY, 3, false));
         assert!(kick(&BARRY, 2, true) > kick(&BARRY, 2, false));
         assert_eq!(kick(&BARRY, 20, true), 0.);
+    }
+    #[test]
+    fn skedaddle_bobs_and_rocks_like_a_bird_and_barry_does_not() {
+        use stompy_sim::data::{Biome, Diff, TimeOfDay, Weather};
+        use stompy_sim::state::start_free_play;
+        let mut g = stompy_sim::Game::new(1);
+        start_free_play(
+            &mut g,
+            Biome::Dusk,
+            TimeOfDay::Dusk,
+            Weather::Clear,
+            1,
+            1,
+            Ch::Jackal,
+            Diff::Normal,
+            true,
+        );
+        let m = &mut g.mechs[0];
+        assert_eq!(body(&SKEDADDLE, m), Body::default(), "standing, still");
+        m.speed = m.max_speed;
+        let (mut lo, mut hi, mut left, mut right, mut fwd, mut back) =
+            (0f32, 0f32, 0f32, 0f32, 0f32, 0f32);
+        for i in 0..100 {
+            m.cyc = i as f32 / 100.;
+            let b = body(&SKEDADDLE, m);
+            (lo, hi) = (lo.min(b.bob), hi.max(b.bob));
+            (left, right) = (left.max(b.sway), right.min(b.sway));
+            (fwd, back) = (fwd.max(b.peck), back.min(b.peck));
+            // It leans the way it rocks.
+            assert!(b.sway * b.roll <= 0.);
+        }
+        assert!(hi - lo > 0.4, "a bob: {lo}..{hi}");
+        assert!(
+            left > 0.25 && right < -0.25,
+            "a sway both ways: {right}..{left}"
+        );
+        assert!(fwd > 0.15 && back < -0.15, "a peck: {back}..{fwd}");
+        assert_eq!(body(&BARRY, m), Body::default(), "BARRY walks as before");
+    }
+    #[test]
+    fn purple_puncher_swaggers_and_rolls_without_pecking() {
+        use stompy_sim::data::{Biome, Diff, TimeOfDay, Weather};
+        use stompy_sim::state::start_free_play;
+        let mut g = stompy_sim::Game::new(1);
+        start_free_play(
+            &mut g,
+            Biome::Dusk,
+            TimeOfDay::Dusk,
+            Weather::Clear,
+            1,
+            1,
+            Ch::Puncher,
+            Diff::Normal,
+            true,
+        );
+        let m = &mut g.mechs[0];
+        m.speed = m.max_speed;
+        let (mut turn, mut rock) = (0f32, 0f32);
+        for i in 0..100 {
+            m.cyc = i as f32 / 100.;
+            let b = body(&PURPLE_PUNCHER, m);
+            assert_eq!(b.peck, 0., "no peck");
+            assert!(b.yaw * b.sway >= 0., "the shoulders turn with the roll");
+            (turn, rock) = (turn.max(b.yaw.abs()), rock.max(b.sway.abs()));
+        }
+        assert!(turn > 0.1 && rock > 0.2, "{turn} {rock}");
     }
     #[test]
     fn the_pods_take_the_same_jolt_out_of_step() {
