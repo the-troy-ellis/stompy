@@ -70,8 +70,8 @@ level 2** (2026-11-27), the default.
 
 **SKEDADDLE** (2026-11-28, `models::skedaddle`): a lean sprinter on bird
 legs. A forward-leaning hull, a glass canopy dome with a frame over it,
-gulping side intakes, raked cooling fins; a raptor's tail off the pelvis,
-ribbed, with a fin; thick armoured thighs over slim open-frame shins; long
+gulping side intakes, raked cooling fins; a counterweight behind the
+pelvis (it had a raptor's tail; the owner: too much); thick armoured thighs over slim open-frame shins; long
 three-toed claws, splayed wide, and a spur behind; slim strut arms with the
 LIL ZAPPERs (a lens at the muzzle); two ears in a V. Level 1 about 4,300
 triangles, level 2 about 8,400 (a little under BARRY).

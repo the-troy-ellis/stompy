@@ -463,7 +463,7 @@ pub const SKED_ANKLE: Piston = Piston {
 };
 
 /// SKEDADDLE: a lean sprinter on bird legs. A forward-leaning hull with a wraparound canopy and
-/// gulping side intakes, a raptor's tail for balance, thick thighs over slim shins, long
+/// gulping side intakes, a counterweight behind, thick thighs over slim shins, long
 /// three-toed claws with a spur, slim arms with the LIL ZAPPERs, and two twitchy ears. Light
 /// plates over an open frame: it runs fast, it breaks fast.
 pub fn skedaddle(level: u8, paint: [f32; 3]) -> Parts {
@@ -474,39 +474,23 @@ pub fn skedaddle(level: u8, paint: [f32; 3]) -> Parts {
     let n = if hi { 14 } else { 8 };
     let (l1, l2) = (g.l1, g.l2);
 
-    // The pelvis: a narrow keel, hip balls at the sides, and the tail: a tapered boom back and
-    // up, ribbed, with a fin at the end.
+    // The pelvis: a narrow keel, hip balls at the sides.
     let mut hip = Builder::default();
     hip.bbox(M4::ID, v3(2.2, 0.85, 1.5), 0.14, 0.9, dark);
     hip.bbox(t(0., 0.45, 0.1), v3(1.2, 0.45, 1.0), 0.1, 0.8, col);
     for s in [1., -1.] {
         hip.rod(v3(s * 0.9, 0., 0.), v3(s * 1.25, 0., 0.), 0.8, n, STEEL);
     }
-    let (root, end) = (v3(0., 0.1, -0.7), v3(0., 0.9, -3.4));
-    hip.rod(root, root + (end - root) * 0.55, 0.55, n, col);
-    hip.rod(root + (end - root) * 0.5, end, 0.32, n, col);
+    // A counterweight behind (the owner, 2026-11-28: a tail was too much).
     hip.bbox(
-        t(end.x, end.y + 0.3, end.z) * M4::rx(-0.5),
-        v3(0.08, 0.9, 0.7),
-        0.02,
-        0.5,
-        acc,
+        t(0., 0.1, -0.95) * M4::rx(-0.15),
+        v3(1.3, 0.7, 0.6),
+        0.1,
+        0.8,
+        col,
     );
     if hi {
-        for k in 1..6 {
-            let at = root + (end - root) * (k as f32 / 6.);
-            let d = if k < 4 { 0.66 } else { 0.42 };
-            hip.rod(at, at + (end - root).norm() * 0.06, d, n, dark);
-        }
-        for s in [1., -1.] {
-            hip.bbox(
-                t(end.x + s * 0.3, end.y, end.z + 0.2) * M4::rz(s * 0.4),
-                v3(0.5, 0.06, 0.5),
-                0.02,
-                0.6,
-                acc,
-            );
-        }
+        vent(&mut hip, t(0., 0.1, -1.27) * M4::ry(PI), 1.0, 0.45, 3, dark);
         vent(&mut hip, t(0., 0., 0.76), 1.2, 0.5, 3, dark);
     }
 
