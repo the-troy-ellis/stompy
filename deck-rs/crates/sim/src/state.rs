@@ -190,6 +190,7 @@ pub fn new_mech(g: &mut Game, ch: Ch, team: u8, x: f32, z: f32, yaw: f32) -> Opt
         flip_t: -1e9,
         shots: 0,
         shots_at: 0,
+        target: None,
     };
     let mut m = Mech {
         ch: c,
@@ -337,6 +338,18 @@ pub fn start_mission(g: &mut Game, mission: usize, ch: Ch, diff: Diff, flat: boo
         place_foe(g, f, i, def.foes.len());
     }
 }
+/// Free Play's mix of foes: lighter ones more often.
+const FREE_POOL: [Ch; 9] = [
+    Ch::Jackal,
+    Ch::Jackal,
+    Ch::Kestrel,
+    Ch::Light1,
+    Ch::Jackal,
+    Ch::Warden,
+    Ch::Sniper1,
+    Ch::Kestrel,
+    Ch::Puncher,
+];
 /// Free Play: a mix of foes on a ring, lighter ones more often.
 pub fn start_free_play(
     g: &mut Game,
@@ -352,19 +365,9 @@ pub fn start_free_play(
     g.diff = diff;
     reset(g, seed, biome, time, weather, flat);
     begin(g, ch);
-    const POOL: [Ch; 9] = [
-        Ch::Jackal,
-        Ch::Jackal,
-        Ch::Kestrel,
-        Ch::Light1,
-        Ch::Jackal,
-        Ch::Warden,
-        Ch::Sniper1,
-        Ch::Kestrel,
-        Ch::Puncher,
-    ];
+
     for i in 0..n_foes.min(MAX_MECHS - 1) {
-        let ch = POOL[g.rng.int(POOL.len())];
+        let ch = FREE_POOL[g.rng.int(FREE_POOL.len())];
         place_foe(
             g,
             &Foe {
@@ -376,5 +379,40 @@ pub fn start_free_play(
             i,
             n_foes,
         );
+    }
+}
+/// A battle: you and `allies` on one side, `foes` on the other, two blocks 700 m apart facing
+/// each other, everyone aware. The mix is Free Play's. For measuring big fights, and for the
+/// base builder's raids to grow from.
+pub fn start_battle(
+    g: &mut Game,
+    biome: Biome,
+    time: TimeOfDay,
+    allies: usize,
+    foes: usize,
+    seed: u32,
+    ch: Ch,
+    diff: Diff,
+    flat: bool,
+) {
+    g.diff = diff;
+    reset(g, seed, biome, time, Weather::Clear, flat);
+    begin(g, ch);
+    let room = MAX_MECHS - 1;
+    let (allies, foes) = (allies.min(room / 2), foes.min(room - allies.min(room / 2)));
+    for (team, n, z0, yaw) in [(0u8, allies, -40., 0.), (1u8, foes, 700., PI)] {
+        // A block of rows 30 m apart, eight abreast, the first row nearest the enemy.
+        for i in 0..n {
+            let (row, col) = ((i / 8) as f32, (i % 8) as f32 - 3.5);
+            let back = if team == 0 { -row } else { row };
+            let (x, z) = (
+                col * 30. + g.rng.range(-6., 6.),
+                z0 + back * 30. + g.rng.range(-6., 6.),
+            );
+            let k = FREE_POOL[g.rng.int(FREE_POOL.len())];
+            if let Some(e) = new_mech(g, k, team, x, z, yaw) {
+                g.mechs[e].ai.aware = true;
+            }
+        }
     }
 }

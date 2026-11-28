@@ -152,7 +152,8 @@ pub fn update(g: &mut Game, i: &Input, dt: f32) {
     steer_volley(g, dt);
 
     for id in 0..g.mechs.len() {
-        if g.mechs[id].team != 0 && g.mechs[id].alive {
+        // Every mech but the player's thinks, on either side.
+        if id != PLAYER && g.mechs[id].alive {
             if g.mechs[id].ai.still {
                 g.mechs[id].throttle = 0.;
                 g.mechs[id].jetting = false;

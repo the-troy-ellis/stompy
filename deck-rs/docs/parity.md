@@ -72,12 +72,13 @@ and ends with the owner playing it on the Deck.
   playtest (`roadmap.md` § M1) and the tuning it asks for.
 - **P2: The engine, built for a base builder's crowds.** The owner
   (2026-11-28): eight mechs is not enough.
-  - **Many mechs.** The sim's cap is 256 (was 24); the crowd test
-    (`tests/crowd.rs`) measures it: 256 mechs fighting cost 0.7 ms a frame
-    on the build machine. What doesn't scale yet: the AI hunts only the
-    player (sides must fight sides), and every mech is about 35 separate
-    draws (parts must be drawn instanced, with less detail far away). The
-    target number, and 60 held with it, is measured on the Deck.
+  - **Big battles** ([specs/04-big-battles.md](specs/04-big-battles.md)).
+    Sides now fight sides, and the crowd test measures two armies: 256
+    mechs cost about 1 ms a frame, 512 about 2.6 ms, 1,024 about 9 ms on
+    the build machine. Drawing is the real limit (about 35 draws a
+    detailed mech): batches and less detail far away come next, then a
+    battle in the game with a readout, so the number is picked on the
+    Deck.
   - **Voxel ground** on a 4 m grid: chunks meshed off the main thread, 3D
     ground questions for feet, shots and sight, craters, falling ground,
     sized for big maps from the start (in the browser version these came as

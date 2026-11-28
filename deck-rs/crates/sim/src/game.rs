@@ -229,7 +229,7 @@ pub struct Ai {
     pub hot: bool,
     pub wp: Option<[f32; 2]>,
     pub beam_aim: V3,
-    /// Where it believes the player is, and how fast they were going.
+    /// Where it believes its target is, and how fast it was going.
     pub belief: Option<(V3, [f32; 2], f32)>,
     pub last_seen: f32,
     pub look_t: f32,
@@ -247,6 +247,9 @@ pub struct Ai {
     pub flip_t: f32,
     pub shots: i32,
     pub shots_at: i32,
+    /// The enemy it is fighting: the nearest it has seen, or whoever last hit it. None: no
+    /// enemy yet (it patrols).
+    pub target: Option<MechId>,
 }
 
 #[derive(Clone, Debug)]

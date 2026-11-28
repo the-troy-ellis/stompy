@@ -23,12 +23,16 @@ pub const BEAM_CONTACT_GAP: f32 = 0.6;
 
 fn alert(g: &mut Game, e: MechId, src: Option<MechId>) {
     let t = g.time;
-    let belief = src.filter(|&s| s != e).map(|s| g.mechs[s].pos());
+    // Being hit by an enemy is a contact: the shooter becomes the target, its spot the belief.
+    let team = g.mechs[e].team;
+    let src = src.filter(|&s| s != e && g.mechs[s].team != team);
+    let belief = src.map(|s| g.mechs[s].pos());
     let a = &mut g.mechs[e].ai;
     a.aware = true;
     a.hit_at = Some(t);
-    if let Some(p) = belief {
-        a.belief = Some((p, [0., 0.], t)); // being hit is a contact; the shooter's spot is the belief
+    if let (Some(s), Some(p)) = (src, belief) {
+        a.target = Some(s);
+        a.belief = Some((p, [0., 0.], t));
     }
 }
 /// What a round does beyond its damage: a bolt scrambles and rattles; anything with `knock` shoves.

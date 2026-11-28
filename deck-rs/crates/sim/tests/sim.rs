@@ -623,3 +623,45 @@ fn missions_start_with_their_foes() {
         assert_eq!(g.state, State::Play);
     }
 }
+
+#[test]
+fn two_armies_fight_each_other_not_just_the_player() {
+    use stompy_sim::state::start_battle;
+    let mut g = Game::new(3);
+    start_battle(
+        &mut g,
+        Biome::Dusk,
+        TimeOfDay::Dusk,
+        15,
+        16,
+        3,
+        Ch::Kestrel,
+        Diff::Normal,
+        true,
+    );
+    assert_eq!(g.mechs.iter().filter(|m| m.team == 0).count(), 16);
+    assert_eq!(g.mechs.iter().filter(|m| m.team == 1).count(), 16);
+    let i = Input::default(); // the player stands at the back of their own block
+    for _ in 0..60 * 120 {
+        update(&mut g, &i, 1. / 60.);
+        g.events.clear();
+    }
+    let lost = |team: u8| {
+        g.mechs
+            .iter()
+            .enumerate()
+            .filter(|(id, m)| m.team == team && *id != PLAYER && !m.alive)
+            .count()
+    };
+    // Both sides lose mechs that the player never fought: allies and foes fight each other.
+    assert!(lost(0) >= 3, "allies lost {}", lost(0));
+    assert!(lost(1) >= 3, "foes lost {}", lost(1));
+    // An AI on the player's side has a foe as its target, and a foe can have an ally as its.
+    let foe_of_ally = g
+        .mechs
+        .iter()
+        .skip(1)
+        .filter(|m| m.team == 0)
+        .filter_map(|m| m.ai.target);
+    assert!(foe_of_ally.clone().all(|t| g.mechs[t].team == 1));
+}
