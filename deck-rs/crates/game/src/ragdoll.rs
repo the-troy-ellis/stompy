@@ -147,18 +147,41 @@ impl Ragdoll {
         }
     }
     /// The blow, along `dir`: the struck upper body takes it hardest, the hips less, and the
-    /// feet are left behind (they had the ground). Nets out about zero, so the body as a whole
-    /// still goes where the sim's shove takes it.
-    pub fn strike(&mut self, dir: V3, k: f32) {
+    /// feet are left behind (they had the ground). Never square on: one shoulder takes more than
+    /// the other, so the body twists and rolls as it goes, and each limb gets its own kick, so
+    /// they flail apart rather than in step; `seed` makes every blow different. Nets out about
+    /// zero, so the body as a whole still goes where the sim's shove takes it.
+    pub fn strike(&mut self, dir: V3, k: f32, seed: u32) {
         // One integration step's worth (the step's substeps, at 60 a second).
         let dt = 1. / (60. * SUBSTEPS as f32);
-        let share = [
+        let mut rng = seed.wrapping_mul(2654435761) | 1;
+        let mut rand = || {
+            rng ^= rng << 13;
+            rng ^= rng >> 17;
+            rng ^= rng << 5;
+            (rng % 20001) as f32 / 10000. - 1.
+        };
+        let mut share = [
             0.0, 0.6, 0.9, -0.1, -0.1, -0.35, -0.35, -0.6, -0.6, 0.6, 0.6, 0.35, 0.35,
         ];
-        // Balanced to nothing net: it turns the body, it doesn't add to the shove.
+        // Off-centre: one side of the body takes more of it.
+        let lean = 0.35 + 0.2 * rand();
+        let side = if rand() >= 0. { 1. } else { -1. };
+        for (pts, s) in [(SHOULDER, side), (HAND, side), (HIP, -side * 0.5)] {
+            share[pts[0]] *= 1. + lean * s;
+            share[pts[1]] *= 1. - lean * s;
+        }
         let mean = share.iter().sum::<f32>() / N as f32;
-        for (p, s) in self.pts.iter_mut().zip(share) {
-            p.o = p.o - dir * (k * (s - mean) * dt);
+        let up = v3(0., 1., 0.);
+        let across = dir.cross(up).norm();
+        for (i, (p, s)) in self.pts.iter_mut().zip(share).enumerate() {
+            let mut v = dir * (k * (s - mean));
+            // Each loose end its own way: up, across and along, a different amount each.
+            if KNEE.contains(&i) || FOOT.contains(&i) || HAND.contains(&i) {
+                let j = k * 0.45;
+                v = v + across * (j * rand()) + up * (j * rand()) + dir * (j * 0.5 * rand());
+            }
+            p.o = p.o - v * dt;
         }
     }
     pub fn step(&mut self, g: &Game, m: &Mech) {
@@ -320,7 +343,7 @@ mod tests {
         let m = g.mechs[0].clone();
         let mut r = Ragdoll::of(&m, g.time).unwrap();
         let (head0, foot0) = (r.pts[HEAD].p, r.pts[FOOT[0]].p);
-        r.strike(v3(0., 0., -1.), 9.);
+        r.strike(v3(0., 0., -1.), 9., 7);
         run(&mut g, &mut r, 0.15);
         let (head, foot) = (head0.z - r.pts[HEAD].p.z, foot0.z - r.pts[FOOT[0]].p.z);
         assert!(
@@ -335,7 +358,7 @@ mod tests {
             let m = g.mechs[0].clone();
             let mut r = Ragdoll::of(&m, g.time).unwrap();
             r.carry(v3(0., 7., -6.));
-            r.strike(v3(0., 0., -1.), 9.);
+            r.strike(v3(0., 0., -1.), 9., 7);
             run(&mut g, &mut r, 6.);
             assert!(r.still() > 0.5, "{ch:?}: still after six seconds");
             for (i, p) in r.pts.iter().enumerate() {
@@ -356,6 +379,30 @@ mod tests {
             let pose = r.pose(&m);
             assert!(pose.hip_h < 0.5, "{ch:?}: lying, hips at {}", pose.hip_h);
         }
+    }
+    #[test]
+    fn the_limbs_flail_apart_not_in_step_and_no_two_blows_are_alike() {
+        // Mirror the right side onto the left: a symmetric blow would match exactly.
+        let skew = |seed: u32| {
+            let mut g = game(Ch::Kestrel);
+            let m = g.mechs[0].clone();
+            let mut r = Ragdoll::of(&m, g.time).unwrap();
+            r.carry(v3(0., 7., -6.));
+            r.strike(v3(0., 0., -1.), 6., seed);
+            run(&mut g, &mut r, 0.4);
+            let c = r.pts[PELVIS].p;
+            let (a, b) = (r.pts[FOOT[0]].p - c, r.pts[FOOT[1]].p - c);
+            let (h, j) = (r.pts[HAND[0]].p - c, r.pts[HAND[1]].p - c);
+            let mirror = |v: V3| v3(-v.x, v.y, v.z);
+            (
+                (a - mirror(b)).len() + (h - mirror(j)).len(),
+                r.pts[HAND[0]].p,
+            )
+        };
+        let (s1, h1) = skew(7);
+        let (_, h2) = skew(8);
+        assert!(s1 > 0.5, "out of step: {s1} m off mirrored");
+        assert!((h1 - h2).len() > 0.2, "each blow its own");
     }
     #[test]
     fn quads_have_no_ragdoll() {
@@ -385,7 +432,7 @@ mod drawn {
         let m = g.mechs[0].clone();
         let mut r = Ragdoll::of(&m, g.time).unwrap();
         r.carry(v3(0., 7., -6.));
-        r.strike(v3(0., 0., -1.), 6.);
+        r.strike(v3(0., 0., -1.), 6., 7);
         let mut worst = 0f32;
         for _ in 0..240 {
             g.time += 1. / 60.;
@@ -438,7 +485,7 @@ mod flight {
         let m = g.mechs[0].clone();
         let mut r = Ragdoll::of(&m, g.time).unwrap();
         r.carry(v3(m.push[0], m.vy, m.push[1]));
-        r.strike(v3(0., 0., -1.), 6.);
+        r.strike(v3(0., 0., -1.), 6., 7);
         let i = stompy_sim::Input::default();
         let (legs, mut apart, mut long) = ((m.geo.l1 + m.geo.l2) * m.ch.scale, 0f32, 0f32);
         for _ in 0..120 {

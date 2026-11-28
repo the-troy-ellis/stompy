@@ -606,9 +606,16 @@ impl Scene {
             }
             let hp = base.apply(v3(l.hx, geo.hip, l.hz));
             let ankle = if let Some(d) = &dp {
-                // Down: the feet where the pose puts them, on the ground.
+                // Down: the feet where the pose (or the ragdoll) puts them, never past the leg's
+                // reach from the hip as drawn, so the foot stays on the shin.
                 let f = d.feet[i.min(1)];
-                down_frames(m, d).1.apply(v3(f[0], geo.ankle + f[1], f[2]))
+                let a = down_frames(m, d).1.apply(v3(f[0], geo.ankle + f[1], f[2]));
+                let (reach, off) = ((geo.l1 + geo.l2) * sc * 0.98, a - hp);
+                if off.len() > reach {
+                    hp + off.norm() * reach
+                } else {
+                    a
+                }
             } else if m.dying.is_some() {
                 base.apply(v3(l.fx, 0.2, l.fz))
             } else {
@@ -624,11 +631,42 @@ impl Scene {
             let k = solve_knee(hp, ankle, pole, geo.l1 * sc, geo.l2 * sc);
             let (mt, ms) = (M4::limb(hp, k, pole, sc), M4::limb(k, ankle, pole, sc));
             let roll = an.map_or(0., |(pr, _)| anim::foot_roll(pr, m, i));
-            let fyaw = if dp.is_some() { m.yaw } else { m.feet[i].yaw };
-            let mf = M4::t(ankle.x, ankle.y - geo.ankle * sc + 0.2 * sc, ankle.z)
-                * M4::ry(fyaw)
-                * M4::rx(roll)
-                * M4::s1(sc);
+            let mf = match &dp {
+                // Down and off the ground, the foot hangs off the shin; on the ground, flat.
+                Some(d) => {
+                    let lift = smooth(d.feet[i.min(1)][1] / 1.2);
+                    let shin = (k - ankle).norm();
+                    let up = (v3(0., 1., 0.) + (shin - v3(0., 1., 0.)) * lift).norm();
+                    let fwd = v3(sn, 0., c);
+                    let z = (fwd - up * fwd.dot(up)).norm();
+                    let x = up.cross(z);
+                    let at = ankle - up * ((geo.ankle - 0.2) * sc);
+                    M4([
+                        x.x * sc,
+                        x.y * sc,
+                        x.z * sc,
+                        0.,
+                        up.x * sc,
+                        up.y * sc,
+                        up.z * sc,
+                        0.,
+                        z.x * sc,
+                        z.y * sc,
+                        z.z * sc,
+                        0.,
+                        at.x,
+                        at.y,
+                        at.z,
+                        1.,
+                    ])
+                }
+                None => {
+                    M4::t(ankle.x, ankle.y - geo.ankle * sc + 0.2 * sc, ankle.z)
+                        * M4::ry(m.feet[i].yaw)
+                        * M4::rx(roll)
+                        * M4::s1(sc)
+                }
+            };
             b.part(ch, lod, Slot::ULeg, &mt);
             b.part(ch, lod, Slot::LLeg, &ms);
             b.part(ch, lod, Slot::Foot, &mf);
@@ -969,11 +1007,13 @@ impl Scene {
                     if let Some(d) = m.down {
                         // The blow, along the shove: the struck torso leads.
                         let f = d.pose.fall_yaw;
-                        r.strike(v3(f.sin(), 0., f.cos()), 6. * m.ch.scale);
+                        let seed = (g.time * 997.) as u32 ^ (id as u32).wrapping_mul(7919);
+                        r.strike(v3(f.sin(), 0., f.cos()), 6. * m.ch.scale, seed);
                     } else if let Some(d) = m.dying {
                         // Dead: the legs go, and it falls the way it was leaning.
                         let f = d.fall_yaw;
-                        r.strike(v3(f.sin(), 0., f.cos()), 3. * m.ch.scale);
+                        let seed = (g.time * 991.) as u32 ^ (id as u32).wrapping_mul(104_729);
+                        r.strike(v3(f.sin(), 0., f.cos()), 3. * m.ch.scale, seed);
                     }
                     r
                 });
