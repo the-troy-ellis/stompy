@@ -153,6 +153,18 @@ fn piston(b: &mut Batch, a: V3, z: V3, pi: &crate::models::Piston, sc: f32, dark
         0.,
     );
 }
+/// A knocked-down mech's frames, from its pose: the hips' frame (what `base` is standing: the
+/// hips drawn at its hip height) and the ground frame its feet are placed in.
+fn down_frames(m: &Mech, d: &anim::DownPose) -> (M4, M4) {
+    let g = &m.geo;
+    let ground = M4::t(m.x, m.y, m.z) * M4::ry(m.yaw) * M4::s1(m.ch.scale);
+    let base = ground
+        * M4::t(0., d.hip_h * g.hip, d.hip_z)
+        * M4::rx(-d.back)
+        * M4::rz(d.roll)
+        * M4::t(0., -g.hip, 0.);
+    (base, ground)
+}
 /// A chain from `a` to `b`: links half a metre long (by scale), every other one fatter, so it
 /// reads as links and not a rod.
 fn chain(b: &mut Batch, a: V3, z: V3, sc: f32) {
@@ -338,9 +350,16 @@ impl Scene {
         let (geo, sc) = (m.geo, m.ch.scale);
         let far = !arms_only && hypot2(m.x - self.eye.x, m.z - self.eye.z) > LOD_FAR;
         let lod = far as usize;
-        let base = if let Some(d) = m.dying.or(m.down.map(|d| d.pose)) {
-            // The legs buckle and the body topples about the ground under it (dying, or
-            // knocked down: the same fall, without the dying).
+        // Knocked down: a boxer's fall and get-up, posed (anim::down_pose).
+        let dp = if m.dying.is_none() {
+            anim::down_pose(m)
+        } else {
+            None
+        };
+        let base = if let Some(d) = &dp {
+            down_frames(m, d).0
+        } else if let Some(d) = m.dying {
+            // The legs buckle and the body topples about the ground under it.
             M4::t(m.x, m.y, m.z)
                 * M4::ry(d.fall_yaw)
                 * M4::rx(d.angle)
@@ -373,7 +392,7 @@ impl Scene {
             * M4::ry(m.twist + walk.yaw)
             * M4::t(0., 0., lunge + walk.peck)
             * M4::rx(walk.nod)
-            * M4::rx(m.wob_p.x - lean + m.torso_nod + m.run_lean)
+            * M4::rx(m.wob_p.x - lean + m.torso_nod + m.run_lean + dp.map_or(0., |d| d.lean))
             * M4::rz(m.wob_r.x);
         // The drawn-only motion: springs moved on, then read below.
         let prof = if self.detail > 0 && m.dying.is_none() && m.down.is_none() && !far {
@@ -514,9 +533,10 @@ impl Scene {
                     Some((pr, a)) => (anim::arm_swing(pr, m, side), a.lag.x),
                     None => (0., 0.),
                 };
+                let reach = dp.map_or(-m.pitch, |d| d.arms[if side > 0. { 0 } else { 1 }]);
                 tb * M4::t(side * geo.arm_x, geo.arm_y, 0.)
                     * M4::ry(lag)
-                    * M4::rx(-m.pitch + sw + swing + back * 0.25)
+                    * M4::rx(reach + sw + swing + back * 0.25)
             };
             // From inside, only the gun (or fist) reaches into view: the shoulder drum and upper
             // arm stay out of the eye.
@@ -585,21 +605,28 @@ impl Scene {
                 continue;
             }
             let hp = base.apply(v3(l.hx, geo.hip, l.hz));
-            let ankle = if m.dying.is_some() || m.down.is_some() {
+            let ankle = if let Some(d) = &dp {
+                // Down: the feet where the pose puts them, on the ground.
+                let f = d.feet[i.min(1)];
+                down_frames(m, d).1.apply(v3(f[0], geo.ankle, f[1]))
+            } else if m.dying.is_some() {
                 base.apply(v3(l.fx, 0.2, l.fz))
             } else {
                 m.feet[i].pos + v3(0., geo.ankle * sc, 0.)
             };
+            // Down, the knees bend up as well as their own way.
+            let lift = if dp.is_some() { 0.8 } else { 0. };
             let pole = match geo.knee {
-                Knee::Back => v3(-sn, 0., -c),
+                Knee::Back => v3(-sn, lift, -c).norm(),
                 Knee::Out => v3(c * l.hx + sn * l.hz, 0., -sn * l.hx + c * l.hz).norm(),
-                Knee::Forward => v3(sn, 0., c),
+                Knee::Forward => v3(sn, lift, c).norm(),
             };
             let k = solve_knee(hp, ankle, pole, geo.l1 * sc, geo.l2 * sc);
             let (mt, ms) = (M4::limb(hp, k, pole, sc), M4::limb(k, ankle, pole, sc));
             let roll = an.map_or(0., |(pr, _)| anim::foot_roll(pr, m, i));
+            let fyaw = if dp.is_some() { m.yaw } else { m.feet[i].yaw };
             let mf = M4::t(ankle.x, ankle.y - geo.ankle * sc + 0.2 * sc, ankle.z)
-                * M4::ry(m.feet[i].yaw)
+                * M4::ry(fyaw)
                 * M4::rx(roll)
                 * M4::s1(sc);
             b.part(ch, lod, Slot::ULeg, &mt);
@@ -867,24 +894,27 @@ impl Scene {
                 p.yaw.cos() * lurch,
             );
         let mut roll = p.wob_r.x * wv * 0.6 + p.tilt_r.x * 0.5;
-        if let Some(d) = p.down {
-            // Knocked down: the view goes over with the body, the way it fell: back toward the
-            // sky, forward toward the ground, sideways onto its side.
-            let f = d.pose;
-            let rel = f.fall_yaw - p.view_yaw();
-            let (fwd, side) = (rel.cos(), rel.sin());
-            pitch -= f.angle * 0.85 * fwd;
-            roll += f.angle * 0.85 * side + f.roll * f.buckle * 0.5;
-            e.y -= f.drop + f.angle * 2.2 * p.ch.scale;
-            let (s, c) = (f.fall_yaw.sin(), f.fall_yaw.cos());
-            let out = f.angle.sin() * 2.5 * p.ch.scale;
-            e.x += s * out;
-            e.z += c * out;
-        }
         if let Some(f) = p.fallen.or(p.dying) {
             pitch -= f.angle * 0.9;
             roll += f.roll * 0.8 * f.buckle.max(if p.fallen.is_some() { 1. } else { 0. });
             e.y -= f.drop + if p.fallen.is_some() { f.angle * 2. } else { 0. };
+        }
+        if let Some(d) = anim::down_pose(p).filter(|_| p.dying.is_none()) {
+            // Knocked down: the eye rides the body through the fall, the lying and the get-up,
+            // shaken as usual.
+            let (base, _) = down_frames(p, &d);
+            let tb = base
+                * M4::t(0., p.geo.torso_y, 0.)
+                * M4::ry(p.twist)
+                * M4::rx(d.lean + p.wob_p.x * wv)
+                * M4::rz(p.wob_r.x * wv);
+            let col = |k: usize| v3(tb.0[k], tb.0[k + 1], tb.0[k + 2]).norm();
+            let eye = tb.apply(v3(p.geo.eye[0], p.geo.eye[1], p.geo.eye[2]));
+            let (dir, up) = (col(8), col(4));
+            let right = dir.cross(up);
+            let mut e = eye + right * jx * 30. + up * (jy * 30. - drop * 0.35);
+            e.y = e.y.max(g.ter.height(e.x, e.z) + 0.6);
+            return (e, dir, up, fov);
         }
         e.y = e.y.max(g.ter.height(e.x, e.z) + 0.6);
         let up = v3(roll.sin() * yaw.cos(), roll.cos(), -roll.sin() * yaw.sin());

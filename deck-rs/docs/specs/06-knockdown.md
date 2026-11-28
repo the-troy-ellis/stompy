@@ -69,24 +69,36 @@ tiny robots under it.
 
 - `sim/down.rs`. A wrecking ball that lands knocks down any two-legged mech
   on the ground (`can_fall`); SLOWPOKE takes the stagger and stands.
-- **Falling** (0.6 s): the legs buckle and it goes over the way the ball
-  pushed it, to 1.35 rad (`DOWN_ANGLE`), drawn as a death's topple without
-  the dying; then the slam (the `knocked` row: an eye drop 1.6, the view
+- **Falling** (0.6 s): the blow turns it as it goes, so it always lands on
+  its back; the knees go first, then it tips back faster and faster, the
+  legs shooting out and the arms flung; then the slam (the `knocked` row: an eye drop 1.6, the view
   shaken, a deep thump, 280 ms of rumble, dust; a landing and a clang).
 - **Lying**: no walking, turning, aiming, punching, jets or guns; for the
   player only A does anything. Each press (a hold counts once) heaves it an
   eighth of the way up (`MASH_PRESSES`) with the `heave` row (a thump, a
-  lurch, a short rumble) and a footfall sound, and lifts the body a little;
-  half a second after the last press the heaves sag back at 0.15 a second.
+  lurch, a short rumble) and a footfall sound; half a second after the last
+  press the heaves sag back at 0.15 a second.
   The AI mashes 3, 4.5 or 6 times a second by difficulty, thinking or not.
   It sits low: its top and its centre drop with the lean, so shots and
   stomps meet it where it lies.
-- **Rising** (0.9 s): it comes back up, the feet plant afresh where it
-  stands (`init_feet`), the `up` row (a thump, the feet's dust) and a
-  landing. A death while down takes over.
-- **From inside**: the view goes over with the body (back toward the sky,
-  forward toward the ground, sideways onto its side), lowered and moved the
-  way it fell; the iris clamps (pain) while down; the HUD shows DOWN, MASH A
+- **The get-up is a boxer's off the canvas**, not a hinge (the owner,
+  2026-11-28: "it needs to get itself up in a realistic way like a boxer
+  stumbling back onto its feet"). Drawn as poses the body moves through
+  (`anim::down_pose`): the hips' height and place, how far they lean back
+  and roll, the torso's lean, each foot on the ground, each arm. Flat on
+  its back with the legs out; sitting up, knees in, a fist planted behind;
+  rolling onto a knee, a fist pushing off the ground in front; up on one
+  knee, a fist on the other; standing, hunched. The legs reach for the
+  feet the pose sets, so the knees bend as they would. The mashing drives
+  it up to the knee: each press visibly shoves it on, and it sinks back
+  when the presses stop.
+- **Rising** (0.9 s): from the knee to standing; the feet plant afresh where
+  it stands (`init_feet`), the `up` row and a landing; then a **stumble**: a
+  shove back that its legs step out of, a wobble, and weak legs for 0.6 s
+  (`STUMBLE`). A death while down takes over.
+- **From inside**: the eye rides the drawn body through the fall, the lying
+  (sky through the eye) and the get-up (the view rolls onto the knee and
+  comes back level as it stands); the iris clamps (pain) while down; the HUD shows DOWN, MASH A
   TO GET UP and a bar of the heaves. Getting up, it comes back level.
 - The demo pilot mashes too.
 

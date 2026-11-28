@@ -750,17 +750,25 @@ pub static FIST_CHAIN: ChainDef = ChainDef {
 pub const CHAIN_ARC: f32 = 10. * PI / 180.;
 /// Knockdown (specs/06-knockdown.md): the fall's time and how far over it ends (radians), how far
 /// the hips drop (by hip height), the presses of A from flat to up, how long after the last press
-/// the heaves start to sag back and how fast, how far the heaves lift the body before it rises,
-/// how long the rise takes, and the AI's presses a second by difficulty.
+/// the heaves start to sag back and how fast, how long the rise takes, and the AI's presses a
+/// second by difficulty.
 pub const DOWN_FALL: f32 = 0.6;
 pub const DOWN_ANGLE: f32 = 1.35;
 pub const DOWN_DROP: f32 = 0.12;
 pub const MASH_PRESSES: f32 = 8.;
 pub const MASH_GRACE: f32 = 0.5;
 pub const MASH_SAG: f32 = 0.15;
-pub const DOWN_HEAVE: f32 = 0.35;
 pub const DOWN_RISE: f32 = 0.9;
 pub const AI_MASH: [f32; Diff::N] = [3., 4.5, 6.];
+/// How far through the get-up the heaves take it (on one knee); the rest is the rise. How fast
+/// the drawn get-up follows the heaves (a second's worth, up and back down).
+pub const KNEEL_P: f32 = 0.8;
+pub const GETUP_RATE: f32 = 1.6;
+pub const GETUP_SAG: f32 = 0.6;
+/// Up again, it stumbles: a shove back that its legs step out of, a wobble, and weak legs for a
+/// moment (m/s by scale, seconds of stagger).
+pub const STUMBLE: f32 = 4.;
+pub const STUMBLE_STAGGER: f32 = 0.6;
 /// While staggered: the share of the turn rate left, and how far the hips sag (metres, by scale).
 pub const STAGGER_TURN: f32 = 0.3;
 pub const STAGGER_SAG: f32 = 0.6;

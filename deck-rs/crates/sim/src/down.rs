@@ -21,12 +21,16 @@ pub fn knock_down(g: &mut Game, id: MechId, dir: [f32; 2]) {
     }
     let roll = g.rng.range(-0.4, 0.4);
     let m = &mut g.mechs[id];
+    let fall_yaw = dir[0].atan2(dir[1]);
+    // It goes over backward: the blow turns it to face where it came from as it falls.
+    let yaw_to = m.yaw + wrap(fall_yaw + PI - m.yaw);
     m.down = Some(Down {
         pose: Dying {
-            fall_yaw: dir[0].atan2(dir[1]),
+            fall_yaw,
             roll,
             ..Dying::default()
         },
+        yaw_to,
         ..Down::default()
     });
     m.throttle = 0.;
@@ -87,6 +91,11 @@ pub fn down_tick(g: &mut Game, id: MechId, dt: f32) {
     match d.phase {
         DownPhase::Falling => {
             let u = (d.t / DOWN_FALL).min(1.);
+            // Turned by the blow as it goes, to fall on its back; the torso swings round too.
+            let m = &mut g.mechs[id];
+            let k = (dt / (DOWN_FALL * (1. - u).max(0.15))).min(1.);
+            m.yaw += wrap(d.yaw_to - m.yaw) * k;
+            m.twist *= 1. - k;
             d.buckle = (u * 2.).min(1.);
             d.pose.angle = u * u * DOWN_ANGLE;
             d.pose.buckle = d.buckle;
@@ -103,7 +112,9 @@ pub fn down_tick(g: &mut Game, id: MechId, dt: f32) {
             if d.t - d.last_press > MASH_GRACE {
                 d.up = (d.up - MASH_SAG * dt).max(0.);
             }
-            d.pose.angle = DOWN_ANGLE * (1. - DOWN_HEAVE * d.up);
+            let to = d.up * KNEEL_P;
+            d.p += clamp(to - d.p, -GETUP_SAG * dt, GETUP_RATE * dt);
+            d.pose.angle = DOWN_ANGLE * (1. - d.p);
             if d.up >= 1. {
                 d.phase = DownPhase::Rising;
                 d.rise = 0.;
@@ -112,7 +123,8 @@ pub fn down_tick(g: &mut Game, id: MechId, dt: f32) {
         DownPhase::Rising => {
             d.rise += dt / DOWN_RISE;
             let v = smooth(d.rise.min(1.));
-            d.pose.angle = DOWN_ANGLE * (1. - DOWN_HEAVE) * (1. - v);
+            d.p = KNEEL_P + (1. - KNEEL_P) * v;
+            d.pose.angle = DOWN_ANGLE * (1. - d.p);
             d.pose.buckle = 1. - v;
             d.pose.drop = d.pose.buckle * DOWN_DROP * hip * sc;
             if d.rise >= 1. {
@@ -144,13 +156,20 @@ fn slam(g: &mut Game, id: MechId) {
     g.sfx_by(id, Sfx::Land(1.2), at);
     g.sfx_by(id, Sfx::Clang(Sec::T), at);
 }
-/// On its feet again: the feet plant where it stands, a heave and a thump.
+/// On its feet again: the feet plant where it stands, a heave and a thump, and a stumble: a shove
+/// back that its legs step out of, a wobble, weak legs for a moment.
 fn stand(g: &mut Game, id: MechId) {
+    let side = if g.rng.chance(0.5) { 1. } else { -1. };
     let Game { ter, mechs, .. } = g;
     let m = &mut mechs[id];
     m.down = None;
-    m.stagger = 0.;
     init_feet(ter, m);
+    let (s, c, k) = (m.yaw.sin(), m.yaw.cos(), STUMBLE * m.ch.scale);
+    m.push[0] -= s * k;
+    m.push[1] -= c * k;
+    m.stagger = STUMBLE_STAGGER;
+    m.wob_p.kick(-1.2);
+    m.wob_r.kick(side * 1.4);
     let c = center_of(&g.mechs[id]);
     feel(
         g,

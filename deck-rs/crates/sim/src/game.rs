@@ -189,6 +189,12 @@ pub struct Down {
     pub held: bool,
     /// Rising, 0 to 1.
     pub rise: f32,
+    /// The get-up as drawn, 0 flat on its back to 1 standing: it follows the heaves (up to on one
+    /// knee) and then the rise, smoothly, so each press visibly shoves it on and it sinks back
+    /// when the presses stop.
+    pub p: f32,
+    /// The heading it falls backward from: the blow turns it as it goes over.
+    pub yaw_to: f32,
 }
 /// A wrecking-ball fist on its chain: which arm, which way it flies, how far out it is, whether
 /// it is coming back, and where it is.
