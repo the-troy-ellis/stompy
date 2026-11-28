@@ -6,6 +6,14 @@ use stompy_sim::data::{Biome, TimeOfDay, PALS};
 use stompy_sim::Game;
 
 pub const RAMP: usize = 9;
+/// A mech's paint is its side's (the owner, 2026-11-28): yours a slate blue, theirs a mustard
+/// yellow. A chassis is told by its shape; its trim (pods, fists) keeps its own accent. Blue and
+/// yellow stand off every ramp and stay apart for colour-blind eyes; a rust red was tried for
+/// theirs and sank into the desert's and the volcanic plain's ground.
+pub const TEAM_PAINT: [[f32; 3]; 2] = [[0.42, 0.52, 0.68], [0.84, 0.68, 0.22]];
+pub fn paint(team: u8) -> [f32; 3] {
+    TEAM_PAINT[(team as usize).min(1)]
+}
 struct Ramp {
     cols: [u32; RAMP],
     /// Under 1 lifts the dark end (a dark place still uses its whole ramp).

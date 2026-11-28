@@ -293,7 +293,7 @@ fn make_wreck(g: &mut Game, id: MechId, roll: f32) {
     }
     let m = &g.mechs[id];
     let ammo = m.w.iter().any(|w| w.def.ammo > 0 && w.ammo > 0 && !w.dead);
-    let (x, y, z, yaw, ch, scale) = (m.x, m.y, m.z, m.yaw, m.key(), m.ch.scale);
+    let (x, y, z, yaw, ch, scale, team) = (m.x, m.y, m.z, m.yaw, m.key(), m.ch.scale, m.team);
     let n = 2 + g.rng.int(3);
     let mut pops: Vec<f32> = (0..n).map(|_| g.rng.range(0.3, WRECK_POPS)).collect();
     pops.sort_by(f32::total_cmp);
@@ -308,6 +308,7 @@ fn make_wreck(g: &mut Game, id: MechId, roll: f32) {
         z,
         yaw,
         ch,
+        team,
         scale,
         t: 0.,
         roll,

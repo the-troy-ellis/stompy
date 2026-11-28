@@ -84,12 +84,14 @@ pub fn shed_part(g: &mut Game, who: MechId, part: Part, p: V3, v: V3) {
         g.debris.remove(0);
     }
     let (ch, scale, yaw) = (g.mechs[who].key(), g.mechs[who].scale(), g.mechs[who].yaw);
+    let team = g.mechs[who].team;
     let r = &mut g.rng;
     let rot = v3(r.range(0., TAU), yaw, r.range(0., TAU));
     let spin = v3(r.range(-6., 6.), r.range(-3., 3.), r.range(-6., 6.));
     g.debris.push(Debris {
         part,
         ch,
+        team,
         scale,
         p,
         v,

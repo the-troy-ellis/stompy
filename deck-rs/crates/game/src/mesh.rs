@@ -362,10 +362,12 @@ fn ball(b: &mut Builder, at: V3, d: f32, col: [f32; 3]) {
 
 /// Every part of a chassis: legs from its leg type sized by its body plan, body from its style.
 /// `detail` above 0 swaps in the detailed model where there is one (`models.rs`; BARRY so far).
-pub fn build_mech_parts(gl: &Gl, ch: Ch, detail: u8) -> MechParts {
-    let mut p = build_box_parts(gl, ch);
+/// `team` picks the paint: a mech's colour is its side's (`look::TEAM_PAINT`).
+pub fn build_mech_parts(gl: &Gl, ch: Ch, detail: u8, team: u8) -> MechParts {
+    let paint = crate::look::paint(team);
+    let mut p = build_box_parts(gl, ch, paint);
     if detail > 0 && ch == Ch::Kestrel {
-        let d = crate::models::barry(detail);
+        let d = crate::models::barry(detail, paint);
         for (slot, mut b) in [
             (&mut p.hip, d.hip),
             (&mut p.uleg, d.uleg),
@@ -390,10 +392,10 @@ pub fn build_mech_parts(gl: &Gl, ch: Ch, detail: u8) -> MechParts {
     }
     p
 }
-fn build_box_parts(gl: &Gl, ch: Ch) -> MechParts {
+fn build_box_parts(gl: &Gl, ch: Ch, paint: [f32; 3]) -> MechParts {
     let c = chassis(ch);
     let g = geo_for(ch);
-    let (col, dark, acc) = (c.col, mulc(c.col, 0.55), c.acc);
+    let (col, dark, acc) = (paint, mulc(paint, 0.55), c.acc);
     let mut b = Builder::default();
     let (l1, l2) = (g.l1, g.l2);
     let (hip, uleg, lleg, foot) = match c.legs {

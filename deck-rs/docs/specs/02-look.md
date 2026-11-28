@@ -69,6 +69,17 @@ Counted for a whole mech, both legs and arms (test: `models::tests`):
 level 2** (2026-11-27), the default. Then the other five, and the ground's faces come with
 the voxel ground (P2).
 
+### Paint shows the side (built)
+
+The owner (2026-11-28): chassis colours indicate teams. A mech's paint is its
+side's, `look::TEAM_PAINT`: yours slate blue, theirs mustard yellow; a
+chassis is told by its shape, and its trim (BARRY's pods, PURPLE PUNCHER's
+fists) keeps its accent. Wrecks and debris keep their side's paint. Each
+chassis's models are built once a side. Rust red was tried for theirs
+first: it sank into the red and orange ground of the desert and the
+volcanic plain. Blue and yellow stand off all four ramps and stay apart for
+the common colour blindnesses. Open: PURPLE PUNCHER is no longer purple.
+
 ### Sprites (agreed in principle, not built)
 
 The owner (2026-11-27) is open to sprites where they earn it, used

@@ -70,6 +70,12 @@ enum Slot {
     Toe2,
 }
 const SLOTS: usize = 15;
+/// Two sides, two paints: a chassis's models are built once a side.
+const SIDES: usize = 2;
+/// Which model set: a side's paint on a chassis.
+fn kit(ch: Ch, team: u8) -> usize {
+    (team as usize).min(SIDES - 1) * Ch::N + ch.i()
+}
 fn slot_mesh(p: &MechParts, s: usize) -> Option<&Mesh> {
     match s {
         0 => Some(&p.hip),
@@ -104,13 +110,13 @@ fn push(v: &mut Vec<f32>, m: &M4, col: [f32; 3], glow: f32) {
 impl Batch {
     fn new() -> Batch {
         Batch {
-            parts: vec![vec![]; Ch::N * 2 * SLOTS],
+            parts: vec![vec![]; SIDES * Ch::N * 2 * SLOTS],
             fx: vec![vec![]; FX_ALL.len() * 2],
         }
     }
-    fn part(&mut self, ch: Ch, lod: usize, s: Slot, m: &M4) {
+    fn part(&mut self, k: usize, lod: usize, s: Slot, m: &M4) {
         push(
-            &mut self.parts[(ch.i() * 2 + lod) * SLOTS + s as usize],
+            &mut self.parts[(k * 2 + lod) * SLOTS + s as usize],
             m,
             [1.; 3],
             0.,
@@ -212,8 +218,8 @@ fn inst_mat(p: V3, yaw: f32, tumble: f32, size: f32) -> M4 {
 impl Scene {
     pub fn new(gl: &Gl) -> Scene {
         Scene {
-            parts: (0..Ch::N).map(|_| None).collect(),
-            boxes: (0..Ch::N).map(|_| None).collect(),
+            parts: (0..SIDES * Ch::N).map(|_| None).collect(),
+            boxes: (0..SIDES * Ch::N).map(|_| None).collect(),
             batch: Batch::new(),
             eye: V3::ZERO,
             fx: FX_ALL.iter().map(|&k| build_effect(gl, k)).collect(),
@@ -230,24 +236,25 @@ impl Scene {
         }
     }
     /// Builds a chassis's models the first time it is drawn: the full one and the plain one.
-    fn ensure(&mut self, gl: &Gl, ch: Ch) {
-        let d = self.detail;
-        self.parts[ch.i()].get_or_insert_with(|| build_mech_parts(gl, ch, d));
-        self.boxes[ch.i()].get_or_insert_with(|| build_mech_parts(gl, ch, 0));
+    fn ensure(&mut self, gl: &Gl, ch: Ch, team: u8) -> usize {
+        let (d, k) = (self.detail, kit(ch, team));
+        self.parts[k].get_or_insert_with(|| build_mech_parts(gl, ch, d, team));
+        self.boxes[k].get_or_insert_with(|| build_mech_parts(gl, ch, 0, team));
+        k
     }
     /// Draws everything gathered this frame, a draw a shape, and empties the lists.
     fn flush(&mut self, gl: &mut Gl) {
         gl.mode(Mode::Lit);
-        for ch in 0..Ch::N {
+        for k in 0..SIDES * Ch::N {
             for lod in 0..2 {
                 let set = if lod == 0 {
-                    &self.parts[ch]
+                    &self.parts[k]
                 } else {
-                    &self.boxes[ch]
+                    &self.boxes[k]
                 };
                 let Some(p) = set.as_ref() else { continue };
                 for sl in 0..SLOTS {
-                    let l = &mut self.batch.parts[(ch * 2 + lod) * SLOTS + sl];
+                    let l = &mut self.batch.parts[(k * 2 + lod) * SLOTS + sl];
                     if l.is_empty() {
                         continue;
                     }
@@ -298,8 +305,7 @@ impl Scene {
     /// One mech: the hull on its springs, the torso on top, the arms, the legs by IK from the feet.
     fn draw_mech(&mut self, gl: &mut Gl, g: &Game, id: MechId, arms_only: bool) {
         let m = &g.mechs[id];
-        let ch = m.key();
-        self.ensure(gl, ch);
+        let ch = self.ensure(gl, m.key(), m.team);
         let (geo, sc) = (m.geo, m.ch.scale);
         let far = !arms_only && hypot2(m.x - self.eye.x, m.z - self.eye.z) > LOD_FAR;
         let lod = far as usize;
@@ -331,7 +337,7 @@ impl Scene {
             * M4::rz(m.wob_r.x);
         // The drawn-only motion: springs moved on, then read below.
         let prof = if self.detail > 0 && m.dying.is_none() && !far {
-            anim::profile(ch)
+            anim::profile(m.key())
         } else {
             None
         };
@@ -369,9 +375,9 @@ impl Scene {
         };
         let kick_of = |w: Kicked| kicked.filter(|k| k.0 == w).map_or(0., |k| k.1);
         let p = if far {
-            &self.boxes[ch.i()]
+            &self.boxes[ch]
         } else {
-            &self.parts[ch.i()]
+            &self.parts[ch]
         };
         let p = p.as_ref().unwrap();
         let b = &mut self.batch;
@@ -445,7 +451,8 @@ impl Scene {
         if arms_only {
             return;
         }
-        let dark = [m.ch.col[0] * 0.55, m.ch.col[1] * 0.55, m.ch.col[2] * 0.55];
+        let paint = crate::look::paint(m.team);
+        let dark = [paint[0] * 0.55, paint[1] * 0.55, paint[2] * 0.55];
         let (c, sn) = (m.yaw.cos(), m.yaw.sin());
         for (i, l) in geo.legs().iter().enumerate() {
             let sec = if l.hx > 0. { Sec::LL } else { Sec::RL };
@@ -592,7 +599,7 @@ impl Scene {
     }
     fn draw_debris(&mut self, gl: &mut Gl, g: &Game) {
         for d in &g.debris {
-            self.ensure(gl, d.ch);
+            let k = self.ensure(gl, d.ch, d.team);
             let slot = match d.part {
                 Part::Arm => Slot::Arm,
                 Part::ULeg => Slot::ULeg,
@@ -602,7 +609,7 @@ impl Scene {
             };
             let far = hypot2(d.p.x - self.eye.x, d.p.z - self.eye.z) > LOD_FAR;
             self.batch.part(
-                d.ch,
+                k,
                 far as usize,
                 slot,
                 &(M4::t(d.p.x, d.p.y, d.p.z)
@@ -700,13 +707,13 @@ impl Scene {
         }
         gl.world(false);
         for w in &g.wrecks {
-            self.ensure(gl, w.ch);
+            let k = self.ensure(gl, w.ch, w.team);
             let sink = (1. - w.settle) * 0.8;
             let m = M4::t(w.x, w.y - sink * 0.3 + 0.2, w.z)
                 * M4::ry(w.yaw)
                 * M4::rz(w.roll * 0.5 + (w.t * 9.).sin() * (1. - w.settle) * 0.1)
                 * M4::s1(w.scale);
-            self.batch.part(w.ch, 0, Slot::Wreck, &m);
+            self.batch.part(k, 0, Slot::Wreck, &m);
         }
     }
     /// The cockpit camera: the eye in the torso, dropped by the kick and the bob, jittered by the shake,

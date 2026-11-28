@@ -405,6 +405,8 @@ pub enum Part {
 pub struct Debris {
     pub part: Part,
     pub ch: Ch,
+    /// Whose it was (its paint is its side's).
+    pub team: u8,
     pub scale: f32,
     pub p: V3,
     pub v: V3,
@@ -422,6 +424,8 @@ pub struct Wreck {
     pub z: f32,
     pub yaw: f32,
     pub ch: Ch,
+    /// Whose it was (its paint is its side's).
+    pub team: u8,
     pub scale: f32,
     pub t: f32,
     pub roll: f32,

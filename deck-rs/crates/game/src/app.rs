@@ -206,6 +206,8 @@ pub struct Args {
     pub battle: Option<(usize, usize)>,
     /// With `battle`: watch it with the free camera.
     pub spectate: bool,
+    /// Watching: keep the camera on the fighting (tools).
+    pub follow: bool,
 }
 /// A line the cockpit voice will say, and when.
 struct Line {
@@ -220,6 +222,7 @@ pub struct App {
     scene: Scene,
     /// The free camera while watching a battle.
     cam: Option<FreeCam>,
+    follow: bool,
     hud: Hud,
     g: Game,
     menu: Game,
@@ -820,6 +823,7 @@ impl App {
             menu: Game::new(5),
             menu_ch: None,
             cam: None,
+            follow: a.follow,
             prefs,
             raw: Raw::default(),
             raw_was: Raw::default(),
@@ -929,6 +933,7 @@ impl App {
                 let mut i = to_input(&self.raw, &self.prefs.controls(), dt as f32);
                 if let Some(c) = &mut self.cam {
                     // Watching: the controls fly the camera; the parked mech does nothing.
+                    i.target |= self.follow;
                     c.fly(&self.g, &i, dt as f32);
                     i = Input::default();
                 } else if self.demo {

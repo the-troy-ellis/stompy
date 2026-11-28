@@ -47,7 +47,7 @@ impl FreeCam {
         }
         let along = across.norm();
         let look = (a + b) * 0.5;
-        self.pos = a - along * 180. + v3(0., 85., 0.);
+        self.pos = a - along * 120. + v3(0., 55., 0.);
         let to = look - self.pos;
         self.yaw = to.x.atan2(to.z);
         self.pitch = (to.y / hypot2(to.x, to.z).max(1.)).atan();

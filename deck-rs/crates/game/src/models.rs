@@ -103,10 +103,10 @@ impl Parts {
 }
 
 /// BARRY: forward knees, a square torso, a domed cockpit, missile pods on the shoulders.
-pub fn barry(level: u8) -> Parts {
+pub fn barry(level: u8, paint: [f32; 3]) -> Parts {
     let c = chassis(Ch::Kestrel);
     let g = geo_for(Ch::Kestrel);
-    let (col, dark, acc) = (c.col, mulc(c.col, 0.55), c.acc);
+    let (col, dark, acc) = (paint, mulc(paint, 0.55), c.acc);
     let hi = level >= 2;
     let n = if hi { 16 } else { 8 }; // sides on anything round
     let (l1, l2, w) = (g.l1, g.l2, g.girth);
@@ -435,7 +435,8 @@ mod tests {
     use super::*;
     #[test]
     fn barry_is_on_budget() {
-        let (a, b) = (barry(1).tris(), barry(2).tris());
+        let c = chassis(Ch::Kestrel);
+        let (a, b) = (barry(1, c.col).tris(), barry(2, c.col).tris());
         println!("BARRY drawn: level 1 {a} triangles, level 2 {b}");
         // A whole mech, both legs and arms. The Deck draws millions a frame; the budget is the
         // look's, not the GPU's: enough faces for detail, few enough that the facets show.
