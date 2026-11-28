@@ -11,6 +11,7 @@ Read in this order the first time:
 
 | Doc | What it answers |
 |---|---|
+| [world.md](world.md) | The world, being worked out: robots and no humans, demigods and tiny robots, temples that summon. Draft. |
 | [vision.md](vision.md) | What this rebuild is, what it is not, and the pillars that settle arguments. The brief, kept. |
 | [architecture.md](architecture.md) | The code as it is: the sim, the platform, the renderer, how they talk, the invariants. |
 | [controls.md](controls.md) | The Deck layout, the gyro, the paddles, and the keyboard and mouse second. |
