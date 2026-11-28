@@ -1,8 +1,9 @@
-# Parity with the browser version
+# Bringing features across from the browser version
 
-The browser version (the rest of this repository) is the reference: about
-20,000 lines, 40 specs and a lot of the owner's playtest notes. This rebuild
-reaches parity with it **one feature at a time, on purpose**. The aim isn't
+The browser version (the rest of this repository) is **deprecated**
+(2026-11-28) and kept as a reference: about 20,000 lines, 40 specs and a lot
+of the owner's playtest notes. This game takes what a base builder needs from
+it **one feature at a time, on purpose**. The aim isn't
 a copy. Each feature comes across once, gets checked against what playing on
 the Deck has taught us, and is kept, changed or dropped on the owner's call.
 
@@ -69,16 +70,24 @@ and ends with the owner playing it on the Deck.
   field or a canyon, the foes you pick), cheats, live FEEL tuning and a
   frame-time readout, since every later playtest uses them. Then the Deck
   playtest (`roadmap.md` § M1) and the tuning it asks for.
-- **P2: The engine.** Voxel ground on a 4 m grid: chunks meshed off the main
-  thread, 3D ground questions for feet, shots and sight, craters, falling
-  ground. Built for bigger maps and big fights from the start, with the
-  Deck's frame budget measured in a crowd scene, rather than retrofitted (in
-  the browser version these came as three rewrites). Structures as a
-  general thing in the world that can be shot, punched and toppled.
-- **P3: Core gameplay on the new ground.** The AI in canyons and caves,
-  mechlab-lite, then the second arm by hand: BIG SCOOPER and digging, the
-  base, the crew and SWAP, raids (spec 20's smallest loop, in Free Play).
-- **P4: The second arm from above.** Command view, the builder, the base
+- **P2: The engine, built for a base builder's crowds.** The owner
+  (2026-11-28): eight mechs is not enough.
+  - **Many mechs.** The sim's cap is 256 (was 24); the crowd test
+    (`tests/crowd.rs`) measures it: 256 mechs fighting cost 0.7 ms a frame
+    on the build machine. What doesn't scale yet: the AI hunts only the
+    player (sides must fight sides), and every mech is about 35 separate
+    draws (parts must be drawn instanced, with less detail far away). The
+    target number, and 60 held with it, is measured on the Deck.
+  - **Voxel ground** on a 4 m grid: chunks meshed off the main thread, 3D
+    ground questions for feet, shots and sight, craters, falling ground,
+    sized for big maps from the start (in the browser version these came as
+    three rewrites).
+  - **Structures** as a general thing in the world that can be shot, punched
+    and toppled.
+- **P3: The base builder, by hand.** The AI in canyons and caves, then the
+  loop: BIG SCOOPER and digging, the base, the crew and SWAP, raids (spec
+  20's smallest loop, in Free Play), mechlab-lite.
+- **P4: The base builder, from above.** Command view, the builder, the base
   loop, production, tunnelling.
 - **P5: The world.** Buildings and the city, the forest, night and
   headlights, weather, props, explosions' extras.
@@ -100,4 +109,7 @@ port spec's "Changed" list is approved.
 | 2026-11-10 | Weapon groups | none (one control per kind) | the same | kept on purpose |
 | 2026-11-27 | The look | smooth shading, a PIXELS setting (240 lines) | an ordered dither onto a ramp per place and time; full-resolution edges; DITHER in SETTINGS (off, fine, chunky, chunkier), chunky by default | the owner: dithering is the style, more distinct palettes |
 | 2026-11-27 | Order | the campaign before the second arm | the core and the engine first, the campaign later | the owner's call: get the game's core and engine right first |
+| 2026-11-28 | The browser version | the game | deprecated: a reference for specs, code and numbers, never changed | the owner |
+| 2026-11-28 | What Stompy is | a mech sim; construction later, if it earned it | a mech base builder; construction is the heart of it | the owner |
+| 2026-11-28 | Mechs on a map | up to about 20 (MAX_MECHS 24) | the sim allows 256; the playable number is what the Deck holds at 60 | the owner: eight is not enough |
 | 2026-11-27 | Rust version | (n/a) | pinned in `rust-toolchain.toml` | fmt and clippy don't drift between builds |

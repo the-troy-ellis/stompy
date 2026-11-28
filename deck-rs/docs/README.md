@@ -1,10 +1,11 @@
 # Stompy for the Steam Deck: the plan of record
 
-This folder is the plan for the Deck rebuild. It exists so that the owner, or
-any agent, can pick up a piece of work cold, build it the way the project
-wants, and hand it off without a conversation. The game is in `deck-rs/src`; the
-reference implementation (the browser version, with every tuned number) is
-the repository around it.
+This folder is the plan for Stompy, a mech base builder for the Steam Deck.
+It exists so that the owner, or any agent, can pick up a piece of work cold,
+build it the way the project wants, and hand it off without a conversation.
+The game is in `deck-rs/crates`. The browser version around it is
+deprecated (2026-11-28): a reference for specs, code and tuned numbers,
+never changed.
 
 Read in this order the first time:
 
@@ -14,7 +15,7 @@ Read in this order the first time:
 | [architecture.md](architecture.md) | The code as it is: the sim, the platform, the renderer, how they talk, the invariants. |
 | [controls.md](controls.md) | The Deck layout, the gyro, the paddles, and the keyboard and mouse second. |
 | [deck-setup.md](deck-setup.md) | Building it, putting it on the Deck, the Steam Input layout, playtesting. |
-| [parity.md](parity.md) | Reaching parity with the browser version: how each feature comes across, where each stands, the phases, the decision log. |
+| [parity.md](parity.md) | The order things are built in, and how a feature comes across from the deprecated browser version: where each stands, the phases, the decision log. |
 | [roadmap.md](roadmap.md) | The milestones, what is in each, what the owner plays before the next starts. |
 | [workflow.md](workflow.md) | How work is claimed, tested, playtested on the Deck and merged. The definition of done. |
 | [bugs.md](bugs.md) | The owner's bug list. Logged as found, fixed only when the owner picks one. |
@@ -72,6 +73,8 @@ These came from the owner's brief and are not up for re-litigation in a PR.
   justification (what it does, why writing it here is worse, its licence,
   its size), and wait for the answer. Single-file, permissively licensed
   libraries are the easiest yes.
-- **The second arm (construction) comes later, and only if it earns it.**
-  When it does, the bucket must visibly bite and drag the dirt continuously
-  before anything else is built on it.
+- **Stompy is a base builder** (the owner, 2026-11-28): dig, build, make
+  mechs, hold the base against raids, with many mechs on the map (eight is
+  not enough), any of them flown from the cockpit. The bucket must visibly
+  bite and drag the dirt continuously (the owner's note on the browser
+  version's digging).

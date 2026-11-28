@@ -19,7 +19,7 @@ contains.
 | **M3** Mechlab-lite | The FIT screen: hardpoints by category, systems (sinks, armour, jets, KNUCKLES), the tonnage bar, saved per chassis. Enemies stay stock. | A JACKAL with two BLINKYs and sinks sustains fire longer than stock (test). |
 | **M4** Atmosphere | Weather particles (rain, snow, dust, fog), night with headlights, the dusk-to-night ramp drawn, the ambience beds per biome, the few CC0 samples under the synthesis, a recorded cockpit voice (the owner's, or a flat TTS render they pick). | A night mission is playable and the voice says the lines. |
 | **M5** Acts II and III | The glacier and the volcanic plain, the forest, LONG LARRY's and BIG TROUBLE's and PURPLE PUNCHER's entrances, contracts after twelve. | All twelve missions winnable headlessly by the perfect-player harness and by the owner. |
-| **Later** | The second arm (construction: BIG SCOOPER, the hauler, BIG STACKER, raids), only if it earns it, with the bucket biting the dirt visibly and continuously first. A Steam release, which must not steer anything. | |
+| **Later** | Superseded on 2026-11-28: Stompy is a base builder, and the construction arm (BIG SCOOPER, the hauler, BIG STACKER, raids) is the heart of it, not an extra. The order is in [parity.md](parity.md). A Steam release, which must not steer anything. | |
 
 ## What M1 is waiting on (the first Deck playtest)
 

@@ -1,5 +1,12 @@
 # Stompy — notes for agents
 
+> **The game is the Rust build in `deck-rs/`.** Start with `deck-rs/CLAUDE.md`
+> and `deck-rs/docs/`. Everything else in this repository (the web version:
+> `src/`, `docs/`, `deck/`, `app/`, `server/`, `test/`) is **deprecated**
+> (the owner, 2026-11-28). No new features and no fixes here unless the owner
+> asks. Read it only as a reference when building something in Rust. The rest
+> of this file describes the web version, for that reading.
+
 Stompy is a 90s-style mech sim made for fun, for the owner's own Steam
 Deck: a web game (raw WebGL, flat-shaded polygons at full resolution, no
 textures, sprites or blending; see `docs/specs/14-look-and-performance.md`,

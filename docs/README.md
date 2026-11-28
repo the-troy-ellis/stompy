@@ -1,5 +1,8 @@
 # Stompy development plan
 
+> **Deprecated** (2026-11-28): this is the web version's plan, kept as a
+> reference. The plan of record is [`deck-rs/docs/`](../deck-rs/docs/README.md).
+
 This folder is the plan of record for Stompy. It exists so that any agent (or
 person) can pick up a piece of work cold, build it the way the project wants,
 and hand it off without a conversation.

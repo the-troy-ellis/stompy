@@ -11,7 +11,7 @@ use crate::terrain::Terrain;
 
 pub type MechId = usize;
 pub const PLAYER: MechId = 0;
-pub const MAX_MECHS: usize = 24;
+pub const MAX_MECHS: usize = 256;
 pub const MAX_SHOTS: usize = 256;
 pub const MAX_PARTS: usize = 4000;
 pub const MAX_DEBRIS: usize = 40;

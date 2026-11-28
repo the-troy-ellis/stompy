@@ -1,5 +1,9 @@
 # Stompy
 
+> **This web version is deprecated** (2026-11-28). The game is now the Rust
+> build for the Steam Deck in [`deck-rs/`](deck-rs/README.md). What follows
+> describes the web version, kept as a reference.
+
 You drive a big walking robot. You stomp other big walking robots.
 
 Stompy is a mech sim in the style of the mid-90s: flat-shaded polygons,

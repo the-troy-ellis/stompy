@@ -2,9 +2,10 @@
 
 ## One line
 
-A 90s-style first-person mech sim for one person's Steam Deck. You pilot a
-big, slow, heavy machine that stomps, punches, overheats and falls apart one
-limb at a time. A deadpan cockpit computer reads out the bad news. One of the
+A 90s-style mech base builder for one person's Steam Deck. You dig, build
+and make mechs, and hold your base against raids, with a crowd of big, slow,
+heavy machines on the map. You can climb into any of them: from the cockpit
+each one stomps, punches, overheats and falls apart one limb at a time. A deadpan cockpit computer reads out the bad news. One of the
 mechs is called PURPLE PUNCHER. It is allowed to be funny.
 
 ## The one rule above all: thunk
@@ -106,14 +107,16 @@ wrong. When two good ideas conflict, the more thunky one wins.
   owner asks).
 - A market. Nothing here is built for a store page.
 
-## The second arm (later, and only if it earns it)
+## A base builder (the owner, 2026-11-28)
 
 Construction mechs: BIG SCOOPER digs ore out of voxel ground, a hauler
-carries it, BIG STACKER builds a small base and mech factory, raids come for
-the base and you swap between your mechs. The owner's note on the first
-version: digging lacked cause and effect; the ground changed in steps and you
-could not see what the mech did to it. If this is built, the bucket must
-visibly bite and drag the dirt continuously before anything else goes on top.
+carries it, BIG STACKER builds the base and a mech factory, and raids come
+for it. Many mechs are on the map at once, yours and theirs; eight is not
+enough. You drop into any of yours and fight or work from its cockpit, so
+thunk still wins every argument. The owner's note on the browser version's
+digging: it lacked cause and effect; the ground changed in steps and you
+could not see what the mech did to it. The bucket must visibly bite and drag
+the dirt continuously before anything else goes on top.
 
 ## Reference points
 
