@@ -56,7 +56,7 @@ const LOD_FAR: f32 = 120.;
 /// The cockpit's own arms: their scale, and where the shoulders sit from the eye (sideways,
 /// down, forward), so the barrels show low in the corners of the view.
 const COCKPIT_ARM: f32 = 0.5;
-const COCKPIT_SHOULDER: [f32; 3] = [1.45, -0.15, 1.3];
+const COCKPIT_SHOULDER: [f32; 3] = [2.0, -0.35, 1.8];
 /// A piece of a chassis, for the batch.
 #[derive(Clone, Copy)]
 enum Slot {
