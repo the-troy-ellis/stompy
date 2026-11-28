@@ -215,6 +215,7 @@ pub fn new_mech(g: &mut Game, ch: Ch, team: u8, x: f32, z: f32, yaw: f32) -> Opt
         shutdown: false,
         was_air: false,
         centring: false,
+        twist_quiet: 0.,
         air_t: 0.,
         hp,
         max: hp,

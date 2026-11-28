@@ -277,6 +277,8 @@ pub struct Mech {
     pub shutdown: bool,
     pub was_air: bool,
     pub centring: bool,
+    /// Seconds since the torso was last twisted by hand (the player's walking recentre).
+    pub twist_quiet: f32,
     pub air_t: f32,
     pub hp: [f32; Sec::N],
     pub max: [f32; Sec::N],

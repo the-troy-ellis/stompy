@@ -2,7 +2,7 @@
 //! presses. Pure: no SDL here, so the mapping is tested.
 //!
 //! Steam Deck layout (docs/controls.md):
-//!   Left stick    legs: sideways turns, up and down nudges the throttle
+//!   Left stick    legs: sideways turns, up and down is the throttle (zero when let go)
 //!   Right stick   torso twist and pitch (and steers a guided volley)
 //!   Gyro          fine aim, while a finger rests on the right trackpad
 //!   RT energy, RB ballistic, LT missiles (tap fires, hold flies them), LB the OOPS BUTTON

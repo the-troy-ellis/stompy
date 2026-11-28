@@ -730,3 +730,61 @@ fn watching_a_battle_nobody_targets_you_and_it_ends_when_a_side_is_gone() {
     assert!(g.allies_left() == 0 || g.enemies_left() == 0);
     assert_eq!(g.won, g.enemies_left() == 0);
 }
+
+#[test]
+fn the_throttle_follows_the_stick_and_drops_to_zero_when_let_go() {
+    let mut g = flat_game(Ch::Kestrel, 21);
+    let mut i = input();
+    i.thr = 1.;
+    steps(&mut g, &i, 120);
+    assert_eq!(g.p().throttle, 1.);
+    let fast = g.p().speed;
+    assert!(fast > 5., "walking: {fast}");
+    i.thr = 0.5;
+    steps(&mut g, &i, 1);
+    assert_eq!(g.p().throttle, 0.5, "half the stick, half the throttle");
+    i.thr = 0.;
+    steps(&mut g, &i, 1);
+    assert_eq!(g.p().throttle, 0., "let go, and it drops to zero");
+    let coasting = g.p().speed;
+    assert!(coasting > 0., "the legs ease out, not stop dead");
+    steps(&mut g, &i, 120);
+    assert!(g.p().speed.abs() < 0.01, "then stand");
+    i.thr = -1.;
+    steps(&mut g, &i, 1);
+    assert_eq!(g.p().throttle, -stompy_sim::update::REVERSE, "back is slow");
+}
+#[test]
+fn walking_forward_recentres_the_torso_when_it_is_left_alone() {
+    let mut g = flat_game(Ch::Kestrel, 22);
+    let mut i = input();
+    g.pm().twist = 1.2;
+    // Standing still, the torso stays where it was put.
+    steps(&mut g, &i, 120);
+    assert_eq!(g.p().twist, 1.2);
+    // Walking and aiming, it stays where it is aimed.
+    i.thr = 1.;
+    i.twist = 0.3;
+    steps(&mut g, &i, 60);
+    let aimed = g.p().twist;
+    assert!(aimed > 1.2);
+    // Let go of the aim: a moment's grace, then it swings back over the legs.
+    i.twist = 0.;
+    steps(&mut g, &i, 20);
+    assert_eq!(g.p().twist, aimed, "not at once");
+    steps(&mut g, &i, 180);
+    assert!(
+        g.p().twist.abs() < 0.05,
+        "back over the legs: {}",
+        g.p().twist
+    );
+    // The gyro's tremor isn't aiming; a real turn of the wrist is.
+    g.pm().twist = 0.8;
+    i.twist_by = 0.0005;
+    steps(&mut g, &i, 120);
+    assert!(g.p().twist < 0.4, "a tremor doesn't hold it");
+    g.pm().twist = 0.8;
+    i.twist_by = 0.01;
+    steps(&mut g, &i, 60);
+    assert!(g.p().twist > 0.8, "aiming holds it");
+}

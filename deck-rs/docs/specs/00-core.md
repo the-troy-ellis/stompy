@@ -19,9 +19,11 @@ missions. Everything in the sim is the reference's, number for number.
 
 ### Legs and torso (`sim/gait.rs`, `sim/mech.rs`)
 
-The left stick turns the legs (`yaw`) at the chassis's turn rate and nudges
-a throttle that holds. The right stick (and the gyro, and the mouse) twists
-and pitches the torso within ±1.9 and -0.4..0.45 rad. Speed follows the
+The left stick turns the legs (`yaw`) at the chassis's turn rate, and its
+push is the throttle (zero when let go; back is a slow reverse, 0.35). The
+right stick (and the gyro, and the mouse) twists and pitches the torso
+within ±1.9 and -0.4..0.45 rad; walking forward with the twist left alone
+for 0.6 s, the torso swings back over the legs (`docs/controls.md`). Speed follows the
 throttle slowly (7 m/s² up, 11 down), a climb slows a walker (a 20% grade
 halves it; quads keep their grip), heat over 85 slows everything to 65%.
 

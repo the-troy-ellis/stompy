@@ -62,6 +62,12 @@ fn tick_objectives(g: &mut Game) {
     g.end_t = 3.2;
     voice(g, Vo::Complete, None, true, 400.);
 }
+/// How far back the stick drives the throttle (reverse is slow).
+pub const REVERSE: f32 = 0.35;
+/// Walking forward with the torso left alone this long, it swings back over the legs.
+pub const RECENTRE_AFTER: f32 = 0.6;
+/// How fast it swings back, a share of the twist a second (gentler than the centre button's 6).
+pub const RECENTRE_RATE: f32 = 1.8;
 /// The player's controls into the mech.
 fn drive(g: &mut Game, i: &Input, dt: f32) {
     let guiding = g.guide.is_some();
@@ -70,9 +76,10 @@ fn drive(g: &mut Game, i: &Input, dt: f32) {
         p.jetting = false;
         return;
     }
-    if i.thr != 0. {
-        p.throttle = clamp(p.throttle + clamp(i.thr, -1., 1.) * dt * 0.9, -0.35, 1.);
-    }
+    // The stick is the throttle: let go and it drops to zero (the owner, 2026-11-28); the legs'
+    // own inertia still eases the speed in and out.
+    let thr = clamp(i.thr, -1., 1.);
+    p.throttle = if thr >= 0. { thr } else { thr * REVERSE };
     if i.stop {
         p.throttle = 0.;
     }
@@ -92,6 +99,16 @@ fn drive(g: &mut Game, i: &Input, dt: f32) {
     let p = g.pm();
     if i.twist != 0. || i.twist_by != 0. {
         p.centring = false;
+    }
+    // Walking forward with the torso left alone, it swings back over the legs. A light touch
+    // (the gyro's tremor) doesn't count as twisting; aiming does, and holds it off a moment.
+    if i.twist.abs() > 0.05 || i.twist_by.abs() > 0.0015 {
+        p.twist_quiet = 0.;
+    } else {
+        p.twist_quiet += dt;
+    }
+    if !guiding && p.throttle > 0.05 && p.twist_quiet > RECENTRE_AFTER {
+        p.twist *= (1. - RECENTRE_RATE * dt).max(0.);
     }
     if i.centre || p.centring {
         p.twist *= (1. - 6. * dt).max(0.);
