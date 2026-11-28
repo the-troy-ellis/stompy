@@ -22,10 +22,13 @@ const STEEL_LT: [f32; 3] = [0.38, 0.41, 0.47];
 const GLASS: [f32; 3] = [0.1, 0.14, 0.17];
 const CHARGE: [f32; 3] = [0.45, 1., 0.85];
 
-/// The porthole: an oval window this wide and tall at this distance from the eye.
-const WIN: [f32; 3] = [0.88, 0.5, 1.0];
+/// The porthole: a rounded-square window (a superellipse) this wide and tall at this distance
+/// from the eye. Wide, so the battle shows (the owner, 2026-11-28: it was hard to see).
+const WIN: [f32; 3] = [0.95, 0.57, 1.0];
+/// How square the window's corners are: 2 is an oval, higher fills the corners.
+const SQUARE: f32 = 3.5;
 /// The tag's hook, at the top of the window, outside the iris: it closes over it.
-const HOOK: [f32; 3] = [0.14, 0.62, 1.26];
+const HOOK: [f32; 3] = [0.14, 0.74, 1.26];
 /// How far the tag may swing in toward the eye before it would touch the iris.
 const TAG_IN: f32 = 0.15;
 /// The iris sits just behind the lip, so the ring covers the blades' outer parts.
@@ -46,11 +49,11 @@ const BLADE_K: [f32; 6] = [1., 0.86, 1.12, 0.94, 1.06, 0.9];
 const STICKY: usize = 4;
 /// The heat coils: a row of fins across the bottom of the eye.
 const COILS: usize = 9;
-const COIL_Y: f32 = -0.43;
+const COIL_Y: f32 = -0.5;
 const COIL_Z: f32 = 0.93;
-/// The jet capacitors, in the frame's upper corners (outside the window: they never block it).
-const CAPS: [[f32; 3]; 2] = [[0.66, 0.42, 0.92], [-0.66, 0.42, 0.92]];
-const CAP_H: f32 = 0.16;
+/// The jet capacitors, either side of the coils at the bottom of the eye.
+const CAPS: [[f32; 3]; 2] = [[0.47, -0.47, 0.95], [-0.47, -0.47, 0.95]];
+const CAP_H: f32 = 0.12;
 
 /// What the head shows, from the machine (or forced, for the tools' mockups).
 #[derive(Clone, Copy)]
@@ -142,18 +145,21 @@ fn shape(top: f32, upper: f32, lower: f32, bottom: f32, roof: f32, keel: f32) ->
 }
 pub fn iris(m: Mood) -> Iris {
     match m {
-        Mood::Relaxed => shape(0.93, 0.95, 0.96, 0.95, 0., 0.),
-        Mood::Lock => shape(0.8, 0.8, 0.82, 0.82, 0., 0.),
-        Mood::Glare => shape(0.6, 0.66, 0.84, 0.8, 0.35, 0.),
-        Mood::Worried => shape(1.1, 0.58, 0.92, 0.9, 0.3, 0.),
-        Mood::Pleased => shape(0.95, 0.95, 0.68, 0.6, 0., 0.35),
-        Mood::Sleepy => shape(0.56, 0.74, 0.95, 0.92, 0.4, 0.),
+        Mood::Relaxed => shape(0.98, 1., 1., 1., 0., 0.),
+        Mood::Lock => shape(0.9, 0.9, 0.93, 0.93, 0., 0.),
+        Mood::Glare => shape(0.74, 0.8, 0.95, 0.92, 0.3, 0.),
+        Mood::Worried => shape(1.1, 0.7, 0.98, 0.96, 0.3, 0.),
+        Mood::Pleased => shape(1., 1., 0.78, 0.7, 0., 0.35),
+        Mood::Sleepy => shape(0.6, 0.8, 1., 0.96, 0.4, 0.),
         Mood::Surprised => shape(1.12, 1.12, 1.12, 1.12, 0., 0.),
     }
 }
 /// How far the window reaches along direction `a`: a blade's edge at `r` 1 just touches it.
 fn reach(a: f32) -> f32 {
-    ((WIN[0] * a.cos()).powi(2) + (WIN[1] * a.sin()).powi(2)).sqrt()
+    let n = v3(a.cos(), a.sin(), 0.);
+    (0..64)
+        .map(|i| oval(i as f32 / 64. * TAU, 1., 0.).dot(n))
+        .fold(0., f32::max)
 }
 /// How near the middle of the eye a blade's edge may come outside a blink, so no face covers the
 /// crosshair.
@@ -197,9 +203,9 @@ pub fn mood_for(r: &Reading, c: &Cue) -> Mood {
         Mood::Relaxed
     }
 }
-/// How far the heat squints the eye, 0 to 0.3, as it climbs past 55.
+/// How far the heat squints the eye, 0 to 0.22, as it climbs past 55.
 pub fn squint(heat: f32) -> f32 {
-    0.3 * smooth((heat - 0.55) / 0.42)
+    0.22 * smooth((heat - 0.55) / 0.42)
 }
 /// The iris for a reading and a mood: the mood's shape and the heat's squint over it (the top and
 /// bottom blades most), every edge held `CLEAR` of the middle; twisted shut when the machine is
@@ -274,9 +280,15 @@ pub struct Cockpit {
     dir: V3,
     up: V3,
 }
-/// A point of the oval window at angle `a`, scaled by `k`, at depth `z`.
+/// A point of the window's edge at angle `a`, scaled by `k`, at depth `z`.
 fn oval(a: f32, k: f32, z: f32) -> V3 {
-    v3(a.cos() * WIN[0] * k, a.sin() * WIN[1] * k, z)
+    let e = 2. / SQUARE;
+    let (c, s) = (a.cos(), a.sin());
+    v3(
+        c.signum() * c.abs().powf(e) * WIN[0] * k,
+        s.signum() * s.abs().powf(e) * WIN[1] * k,
+        z,
+    )
 }
 /// Where the ray from the window's middle at angle `a` meets a rectangle `x` by `y` (the frame's
 /// outer edge, wider than the screen).
@@ -335,7 +347,7 @@ impl Cockpit {
     }
     /// BARRY's head.
     pub fn barry(gl: &Gl) -> Cockpit {
-        let n = 28;
+        let n = 40;
         let mut b = Builder::default();
         let away = v3(0., 0., 5.); // faces point back at the eye
         for i in 0..n {
@@ -423,7 +435,7 @@ impl Cockpit {
         // The jet capacitors: a cage of thin bars between steel caps, its charge a column of light
         // inside (open, so the light shows), a dark core when empty.
         for c in CAPS {
-            let m = M4::t(c[0], c[1], c[2]) * M4::rz(c[0].signum() * -0.35);
+            let m = M4::t(c[0], c[1], c[2]);
             b.cyl(m * M4::s(0.03, CAP_H, 0.03), GLASS, 6, 1.);
             for k in 0..5 {
                 let a = k as f32 / 5. * TAU;
@@ -701,7 +713,7 @@ impl Cockpit {
         gl.draw(&self.fins, &view, c, if glows { 1. } else { 0. });
         // The capacitors fill with the jets' charge, and hum bright when full.
         for cap in CAPS {
-            let m = view * M4::t(cap[0], cap[1], cap[2]) * M4::rz(cap[0].signum() * -0.35);
+            let m = view * M4::t(cap[0], cap[1], cap[2]);
             let f = if r.off { 0. } else { r.fuel };
             if f > 0.02 {
                 let hum = if f >= 1. {
@@ -756,13 +768,13 @@ mod tests {
             glare.r[0] < rest.r[0] - 0.2 && glare.phi[1] < -0.2,
             "a flat heavy top"
         );
-        assert!(worried.r[0] > 1. && worried.r[1] < 0.6, "a peak");
+        assert!(worried.r[0] > 1. && worried.r[1] < 0.8, "a peak");
         assert!(
             pleased.r[3] < rest.r[3] - 0.2 && pleased.phi[2] > 0.2,
             "the bottom rises flat"
         );
-        assert!(iris(Mood::Sleepy).r[0] < 0.6, "a droop");
-        assert!(iris(Mood::Lock).r.iter().all(|&r| r < 0.85), "focusing");
+        assert!(iris(Mood::Sleepy).r[0] <= 0.6, "a droop");
+        assert!(iris(Mood::Lock).r.iter().all(|&r| r < 0.95), "focusing");
         assert!(iris(Mood::Surprised).r.iter().all(|&r| r > 1.), "wide open");
         // Every face is symmetric: blade k mirrors blade 6 - k.
         for m in [Mood::Glare, Mood::Worried, Mood::Pleased, Mood::Sleepy] {

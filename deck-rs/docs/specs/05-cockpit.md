@@ -23,9 +23,11 @@ own; the mockups (window shapes for all six) came first.
 - **No instruments.** The owner (2026-11-28): the first try's dials and
   lamps were a pilot's, and there is no pilot. The head shows its state
   through its own workings (the green HUD is already the robot's readout):
-- **BARRY**: a porthole eye (an oval 0.88 by 0.5 at a metre) with a lip, a
-  raised faceted ring and 24 rivets, the panel round it dished in toward
-  the eye past the screen's edge.
+- **BARRY**: a big rounded-square eye (a superellipse 0.95 by 0.57 at a
+  metre, nearly the whole screen: the owner, 2026-11-28, found the first
+  oval made the battle hard to see) with a lip, a raised faceted ring and
+  rivets, the panel round it dished in toward the eye past the screen's
+  edge.
 - **The iris**: a six-blade aperture just behind the ring, in place of
   eyelids. The owner (2026-11-28): the giant eye means every demigod is a
   cyclops, and the eye can be expressive; then "a full 6 blade aperture
@@ -63,8 +65,8 @@ own; the mockups (window shapes for all six) came first.
   then dull red, orange, and near white at shutdown, flickering when
   critical, with puffs of steam rising and thinning out. Shut down, they
   cool to a dull red.
-- **Jet capacitors**: two cages of thin bars in the frame's upper corners,
-  outside the eye, each filling with a column of light as the jets
+- **Jet capacitors**: two small cages of thin bars standing either side of
+  the coils at the bottom of the eye, clear of the HUD, each filling with a column of light as the jets
   recharge, humming bright when ready, dark when off.
 - **Cracks** spread across the eye in three stages as the torso drops below
   three quarters, a half and a quarter.
