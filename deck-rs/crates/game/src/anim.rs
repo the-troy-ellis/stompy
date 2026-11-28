@@ -42,6 +42,15 @@ pub struct Profile {
     pub ant_base: [f32; 3],
     /// Where the left pod hinges on the torso (the right is its mirror).
     pub pod_hinge: [f32; 3],
+    /// The body's walk, on top of the sim's: how far it dips at each footfall (metres), rocks
+    /// over the planted foot (metres, and a lean in radians), and how far the torso thrusts
+    /// forward each step and nods with it, a bird's head-bob (metres, radians). All at full
+    /// pace; standing, none.
+    pub bob: f32,
+    pub sway: f32,
+    pub roll: f32,
+    pub peck: f32,
+    pub nod: f32,
 }
 /// BARRY: steady and workmanlike. The swing is small and even, the antenna whips, the pods
 /// thump down on each footfall and settle.
@@ -65,9 +74,16 @@ pub const BARRY: Profile = Profile {
     recoil: 0.28,
     ant_base: [-0.6, 3.1, -0.4],
     pod_hinge: [1.75, 2.4, -0.1],
+    bob: 0.,
+    sway: 0.,
+    roll: 0.,
+    peck: 0.,
+    nod: 0.,
 };
-/// SKEDADDLE: twitchy. The arms pump hard and trail a turn, the feet snap off the ground and
-/// the long toes grab, the ears flick at every jolt. No pods.
+/// SKEDADDLE: twitchy, and it walks like a bird (the owner, 2026-11-28: more bob and sway).
+/// The body dips at each footfall and rocks over the planted foot, the torso thrusts forward
+/// each step and eases back, the arms pump hard and trail a turn, the feet snap off the
+/// ground and the long toes grab, the ears flick at every jolt. No pods.
 pub const SKEDADDLE: Profile = Profile {
     arm_swing: 0.17,
     arm_lag: 0.2,
@@ -88,6 +104,11 @@ pub const SKEDADDLE: Profile = Profile {
     recoil: 0.16,
     ant_base: [0., 2.5, -0.3],
     pod_hinge: [0.; 3],
+    bob: 0.24,
+    sway: 0.3,
+    roll: 0.07,
+    peck: 0.4,
+    nod: 0.08,
 };
 pub fn profile(ch: Ch) -> Option<&'static Profile> {
     match ch {
@@ -226,6 +247,47 @@ fn swing_u(m: &Mech, i: usize) -> Option<f32> {
     let u = (m.cyc - m.geo.legs()[i].ph).rem_euclid(1.) / sw;
     (u < 1.).then_some(u)
 }
+/// The body's walk now, on top of the sim's (drawn only).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Body {
+    /// Up (metres); sideways, toward +x (metres), and the lean that goes with it (radians,
+    /// about z); the torso's thrust forward (metres) and its nod (radians, forward).
+    pub bob: f32,
+    pub sway: f32,
+    pub roll: f32,
+    pub peck: f32,
+    pub nod: f32,
+}
+/// The body's walk for where a mech is in its stride. It dips as each foot lands and rises
+/// over the planted leg; it rocks over whichever foot is down; each step the torso thrusts
+/// forward fast and eases back while the body catches up, as a bird's head does.
+pub fn body(p: &Profile, m: &Mech) -> Body {
+    let k = pace(m).min(1.2);
+    let legs = m.geo.legs();
+    if k < 0.02 || m.air || legs.len() != 2 {
+        return Body::default();
+    }
+    let (ph, side) = (legs[0].ph, legs[0].hx.signum());
+    let sw = swing_now(m, pace(m));
+    // Steps since the first foot last landed: a footfall at every whole and half.
+    let since = m.cyc - ph - sw;
+    let bob = -p.bob * k * (TAU * 2. * since).cos();
+    // Over the first foot halfway through its stance, over the other half a stride later.
+    let over = (TAU * (since - (1. - sw) * 0.5)).cos();
+    let f = (2. * since).rem_euclid(1.);
+    let thrust = if f < 0.22 {
+        f / 0.22
+    } else {
+        1. - (f - 0.22) / 0.78
+    };
+    Body {
+        bob,
+        sway: p.sway * k * side * over,
+        roll: -p.roll * k * side * over,
+        peck: p.peck * k * (smooth(thrust) - 0.5),
+        nod: p.nod * k * (smooth(thrust) - 0.5),
+    }
+}
 /// How big the step's gestures are: full at a walk, still there for a shuffle or a turn.
 fn step_k(m: &Mech) -> f32 {
     (pace(m) * 2.).clamp(0.5, 1.)
@@ -288,6 +350,44 @@ mod tests {
         assert!(kick(&BARRY, 10, false) < kick(&BARRY, 3, false));
         assert!(kick(&BARRY, 2, true) > kick(&BARRY, 2, false));
         assert_eq!(kick(&BARRY, 20, true), 0.);
+    }
+    #[test]
+    fn skedaddle_bobs_and_rocks_like_a_bird_and_barry_does_not() {
+        use stompy_sim::data::{Biome, Diff, TimeOfDay, Weather};
+        use stompy_sim::state::start_free_play;
+        let mut g = stompy_sim::Game::new(1);
+        start_free_play(
+            &mut g,
+            Biome::Dusk,
+            TimeOfDay::Dusk,
+            Weather::Clear,
+            1,
+            1,
+            Ch::Jackal,
+            Diff::Normal,
+            true,
+        );
+        let m = &mut g.mechs[0];
+        assert_eq!(body(&SKEDADDLE, m), Body::default(), "standing, still");
+        m.speed = m.max_speed;
+        let (mut lo, mut hi, mut left, mut right, mut fwd, mut back) =
+            (0f32, 0f32, 0f32, 0f32, 0f32, 0f32);
+        for i in 0..100 {
+            m.cyc = i as f32 / 100.;
+            let b = body(&SKEDADDLE, m);
+            (lo, hi) = (lo.min(b.bob), hi.max(b.bob));
+            (left, right) = (left.max(b.sway), right.min(b.sway));
+            (fwd, back) = (fwd.max(b.peck), back.min(b.peck));
+            // It leans the way it rocks.
+            assert!(b.sway * b.roll <= 0.);
+        }
+        assert!(hi - lo > 0.4, "a bob: {lo}..{hi}");
+        assert!(
+            left > 0.25 && right < -0.25,
+            "a sway both ways: {right}..{left}"
+        );
+        assert!(fwd > 0.15 && back < -0.15, "a peck: {back}..{fwd}");
+        assert_eq!(body(&BARRY, m), Body::default(), "BARRY walks as before");
     }
     #[test]
     fn the_pods_take_the_same_jolt_out_of_step() {

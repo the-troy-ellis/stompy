@@ -57,7 +57,14 @@ without one draws as before.
 **SKEDADDLE** (2026-11-28) has its own profile (`anim::SKEDADDLE`),
 twitchy where BARRY is steady: the arms pump harder (0.17) and trail a turn
 more, the feet snap off the ground, the long toes grab harder, the two ears
-flick at every jolt on a quick spring; no pods. Its pistons: a knee ram in
+flick at every jolt on a quick spring; no pods. It walks like a bird (the
+owner, 2026-11-28: more bob and sway, birdlike): on top of the sim's body,
+drawn only, the hips dip at every footfall (0.24 m at full pace) and rise
+over the planted leg, rock over whichever foot is down (0.3 m, leaning 0.07
+rad into it), and each step the torso thrusts forward fast and eases back
+while the body catches up, nodding with it (0.4 m, 0.08 rad), as a bird's
+head does (`anim::body`). The legs reach for the planted feet, so the feet
+still never slide. BARRY's body walk is zero: it walks as before. Its pistons: a knee ram in
 front of the backward knee, an ankle ram down the back of the shin to the
 heel (`models::SKED_KNEE`, `SKED_ANKLE`). Every chassis's toes and pistons
 now come with its model.

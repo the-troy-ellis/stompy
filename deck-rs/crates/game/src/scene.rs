@@ -342,13 +342,21 @@ impl Scene {
                 * M4::rz(m.lean + m.tilt_r.x)
                 * M4::t(m.sway, 0., m.surge)
         };
+        // The body's own walk on top (a bird's bob and sway, drawn only): the hips move, the
+        // legs reach for the planted feet, and the feet stay put.
+        let walk = match anim::profile(m.key()) {
+            Some(pr) if self.detail > 0 && m.dying.is_none() && !far => anim::body(pr, m),
+            _ => anim::Body::default(),
+        };
+        let base = base * M4::t(walk.sway, walk.bob, 0.) * M4::rz(walk.roll);
         let sq = m.squash.x + m.jet.charge * 0.14;
         let (lean, arm_swing, lunge) = melee_pose(m);
         let tb = base
             * M4::t(0., geo.torso_y + m.torso_drop, 0.)
             * M4::s(1. + sq * 0.5, 1. - sq, 1. + sq * 0.5)
             * M4::ry(m.twist)
-            * M4::t(0., 0., lunge)
+            * M4::t(0., 0., lunge + walk.peck)
+            * M4::rx(walk.nod)
             * M4::rx(m.wob_p.x - lean + m.torso_nod + m.run_lean)
             * M4::rz(m.wob_r.x);
         // The drawn-only motion: springs moved on, then read below.
