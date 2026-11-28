@@ -15,12 +15,14 @@ tiny robots under it.
 
 ## Proposed
 
-- **What puts a mech down.** A blow big enough for its mass. Every blow
-  already has an impulse scaled by the masses (the knock, `melee::knock`);
-  above a threshold the mech goes down instead of staggering. So a wrecking
-  ball floors a SKEDADDLE every time, a BARRY sometimes, a SLOWPOKE (four
-  legs) never. Also an insta-stomp from a high blast-off, and a big blast at
-  your feet. A lost leg already sits a mech down; that stays as it is.
+- **What puts a mech down: the wrecking ball, for now** (the owner,
+  2026-11-28: "just the wrecking ball for now should knock a mech down").
+  A wrecking ball that lands floors any two-legged mech; nothing else knocks
+  one down (stomps, blasts and shells stagger and shove as they do now). A
+  lost leg already sits a mech down; that stays as it is.
+- **SLOWPOKE stands** (the owner: "Slowpoke gets a good thunk but doesn't
+  get knocked down"). On four legs it takes the wrecking ball's full feel
+  and its stagger, and stays on its feet.
 - **The fall.** The body topples the way the blow pushed it, pivoting about
   its feet (the death's topple, `Dying`, without the dying): the legs
   buckle, it goes over in about 0.6 s, and hits the ground with the biggest
@@ -38,8 +40,8 @@ tiny robots under it.
   down; Space on the keyboard), about eight quick presses from flat on the
   ground. The AI mashes at a rate set by difficulty. At the top, the last
   push: it rolls to its front, gets its knees and hands (or fists) under
-  it, and stands, with a heave and a thump as the feet plant. Each chassis in its own way (`03-anim.md`):
-  SKEDADDLE springs up, PURPLE PUNCHER shoves itself up off its fists,
+  it, and stands, with a heave and a thump as the feet plant. Each chassis
+  in its own way (`03-anim.md`): SKEDADDLE springs up, PURPLE PUNCHER shoves itself up off its fists,
   BARRY grinds up. While getting up it is open: a stomp lands, the next
   wrecking ball puts it straight back down.
 - **From inside.** The view goes over with the body: the horizon rolls, the
@@ -54,20 +56,19 @@ tiny robots under it.
 
 ## Ask
 
-1. **What knocks a mech down?** Only PURPLE PUNCHER's wrecking ball, or any
-   big enough blow (a high stomp, a big blast, BIG BONKER's shell)?
+1. ~~What knocks a mech down?~~ **Answered:** only the wrecking ball, for now.
 2. ~~Getting up~~ **Answered:** you button-mash; it never gets up by itself.
    Still to confirm: A (Space) as the button, and about eight presses.
 3. ~~Down: helpless?~~ **Answered:** effectively disabled; nothing fires.
-4. **SLOWPOKE.** Never knocked down (four legs), or only by the biggest
-   blows?
+4. ~~SLOWPOKE~~ **Answered:** a good thunk, never knocked down.
 5. **The other side.** Can you stomp a downed mech for extra (the honour of
    the foot, at demigod scale)?
 
 ## Acceptance criteria
 
-1. A blow over the threshold puts a mech down the way it was pushed; under
-   it, a stagger (tests).
+1. A wrecking ball puts a two-legged mech down the way it was pushed;
+   SLOWPOKE takes the feel and the stagger and stands; nothing else knocks a
+   mech down (tests).
 2. Down, it can't walk, turn, punch or fire; it gets up only by mashing, a
    steady mash gets it up and a slow one doesn't, and the AI mashes by
    difficulty (tests).
