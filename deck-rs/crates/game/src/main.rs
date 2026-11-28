@@ -21,6 +21,7 @@
 mod anim;
 mod app;
 mod audio;
+mod cockpit;
 mod controls;
 mod font;
 mod freecam;

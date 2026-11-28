@@ -51,7 +51,7 @@ better on the way, not the same code.
 | Voxel ground: canyons, caves, craters (big weapons and diggers only), falling ground | specs 18, 27, 29 | not yet (heightfield) | P2 |
 | Bigger maps | spec 35 | not yet | P2 |
 | Buildings at two scales: the tiny robots' (stompable) and the demigods' (temples, dead towers) | specs 36, 38 | not yet | P2 |
-| Cockpits: each demigod's head, from inside, in 3D | spec 17 (portrait, parked) | not yet | P3 |
+| Cockpits: each demigod's head, from inside, in 3D | spec 17 (portrait, parked) | **BARRY's built** (specs/05-cockpit.md) | P3 (the other five) |
 | Digging: BIG SCOOPER, hold to dig, dig up, dig feel | specs 20, 25, 28, 30 | not yet | P4 |
 | Tiny robots gathering ore and carrying it home | (the hauler, spec 20) | not yet | P4 |
 | The builder demigod and its buildings, which make tiny robots | specs 23, 31, 36 | not yet | P4 |

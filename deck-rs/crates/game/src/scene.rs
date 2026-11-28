@@ -23,6 +23,8 @@ pub struct Scene {
     /// The cockpit's own guns this frame: where the real muzzle is (the sim fires from it) and
     /// where the drawn barrel's tip is, so your beams leave the barrels you see (bug 2).
     cockpit_guns: Vec<(V3, V3)>,
+    /// The demigod's head round the eye, built the first time it's needed (BARRY's so far).
+    head: Option<crate::cockpit::Cockpit>,
     fx: Vec<Mesh>,
     sky: Mesh,
     ground: Vec<(Mesh, V3)>,
@@ -56,7 +58,7 @@ const LOD_FAR: f32 = 120.;
 /// The cockpit's own arms: their scale, and where the shoulders sit from the eye (sideways,
 /// down, forward), so the barrels show low in the corners of the view.
 const COCKPIT_ARM: f32 = 0.5;
-const COCKPIT_SHOULDER: [f32; 3] = [2.0, -0.35, 1.8];
+const COCKPIT_SHOULDER: [f32; 3] = [1.9, -0.15, 1.8];
 /// A piece of a chassis, for the batch.
 #[derive(Clone, Copy)]
 enum Slot {
@@ -230,6 +232,7 @@ impl Scene {
             batch: Batch::new(),
             eye: V3::ZERO,
             cockpit_guns: Vec::with_capacity(2),
+            head: None,
             fx: FX_ALL.iter().map(|&k| build_effect(gl, k)).collect(),
             sky: build_sky(gl),
             ground: vec![],
@@ -893,6 +896,20 @@ impl Scene {
             gl.mode(Mode::Lit);
         }
         self.draw_particles(gl, g, g.pal.hor);
+        // From the cockpit, the demigod's own head round the eye (BARRY's, at full detail).
+        let p = g.p();
+        if cam.is_none()
+            && g.guide.is_none()
+            && !g.spectate
+            && self.detail > 0
+            && p.key() == Ch::Kestrel
+            && (p.alive || p.dying.is_some())
+        {
+            let (right, up) = (self.right, self.up);
+            self.head
+                .get_or_insert_with(|| crate::cockpit::Cockpit::barry(gl))
+                .draw(gl, p, g.time, eye, right, up, dir);
+        }
         vp
     }
     /// The menu's turntable: the player's mech on a patch of desert, a camera looking at it.

@@ -103,6 +103,7 @@ ELIMINATE is implemented.
 | `controls.rs` | `Raw` → `Input` and the menus' presses. Pure, with unit tests. The Deck layout is at its top. |
 | `audio.rs` | The synthesiser in SDL's audio callback: oscillator and filtered-noise voices for the one-shots (the reference's recipes), the sub-bass thump through a soft clipper, the loops (hum, jets, servo, beam, sizzle, fusion scan) on a bus that ducks under impacts. No samples yet. |
 | `gl.rs` | One shader through glow: a colour per vertex, one light, the palette's sky and fog, the ordered 4 by 4 dither that is the look (the ground, sky and fog onto the place's ramp; a mech's light in fifths; fog and fades by pixel), a 2D mode for the HUD. Meshes, instancing, screenshots. |
+| `cockpit.rs` | The demigod's head round the eye, built in the view's own space and drawn with the camera: BARRY's porthole, ring and rivets, the dash's dials and lamps reading the machine, the maintenance tag on its springs. |
 | `models.rs` | Detailed models built on the box models' joints (BARRY so far), and the live pistons' anchors. |
 | `anim.rs` | Drawn-only motion with a profile per chassis: arm swing and lag, foot roll, live pistons, the antenna's whip, the pods' bounce, recoil. Springs carried frame to frame. |
 | `scene.rs`'s batch | A frame's drawing gathered by shape (each chassis's parts at two details, each effect lit or glowing) and flushed one instanced draw a shape; mechs past 120 m use their plain model. |
