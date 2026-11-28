@@ -58,10 +58,11 @@ fn fx_mesh(s: &Scene, k: Fx) -> &Mesh {
 /// Past this distance a mech is drawn with its plain model and no drawn-only motion: at 120 m
 /// it is a few dozen pixels tall.
 const LOD_FAR: f32 = 120.;
-/// The cockpit's own arms: their scale, and where the shoulders sit from the eye (sideways,
-/// down, forward), so the barrels show low in the corners of the view.
-const COCKPIT_ARM: f32 = 0.5;
-const COCKPIT_SHOULDER: [f32; 3] = [1.9, -0.15, 1.8];
+/// The cockpit's own guns: their scale, and where the shoulders sit from the eye (sideways, up,
+/// forward): outside the window, so each barrel reaches in from behind the frame and its back end
+/// never shows (the owner, 2026-11-28: the arms floated, attached to nothing).
+const COCKPIT_ARM: f32 = 0.55;
+const COCKPIT_SHOULDER: [f32; 3] = [2.1, 0.22, 1.3];
 /// A piece of a chassis, for the batch.
 #[derive(Clone, Copy)]
 enum Slot {
@@ -442,17 +443,28 @@ impl Scene {
             let sw = if swinging { arm_swing } else { 0. };
             let back = kick_of(Kicked::Arm(side));
             let a = if arms_only {
-                // The cockpit's own arms, small and low at the edges of the view, each barrel
-                // aimed at the point under the crosshair so the two meet where your shots go.
+                // The cockpit's own guns, reaching in from behind the frame at the sides of the
+                // view, each barrel aimed down the crosshair's line so the two meet where your
+                // shots go. Never at a point nearer than 80 m: close ground under the crosshair
+                // would swing them down out of the frame.
                 let k = COCKPIT_ARM;
-                let up = v3(tb.0[4], tb.0[5], tb.0[6]).norm();
-                let shoulder = tb.apply(v3(
-                    side * COCKPIT_SHOULDER[0],
-                    geo.eye[1] + COCKPIT_SHOULDER[1],
-                    geo.eye[2] + COCKPIT_SHOULDER[2],
-                ));
+                let far = g.aim - g.eye;
+                let aim = g.eye + far * (far.len().max(80.) / far.len().max(1e-3));
+                // Hung from the head (the camera), not the torso, so they stay put against the
+                // frame while the head bobs and sways.
+                let up = self.up;
+                let ahead = up.cross(self.right);
+                let lat = if v3(tb.0[0], tb.0[1], tb.0[2]).dot(self.right) >= 0. {
+                    self.right
+                } else {
+                    -self.right
+                };
+                let shoulder = self.eye
+                    + lat * (side * COCKPIT_SHOULDER[0])
+                    + up * COCKPIT_SHOULDER[1]
+                    + ahead * COCKPIT_SHOULDER[2];
                 let bore = shoulder + up * (-1.15 * k);
-                let z = (g.aim - bore).norm();
+                let z = (aim - bore).norm();
                 let x = up.cross(z).norm();
                 let y = z.cross(x);
                 M4([
