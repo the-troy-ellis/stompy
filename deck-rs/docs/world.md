@@ -22,7 +22,7 @@ and the few words on screen keep the board-book voice.
   theirs, and the deadpan is in the gap between the two.
 
 - **The rite** (the owner, for its tone): **"Ore to ore."** and **"Smelt
-  me into thy will."** The dead feed the living: salvage is smelted into the
+  me into thy image."** The dead feed the living: salvage is smelted into the
   next demigod, literally, in the temple's smelter. The one place the flat
   voice goes solemn.
 
@@ -97,7 +97,7 @@ What the tiny robots see, and what is happening:
 - Your demigod's last line as it falls: "Ore to ore." (it will be hauled
   home and come back as something else).
 - At a summoning, the moment the new demigod is switched on: "Smelt me
-  into thy will." (the offering, speaking to you, the god above).
+  into thy image." (the offering, speaking to you, the god above).
 
 ### Shown, not told
 
