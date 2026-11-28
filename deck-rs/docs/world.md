@@ -25,6 +25,8 @@ and the few words on screen keep the board-book voice.
   are demigod against demigod. The tiny robots are the cities' people and
   workforce: they carry ore and salvage, cheer their own demigods and
   scatter from the other city's, but they don't fight.
+- **Crowds get stomped. Hence Stompy** (the owner). It is an honour for a
+  tiny robot to be squished back into ore by a demigod. Ore to ore.
 - **The rite** (the owner, for its tone): **"Ore to ore."** and **"Smelt
   me into thy image."** The dead feed the living: salvage is smelted into the
   next demigod, literally, in the temple's smelter. The one place the flat
@@ -103,6 +105,15 @@ What the tiny robots see, and what is happening:
 - At a summoning, the moment the new demigod is switched on: "Smelt me
   into thy image." (the offering, speaking to you, the god above).
 
+### The honour of the foot
+
+- The tiny robots don't run from their own demigods: they gather at the
+  roadside, cheer, and some kneel in its path.
+- They do run from the other city's: its foot flattens, it doesn't honour.
+- A squished tiny robot leaves a little ore. The others carry it to the
+  temple's hoppers. The loop closes.
+- Felt: a small crunch, a puff of ore dust, and the cheering a beat after.
+
 ### Shown, not told
 
 Statues of the city's demigods in the squares, made slightly wrong.
@@ -112,8 +123,9 @@ and dry: "Relic recovered. The faithful are pleased."
 
 ## Open
 
-1. **Your own tiny robots underfoot:** flattened if you're careless, or
-   always scrambling clear?
+1. **Who makes the tiny robots, and what a squish costs:** does the temple
+   make them too (so a squish trades a worker for a little ore), or do
+   they come from somewhere else?
 2. **The construction machines:** is BIG SCOOPER a demigod of digging, with
    the tiny robots doing the small work, or do tiny robots do it all?
 3. **Which needs become systems:** power (a Spark deep in the ground,
