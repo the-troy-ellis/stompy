@@ -32,6 +32,7 @@ mod look;
 mod mesh;
 mod models;
 mod platform;
+mod ragdoll;
 mod scene;
 
 use app::{App, Args, Screen};

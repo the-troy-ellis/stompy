@@ -66,6 +66,11 @@ while the body catches up, nodding with it (0.4 m, 0.08 rad), as a bird's
 head does (`anim::body`). The legs reach for the planted feet, so the feet
 still never slide. BARRY's body walk is zero: it walks as before.
 
+**Ragdolls** (2026-11-28): a thrown or dying two-legged mech is a small
+point-and-stick ragdoll while it falls (`ragdoll.rs`, `06-knockdown.md`).
+The owner asked whether physics beat hand tuning: for passive motion
+(thrown, falling, dying) it does; walking and getting up stay authored.
+
 **PURPLE PUNCHER** (2026-11-28, `anim::PURPLE_PUNCHER`): a heavyweight's
 lumber. It rolls over each planted foot (0.24 m, leaning 0.06 rad), bobs a
 little (0.1 m), and its shoulders turn against the hips with every stride

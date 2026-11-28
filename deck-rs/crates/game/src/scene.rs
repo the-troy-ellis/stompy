@@ -42,8 +42,8 @@ pub struct Scene {
     pub detail: u8,
     /// Each mech's drawn-only motion (`anim.rs`), by index.
     anims: Vec<Option<Anim>>,
-    /// Each knocked-down mech's ragdoll, from the blow until it has settled (drawn only).
-    rags: Vec<Option<anim::Rag>>,
+    /// Each thrown or dying mech's ragdoll (drawn only).
+    rags: Vec<Option<crate::ragdoll::Ragdoll>>,
 }
 /// A fixed camera instead of the cockpit (the menu's turntable).
 pub struct Cam {
@@ -161,9 +161,10 @@ fn down_frames(m: &Mech, d: &anim::DownPose) -> (M4, M4) {
     let g = &m.geo;
     let ground = M4::t(m.x, m.y, m.z) * M4::ry(m.yaw) * M4::s1(m.ch.scale);
     let base = ground
-        * M4::t(0., d.hip_h * g.hip, d.hip_z)
-        * M4::rx(-d.back)
+        * M4::t(d.hip_x, d.hip_h * g.hip, d.hip_z)
+        * M4::ry(d.turn)
         * M4::rz(d.roll)
+        * M4::rx(-d.back)
         * M4::t(0., -g.hip, 0.);
     (base, ground)
 }
@@ -354,11 +355,7 @@ impl Scene {
         let far = !arms_only && hypot2(m.x - self.eye.x, m.z - self.eye.z) > LOD_FAR;
         let lod = far as usize;
         // Knocked down: a boxer's fall and get-up, posed (anim::down_pose).
-        let dp = if m.dying.is_none() {
-            anim::down_pose(m, self.rags.get(id).and_then(|r| r.as_ref()))
-        } else {
-            None
-        };
+        let dp = self.posed(m, id);
         let base = if let Some(d) = &dp {
             down_frames(m, d).0
         } else if let Some(d) = m.dying {
@@ -902,8 +899,7 @@ impl Scene {
             roll += f.roll * 0.8 * f.buckle.max(if p.fallen.is_some() { 1. } else { 0. });
             e.y -= f.drop + if p.fallen.is_some() { f.angle * 2. } else { 0. };
         }
-        let rag = self.rags.get(PLAYER).and_then(|r| r.as_ref());
-        if let Some(d) = anim::down_pose(p, rag).filter(|_| p.dying.is_none()) {
+        if let Some(d) = self.posed(p, PLAYER).filter(|_| p.dying.is_none()) {
             // Knocked down: the eye rides the body through the fall, the lying and the get-up,
             // shaken as usual.
             let (base, _) = down_frames(p, &d);
@@ -956,21 +952,52 @@ impl Scene {
         vp
     }
     /// The match, from the cockpit (or a fixed camera). Returns the view-projection, for the HUD.
-    /// A ragdoll for each mech just knocked down, stepped once a frame; gone when it's up.
+    /// A ragdoll for each mech just thrown (knocked down) or going down dead, stepped once a
+    /// frame; gone when it's up again.
     fn step_rags(&mut self, g: &Game) {
+        use crate::ragdoll::Ragdoll;
         if self.rags.len() < g.mechs.len() {
             self.rags.resize_with(g.mechs.len(), || None);
         }
         for (id, m) in g.mechs.iter().enumerate() {
-            match (&mut self.rags[id], m.down) {
-                (slot @ None, Some(d)) if d.phase == DownPhase::Falling => {
-                    *slot = Some(anim::Rag::struck(g.time));
-                }
-                (Some(r), Some(_)) => r.step(m, g.time),
-                (slot, None) => *slot = None,
-                _ => {}
+            let slot = &mut self.rags[id];
+            let dying = m.dying.is_some_and(|d| d.exploded) && !m.gone;
+            let thrown = m.down.is_some_and(|d| d.phase == DownPhase::Falling);
+            if slot.is_none() && (thrown || dying) && self.detail > 0 {
+                *slot = Ragdoll::of(m, g.time).map(|mut r| {
+                    r.carry(v3(m.push[0], m.vy, m.push[1]));
+                    if let Some(d) = m.down {
+                        // The blow, along the shove: the struck torso leads.
+                        let f = d.pose.fall_yaw;
+                        r.strike(v3(f.sin(), 0., f.cos()), 6. * m.ch.scale);
+                    } else if let Some(d) = m.dying {
+                        // Dead: the legs go, and it falls the way it was leaning.
+                        let f = d.fall_yaw;
+                        r.strike(v3(f.sin(), 0., f.cos()), 3. * m.ch.scale);
+                    }
+                    r
+                });
+            }
+            match slot {
+                Some(r) if m.down.is_some() || dying => r.step(g, m),
+                Some(_) => *slot = None,
+                None => {}
             }
         }
+    }
+    /// A knocked-down or dying mech's pose: the ragdoll's while it falls and lies, handing over
+    /// to the get-up's once it has lain still a moment or the mashing has started.
+    fn posed(&self, m: &Mech, id: MechId) -> Option<anim::DownPose> {
+        let rag = self.rags.get(id).and_then(|r| r.as_ref());
+        if m.dying.is_some() {
+            return rag.map(|r| r.pose(m));
+        }
+        let d = m.down?;
+        let rag = rag.map(|r| {
+            let settled = ((r.still() - 0.3) / 0.4).clamp(0., 1.);
+            (r.pose(m), settled.max((d.p * 12.).min(1.)))
+        });
+        anim::down_pose(m, rag)
     }
     pub fn render(
         &mut self,

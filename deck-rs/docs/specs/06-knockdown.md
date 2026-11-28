@@ -91,15 +91,23 @@ tiny robots under it.
   stomps meet it where it lies.
 - **A ragdoll from the blow** (the owner, 2026-11-28: it looked like it was
   lying down as it flew back; "the point of impact should fly back and the
-  rest of the body should follow. It should ragdoll a bit"). Drawn only
-  (`anim::Rag`), a few loose joints driven by the blow: the struck torso
-  whips back against the hips first and rocks; the body is set tipping back
-  and spins freely in the air, then topples the rest of the way onto its
-  back on the ground and bounces; the legs hang from the hips and lag the
-  body on a loose spring, so the feet trail, then swing up and kick; the
-  arms are flung forward and flail. The hips sit as high as the legs hold
-  them. Once it has lain a moment (or the mashing starts) the get-up's poses
-  take over, blended in.
+  rest of the body should follow. It should ragdoll a bit"; then: a small
+  physics model rather than hand-tuned springs). `crates/game/src/
+  ragdoll.rs`, drawn only, no library: 13 points (pelvis, chest, head, hip
+  joints, knees, feet, shoulders, hands) joined by sticks, Verlet
+  integration, 8 constraint passes, gravity, the ground under every point
+  and sliding friction. The hips and the upper body are rigid blocks hinged
+  at the chest (the waist resists folding a little); the legs and arms are
+  links, and a leg can't fold up into the hips. The blow goes in as speed:
+  the struck upper body most, the hips less, the feet backward (they had the
+  ground), balanced to nothing net, so the body turns and the impact leads
+  while the whole still goes where the sim's shove takes it. Held loosely to
+  the sim's place. Read back as the get-up's pose (hips' place, heading,
+  tilt back, roll, the torso's lean, feet, arms), so the drawing, the
+  cockpit's eye and the hand-over to the get-up are unchanged: once it has
+  lain still a moment, or the mashing starts, the get-up's poses blend in.
+  A dying two-legged mech gets one too, toppling the way it was leaning.
+  A few microseconds a mech; only falling mechs run one. SLOWPOKE has none.
 - **The get-up is a boxer's off the canvas**, not a hinge (the owner,
   2026-11-28: "it needs to get itself up in a realistic way like a boxer
   stumbling back onto its feet"). Drawn as poses the body moves through
