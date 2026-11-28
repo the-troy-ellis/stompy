@@ -99,18 +99,19 @@ impl Reading {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Mood {
     Relaxed,
-    /// Firing or zoomed in: a flat, top-heavy squint.
+    /// Firing or zoomed in: a slight squint from the top. Subtle.
     Glare,
-    /// A target locked: the iris tightens, focusing.
+    /// A target locked: the iris tightens a touch, focusing. Subtle.
     Lock,
-    /// Badly hurt: the top blade pulls back and the upper pair close in, a peak.
+    /// Close to destroyed: the top blade pulls back and the upper pair close in, a peak that
+    /// grows as the torso goes, the blades trembling. Strong.
     Worried,
-    /// A beat after a kill: the bottom blades rise flat, a dome, an eye that smiles.
+    /// A beat after a kill: the bottom blades rise a little, an eye that smiles. Subtle.
     Pleased,
-    /// Standing about: a heavy flat top.
+    /// Standing about: the top droops a little. Subtle.
     Sleepy,
-    /// A big hit: wide open for a moment, before the flinch.
-    Surprised,
+    /// A big hit: the iris clamps in hard for a moment. Strong.
+    Pain,
 }
 impl Mood {
     /// The tools' mockups, poses 5 on.
@@ -120,7 +121,7 @@ impl Mood {
             6 => Mood::Worried,
             7 => Mood::Pleased,
             8 => Mood::Sleepy,
-            9 => Mood::Surprised,
+            9 => Mood::Pain,
             10 => Mood::Lock,
             _ => return None,
         })
@@ -145,13 +146,15 @@ fn shape(top: f32, upper: f32, lower: f32, bottom: f32, roof: f32, keel: f32) ->
 }
 pub fn iris(m: Mood) -> Iris {
     match m {
+        // The everyday faces are small shifts (the owner, 2026-11-28: subtle, except for pain
+        // or being close to destroyed).
         Mood::Relaxed => shape(0.98, 1., 1., 1., 0., 0.),
-        Mood::Lock => shape(0.9, 0.9, 0.93, 0.93, 0., 0.),
-        Mood::Glare => shape(0.74, 0.8, 0.95, 0.92, 0.3, 0.),
-        Mood::Worried => shape(1.1, 0.7, 0.98, 0.96, 0.3, 0.),
-        Mood::Pleased => shape(1., 1., 0.78, 0.7, 0., 0.35),
-        Mood::Sleepy => shape(0.6, 0.8, 1., 0.96, 0.4, 0.),
-        Mood::Surprised => shape(1.12, 1.12, 1.12, 1.12, 0., 0.),
+        Mood::Lock => shape(0.94, 0.94, 0.97, 0.97, 0., 0.),
+        Mood::Glare => shape(0.86, 0.9, 1., 0.97, 0.15, 0.),
+        Mood::Pleased => shape(1., 1., 0.92, 0.86, 0., 0.15),
+        Mood::Sleepy => shape(0.8, 0.9, 1., 1., 0.2, 0.),
+        Mood::Worried => shape(1.1, 0.5, 0.88, 0.84, 0.3, 0.),
+        Mood::Pain => shape(0.45, 0.5, 0.58, 0.5, 0.2, 0.15),
     }
 }
 /// How far the window reaches along direction `a`: a blade's edge at `r` 1 just touches it.
@@ -184,17 +187,23 @@ pub struct Cue {
     /// A big hit just landed.
     pub struck: bool,
 }
-/// The mood, by priority: a big hit, a kill a beat ago (the joke comes after the fact), a fight,
-/// a bad hurt, a lock, standing about.
+/// Below this much torso the machine is close to destroyed, and shows it.
+const DYING: f32 = 0.35;
+/// How close to destroyed, 0 (not yet) to 1 (nearly gone).
+pub fn dying(torso: f32) -> f32 {
+    smooth((DYING - torso) / (DYING - 0.05))
+}
+/// The mood, by priority: pain, then being close to destroyed (the strong ones), then a kill a
+/// beat ago (the joke comes after the fact), a fight, a lock, standing about.
 pub fn mood_for(r: &Reading, c: &Cue) -> Mood {
     if c.struck {
-        Mood::Surprised
+        Mood::Pain
+    } else if r.torso < DYING {
+        Mood::Worried
     } else if (0.5..3.5).contains(&c.since_kill) {
         Mood::Pleased
     } else if c.attacking {
         Mood::Glare
-    } else if r.torso < 0.3 {
-        Mood::Worried
     } else if c.locked {
         Mood::Lock
     } else if c.idle > 8. {
@@ -218,6 +227,14 @@ pub fn iris_for(r: &Reading, m: Mood) -> Iris {
         };
     }
     let mut i = iris(m);
+    if m == Mood::Worried {
+        // The peak grows as the torso goes.
+        let (rest, s) = (iris(Mood::Relaxed), dying(r.torso).max(0.15));
+        for k in 0..6 {
+            i.r[k] = rest.r[k] + (i.r[k] - rest.r[k]) * s;
+            i.phi[k] = rest.phi[k] + (i.phi[k] - rest.phi[k]) * s;
+        }
+    }
     let q = squint(r.heat);
     for (k, w) in [1., 0.6, 0.4, 0.8, 0.4, 0.6].into_iter().enumerate() {
         let a = BLADES[k] + i.phi[k];
@@ -549,6 +566,10 @@ impl Cockpit {
     ) {
         let (m, time) = (g.p(), g.time);
         let r = match pose {
+            Some(6) => Reading {
+                torso: 0.06,
+                ..Reading::pose(0)
+            },
             Some(n) if n >= 5 => Reading::pose(0),
             Some(n) => Reading::pose(n),
             None => Reading::of(m),
@@ -578,7 +599,7 @@ impl Cockpit {
         }
         let hp = m.hp.iter().sum::<f32>() / m.max.iter().sum::<f32>().max(1.);
         if !fresh && hp < self.hp_was - 0.04 {
-            self.struck_till = time + 0.3;
+            self.struck_till = time + 0.4;
         }
         let struck = self.struck_till > time;
         if time >= self.blink_at + 0.25 {
@@ -634,18 +655,20 @@ impl Cockpit {
             } else {
                 self.r[STICKY].tune(220. * BLADE_K[STICKY], 0.7);
             }
+            if mood == Mood::Worried {
+                // Close to destroyed, the blades tremble, each on its own beat.
+                let shake = 0.04 * dying(r.torso);
+                for (k, v) in to.r.iter_mut().enumerate() {
+                    *v += shake * (time * 9. + k as f32 * 1.7).sin();
+                }
+            }
             for k in 0..6 {
                 self.r[k].step(dt, to.r[k]);
                 self.phi[k].step(dt, to.phi[k]);
             }
-            // A hit flinches the iris (a big one after its moment wide open).
-            let flinch = |r: &mut [Spring; 6], v: f32| r.iter_mut().for_each(|sp| sp.kick(-v));
+            // A small hit flinches the iris a little; a big one is pain (the mood).
             if r.torso < self.torso_was - 0.005 && !struck {
-                flinch(&mut self.r, 3.);
-            }
-            if self.struck_till > 0. && time >= self.struck_till {
-                self.struck_till = -1.;
-                flinch(&mut self.r, 4.);
+                self.r.iter_mut().for_each(|sp| sp.kick(-2.));
             }
             for sp in &mut self.r {
                 sp.x = sp.x.clamp(0., 1.2);
@@ -761,23 +784,41 @@ mod tests {
     #[test]
     fn the_moods_make_shapes() {
         let rest = iris(Mood::Relaxed);
-        let (glare, worried, pleased) =
-            (iris(Mood::Glare), iris(Mood::Worried), iris(Mood::Pleased));
-        // The upper-left blade faces 150 degrees at rest: toward level is less, steeper more.
+        let (glare, pleased) = (iris(Mood::Glare), iris(Mood::Pleased));
+        // The everyday faces are subtle: every blade within a fifth of rest, turned a little.
+        for m in [Mood::Glare, Mood::Lock, Mood::Pleased, Mood::Sleepy] {
+            let i = iris(m);
+            for k in 0..6 {
+                assert!((i.r[k] - rest.r[k]).abs() <= 0.2, "{m:?} blade {k}");
+                assert!(i.phi[k].abs() <= 0.2, "{m:?} blade {k}");
+            }
+        }
+        // But each still reads. The upper-left blade faces 150 degrees: toward level is less.
         assert!(
-            glare.r[0] < rest.r[0] - 0.2 && glare.phi[1] < -0.2,
-            "a flat heavy top"
+            glare.r[0] < rest.r[0] && glare.phi[1] < 0.,
+            "the top comes down"
         );
-        assert!(worried.r[0] > 1. && worried.r[1] < 0.8, "a peak");
         assert!(
-            pleased.r[3] < rest.r[3] - 0.2 && pleased.phi[2] > 0.2,
-            "the bottom rises flat"
+            pleased.r[3] < rest.r[3] && pleased.phi[2] > 0.,
+            "the bottom rises"
         );
-        assert!(iris(Mood::Sleepy).r[0] <= 0.6, "a droop");
-        assert!(iris(Mood::Lock).r.iter().all(|&r| r < 0.95), "focusing");
-        assert!(iris(Mood::Surprised).r.iter().all(|&r| r > 1.), "wide open");
+        assert!(iris(Mood::Sleepy).r[0] < glare.r[0], "a droop");
+        assert!(iris(Mood::Lock).r.iter().all(|&r| r < 0.98), "focusing");
+        // Pain and being close to destroyed are strong.
+        assert!(
+            iris(Mood::Pain).r.iter().all(|&r| r < 0.6),
+            "pain clamps in"
+        );
+        let worried = iris(Mood::Worried);
+        assert!(worried.r[0] > 1. && worried.r[1] < 0.6, "a peak");
         // Every face is symmetric: blade k mirrors blade 6 - k.
-        for m in [Mood::Glare, Mood::Worried, Mood::Pleased, Mood::Sleepy] {
+        for m in [
+            Mood::Glare,
+            Mood::Worried,
+            Mood::Pleased,
+            Mood::Sleepy,
+            Mood::Pain,
+        ] {
             let i = iris(m);
             for k in 1..3 {
                 assert_eq!(i.r[k], i.r[6 - k]);
@@ -806,7 +847,9 @@ mod tests {
             attacking: true,
             ..locked
         };
-        assert_eq!(mood_for(&hurt, &fighting), Mood::Glare);
+        assert_eq!(mood_for(&cool, &fighting), Mood::Glare);
+        // Close to destroyed outranks the everyday faces.
+        assert_eq!(mood_for(&hurt, &fighting), Mood::Worried);
         // The joke comes after the fact: not the instant of the kill, a beat later, and not long.
         let kill = |t| Cue {
             since_kill: t,
@@ -819,7 +862,25 @@ mod tests {
             struck: true,
             ..kill(1.)
         };
-        assert_eq!(mood_for(&cool, &hit), Mood::Surprised);
+        assert_eq!(mood_for(&cool, &hit), Mood::Pain);
+        assert_eq!(mood_for(&hurt, &hit), Mood::Pain);
+    }
+    #[test]
+    fn the_closer_to_destroyed_the_stronger_the_peak() {
+        let at = |torso| {
+            iris_for(
+                &Reading {
+                    torso,
+                    ..Reading::pose(0)
+                },
+                Mood::Worried,
+            )
+        };
+        let (start, half, gone) = (at(0.34), at(0.2), at(0.05));
+        assert!(start.r[1] > half.r[1] && half.r[1] > gone.r[1]);
+        assert!(start.r[1] > 0.9, "it starts gently");
+        assert_eq!(dying(0.5), 0.);
+        assert_eq!(dying(0.04), 1.);
     }
     #[test]
     fn no_face_covers_the_crosshair_however_hot() {
@@ -830,7 +891,7 @@ mod tests {
             Mood::Worried,
             Mood::Pleased,
             Mood::Sleepy,
-            Mood::Surprised,
+            Mood::Pain,
         ] {
             for heat in [0., 0.6, 0.8, 0.99] {
                 let r = Reading {

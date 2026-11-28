@@ -42,21 +42,25 @@ own; the mockups (window shapes for all six) came first.
   edges leave: a hexagon, always convex (so there is no V or arch; the
   faces are shapes). The face, by priority:
 
+  The owner (2026-11-28): the faces are subtle, except for pain and being
+  close to destroyed. By priority:
+
   | Face | Iris | When |
   |---|---|---|
-  | Surprised | wide open, the blades gone, for 0.3 s; then a flinch | a big hit (4% of the whole machine in a frame) |
-  | Pleased | the bottom blades rise flat: a dome, an eye that smiles | 0.5 to 3.5 s after the player's kill: the joke after the fact |
-  | Glare | a flat, top-heavy squint, the upper blades turned toward level | firing in the last 1.2 s, or zoomed in |
-  | Worried | the top blade pulls back and the upper pair close in: a peak | the torso under 30% |
-  | Locked | the whole iris tightens, focusing | a target locked |
-  | Sleepy | a heavy flat top | nothing touched for 8 s |
-  | Relaxed | nearly open, the blades' edges just in from the rim | otherwise |
+  | Pain (strong) | clamps in hard for 0.4 s | a big hit (4% of the whole machine in a frame) |
+  | Close to destroyed (strong) | the top blade pulls back and the upper pair close in, a peak that grows as the torso goes, every blade trembling on its own beat | the torso under 35%, starting gently and full at 5% |
+  | Pleased (subtle) | the bottom blades rise a little | 0.5 to 3.5 s after the player's kill: the joke after the fact |
+  | Glare (subtle) | the top comes down a little, the upper pair a touch toward level | firing in the last 1.2 s, or zoomed in |
+  | Locked (subtle) | the whole iris tightens a touch, focusing | a target locked |
+  | Sleepy (subtle) | the top droops a little | nothing touched for 8 s |
+  | Relaxed | open, the blades all but out of sight | otherwise |
 
-  Over every face the heat squints the eye as it climbs past 55 (the top
-  and bottom blades most); shut down (or dead), the iris twists shut. A
-  small hit flinches every blade in a little. Hurt below half, one blade
-  sticks: it lags and twitches. **No face covers the middle of the
-  view**: every edge stays 0.24 clear of it however hot (test).
+  The subtle faces keep every blade within a fifth of rest (test). Over
+  every face the heat squints the eye as it climbs past 55 (the top and
+  bottom blades most); shut down (or dead), the iris twists shut. A small
+  hit flinches every blade in a little. Hurt below half, one blade sticks:
+  it lags and twitches. **No face covers the middle of the view**: every
+  edge stays 0.24 clear of it however hot (test).
 - **The blink** (the owner liked the blink, and asked for it more like an
   aperture): every 2.5 to 6.5 s the iris twists shut to a point in 0.05 s,
   each blade a hundredth of a second after the last, holds a moment, and
@@ -99,8 +103,8 @@ pilot's.
    crosshair, however hot; a blink snaps shut, holds and opens; the coils run from cold steel
    through red and orange to near white (tests: `cockpit::tests`).
 2. Screenshots of the states (`--cockpit-pose 0` to `4`: cool, hot,
-   critical, shut down, hurt) and the faces (`5` glare, `6` worried, `7`
-   pleased, `8` sleepy, `9` surprised, `10` locked; `11` and `12` a blink
+   critical, shut down, hurt) and the faces (`5` glare, `6` nearly destroyed, `7`
+   pleased, `8` sleepy, `9` pain, `10` locked; `11` and `12` a blink
    half and nearly shut), and a clip in the PR.
 3. On the Deck: it feels like being inside BARRY, the view is not cramped,
    and the face reads without getting in the way. **Deck check: open.**

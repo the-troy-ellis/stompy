@@ -26,7 +26,7 @@ pub struct Scene {
     /// The demigod's head round the eye, built the first time it's needed (BARRY's so far).
     head: Option<crate::cockpit::Cockpit>,
     /// Forces what the head shows (the tools' mockups): 0 cool, 1 hot, 2 critical, 3 off, 4 hurt,
-    /// 5 glare, 6 worried, 7 pleased, 8 sleepy, 9 surprised, 10 locked, 11 and 12 a blink.
+    /// 5 glare, 6 nearly destroyed, 7 pleased, 8 sleepy, 9 pain, 10 locked, 11 and 12 a blink.
     pub cockpit_pose: Option<u8>,
     fx: Vec<Mesh>,
     sky: Mesh,
