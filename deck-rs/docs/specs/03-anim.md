@@ -54,6 +54,14 @@ without one draws as before.
   back hard in 0.04 s and returns by 0.3 s, twice as far for a big gun; the
   arm rocks up a touch with it. The cockpit's own guns kick too.
 
+**SKEDADDLE** (2026-11-28) has its own profile (`anim::SKEDADDLE`),
+twitchy where BARRY is steady: the arms pump harder (0.17) and trail a turn
+more, the feet snap off the ground, the long toes grab harder, the two ears
+flick at every jolt on a quick spring; no pods. Its pistons: a knee ram in
+front of the backward knee, an ankle ram down the back of the shin to the
+heel (`models::SKED_KNEE`, `SKED_ANKLE`). Every chassis's toes and pistons
+now come with its model.
+
 Clips: `--watch` (or `--watch-from A`) films your own mech from outside,
 `--record N K dir` saves the frames.
 

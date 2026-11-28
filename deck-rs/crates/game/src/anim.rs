@@ -66,9 +66,33 @@ pub const BARRY: Profile = Profile {
     ant_base: [-0.6, 3.1, -0.4],
     pod_hinge: [1.75, 2.4, -0.1],
 };
+/// SKEDADDLE: twitchy. The arms pump hard and trail a turn, the feet snap off the ground and
+/// the long toes grab, the ears flick at every jolt. No pods.
+pub const SKEDADDLE: Profile = Profile {
+    arm_swing: 0.17,
+    arm_lag: 0.2,
+    foot_roll: 0.26,
+    toe_curl: 0.75,
+    toe_open: 0.45,
+    toe_close: 0.6,
+    toe_grip: 0.38,
+    ant_gain: 0.11,
+    ant_k: 150.,
+    ant_zeta: 0.1,
+    pod_gain: 0.,
+    pod_k: 170.,
+    pod_zeta: 0.22,
+    pod_spread: 0.,
+    pod_sway: 0.,
+    pod_step: 0.,
+    recoil: 0.16,
+    ant_base: [0., 2.5, -0.3],
+    pod_hinge: [0.; 3],
+};
 pub fn profile(ch: Ch) -> Option<&'static Profile> {
     match ch {
         Ch::Kestrel => Some(&BARRY),
+        Ch::Jackal => Some(&SKEDADDLE),
         _ => None,
     }
 }

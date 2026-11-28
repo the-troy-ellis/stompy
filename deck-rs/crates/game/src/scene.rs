@@ -545,36 +545,22 @@ impl Scene {
             b.part(ch, lod, Slot::LLeg, &ms);
             b.part(ch, lod, Slot::Foot, &mf);
             if p.toe1.is_some() {
-                use crate::models::{TOES, TOE_1};
                 let (curl, spread) =
                     an.map_or((0., 1.), |(pr, a)| anim::toe_pose(pr, m, a, i, g.time));
-                for h in TOES {
+                for h in p.toes {
                     let near =
                         mf * M4::t(h[0], h[1], h[2]) * M4::ry(h[3] * spread) * M4::rx(curl * 0.55);
                     b.part(ch, lod, Slot::Toe1, &near);
-                    let tip = near * M4::t(0., 0., TOE_1) * M4::rx(curl * 0.75);
+                    let tip = near * M4::t(0., 0., p.toe_len) * M4::rx(curl * 0.75);
                     b.part(ch, lod, Slot::Toe2, &tip);
                 }
             }
-            if p.pistons {
-                use crate::models::{ANKLE, KNEE};
-                let v = |a: [f32; 3]| v3(a[0], a[1], a[2]);
-                piston(
-                    b,
-                    mt.apply(v(KNEE.from)),
-                    ms.apply(v(KNEE.to)),
-                    &KNEE,
-                    sc,
-                    dark,
-                );
-                piston(
-                    b,
-                    ms.apply(v(ANKLE.from)),
-                    mf.apply(v(ANKLE.to)),
-                    &ANKLE,
-                    sc,
-                    dark,
-                );
+            let v = |a: [f32; 3]| v3(a[0], a[1], a[2]);
+            if let Some(kn) = &p.knee {
+                piston(b, mt.apply(v(kn.from)), ms.apply(v(kn.to)), kn, sc, dark);
+            }
+            if let Some(an) = &p.ankle {
+                piston(b, ms.apply(v(an.from)), mf.apply(v(an.to)), an, sc, dark);
             }
         }
         if m.flash.frame + 1 >= g.frame {

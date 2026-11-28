@@ -49,12 +49,17 @@ pub struct Parts {
     pub arm: Builder,
     pub barrel: Builder,
     /// The shoulder pods, left (x > 0) then right, in the torso's frame, each on its hinge.
-    pub pods: [Builder; 2],
+    pub pods: Option<[Builder; 2]>,
     /// The antenna, standing at its own origin; drawn at its socket.
     pub antenna: Builder,
     /// A toe's two segments, each standing at its own knuckle, pointing along z.
     pub toe1: Builder,
     pub toe2: Builder,
+    /// Where the toes' knuckles sit, the near segment's length, and the pistons drawn live.
+    pub toes: &'static [[f32; 4]],
+    pub toe_len: f32,
+    pub knee: Piston,
+    pub ankle: Piston,
 }
 /// BARRY's three toes: where each knuckle sits on the foot (x, y, z) and which way it points.
 pub const TOES: [[f32; 4]; 3] = [
@@ -66,6 +71,7 @@ pub const TOES: [[f32; 4]; 3] = [
 pub const TOE_1: f32 = 0.55;
 /// A piston drawn live between two parts: `from` in the upper part's frame, `to` in the
 /// lower's, a fat cylinder `fat` long from `from`, a rod the rest of the way.
+#[derive(Clone, Copy)]
 pub struct Piston {
     pub from: [f32; 3],
     pub to: [f32; 3],
@@ -91,10 +97,9 @@ impl Parts {
     pub fn tris(&self) -> usize {
         self.hip.tris()
             + self.torso.tris()
-            + self.pods[0].tris()
-            + self.pods[1].tris()
+            + self.pods.as_ref().map_or(0, |p| p[0].tris() + p[1].tris())
             + self.antenna.tris()
-            + 6 * (self.toe1.tris() + self.toe2.tris())
+            + 2 * self.toes.len() * (self.toe1.tris() + self.toe2.tris())
             + 2 * [&self.uleg, &self.lleg, &self.foot, &self.arm, &self.barrel]
                 .iter()
                 .map(|b| b.tris())
@@ -423,10 +428,345 @@ pub fn barry(level: u8, paint: [f32; 3]) -> Parts {
         torso,
         arm,
         barrel,
-        pods,
+        pods: Some(pods),
         antenna,
         toe1,
         toe2,
+        toes: &TOES,
+        toe_len: TOE_1,
+        knee: KNEE,
+        ankle: ANKLE,
+    }
+}
+
+/// SKEDADDLE's toes: three long ones, splayed wide for grip at a sprint.
+pub const SKED_TOES: [[f32; 4]; 3] = [
+    [-0.4, -0.3, 0.62, -0.42],
+    [0., -0.3, 0.72, 0.],
+    [0.4, -0.3, 0.62, 0.42],
+];
+pub const SKED_TOE_1: f32 = 0.62;
+/// SKEDADDLE's: the knee ram in front of the backward knee (thigh to shin), and the ankle ram
+/// down the back of the shin to the heel. A bird leg's limb frame has +z toward the knee, which
+/// points back, so the front is -z.
+pub const SKED_KNEE: Piston = Piston {
+    from: [0., -0.75, -0.62],
+    to: [0., -0.75, -0.42],
+    d: 0.22,
+    fat: 1.0,
+};
+pub const SKED_ANKLE: Piston = Piston {
+    from: [0., -0.9, 0.42],
+    to: [0., 0.05, -0.5],
+    d: 0.18,
+    fat: 0.8,
+};
+
+/// SKEDADDLE: a lean sprinter on bird legs. A forward-leaning hull with a wraparound canopy and
+/// gulping side intakes, a raptor's tail for balance, thick thighs over slim shins, long
+/// three-toed claws with a spur, slim arms with the LIL ZAPPERs, and two twitchy ears. Light
+/// plates over an open frame: it runs fast, it breaks fast.
+pub fn skedaddle(level: u8, paint: [f32; 3]) -> Parts {
+    let c = chassis(Ch::Jackal);
+    let g = geo_for(Ch::Jackal);
+    let (col, dark, acc) = (paint, mulc(paint, 0.55), c.acc);
+    let hi = level >= 2;
+    let n = if hi { 14 } else { 8 };
+    let (l1, l2) = (g.l1, g.l2);
+
+    // The pelvis: a narrow keel, hip balls at the sides, and the tail: a tapered boom back and
+    // up, ribbed, with a fin at the end.
+    let mut hip = Builder::default();
+    hip.bbox(M4::ID, v3(2.2, 0.85, 1.5), 0.14, 0.9, dark);
+    hip.bbox(t(0., 0.45, 0.1), v3(1.2, 0.45, 1.0), 0.1, 0.8, col);
+    for s in [1., -1.] {
+        hip.rod(v3(s * 0.9, 0., 0.), v3(s * 1.25, 0., 0.), 0.8, n, STEEL);
+    }
+    let (root, end) = (v3(0., 0.1, -0.7), v3(0., 0.9, -3.4));
+    hip.rod(root, root + (end - root) * 0.55, 0.55, n, col);
+    hip.rod(root + (end - root) * 0.5, end, 0.32, n, col);
+    hip.bbox(
+        t(end.x, end.y + 0.3, end.z) * M4::rx(-0.5),
+        v3(0.08, 0.9, 0.7),
+        0.02,
+        0.5,
+        acc,
+    );
+    if hi {
+        for k in 1..6 {
+            let at = root + (end - root) * (k as f32 / 6.);
+            let d = if k < 4 { 0.66 } else { 0.42 };
+            hip.rod(at, at + (end - root).norm() * 0.06, d, n, dark);
+        }
+        for s in [1., -1.] {
+            hip.bbox(
+                t(end.x + s * 0.3, end.y, end.z + 0.2) * M4::rz(s * 0.4),
+                v3(0.5, 0.06, 0.5),
+                0.02,
+                0.6,
+                acc,
+            );
+        }
+        vent(&mut hip, t(0., 0., 0.76), 1.2, 0.5, 3, dark);
+    }
+
+    // The thigh: thick, an armour shell on the outside and the front (-z: the knee points back).
+    let mut uleg = Builder::default();
+    uleg.sphere(M4::s1(1.4), dark, n, n / 2);
+    uleg.bbox(
+        t(0., -l1 * 0.48, -0.05),
+        v3(1.1, l1 + 0.1, 1.35),
+        0.16,
+        0.72,
+        col,
+    );
+    uleg.bbox(
+        t(0., -l1 * 0.4, -0.66) * M4::rx(0.08),
+        v3(1.15, l1 * 0.7, 0.22),
+        0.06,
+        0.8,
+        col,
+    );
+    drum(&mut uleg, v3(0., -l1, 0.), 1.3, 1.05, n, dark, STEEL);
+    // The knee ram's lug, in front.
+    uleg.bbox(t(0., -0.75, -0.62), v3(0.3, 0.3, 0.28), 0.05, 1., dark);
+    if hi {
+        for s in [1., -1.] {
+            uleg.bbox(
+                t(s * 0.58, -l1 * 0.45, -0.1),
+                v3(0.08, l1 * 0.6, 0.9),
+                0.02,
+                0.9,
+                dark,
+            );
+        }
+        for k in 0..3 {
+            let y = -0.5 - k as f32 * 0.55;
+            uleg.bbox(t(0., y, -0.78), v3(0.9, 0.07, 0.05), 0.01, 1., dark);
+        }
+    }
+
+    // The shin: slim and long, an open frame of two struts round a core, a guard down the front,
+    // the ankle ball.
+    let mut lleg = Builder::default();
+    lleg.bbox(t(0., -l2 * 0.5, 0.), v3(0.55, l2, 0.6), 0.1, 0.8, dark);
+    for s in [1., -1.] {
+        lleg.rod(
+            v3(s * 0.34, -0.2, 0.1),
+            v3(s * 0.3, -l2 + 0.25, 0.05),
+            0.16,
+            if hi { 8 } else { 6 },
+            STEEL,
+        );
+    }
+    lleg.bbox(
+        t(0., -l2 * 0.42, -0.34) * M4::rx(-0.05),
+        v3(0.7, l2 * 0.7, 0.16),
+        0.05,
+        0.7,
+        col,
+    );
+    lleg.bbox(t(0., -0.75, -0.42), v3(0.28, 0.28, 0.26), 0.05, 1., dark);
+    lleg.bbox(t(0., -0.9, 0.42), v3(0.26, 0.26, 0.26), 0.05, 1., dark);
+    lleg.sphere(t(0., -l2, 0.) * M4::s1(0.8), dark, n, n / 2);
+    if hi {
+        lleg.bbox(t(0., -0.25, 0.), v3(0.8, 0.35, 0.75), 0.08, 0.9, col);
+        for k in 0..4 {
+            let y = -0.9 - k as f32 * 0.35;
+            lleg.bbox(t(0., y, -0.44), v3(0.5, 0.05, 0.04), 0.01, 1., dark);
+        }
+    }
+
+    // The foot: a cuff, a narrow pad, the knuckles, a long spur behind.
+    let mut foot = Builder::default();
+    foot.rod(v3(0., 0.15, 0.), v3(0., -0.18, 0.), 0.75, n, col);
+    foot.bbox(t(0., -0.25, 0.1), v3(1.0, 0.32, 1.1), 0.09, 0.85, dark);
+    for h in SKED_TOES {
+        foot.rod(
+            v3(h[0] - 0.17, h[1] + 0.02, h[2]),
+            v3(h[0] + 0.17, h[1] + 0.02, h[2]),
+            0.28,
+            if hi { 10 } else { 8 },
+            STEEL,
+        );
+    }
+    foot.bbox(
+        t(0., -0.28, -0.8) * M4::rx(-0.3),
+        v3(0.26, 0.24, 0.85),
+        0.05,
+        0.5,
+        dark,
+    );
+    foot.bbox(
+        t(0., -0.4, -1.2) * M4::rx(0.5),
+        v3(0.18, 0.14, 0.35),
+        0.03,
+        0.4,
+        STEEL,
+    );
+    foot.bbox(t(0., 0.05, -0.5), v3(0.26, 0.26, 0.26), 0.05, 1., dark);
+    // A toe: a long slim segment, then a hooked claw.
+    let mut toe1 = Builder::default();
+    toe1.bbox(
+        t(0., 0., SKED_TOE_1 * 0.5),
+        v3(0.28, 0.24, SKED_TOE_1 + 0.06),
+        0.06,
+        0.8,
+        dark,
+    );
+    toe1.rod(
+        v3(-0.13, 0., SKED_TOE_1),
+        v3(0.13, 0., SKED_TOE_1),
+        0.2,
+        if hi { 8 } else { 6 },
+        STEEL,
+    );
+    let mut toe2 = Builder::default();
+    toe2.bbox(t(0., -0.02, 0.22), v3(0.24, 0.2, 0.46), 0.05, 0.7, dark);
+    toe2.bbox(
+        t(0., -0.1, 0.52) * M4::rx(0.6),
+        v3(0.16, 0.14, 0.36),
+        0.03,
+        0.4,
+        STEEL,
+    );
+
+    // The torso: a wedge leaning into the run, the canopy wrapped round the front, intakes at
+    // the sides, cooling fins behind, the ears' socket on top.
+    let mut torso = Builder::default();
+    torso.rod(v3(0., -0.2, 0.), v3(0., 0.3, 0.), 1.7, n, dark);
+    torso.bbox(
+        t(0., 1.25, -0.1) * M4::rx(0.08),
+        v3(2.9, 2.2, 2.4),
+        0.24,
+        0.78,
+        col,
+    );
+    torso.bbox(
+        t(0., 0.75, 1.25) * M4::rx(0.45),
+        v3(2.0, 1.1, 0.9),
+        0.14,
+        0.7,
+        col,
+    );
+    // The canopy, a dome of glass with a frame over it.
+    torso.sphere(t(0., 2.2, 1.05) * M4::s(1.0, 0.55, 0.85), GLASS, n, n / 2);
+    torso.rod(v3(0., 2.75, 0.4), v3(0., 2.3, 1.85), 0.09, 6, dark);
+    for s in [1., -1.] {
+        // The intakes: a cowl and a dark throat.
+        let at = v3(s * 1.5, 1.35, 0.5);
+        torso.rod(at - v3(0., 0., 0.9), at + v3(0., 0., 0.5), 0.78, n, col);
+        torso.rod(at + v3(0., 0., 0.45), at + v3(0., 0., 0.52), 0.6, n, TUBE);
+        // Shoulder mounts.
+        torso.bbox(t(s * 1.6, 2.0, -0.2), v3(0.4, 0.7, 0.9), 0.08, 1., dark);
+        // Cooling fins, raked back.
+        torso.bbox(
+            t(s * 0.55, 2.55, -0.9) * M4::rx(-0.5) * M4::rz(s * 0.12),
+            v3(0.08, 0.9, 0.9),
+            0.02,
+            0.6,
+            acc,
+        );
+    }
+    torso.bbox(t(0., 1.0, -1.45), v3(1.8, 1.4, 0.5), 0.1, 0.9, dark);
+    torso.rod(v3(0., 2.35, -0.3), v3(0., 2.55, -0.3), 0.22, 8, dark);
+    if hi {
+        vent(
+            &mut torso,
+            t(0., 1.0, -1.72) * M4::ry(PI),
+            1.4,
+            1.0,
+            5,
+            dark,
+        );
+        for s in [1., -1.] {
+            torso.bbox(
+                t(s * 1.0, 1.55, 1.12) * M4::rx(-0.1) * M4::ry(s * 0.35),
+                v3(0.7, 1.0, 0.16),
+                0.05,
+                0.85,
+                col,
+            );
+            torso.rod(
+                v3(s * 1.5, 1.35, -0.5),
+                v3(s * 1.5, 1.35, -0.75),
+                0.5,
+                n,
+                STEEL,
+            );
+            for k in 0..3 {
+                let z = -0.1 + k as f32 * 0.25;
+                torso.rod(
+                    v3(s * 1.5, 1.35, z),
+                    v3(s * 1.5, 1.35, z + 0.05),
+                    0.84,
+                    n,
+                    dark,
+                );
+            }
+        }
+        torso.bbox(
+            t(0., 2.0, 1.72) * M4::rx(-0.5),
+            v3(0.9, 0.1, 0.2),
+            0.02,
+            1.,
+            dark,
+        );
+    }
+    // The ears: two thin aerials in a V from one socket, so they twitch together (anim.rs).
+    let mut antenna = Builder::default();
+    for s in [1., -1.] {
+        antenna.rod(V3::ZERO, v3(s * 0.35, 1.1, -0.35), 0.045, 5, dark);
+        if hi {
+            antenna.sphere(t(s * 0.35, 1.1, -0.35) * M4::s1(0.1), acc, 6, 3);
+        }
+    }
+
+    // The arm: a small shoulder drum and a slim strut: two rods and a light plate.
+    let mut arm = Builder::default();
+    drum(&mut arm, v3(0., 0.15, 0.), 1.0, 0.9, n, dark, STEEL);
+    for z in [-0.2, 0.35] {
+        arm.rod(
+            v3(0., 0.0, z),
+            v3(0., -1.0, z),
+            0.16,
+            if hi { 8 } else { 6 },
+            STEEL,
+        );
+    }
+    arm.bbox(t(0.2, -0.5, 0.08), v3(0.12, 1.0, 0.8), 0.03, 0.85, col);
+    arm.bbox(t(0., -1.15, 0.2), v3(0.6, 0.5, 0.8), 0.08, 1., dark);
+
+    // The gun (a LIL ZAPPER): a slim housing, an emitter, two focusing rings, a lens. It ends
+    // where the box did (z 2.6).
+    let mut barrel = Builder::default();
+    barrel.bbox(t(0., -1.15, 0.8), v3(0.5, 0.5, 1.0), 0.08, 0.9, dark);
+    barrel.rod(v3(0., -1.15, 1.25), v3(0., -1.15, 2.45), 0.22, n, STEEL);
+    for z in if hi {
+        &[1.6, 1.95, 2.25][..]
+    } else {
+        &[1.8][..]
+    } {
+        barrel.rod(v3(0., -1.15, *z), v3(0., -1.15, z + 0.05), 0.34, n, dark);
+    }
+    barrel.rod(v3(0., -1.15, 2.45), v3(0., -1.15, 2.6), 0.36, n, dark);
+    barrel.rod(v3(0., -1.15, 2.59), v3(0., -1.15, 2.61), 0.22, n, GLASS);
+    Parts {
+        hip,
+        uleg,
+        lleg,
+        foot,
+        torso,
+        arm,
+        barrel,
+        pods: None,
+        antenna,
+        toe1,
+        toe2,
+        toes: &SKED_TOES,
+        toe_len: SKED_TOE_1,
+        knee: SKED_KNEE,
+        ankle: SKED_ANKLE,
     }
 }
 
@@ -442,6 +782,15 @@ mod tests {
         // look's, not the GPU's: enough faces for detail, few enough that the facets show.
         assert!((2500..6000).contains(&a), "level 1: {a}");
         assert!((6000..12000).contains(&b), "level 2: {b}");
+        assert!(b > a * 3 / 2);
+    }
+    #[test]
+    fn skedaddle_is_on_budget_and_lighter_than_barry() {
+        let c = chassis(Ch::Jackal);
+        let (a, b) = (skedaddle(1, c.col).tris(), skedaddle(2, c.col).tris());
+        println!("SKEDADDLE drawn: level 1 {a} triangles, level 2 {b}");
+        assert!((2000..6000).contains(&a), "level 1: {a}");
+        assert!((5000..12000).contains(&b), "level 2: {b}");
         assert!(b > a * 3 / 2);
     }
 }

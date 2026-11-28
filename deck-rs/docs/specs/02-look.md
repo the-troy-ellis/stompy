@@ -66,7 +66,17 @@ Counted for a whole mech, both legs and arms (test: `models::tests`):
   antenna light and a coolant line on the gun.
 
 `--detail N` (0 the boxes, 1, 2) picks for a tools run. **The owner picked
-level 2** (2026-11-27), the default. Then the other five, and the ground's faces come with
+level 2** (2026-11-27), the default.
+
+**SKEDADDLE** (2026-11-28, `models::skedaddle`): a lean sprinter on bird
+legs. A forward-leaning hull, a glass canopy dome with a frame over it,
+gulping side intakes, raked cooling fins; a raptor's tail off the pelvis,
+ribbed, with a fin; thick armoured thighs over slim open-frame shins; long
+three-toed claws, splayed wide, and a spur behind; slim strut arms with the
+LIL ZAPPERs (a lens at the muzzle); two ears in a V. Level 1 about 4,300
+triangles, level 2 about 8,400 (a little under BARRY).
+
+Then the other four, and the ground's faces come with
 the voxel ground (P2).
 
 ### Paint shows the side (built)

@@ -44,7 +44,7 @@ better on the way, not the same code.
 | Thunk: feel table, camera, body, sub-bass, rumble | spec 13 | **built**, not yet tuned on the Deck | P1 |
 | Six combat demigods, eleven weapons | spec 06 | **built** | P1 |
 | The look: dither, ramps, side paint, lumps for effects | spec 14 | **built** (specs/02-look.md) | P3 (more) |
-| BARRY remodelled and animated (layer 1, toes, pods) | (new) | **built** (specs/03-anim.md) | P3 (the rest) |
+| BARRY remodelled and animated (layer 1, toes, pods); SKEDADDLE remodelled and animated | (new) | **built** (specs/02-look.md, 03-anim.md) | P3 (the other four) |
 | Big battles: batches, distance detail, readout, WATCH | spec 34 | **built**, the number to measure on the Deck (specs/04-big-battles.md) | P2 |
 | Debug page, test range, cheats, live tuning | spec 19 | a readout (View + Y) | P1 |
 | The crowd: tiny robots by the thousand, honoured underfoot | (new) | not yet | P2 |
