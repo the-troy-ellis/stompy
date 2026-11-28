@@ -209,6 +209,18 @@ pub struct MenuPress {
     pub debug: bool,
     pub any: bool,
 }
+/// In play, a pause press opens the pause menu and is used up: the same frame's menu must not
+/// see it, or the menu takes it as RESUME and closes as it opens (bug 1). Returns whether to pause.
+pub fn take_pause(m: &mut MenuPress) -> bool {
+    if !m.pause {
+        return false;
+    }
+    *m = MenuPress {
+        debug: m.debug,
+        ..MenuPress::default()
+    };
+    true
+}
 /// The menus: the D-pad, the left stick (flicked past 0.6) or the keys move; A, Enter or a click picks; B or Escape backs.
 pub fn to_menu(r: &Raw, was: &Raw) -> MenuPress {
     let flick = |now: f32, before: f32, dir: f32| now * dir > 0.6 && before * dir <= 0.6;
@@ -228,6 +240,18 @@ pub fn to_menu(r: &Raw, was: &Raw) -> MenuPress {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn a_pause_press_opens_the_menu_and_is_used_up() {
+        let mut m = MenuPress {
+            pause: true,
+            back: true,
+            ..MenuPress::default()
+        };
+        assert!(take_pause(&mut m));
+        // Nothing left for the pause menu to read as RESUME this frame.
+        assert!(!m.pause && !m.back && !m.accept);
+        assert!(!take_pause(&mut m));
+    }
     const P: ControlPrefs = ControlPrefs {
         pad_sens: 1.,
         mouse_sens: 1.,

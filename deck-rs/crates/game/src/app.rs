@@ -921,12 +921,12 @@ impl App {
             };
             last = now;
             self.fps += ((1. / dt.max(1e-4)) as f32 - self.fps) * 0.05;
-            let m = to_menu(&self.raw, &self.raw_was);
+            let mut m = to_menu(&self.raw, &self.raw_was);
             if m.debug {
                 self.debug = !self.debug;
             }
             if self.screen == Screen::Play {
-                if m.pause {
+                if take_pause(&mut m) {
                     (self.screen, self.sel) = (Screen::Pause, 0);
                     self.plat.relative_mouse(false);
                 }
