@@ -26,12 +26,19 @@ tiny robots under it.
   buckle, it goes over in about 0.6 s, and hits the ground with the biggest
   thump a body makes, a ring of dust and the ground shaking for those near.
   Tiny robots under it are honoured.
-- **Down.** It lies on its side or back for about two seconds. Its feet are
-  off the ground, so the gait stops; the sim holds it as a body lying where
-  it fell. Down, it can't walk, turn or punch.
-- **Getting up.** About 1.2 s: it rolls to its front, gets its knees and
-  hands (or fists) under it, pushes up, and stands, with a heave and a
-  thump as the feet plant. Each chassis in its own way (`03-anim.md`):
+- **Down** (the owner, 2026-11-28: "you are effectively disabled and can't
+  fire"). It lies on its side or back. Its feet are off the ground, so the
+  gait stops; the sim holds it as a body lying where it fell. Down, it can't
+  walk, turn, aim, punch or fire anything.
+- **Getting up: you mash** (the owner: "while down you have to button mash
+  to get up"). It never gets up by itself. Each press is a heave: the body
+  shoves part of the way up, felt (a thump, a lurch of the view, a rumble),
+  and sags back a little if the presses stop, so a steady mash gets you up
+  and a slow one barely does. Proposed: A (the jets' button, free while
+  down; Space on the keyboard), about eight quick presses from flat on the
+  ground. The AI mashes at a rate set by difficulty. At the top, the last
+  push: it rolls to its front, gets its knees and hands (or fists) under
+  it, and stands, with a heave and a thump as the feet plant. Each chassis in its own way (`03-anim.md`):
   SKEDADDLE springs up, PURPLE PUNCHER shoves itself up off its fists,
   BARRY grinds up. While getting up it is open: a stomp lands, the next
   wrecking ball puts it straight back down.
@@ -49,11 +56,9 @@ tiny robots under it.
 
 1. **What knocks a mech down?** Only PURPLE PUNCHER's wrecking ball, or any
    big enough blow (a high stomp, a big blast, BIG BONKER's shell)?
-2. **Getting up: automatic, or yours?** After a set time it gets up by
-   itself; or you press (A?) to get up, and mashing gets you up sooner; or
-   both (it gets up by itself after a while, pressing gets you up sooner).
-3. **Down: helpless?** No guns at all while down, or can the torso's guns
-   still fire (wildly, at whatever they point at)?
+2. ~~Getting up~~ **Answered:** you button-mash; it never gets up by itself.
+   Still to confirm: A (Space) as the button, and about eight presses.
+3. ~~Down: helpless?~~ **Answered:** effectively disabled; nothing fires.
 4. **SLOWPOKE.** Never knocked down (four legs), or only by the biggest
    blows?
 5. **The other side.** Can you stomp a downed mech for extra (the honour of
@@ -63,7 +68,9 @@ tiny robots under it.
 
 1. A blow over the threshold puts a mech down the way it was pushed; under
    it, a stagger (tests).
-2. Down, it can't walk, turn or punch; it gets up as the asks decide (tests).
+2. Down, it can't walk, turn, punch or fire; it gets up only by mashing, a
+   steady mash gets it up and a slow one doesn't, and the AI mashes by
+   difficulty (tests).
 3. Its feet never slide: down, the gait stops; getting up, they plant where
    it stands (test).
 4. From the cockpit the fall, the slam, the lying and the getting up read
