@@ -20,13 +20,25 @@ own; the mockups (window shapes for all six) came first.
   faces keep their winding. Drawn with the camera after everything else, so
   every kick, bob, shake and lurch moves it with you; lit by the world's
   light in dithered steps like any machine; no fog.
+- **No instruments.** The owner (2026-11-28): the first try's dials and
+  lamps were a pilot's, and there is no pilot. The head shows its state
+  through its own workings (the green HUD is already the robot's readout):
 - **BARRY**: a porthole eye (an oval 0.88 by 0.5 at a metre) with a lip, a
   raised faceted ring and 24 rivets, the panel round it dished in toward
-  the eye past the screen's edge. A small slanted dash low in the middle:
-  two dials (heat on the left, pace on the right; red past 85%) whose
-  needles sweep clockwise from the lower left, and three lamps (jets ready
-  green, heat over 55 amber, heat critical red and flashing). Shut down or
-  dead, the needles drop and the lamps go dark.
+  the eye past the screen's edge.
+- **Eyelids**: steel shutters top and bottom with a rolled lip, ribs and a
+  piston, sliding just behind the ring. They rest almost open, squint as
+  the heat climbs past 55, slam shut when the machine shuts down (or dies),
+  and flinch half-closed for a moment when the torso is hit.
+- **Heat coils**: a row of fins across the bottom of the eye: cold steel,
+  then dull red, orange, and near white at shutdown, flickering when
+  critical, with puffs of steam rising and thinning out. Shut down, they
+  cool to a dull red.
+- **Jet capacitors**: two cages of thin bars in the frame's upper corners,
+  outside the eye, each filling with a column of light as the jets
+  recharge, humming bright when ready, dark when off.
+- **Cracks** spread across the eye in three stages as the torso drops below
+  three quarters, a half and a quarter.
 - **The maintenance tag** the tiny robots tied on, in BARRY's accent, on
   three links of chain from a hook at the top of the eye. It swings on two
   springs, pushed by the head's jolts (sideways, fore and aft), by its turns
@@ -47,9 +59,10 @@ pilot's.
 
 ## Acceptance criteria
 
-1. The needles read empty at the lower left and full at the lower right
-   (test: `cockpit::tests`).
-2. Screenshots and a walking clip in the PR: the ring and rivets frame the
-   view, the barrels and their beams show, the tag swings.
+1. The lids rest open, squint when hot and shut when off; the coils run
+   from cold steel through red and orange to near white (tests:
+   `cockpit::tests`).
+2. Screenshots of the five states (`--cockpit-pose 0` to `4`: cool, hot,
+   critical, shut down, hurt) and a walking clip in the PR.
 3. On the Deck: it feels like being inside BARRY, and the view is not
    cramped. **Deck check: open.**

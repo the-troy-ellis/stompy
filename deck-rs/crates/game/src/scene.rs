@@ -25,6 +25,8 @@ pub struct Scene {
     cockpit_guns: Vec<(V3, V3)>,
     /// The demigod's head round the eye, built the first time it's needed (BARRY's so far).
     head: Option<crate::cockpit::Cockpit>,
+    /// Forces what the head shows (the tools' mockups): 0 cool, 1 hot, 2 critical, 3 off, 4 hurt.
+    pub cockpit_pose: Option<u8>,
     fx: Vec<Mesh>,
     sky: Mesh,
     ground: Vec<(Mesh, V3)>,
@@ -233,6 +235,7 @@ impl Scene {
             eye: V3::ZERO,
             cockpit_guns: Vec::with_capacity(2),
             head: None,
+            cockpit_pose: None,
             fx: FX_ALL.iter().map(|&k| build_effect(gl, k)).collect(),
             sky: build_sky(gl),
             ground: vec![],
@@ -905,10 +908,10 @@ impl Scene {
             && p.key() == Ch::Kestrel
             && (p.alive || p.dying.is_some())
         {
-            let (right, up) = (self.right, self.up);
+            let (right, up, pose) = (self.right, self.up, self.cockpit_pose);
             self.head
                 .get_or_insert_with(|| crate::cockpit::Cockpit::barry(gl))
-                .draw(gl, p, g.time, eye, right, up, dir);
+                .draw(gl, p, g.time, eye, right, up, dir, pose);
         }
         vp
     }
