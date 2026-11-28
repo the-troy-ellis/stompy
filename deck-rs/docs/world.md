@@ -30,6 +30,11 @@ and the few words on screen keep the board-book voice.
 - **The ore loop** (the owner). The **digger** (a demigod, BIG SCOOPER)
   unearths ore and reveals it; the **tiny robots** harvest it and bring it
   back to the city; the temple smelts it into demigods.
+- **The builder and the buildings** (the owner). A **builder** demigod
+  puts up the buildings; the **buildings make tiny robots**. So the whole
+  loop: the digger reveals ore, the tiny robots gather it and bring it
+  home, the builder raises buildings, the buildings make more tiny robots,
+  and the temple smelts ore and salvage into demigods.
 - **Honour has a cost** (the owner). The tiny robots are the ones who
   gather the ore, so every one squished is a pair of hands fewer bringing
   it home. A careless stride through your own fields slows your city.
@@ -130,18 +135,16 @@ and dry: "Relic recovered. The faithful are pleased."
 
 ## Open
 
-1. **Where new tiny robots come from:** made at the temple (ore spent on
-   hands), or something slower (they turn up, they're found in the dead
-   cities)?
-2. **Building:** the digger reveals and the tiny robots gather; who puts
-   up buildings (the temple, new halls): the tiny robots, or a builder
-   demigod?
-3. **Which needs become systems:** power (a Spark deep in the ground,
+1. **The buildings:** what they cost (ore, brought by the tiny robots?),
+   how fast they make tiny robots, whether some kinds make more than
+   others; and stomping a building (yours, by accident; theirs, on
+   purpose) as the way to stop its robots.
+2. **Which needs become systems:** power (a Spark deep in the ground,
    beside ore), memory (relics unlock demigods), protection (the loop
    itself)? The rest stays flavour.
-4. **Worship:** flavour only (the tiny robots' view of the factory), or
+3. **Worship:** flavour only (the tiny robots' view of the factory), or
    a resource (devotion, say, as how hard the tiny robots work)?
-5. **The tiny robots' manner:** beeping, squabbling characters of their
+4. **The tiny robots' manner:** beeping, squabbling characters of their
    own, or a simple crowd?
-6. **Salvage vs ore, one temple vs many, summoning time, summoning only at
+5. **Salvage vs ore, one temple vs many, summoning time, summoning only at
    home:** the proposals above.
