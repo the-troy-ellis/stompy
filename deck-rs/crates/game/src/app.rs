@@ -3,6 +3,7 @@
 //! effects the sim asks for (sound, the cockpit voice, rumble), and the settings.
 use crate::audio::Audio;
 use crate::controls::*;
+use crate::freecam::FreeCam;
 use crate::gl::Gl;
 use crate::hud::*;
 use crate::platform::Platform;
@@ -51,6 +52,8 @@ pub struct Prefs {
     pub foes: usize,
     /// Free Play's allies on your side: any (or more than eight foes) makes it a battle.
     pub allies: usize,
+    /// Free Play's VIEW: watch the battle with a free camera instead of fighting in it.
+    pub watch: bool,
     pub cleared: u32,
 }
 impl Default for Prefs {
@@ -75,6 +78,7 @@ impl Default for Prefs {
             time: TimeOfDay::Dusk,
             foes: 3,
             allies: 0,
+            watch: false,
             cleared: 0,
         }
     }
@@ -144,6 +148,7 @@ impl Prefs {
                 "biome" => p.biome = pick(Biome::ALL, v),
                 "time" => p.time = pick(TimeOfDay::ALL, v),
                 "foes" => p.foes = clamp(v, 1., FOE_STEPS[FOE_STEPS.len() - 1] as f32) as usize,
+                "watch" => p.watch = v != 0.,
                 "allies" => {
                     p.allies = clamp(v, 0., ALLY_STEPS[ALLY_STEPS.len() - 1] as f32) as usize
                 }
@@ -160,9 +165,9 @@ impl Prefs {
         }
         let b = |v: bool| if v { 1 } else { 0 };
         let s = format!(
-            "padSens={}\nmouseSens={}\ngyroSens={}\nfov={}\nvolume={}\ninvertY={}\ngyro={}\nrumble={}\nreducedMotion={}\nhudScale={}\ndither={}\nfullscreen={}\ndiff={}\nchassis={}\nmission={}\nbiome={}\ntime={}\nfoes={}\nallies={}\ncleared={}\n",
+            "padSens={}\nmouseSens={}\ngyroSens={}\nfov={}\nvolume={}\ninvertY={}\ngyro={}\nrumble={}\nreducedMotion={}\nhudScale={}\ndither={}\nfullscreen={}\ndiff={}\nchassis={}\nmission={}\nbiome={}\ntime={}\nfoes={}\nallies={}\nwatch={}\ncleared={}\n",
             self.pad_sens, self.mouse_sens, self.gyro_sens, self.fov, self.volume, b(self.invert_y), idx(&GYROS, self.gyro), b(self.rumble), b(self.reduced_motion),
-            self.hud_scale, self.dither, b(self.fullscreen), self.diff.i(), self.chassis.i(), self.mission.map_or(-1, |m| m as i32), self.biome.i(), self.time.i(), self.foes, self.allies, self.cleared
+            self.hud_scale, self.dither, b(self.fullscreen), self.diff.i(), self.chassis.i(), self.mission.map_or(-1, |m| m as i32), self.biome.i(), self.time.i(), self.foes, self.allies, b(self.watch), self.cleared
         );
         let _ = std::fs::write(path, s);
     }
@@ -199,6 +204,8 @@ pub struct Args {
     pub watch: Option<f32>,
     /// Straight into a battle: allies, foes (tools).
     pub battle: Option<(usize, usize)>,
+    /// With `battle`: watch it with the free camera.
+    pub spectate: bool,
 }
 /// A line the cockpit voice will say, and when.
 struct Line {
@@ -211,6 +218,8 @@ pub struct App {
     gl: Gl,
     audio: Audio,
     scene: Scene,
+    /// The free camera while watching a battle.
+    cam: Option<FreeCam>,
     hud: Hud,
     g: Game,
     menu: Game,
@@ -322,17 +331,28 @@ impl App {
         self.g.reduced_motion = self.prefs.reduced_motion;
         match self.prefs.mission {
             Some(m) => start_mission(&mut self.g, m, self.prefs.chassis, self.prefs.diff, false),
-            None if self.prefs.allies > 0 || self.prefs.foes > 8 => start_battle(
-                &mut self.g,
-                self.prefs.biome,
-                self.prefs.time,
-                self.prefs.allies,
-                self.prefs.foes,
-                seed,
-                self.prefs.chassis,
-                self.prefs.diff,
-                false,
-            ),
+            None if self.prefs.watch || self.prefs.allies > 0 || self.prefs.foes > 8 => {
+                // Watching needs two sides: no allies chosen means as many as the enemies.
+                let allies = if self.prefs.watch && self.prefs.allies == 0 {
+                    self.prefs.foes
+                } else {
+                    self.prefs.allies
+                };
+                start_battle(
+                    &mut self.g,
+                    self.prefs.biome,
+                    self.prefs.time,
+                    allies,
+                    self.prefs.foes,
+                    seed,
+                    self.prefs.chassis,
+                    self.prefs.diff,
+                    false,
+                );
+                if self.prefs.watch {
+                    spectate(&mut self.g);
+                }
+            }
             None => start_free_play(
                 &mut self.g,
                 self.prefs.biome,
@@ -345,6 +365,7 @@ impl App {
                 false,
             ),
         }
+        self.cam = self.g.spectate.then(|| FreeCam::new(&self.g));
         self.screen = Screen::Play;
         self.plat.relative_mouse(true);
     }
@@ -478,10 +499,11 @@ impl App {
             }
             Screen::Free => {
                 let p = &self.prefs;
-                let battle = p.allies > 0 || p.foes > 8;
+                let battle = p.watch || p.allies > 0 || p.foes > 8;
                 let rows = [
                     ("PLACE", biome_name(p.biome).into()),
                     ("TIME", time_name(p.time).into()),
+                    ("VIEW", if p.watch { "WATCH" } else { "COCKPIT" }.into()),
                     ("ALLIES", p.allies.to_string()),
                     ("ENEMIES", p.foes.to_string()),
                     ("DIFFICULTY", diff_label(p.diff).into()),
@@ -491,15 +513,15 @@ impl App {
                     80. * s,
                     70. * s,
                     3. * s,
-                    if battle {
-                        "FREE PLAY  BATTLE"
-                    } else {
-                        "FREE PLAY"
+                    match (p.watch, battle) {
+                        (true, _) => "FREE PLAY  WATCH",
+                        (_, true) => "FREE PLAY  BATTLE",
+                        _ => "FREE PLAY",
                     },
                     DIM,
                 );
                 self.rows(&rows, 80. * s, 140. * s, s);
-                self.nav(m, 6);
+                self.nav(m, 7);
                 if d != 0. {
                     self.click();
                     let p = &mut self.prefs;
@@ -508,17 +530,22 @@ impl App {
                     match self.sel {
                         0 => p.biome = Biome::ALL[step(p.biome.i(), Biome::N)],
                         1 => p.time = TimeOfDay::ALL[step(p.time.i(), TimeOfDay::N)],
-                        2 => p.allies = step_in(&ALLY_STEPS, p.allies, d as i32),
-                        3 => p.foes = step_in(&FOE_STEPS, p.foes, d as i32),
-                        4 => p.diff = Diff::ALL[step(p.diff.i(), Diff::N)],
+                        2 => p.watch = !p.watch,
+                        3 => p.allies = step_in(&ALLY_STEPS, p.allies, d as i32),
+                        4 => p.foes = step_in(&FOE_STEPS, p.foes, d as i32),
+                        5 => p.diff = Diff::ALL[step(p.diff.i(), Diff::N)],
                         _ => {}
                     }
                 }
-                if m.accept && self.sel == 5 {
+                if m.accept && self.sel == 6 {
                     self.click();
                     self.prefs.mission = None;
-                    self.screen = Screen::Mech;
-                    self.sel = idx(&MECH_ORDER, self.prefs.chassis);
+                    if self.prefs.watch {
+                        self.start(); // nobody to pick: you are only watching
+                    } else {
+                        self.screen = Screen::Mech;
+                        self.sel = idx(&MECH_ORDER, self.prefs.chassis);
+                    }
                 }
                 if m.back {
                     (self.screen, self.sel) = (Screen::Main, 1);
@@ -792,6 +819,7 @@ impl App {
             g: Game::new(1),
             menu: Game::new(5),
             menu_ch: None,
+            cam: None,
             prefs,
             raw: Raw::default(),
             raw_was: Raw::default(),
@@ -839,6 +867,10 @@ impl App {
                     app.prefs.diff,
                     false,
                 );
+                if a.spectate {
+                    spectate(&mut app.g);
+                    app.cam = Some(FreeCam::new(&app.g));
+                }
             } else {
                 start_free_play(
                     &mut app.g,
@@ -895,7 +927,11 @@ impl App {
                     self.plat.relative_mouse(false);
                 }
                 let mut i = to_input(&self.raw, &self.prefs.controls(), dt as f32);
-                if self.demo {
+                if let Some(c) = &mut self.cam {
+                    // Watching: the controls fly the camera; the parked mech does nothing.
+                    c.fly(&self.g, &i, dt as f32);
+                    i = Input::default();
+                } else if self.demo {
                     demo_pilot(&mut self.g, &mut i);
                 }
                 if zoom_pressed(&self.raw) {
@@ -923,7 +959,10 @@ impl App {
                     self.sim_ms += (ms - self.sim_ms) * 0.1;
                 }
                 let p = self.g.p();
-                self.audio.listener(self.g.eye, p.view_yaw());
+                match &self.cam {
+                    Some(c) => self.audio.listener(c.pos, c.yaw),
+                    None => self.audio.listener(self.g.eye, p.view_yaw()),
+                }
                 if p.jet.charge > 0. && self.prefs.rumble {
                     let c = p.jet.charge;
                     self.plat.rumble(0.15 * c, 0.1, 40); // charging the jets hums in the hands
@@ -952,7 +991,12 @@ impl App {
             self.hud.begin(w, h);
             self.scene.cell = self.prefs.dither;
             if in_match {
-                let cam = self.watch.map(|from| {
+                let free = self.cam.as_ref().map(|c| Cam {
+                    eye: c.pos,
+                    at: c.pos + c.dir(),
+                    fov: self.prefs.fov * PI / 180.,
+                });
+                let cam = free.or(self.watch.map(|from| {
                     let p = self.g.p();
                     let (a, r, up) = (p.yaw + from, 24. * p.ch.scale, 5.5 * p.ch.scale);
                     let at = v3(p.x, p.y + up, p.z);
@@ -961,7 +1005,7 @@ impl App {
                         at,
                         fov: 0.8,
                     }
-                });
+                }));
                 let t_draw = self.plat.now();
                 let vp =
                     self.scene

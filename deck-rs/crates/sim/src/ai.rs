@@ -44,7 +44,7 @@ fn spot(g: &Game, id: MechId, sight: f32) -> Option<MechId> {
         .mechs
         .iter()
         .enumerate()
-        .filter(|(i, o)| *i != id && o.alive && o.team != e.team)
+        .filter(|(i, o)| *i != id && g.targetable(*i) && o.team != e.team)
         .map(|(i, o)| (hypot2(o.x - e.x, o.z - e.z), i))
         .filter(|(d, _)| *d < sight)
         .collect();
@@ -61,7 +61,7 @@ fn perceive(g: &mut Game, id: MechId) -> Option<(f32, f32)> {
     let (time, sight) = (g.time, diff(g).sight * WEATHER[g.weather.i()].radar);
     if time >= g.mechs[id].ai.look_t {
         // The target: the one it is on while it can still see it, else the nearest it can.
-        let cur = g.mechs[id].ai.target.filter(|&t| g.mechs[t].alive);
+        let cur = g.mechs[id].ai.target.filter(|&t| g.targetable(t));
         let keep = cur.filter(|&t| {
             let (e, o) = (&g.mechs[id], &g.mechs[t]);
             hypot2(o.x - e.x, o.z - e.z) < sight && !blocked(g, eye_of(e), center_of(o))
@@ -74,7 +74,7 @@ fn perceive(g: &mut Game, id: MechId) -> Option<(f32, f32)> {
                 .mechs
                 .iter()
                 .enumerate()
-                .filter(|(i, o)| *i != id && o.alive && o.team != e.team)
+                .filter(|(i, o)| *i != id && g.targetable(*i) && o.team != e.team)
                 .min_by(|a, b| {
                     hypot2(a.1.x - e.x, a.1.z - e.z).total_cmp(&hypot2(b.1.x - e.x, b.1.z - e.z))
                 })

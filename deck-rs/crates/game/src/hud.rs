@@ -504,6 +504,9 @@ pub struct HudOpts {
 }
 /// The instruments for a match in play.
 pub fn draw_hud(h: &mut Hud, gl: &mut Gl, g: &Game, vp: &M4, o: &HudOpts) {
+    if g.spectate {
+        return watch_hud(h, gl, g, o);
+    }
     let p = g.p();
     let s = (o.scale * h.h / 800.).max(0.5);
     let drop = (g.kick + g.bob.x) * 2.5 * s; // the HUD floats behind the camera's drop
@@ -610,6 +613,12 @@ pub fn draw_hud(h: &mut Hud, gl: &mut Gl, g: &Game, vp: &M4, o: &HudOpts) {
             if m.warn { AMBER } else { GREEN },
         );
     }
+    readout(h, g, o, s);
+    h.flush(gl, 1.);
+    flashes(h, gl, g, p.shutdown);
+}
+/// The debug readout (View held + Y, or F3): the frame's costs, for measuring battles.
+fn readout(h: &mut Hud, g: &Game, o: &HudOpts, s: f32) {
     if o.debug {
         let t = format!(
             "{:4.1} FPS  {} DRAWS  {} PARTS  {} SHOTS  {}",
@@ -630,8 +639,9 @@ pub fn draw_hud(h: &mut Hud, gl: &mut Gl, g: &Game, vp: &M4, o: &HudOpts) {
         );
         h.text(16. * s, 84. * s, 1.5 * s, &t, DIM);
     }
-    h.flush(gl, 1.);
-    // The flashes: a dithered sheet of red or white, never a blend; dark under a shutdown.
+}
+/// The flashes: a dithered sheet of red or white, never a blend; dark under a shutdown.
+fn flashes(h: &mut Hud, gl: &mut Gl, g: &Game, shutdown: bool) {
     let (w, hh) = (h.w, h.h);
     if g.flash > 0.01 {
         h.rect(0., 0., w, hh, RED);
@@ -641,8 +651,25 @@ pub fn draw_hud(h: &mut Hud, gl: &mut Gl, g: &Game, vp: &M4, o: &HudOpts) {
         h.rect(0., 0., w, hh, WHITE);
         h.flush(gl, clamp(g.white_flash * 0.8, 0., 0.7));
     }
-    if p.shutdown {
+    if shutdown {
         h.rect(0., 0., w, hh, BLACK);
         h.flush(gl, 0.3);
     }
+}
+/// Watching a battle: no cockpit, only the two sides, the clock, the controls and the readout.
+fn watch_hud(h: &mut Hud, gl: &mut Gl, g: &Game, o: &HudOpts) {
+    let s = (o.scale * h.h / 800.).max(0.5);
+    h.text(16. * s, 14. * s, 2. * s, "WATCH", DIM);
+    let sides = format!("YOURS {}   THEIRS {}", g.allies_left(), g.enemies_left());
+    h.text(16. * s, 32. * s, 2. * s, &sides, GREEN);
+    let clock = format!("{}:{:02}", g.time as i32 / 60, g.time as i32 % 60);
+    h.text(16. * s, 50. * s, 2. * s, &clock, DIM);
+    let keys = if o.pad {
+        "LEFT STICK FLY   RIGHT STICK LOOK   A UP   B DOWN   RT FAST   X TO THE FIGHT"
+    } else {
+        "WASD FLY   MOUSE LOOK   SPACE UP   C DOWN   LEFT CLICK FAST   R TO THE FIGHT"
+    };
+    h.text_c(h.w / 2., h.h - 28. * s, 1.6 * s, keys, DIM);
+    readout(h, g, o, s);
+    h.flush(gl, 1.);
 }

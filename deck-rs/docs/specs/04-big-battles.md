@@ -62,8 +62,14 @@ BARRY at level 2 is 9,200.
    than eight enemies, is a battle (`start_battle`). The debug readout
    (View held + Y, or F3) adds mechs alive, the sim's and the 3D drawing's
    ms a frame (CPU side) and triangles. `--battle A F` for tools runs. The
-   cockpit voice reports only your kills. The owner runs it on the Deck and
-   fills in the table below; it picks the number.
+   cockpit voice reports only your kills. **VIEW: WATCH** (the owner,
+   2026-11-28) watches the battle instead of fighting in it: a free camera
+   (`freecam.rs`, the controls in `controls.md`) that starts behind your
+   side looking at theirs; your mech is parked off the field and nobody
+   targets it (`state::spectate`), and the battle ends when either side is
+   gone (test). With no allies chosen, WATCH gives you as many as the
+   enemies. The owner runs it on the Deck and fills in the table below; it
+   picks the number.
    
    | allies + enemies | fps | sim ms | draw ms | draws | triangles |
    |---|---|---|---|---|---|

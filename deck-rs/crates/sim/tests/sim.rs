@@ -697,3 +697,36 @@ fn in_a_battle_the_cockpit_reports_only_the_players_kills() {
     destroy(&mut g, 5, Some(PLAYER)); // yours: the line
     assert_eq!(says(&g), 1);
 }
+
+#[test]
+fn watching_a_battle_nobody_targets_you_and_it_ends_when_a_side_is_gone() {
+    use stompy_sim::state::{spectate, start_battle};
+    let mut g = Game::new(5);
+    start_battle(
+        &mut g,
+        Biome::Dusk,
+        TimeOfDay::Dusk,
+        8,
+        8,
+        5,
+        Ch::Kestrel,
+        Diff::Hard,
+        true,
+    );
+    spectate(&mut g);
+    let i = Input::default();
+    let mut t = 0.;
+    while g.state == State::Play && t < 600. {
+        update(&mut g, &i, 1. / 60.);
+        g.events.clear();
+        t += 1. / 60.;
+        assert!(
+            g.mechs.iter().all(|m| m.ai.target != Some(PLAYER)),
+            "someone targets the spectator"
+        );
+    }
+    assert!(g.p().alive, "the parked mech is never hurt");
+    assert_eq!(g.state, State::Over, "the battle ended ({t} s)");
+    assert!(g.allies_left() == 0 || g.enemies_left() == 0);
+    assert_eq!(g.won, g.enemies_left() == 0);
+}

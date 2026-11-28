@@ -810,6 +810,9 @@ impl Scene {
             if m.gone {
                 continue;
             }
+            if id == PLAYER && g.spectate {
+                continue; // parked off the field while you watch
+            }
             if id == PLAYER && cam.is_none() {
                 if g.guide.is_none() && m.alive {
                     self.draw_mech(gl, g, id, true);

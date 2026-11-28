@@ -44,6 +44,7 @@ impl Game {
             bob_in: Spring::new(BOB_K, BOB_ZETA),
             zoom: false,
             reduced_motion: false,
+            spectate: false,
             guide: None,
             m_down: false,
             m_at: 0.,
@@ -415,4 +416,14 @@ pub fn start_battle(
             }
         }
     }
+}
+/// Watching instead of playing (Free Play's WATCH): the player's mech is parked in a far corner,
+/// out of the fight and out of everyone's sights, and the match ends when either side is gone.
+pub fn spectate(g: &mut Game) {
+    g.spectate = true;
+    let (x, z) = (g.ter.bx - 20., -g.ter.bz + 20.);
+    let y = g.ter.height(x, z);
+    let p = g.pm();
+    (p.x, p.y, p.z) = (x, y, z);
+    gait::init_feet(&g.ter, &mut g.mechs[PLAYER]);
 }

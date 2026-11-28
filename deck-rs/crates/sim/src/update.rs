@@ -40,7 +40,21 @@ fn apart(g: &mut Game) {
 }
 /// ELIMINATE: the match is won when no enemy is left.
 fn tick_objectives(g: &mut Game) {
-    if g.state != State::Play || g.enemies_left() > 0 {
+    if g.state != State::Play {
+        return;
+    }
+    if g.spectate {
+        // Watching: over when either side is gone; "won" if yours is the one standing.
+        let (yours, theirs) = (g.allies_left(), g.enemies_left());
+        if yours > 0 && theirs > 0 {
+            return;
+        }
+        g.won = theirs == 0;
+        g.state = State::Over;
+        g.end_t = 3.2;
+        return;
+    }
+    if g.enemies_left() > 0 {
         return;
     }
     g.won = true;

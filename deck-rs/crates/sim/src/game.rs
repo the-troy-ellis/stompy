@@ -536,6 +536,9 @@ pub struct Game {
     pub bob_in: Spring,
     pub zoom: bool,
     pub reduced_motion: bool,
+    /// Watching, not playing: the player's mech is parked off the field, nobody targets it, and
+    /// the match ends when either side is gone (`state::spectate`).
+    pub spectate: bool,
     pub guide: Option<Guide>,
     pub m_down: bool,
     pub m_at: f32,
@@ -605,5 +608,17 @@ impl Game {
     }
     pub fn enemies_left(&self) -> usize {
         self.mechs.iter().filter(|m| m.team != 0 && m.alive).count()
+    }
+    /// The player's side still standing, the player's own mech not counted.
+    pub fn allies_left(&self) -> usize {
+        self.mechs
+            .iter()
+            .enumerate()
+            .filter(|(i, m)| *i != PLAYER && m.team == 0 && m.alive)
+            .count()
+    }
+    /// Whether an AI may take this mech as its target (a parked spectator's is out of it).
+    pub fn targetable(&self, id: MechId) -> bool {
+        self.mechs[id].alive && !(self.spectate && id == PLAYER)
     }
 }

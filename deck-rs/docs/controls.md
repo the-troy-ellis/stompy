@@ -29,6 +29,21 @@ here is in `crates/game/src/controls.rs` (pure, with unit tests) and
 Menus: D-pad or the left stick moves, A picks, B goes back, left and right
 change a value.
 
+### Watching a battle (Free Play, VIEW: WATCH)
+
+| Pad | Keys and mouse | |
+|---|---|---|
+| Left stick | W A S D | Fly. |
+| Right stick, or the gyro | The mouse | Look. |
+| A | Space | Rise. |
+| B | C | Sink. |
+| RT held | Left button held | Fly four times as fast. |
+| X | R | Jump to the fighting: behind your side, looking at theirs. |
+| Start, View | Esc | Pause. |
+
+Your own mech is parked off the field and nobody targets it; the battle ends
+when either side is gone.
+
 ### Why the throttle holds
 
 A mech sim's throttle is a setting, not a pedal: you set a speed and your
