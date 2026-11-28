@@ -134,7 +134,22 @@ pub fn step_mech(g: &mut Game, id: MechId, dt: f32) {
     } else {
         m.speed
     };
-    let keep = (1. - PUSH_DECAY * dt).max(0.);
+    // Skidding after a throw, the feet slide with it (the one time they do: the owner's call).
+    if m.skid > 0. && !m.air {
+        let (dx, dz) = (m.x - x0, m.z - z0);
+        for f in m.feet.iter_mut().take(m.geo.n_legs) {
+            f.pos.x += dx;
+            f.pos.z += dz;
+            f.from.x += dx;
+            f.from.z += dz;
+        }
+        m.skid -= dt;
+        if hypot2(m.push[0], m.push[1]) < 1. {
+            m.skid = 0.;
+        }
+    }
+    // The ground drags the shove down; the air hardly does.
+    let keep = (1. - if m.air { AIR_DECAY } else { PUSH_DECAY } * dt).max(0.);
     m.push[0] *= keep;
     m.push[1] *= keep;
     let skid = hypot2(m.push[0], m.push[1]);
@@ -176,8 +191,28 @@ pub fn step_mech(g: &mut Game, id: MechId, dt: f32) {
         }
     }
     let m = &g.mechs[id];
-    if m.vy <= 0. && m.y - ground < 1.2 {
-        if m.air {
+    // Thrown, it comes down only when it meets the ground (no snapping to it from above).
+    let landing = if m.thrown {
+        m.vy <= 0. && m.y <= ground + 0.05
+    } else {
+        m.vy <= 0. && m.y - ground < 1.2
+    };
+    if m.thrown && landing {
+        // A throw's landing: the skid starts, and the feet sit where it comes down.
+        let Game { ter, mechs, .. } = g;
+        let m = &mut mechs[id];
+        (m.thrown, m.skid) = (false, SKID_MAX);
+        for f in m.feet.iter_mut().take(m.geo.n_legs) {
+            f.pos.y = ter.height(f.pos.x, f.pos.z);
+            f.lifted = false;
+        }
+    }
+    let m = &g.mechs[id];
+    if landing {
+        if m.air && m.down.is_some() {
+            // Knocked down, the slam is the landing (down.rs).
+            g.mechs[id].air_t = 0.;
+        } else if m.air {
             let force = clamp(-m.vy / 20., 0.25, 1.);
             let at = m.pos();
             g.mechs[id].air_t = 0.;
@@ -210,7 +245,7 @@ pub fn step_mech(g: &mut Game, id: MechId, dt: f32) {
         m.y = ground;
         m.vy = 0.;
         m.air = false;
-    } else if m.y > ground + 1.2 {
+    } else if m.y > ground + 1.2 || m.thrown {
         g.mechs[id].air = true;
     }
     let m = &mut g.mechs[id];

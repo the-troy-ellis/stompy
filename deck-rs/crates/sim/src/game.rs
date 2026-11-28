@@ -373,6 +373,11 @@ pub struct Mech {
     pub flail: Option<Flail>,
     /// Seconds left staggering from a wrecking ball: legs buckled, no walking, slow turns.
     pub stagger: f32,
+    /// Thrown off its feet by a wrecking ball: in the air until it meets the ground itself (not
+    /// the terrain-following snap), then a skid.
+    pub thrown: bool,
+    /// Seconds left skidding: its feet slide with it, scraping, until the shove dies down.
+    pub skid: f32,
     pub last_arm: Sec,
     pub last_hit: Option<HitBy>,
     pub jet: JetState,

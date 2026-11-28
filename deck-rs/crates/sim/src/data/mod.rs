@@ -769,6 +769,13 @@ pub const GETUP_SAG: f32 = 0.6;
 /// moment (m/s by scale, seconds of stagger).
 pub const STUMBLE: f32 = 4.;
 pub const STUMBLE_STAGGER: f32 = 0.6;
+/// A wrecking ball throws what it hits off the ground (the owner, 2026-11-28: lifted a bit in
+/// the air, sliding a bit when it lands): the lift (m/s up) for the lightest and the heaviest by
+/// the blow's mass ratio, how much of the shove the air keeps (its decay a second, against the
+/// ground's), and the longest the landing's skid lasts.
+pub const THROW_LIFT: [f32; 2] = [5., 9.];
+pub const AIR_DECAY: f32 = 0.5;
+pub const SKID_MAX: f32 = 1.2;
 /// While staggered: the share of the turn rate left, and how far the hips sag (metres, by scale).
 pub const STAGGER_TURN: f32 = 0.3;
 pub const STAGGER_SAG: f32 = 0.6;

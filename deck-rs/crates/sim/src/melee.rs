@@ -243,10 +243,20 @@ fn wreck(g: &mut Game, id: MechId, t: MechId, at: V3, dir: V3, c: &ChainDef) {
     g.mechs[t].last_hit = Some(HitBy::Punch);
     damage(g, t, at, def.dmg, Some(id), false, true);
     let v = knock(g, t, Some(id), def.knock, [nx, nz], true);
+    let ratio = (v / def.knock.max(1.)).clamp(KNOCK_MIN, KNOCK_MAX);
     g.mechs[id].heat += def.heat;
     g.mechs[t].stagger = g.mechs[t].stagger.max(c.stagger);
     // Two legs go over; SLOWPOKE's four take it and stand.
     crate::down::knock_down(g, t, [nx, nz]);
+    // And it's thrown off the ground: higher the lighter it is next to the thrower.
+    let u = ((ratio - KNOCK_MIN) / (KNOCK_MAX - KNOCK_MIN)).clamp(0., 1.);
+    let tm = &mut g.mechs[t];
+    if tm.alive && !tm.air {
+        tm.vy = tm
+            .vy
+            .max(THROW_LIFT[0] + (THROW_LIFT[1] - THROW_LIFT[0]) * u);
+        (tm.air, tm.thrown, tm.air_t) = (true, true, 0.);
+    }
     let side = sign(nx * tyaw.cos() - nz * tyaw.sin());
     let side = if side == 0. { 1. } else { side };
     feel(

@@ -69,9 +69,18 @@ tiny robots under it.
 
 - `sim/down.rs`. A wrecking ball that lands knocks down any two-legged mech
   on the ground (`can_fall`); SLOWPOKE takes the stagger and stands.
-- **Falling** (0.6 s): the blow turns it as it goes, so it always lands on
+- **Thrown** (the owner, 2026-11-28: "the mech should be lifted a bit in the
+  air and slide a bit when it hits the ground"). A wrecking ball throws what
+  it hits off the ground: 5 to 9 m/s up by the blow's mass ratio (a
+  SKEDADDLE highest, SLOWPOKE a hop), the shove carrying it back, the air
+  hardly slowing it (`THROW_LIFT`, `AIR_DECAY`). The legs hang under it in
+  the air. It comes down when it meets the ground (not the usual snap to it
+  from 1.2 m), and skids: its feet slide with it, scraping dust, until the
+  shove dies down (`SKID_MAX`), then plant. SLOWPOKE lands on its feet and
+  skids; a mech going over lands on its back and slides.
+- **Falling** (0.6 s, in the air when thrown): the blow turns it as it goes, so it always lands on
   its back; the knees go first, then it tips back faster and faster, the
-  legs shooting out and the arms flung; then the slam (the `knocked` row: an eye drop 1.6, the view
+  legs shooting out and the arms flung; then, when it meets the ground, the slam (the `knocked` row: an eye drop 1.6, the view
   shaken, a deep thump, 280 ms of rumble, dust; a landing and a clang).
 - **Lying**: no walking, turning, aiming, punching, jets or guns; for the
   player only A does anything. Each press (a hold counts once) heaves it an

@@ -257,6 +257,8 @@ pub fn new_mech(g: &mut Game, ch: Ch, team: u8, x: f32, z: f32, yaw: f32) -> Opt
         melee_cd: 0.,
         flail: None,
         stagger: 0.,
+        thrown: false,
+        skid: 0.,
         last_arm: Sec::RA,
         last_hit: None,
         jet: JetState::default(),

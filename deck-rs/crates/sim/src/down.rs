@@ -100,7 +100,8 @@ pub fn down_tick(g: &mut Game, id: MechId, dt: f32) {
             d.pose.angle = u * u * DOWN_ANGLE;
             d.pose.buckle = d.buckle;
             d.pose.drop = d.buckle * DOWN_DROP * hip * sc;
-            if u >= 1. {
+            // Thrown, it goes over in the air and the slam waits for the ground.
+            if u >= 1. && !g.mechs[id].air {
                 d.phase = DownPhase::Lying;
                 g.mechs[id].down = Some(d);
                 slam(g, id);

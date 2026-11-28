@@ -974,7 +974,8 @@ fn a_wrecking_ball_knocks_two_legs_down_and_slowpoke_stands() {
 #[test]
 fn down_you_are_disabled_and_stay_down_without_mashing() {
     let mut g = wrecked_player(Ch::Kestrel);
-    steps(&mut g, &input(), 60);
+    // Thrown, landed, slid to a stop.
+    steps(&mut g, &input(), 150);
     let (x, z, yaw) = (g.p().x, g.p().z, g.p().yaw);
     let mut i = input();
     (i.thr, i.turn, i.energy, i.ballistic, i.missile) = (1., 1., true, true, true);
@@ -1058,4 +1059,71 @@ fn a_knocked_down_ai_mashes_itself_up() {
         }
     }
     assert!(up.is_some(), "it gets itself up");
+}
+#[test]
+fn a_wrecking_ball_throws_you_off_the_ground_and_you_land_and_slide() {
+    let mut g = wrecked_player(Ch::Kestrel);
+    let (ground, x0, z0) = (g.p().y, g.p().x, g.p().z);
+    let (mut peak, mut landed_at, mut slammed_in_air) = (0f32, None, false);
+    for f in 0..240 {
+        update(&mut g, &input(), DT);
+        let p = g.p();
+        peak = peak.max(p.y - ground);
+        if p.air && p.down.is_some_and(|d| d.phase == DownPhase::Lying) {
+            slammed_in_air = true;
+        }
+        if landed_at.is_none() && !p.air && f > 2 {
+            landed_at = Some((f, p.x, p.z));
+        }
+    }
+    assert!(peak > 1., "lifted off the ground: {peak} m");
+    assert!(!slammed_in_air, "the slam waits for the ground");
+    let (f, lx, lz) = landed_at.expect("it lands");
+    assert!(f > 20, "a flight, not a hop: landed at frame {f}");
+    assert!(hypot2(lx - x0, lz - z0) > 2., "thrown back");
+    let p = g.p();
+    assert!(hypot2(p.x - lx, p.z - lz) > 1., "and slides on");
+    assert!(!p.thrown && p.skid <= 0. && p.down.is_some());
+}
+#[test]
+fn slowpoke_is_lifted_less_lands_on_its_feet_and_its_feet_slide_with_it() {
+    let barry_peak = {
+        let mut g = wrecked_player(Ch::Kestrel);
+        let ground = g.p().y;
+        let mut peak = 0f32;
+        for _ in 0..120 {
+            update(&mut g, &input(), DT);
+            peak = peak.max(g.p().y - ground);
+        }
+        peak
+    };
+    let mut g = wrecked_player(Ch::Warden);
+    let ground = g.p().y;
+    let mut peak = 0f32;
+    let mut skidding = None;
+    for _ in 0..120 {
+        update(&mut g, &input(), DT);
+        let p = g.p();
+        peak = peak.max(p.y - ground);
+        if p.skid > 0. && skidding.is_none() {
+            skidding = Some((p.x, p.z, p.feet[0].pos));
+        }
+    }
+    assert!(
+        peak > 0.3 && peak < barry_peak,
+        "a hop: {peak} m to BARRY's {barry_peak}"
+    );
+    assert!(g.p().down.is_none(), "on its feet");
+    let (x, z, f) = skidding.expect("it skids on landing");
+    // The skid carried the feet as far as the body.
+    let p = g.p();
+    let (body, foot) = (
+        hypot2(p.x - x, p.z - z),
+        hypot2(p.feet[0].pos.x - f.x, p.feet[0].pos.z - f.z),
+    );
+    assert!(body > 0.5, "it slid: {body} m");
+    assert!(
+        foot > body * 0.5,
+        "its feet slid with it: {foot} m to {body} m"
+    );
 }
