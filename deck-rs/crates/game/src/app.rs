@@ -178,7 +178,7 @@ pub struct Args {
     /// The models' detail for this run (the tools): 0 boxes, 1, 2.
     pub detail: Option<u8>,
     /// A camera outside, three-quarters on, following the player's mech (tools).
-    pub watch: bool,
+    pub watch: Option<f32>,
 }
 /// A line the cockpit voice will say, and when.
 struct Line {
@@ -210,7 +210,7 @@ pub struct App {
     demo: bool,
     shot: Option<(u64, String)>,
     record: Option<(u64, u64, String)>,
-    watch: bool,
+    watch: Option<f32>,
     frame: u64,
     quit: bool,
     tool_run: bool,
@@ -884,9 +884,9 @@ impl App {
             self.hud.begin(w, h);
             self.scene.cell = self.prefs.dither;
             if in_match {
-                let cam = self.watch.then(|| {
+                let cam = self.watch.map(|from| {
                     let p = self.g.p();
-                    let (a, r, up) = (p.yaw + 1.1, 24. * p.ch.scale, 5.5 * p.ch.scale);
+                    let (a, r, up) = (p.yaw + from, 24. * p.ch.scale, 5.5 * p.ch.scale);
                     let at = v3(p.x, p.y + up, p.z);
                     Cam {
                         eye: at + v3(a.sin() * r, 2.5, a.cos() * r),

@@ -329,6 +329,10 @@ pub struct MechParts {
     pub barrel: Option<Mesh>,
     pub fist: Option<Mesh>,
     pub wreck: Mesh,
+    /// Pieces that move on their own (`anim.rs`), and whether the pistons are drawn live.
+    pub pods: Option<Mesh>,
+    pub antenna: Option<Mesh>,
+    pub pistons: bool,
 }
 fn t(x: f32, y: f32, z: f32) -> M4 {
     M4::t(x, y, z)
@@ -374,6 +378,10 @@ pub fn build_mech_parts(gl: &Gl, ch: Ch, detail: u8) -> MechParts {
         if let Some(old) = p.barrel.replace(b.upload(gl)) {
             gl.free(old);
         }
+        let (mut pods, mut ant) = (d.pods, d.antenna);
+        p.pods = Some(pods.upload(gl));
+        p.antenna = Some(ant.upload(gl));
+        p.pistons = true;
     }
     p
 }
@@ -619,11 +627,15 @@ fn build_box_parts(gl: &Gl, ch: Ch) -> MechParts {
         barrel,
         fist,
         wreck,
+        pods: None,
+        antenna: None,
+        pistons: false,
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Fx {
+    Rod,
     Puff,
     DustPuff,
     Shard,
@@ -640,7 +652,8 @@ pub enum Fx {
     Beam,
     Disc,
 }
-pub const FX_ALL: [Fx; 15] = [
+pub const FX_ALL: [Fx; 16] = [
+    Fx::Rod,
     Fx::Puff,
     Fx::DustPuff,
     Fx::Shard,
@@ -662,6 +675,8 @@ pub fn build_effect(gl: &Gl, k: Fx) -> Mesh {
     let mut b = Builder::default();
     let o = Some(V3::ZERO);
     match k {
+        // A unit rod (radius 0.5, -0.5..0.5 along y): the live pistons.
+        Fx::Rod => b.cyl(M4::ID, W, 12, 1.),
         // Smoke: a soft lump of faces, more round than not.
         Fx::Puff => b.lump(M4::ID, W, 1, 0.22, 1.),
         // Dust: the same, squashed down onto the ground.

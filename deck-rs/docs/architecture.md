@@ -103,6 +103,8 @@ ELIMINATE is implemented.
 | `controls.rs` | `Raw` → `Input` and the menus' presses. Pure, with unit tests. The Deck layout is at its top. |
 | `audio.rs` | The synthesiser in SDL's audio callback: oscillator and filtered-noise voices for the one-shots (the reference's recipes), the sub-bass thump through a soft clipper, the loops (hum, jets, servo, beam, sizzle, fusion scan) on a bus that ducks under impacts. No samples yet. |
 | `gl.rs` | One shader through glow: a colour per vertex, one light, the palette's sky and fog, the ordered 4 by 4 dither that is the look (the ground, sky and fog onto the place's ramp; a mech's light in fifths; fog and fades by pixel), a 2D mode for the HUD. Meshes, instancing, screenshots. |
+| `models.rs` | Detailed models built on the box models' joints (BARRY so far), and the live pistons' anchors. |
+| `anim.rs` | Drawn-only motion with a profile per chassis: arm swing and lag, foot roll, live pistons, the antenna's whip, the pods' bounce, recoil. Springs carried frame to frame. |
 | `look.rs` | The look's table: a ramp of nine colours for each place at each time of day, and the tone range that spreads a place over it. |
 | `mesh.rs` | The builder (cube, cylinder, sphere, tri), every chassis's parts ported from the reference's `mesh/mechParts.js`, the effect shapes, the terrain in 16 chunks, the sky dome, the wrecks. |
 | `scene.rs` | The cockpit camera (kick, bob, shake, wobble, heat sway, squash, sag, the fall; the volley's nose camera), the world, each mech posed from its planted feet by IK, the cockpit's own arms, debris, wrecks, shots, beams, particles instanced by shape, shockwaves dithered away, the jets' landing ring. |

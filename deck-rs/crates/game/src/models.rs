@@ -25,15 +25,6 @@ fn drum(b: &mut Builder, at: V3, d: f32, len: f32, n: usize, col: [f32; 3], cap:
         b.rod(e, e + x * (0.12 * s), d * 0.6, n, cap);
     }
 }
-/// A hydraulic: a fat cylinder for the first part of the way, a thin rod for the rest.
-fn piston(b: &mut Builder, a: V3, z: V3, d: f32, n: usize, col: [f32; 3]) {
-    let mid = a + (z - a) * 0.55;
-    b.rod(a, mid, d, n, col);
-    b.rod(mid, z, d * 0.5, n, STEEL);
-    for e in [a, z] {
-        b.sphere(t(e.x, e.y, e.z) * M4::s1(d * 1.1), col, n.min(8), 4);
-    }
-}
 /// Slats across a vent: `k` thin bars in a frame.
 fn vent(b: &mut Builder, m: M4, w: f32, h: f32, k: usize, col: [f32; 3]) {
     b.bbox(m, v3(w, h, 0.08), 0.03, 1., mulc(col, 0.6));
@@ -57,13 +48,40 @@ pub struct Parts {
     pub torso: Builder,
     pub arm: Builder,
     pub barrel: Builder,
+    /// The shoulder pods, in the torso's frame, drawn on their hinge.
+    pub pods: Builder,
+    /// The antenna, standing at its own origin; drawn at its socket.
+    pub antenna: Builder,
 }
+/// A piston drawn live between two parts: `from` in the upper part's frame, `to` in the
+/// lower's, a fat cylinder `fat` long from `from`, a rod the rest of the way.
+pub struct Piston {
+    pub from: [f32; 3],
+    pub to: [f32; 3],
+    pub d: f32,
+    pub fat: f32,
+}
+/// BARRY's: the knee (thigh to shin, behind) and the ankle (shin to heel).
+pub const KNEE: Piston = Piston {
+    from: [0., -0.5, -0.62],
+    to: [0., -0.7, -0.58],
+    d: 0.27,
+    fat: 1.15,
+};
+pub const ANKLE: Piston = Piston {
+    from: [0., -1.15, -0.62],
+    to: [0., -0.02, -0.55],
+    d: 0.22,
+    fat: 0.7,
+};
 impl Parts {
     /// Triangles drawn for one whole mech: one hip and torso, two of everything else.
     #[cfg(test)]
     pub fn tris(&self) -> usize {
         self.hip.tris()
             + self.torso.tris()
+            + self.pods.tris()
+            + self.antenna.tris()
             + 2 * [&self.uleg, &self.lleg, &self.foot, &self.arm, &self.barrel]
                 .iter()
                 .map(|b| b.tris())
@@ -153,14 +171,8 @@ pub fn barry(level: u8) -> Parts {
         0.8,
         col,
     );
-    piston(
-        &mut uleg,
-        v3(0., -0.45, -0.62 * w),
-        v3(0., -l1 + 0.45, -0.6 * w),
-        0.26,
-        n,
-        dark,
-    );
+    // The knee piston is drawn live (`PISTONS`); here, the lug it hangs from.
+    uleg.bbox(t(0., -0.5, -0.6 * w), v3(0.36, 0.36, 0.3), 0.06, 1., dark);
     if hi {
         for s in [1., -1.] {
             uleg.bbox(
@@ -199,14 +211,9 @@ pub fn barry(level: u8) -> Parts {
         0.9,
         col,
     );
-    piston(
-        &mut lleg,
-        v3(0., -0.35, -0.68 * w),
-        v3(0., -l2 + 0.55, -0.6 * w),
-        0.24,
-        n,
-        dark,
-    );
+    // Lugs for the knee piston's lower end and the ankle piston's upper end.
+    lleg.bbox(t(0., -0.7, -0.56 * w), v3(0.34, 0.34, 0.3), 0.06, 1., dark);
+    lleg.bbox(t(0., -1.15, -0.6 * w), v3(0.32, 0.32, 0.3), 0.06, 1., dark);
     lleg.sphere(t(0., -l2, -0.05) * M4::s1(1.0 * w), dark, n, n / 2);
     if hi {
         vent(
@@ -251,6 +258,8 @@ pub fn barry(level: u8) -> Parts {
         0.8,
         dark,
     );
+    // The ankle piston's heel lug.
+    foot.bbox(t(0., -0.02, -0.52), v3(0.3, 0.3, 0.3), 0.06, 1., dark);
 
     // The torso: a bevelled hull, chest plates, a waist ring, the dome, the canopy, the pods.
     let mut torso = Builder::default();
@@ -283,14 +292,16 @@ pub fn barry(level: u8) -> Parts {
         1.,
         dark,
     );
+    // The pods ride on their own hinge, so they can bounce (anim.rs).
+    let mut pods = Builder::default();
     for s in [1., -1.] {
         let pod = t(s * 1.75, 3.0, -0.1);
-        torso.bbox(pod, v3(1.25, 1.25, 1.45), 0.12, 1., acc);
+        pods.bbox(pod, v3(1.25, 1.25, 1.45), 0.12, 1., acc);
         for i in 0..3 {
             for j in 0..3 {
                 let (x, y) = ((i as f32 - 1.) * 0.34, (j as f32 - 1.) * 0.34);
                 let at = pod.apply(v3(x, y, 0.7));
-                torso.rod(
+                pods.rod(
                     at - v3(0., 0., 0.1),
                     at + v3(0., 0., 0.04),
                     0.22,
@@ -300,8 +311,8 @@ pub fn barry(level: u8) -> Parts {
             }
         }
         if hi {
-            torso.bbox(pod * t(s * 0.66, 0., 0.), v3(0.1, 1.0, 1.2), 0.03, 1., dark);
-            torso.bbox(pod * t(0., 0.66, -0.2), v3(1.0, 0.1, 0.9), 0.03, 1., dark);
+            pods.bbox(pod * t(s * 0.66, 0., 0.), v3(0.1, 1.0, 1.2), 0.03, 1., dark);
+            pods.bbox(pod * t(0., 0.66, -0.2), v3(1.0, 0.1, 0.9), 0.03, 1., dark);
         }
     }
     torso.bbox(t(0., 1.0, -1.38), v3(2.0, 1.6, 0.5), 0.12, 1., dark);
@@ -313,7 +324,10 @@ pub fn barry(level: u8) -> Parts {
         if hi { 6 } else { 4 },
         dark,
     );
-    torso.rod(v3(-0.6, 3.1, -0.4), v3(-0.62, 4.5, -0.55), 0.05, 6, dark);
+    // The antenna is its own piece, so it can whip (anim.rs); its socket stays.
+    torso.rod(v3(-0.6, 3.0, -0.4), v3(-0.6, 3.18, -0.4), 0.2, 8, dark);
+    let mut antenna = Builder::default();
+    antenna.rod(V3::ZERO, v3(-0.02, 1.4, -0.15), 0.05, 6, dark);
     if hi {
         for s in [1., -1.] {
             torso.rod(
@@ -331,7 +345,7 @@ pub fn barry(level: u8) -> Parts {
                 col,
             );
         }
-        torso.sphere(t(-0.62, 4.5, -0.55) * M4::s1(0.14), [1., 0.3, 0.2], 6, 3);
+        antenna.sphere(t(-0.02, 1.4, -0.15) * M4::s1(0.14), [1., 0.3, 0.2], 6, 3);
         torso.bbox(t(0., 2.6, 0.95), v3(1.5, 0.12, 0.3), 0.03, 1., dark);
     }
 
@@ -372,6 +386,8 @@ pub fn barry(level: u8) -> Parts {
         torso,
         arm,
         barrel,
+        pods,
+        antenna,
     }
 }
 

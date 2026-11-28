@@ -4,7 +4,8 @@
 //!   --free               straight into Free Play; --seed N its seed
 //!   --shot N file.ppm    save frame N and exit; --skip S runs the sim S seconds first;
 //!   --demo               the mech flies itself; --debug the readout; --screen NAME and --mech N open a menu;
-//!   --watch              a camera outside, following your own mech (clips of it walking)
+//!   --watch              a camera outside, following your own mech (clips of it walking);
+//!   --watch-from A       the same from A radians round from its nose (0 in front, 3.1 behind)
 //!   --record N K dir     save frames N to N+K-1 as dir/0000.ppm and on, then exit (clips)
 //!   --dither N           the dither's cell for this run (0 off, 1, 2, 3); --detail N the models' (0 boxes, 1, 2)
 //! The last five are for the tools (tools/shot.sh): screenshots on a box with no display.
@@ -14,6 +15,7 @@
     clippy::too_many_arguments,
     clippy::neg_cmp_op_on_partial_ord
 )]
+mod anim;
 mod app;
 mod audio;
 mod controls;
@@ -44,7 +46,7 @@ fn main() {
         dither: None,
         detail: None,
         record: None,
-        watch: false,
+        watch: None,
     };
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut it = args.iter();
@@ -55,7 +57,8 @@ fn main() {
             "--fullscreen" => a.fullscreen = Some(true),
             "--free" => a.free = true,
             "--demo" => a.demo = true,
-            "--watch" => a.watch = true,
+            "--watch" => a.watch = Some(1.1),
+            "--watch-from" => a.watch = Some(num(it.next()) as f32),
             "--debug" => a.debug = true,
             "--dither" => a.dither = Some(num(it.next()) as u32),
             "--detail" => a.detail = Some(num(it.next()) as u8),

@@ -1,6 +1,7 @@
 //! The 3D view: the sky, the ground, every mech posed from its planted feet,
 //! the shots, beams, debris, wrecks and effects, and the cockpit camera with
 //! its kick, bob, shake, wobble and heat sway.
+use crate::anim::{self, Anim};
 use crate::gl::{Gl, Mesh, Mode};
 use crate::mesh::*;
 use stompy_sim::data::*;
@@ -25,6 +26,8 @@ pub struct Scene {
     pub cell: u32,
     /// Model detail: 0 the boxes, 1 or 2 the detailed models where there are some.
     pub detail: u8,
+    /// Each mech's drawn-only motion (`anim.rs`), by index.
+    anims: Vec<Option<Anim>>,
 }
 /// A fixed camera instead of the cockpit (the menu's turntable).
 pub struct Cam {
@@ -70,6 +73,43 @@ fn dissolve(glow: f32, solid: f32) -> f32 {
     let k = (solid.clamp(0., 1.) * 16.).round();
     glow.min(0.999) + if k >= 16. { 0. } else { 2. * k.max(1.) }
 }
+/// A unit rod (`Fx::Rod`) laid from `a` to `b`, `d` across.
+fn rod_mat(a: V3, b: V3, d: f32) -> M4 {
+    let ax = b - a;
+    let y = ax.norm();
+    let up = if y.y.abs() < 0.9 {
+        v3(0., 1., 0.)
+    } else {
+        v3(1., 0., 0.)
+    };
+    let x = y.cross(up).norm();
+    let z = x.cross(y).norm();
+    let m = (a + b) * 0.5;
+    M4([
+        x.x * d,
+        x.y * d,
+        x.z * d,
+        0.,
+        ax.x,
+        ax.y,
+        ax.z,
+        0.,
+        z.x * d,
+        z.y * d,
+        z.z * d,
+        0.,
+        m.x,
+        m.y,
+        m.z,
+        1.,
+    ])
+}
+/// What a shot kicked back: a gun on one side, or the pods.
+#[derive(Clone, Copy, PartialEq)]
+enum Kicked {
+    Arm(f32),
+    Pods,
+}
 fn inst_mat(p: V3, yaw: f32, tumble: f32, size: f32) -> M4 {
     M4::t(p.x, p.y, p.z) * M4::ry(yaw) * M4::rx(tumble) * M4::s1(size)
 }
@@ -87,6 +127,7 @@ impl Scene {
             jitter: 0.,
             cell: 2,
             detail: 2,
+            anims: vec![],
         }
     }
     fn parts(&mut self, gl: &Gl, ch: Ch) -> &MechParts {
@@ -149,10 +190,66 @@ impl Scene {
             * M4::t(0., 0., lunge)
             * M4::rx(m.wob_p.x - lean + m.torso_nod + m.run_lean)
             * M4::rz(m.wob_r.x);
+        // The drawn-only motion: springs moved on, then read below.
+        let prof = if self.detail > 0 && m.dying.is_none() {
+            anim::profile(m.key())
+        } else {
+            None
+        };
+        if let Some(pr) = prof {
+            if self.anims.len() < g.mechs.len() {
+                self.anims.resize_with(g.mechs.len(), || None);
+            }
+            self.anims[id]
+                .get_or_insert_with(|| Anim::new(pr, g.time))
+                .tick(pr, m, g.time, &tb);
+        }
+        let an = prof.zip(self.anims.get(id).and_then(|a| a.as_ref()));
+        // Which gun the last shot kicked, and how far back it sits now.
+        let age = g.frame.saturating_sub(m.flash.frame);
+        let kicked = match an {
+            Some((pr, _)) if m.flash.frame > 0 && age < 20 => {
+                let k = anim::kick(pr, age, m.flash.big);
+                let at = |v: V3| (tb.apply(v) - m.flash.p).len();
+                let (ax, ay) = (geo.arm_x, geo.arm_y - 1.2);
+                let pods = at(v3(1.25, geo.rack_y, 0.6)).min(at(v3(-1.25, geo.rack_y, 0.6)));
+                let (l, r) = (at(v3(ax, ay, 2.4)), at(v3(-ax, ay, 2.4)));
+                let which = if pods < l.min(r) {
+                    Kicked::Pods
+                } else if l < r {
+                    Kicked::Arm(1.)
+                } else {
+                    Kicked::Arm(-1.)
+                };
+                Some((which, k))
+            }
+            _ => None,
+        };
+        let kick_of = |w: Kicked| kicked.filter(|k| k.0 == w).map_or(0., |k| k.1);
         let p = self.parts[m.key().i()].as_ref().unwrap();
         if !arms_only {
             gl.draw_plain(&p.hip, &(base * M4::t(0., geo.hip, 0.) * M4::ry(m.hip_yaw)));
             gl.draw_plain(&p.torso, &tb);
+            if let Some(pods) = &p.pods {
+                let (drop, h) = match an {
+                    Some((pr, a)) => (a.pod.x, pr.pod_hinge),
+                    None => (0., [0.; 3]),
+                };
+                let back = kick_of(Kicked::Pods);
+                gl.draw_plain(
+                    pods,
+                    &(tb * M4::t(h[0], h[1] + drop, h[2] - back * 0.5)
+                        * M4::rx(-drop * 1.2 - back * 0.5)
+                        * M4::t(-h[0], -h[1], -h[2])),
+                );
+            }
+            if let (Some(ant), Some((pr, a))) = (&p.antenna, an) {
+                let b = pr.ant_base;
+                gl.draw_plain(
+                    ant,
+                    &(tb * M4::t(b[0], b[1], b[2]) * M4::rx(a.ant_x.x) * M4::rz(a.ant_z.x)),
+                );
+            }
         }
         for (side, sec) in [(1., Sec::LA), (-1., Sec::RA)] {
             if m.hp[sec.i()] <= 0. && m.dying.is_none() {
@@ -160,25 +257,43 @@ impl Scene {
             }
             let swinging = m.melee.is_some_and(|s| s.arm.is_none_or(|a| a == sec));
             let sw = if swinging { arm_swing } else { 0. };
+            let back = kick_of(Kicked::Arm(side));
             let a = if arms_only {
                 // The cockpit's own arms: drawn in and forward of the eye.
                 tb * M4::t(side * 2.4, geo.eye[1] - 0.9, geo.eye[2] + 1.9)
                     * M4::rx(-1.25 - m.pitch * 0.5 + sw)
                     * M4::s1(0.55)
             } else {
-                tb * M4::t(side * geo.arm_x, geo.arm_y, 0.) * M4::rx(-m.pitch + sw)
+                let (swing, lag) = match an {
+                    Some((pr, a)) => (anim::arm_swing(pr, m, side), a.lag.x),
+                    None => (0., 0.),
+                };
+                tb * M4::t(side * geo.arm_x, geo.arm_y, 0.)
+                    * M4::ry(lag)
+                    * M4::rx(-m.pitch + sw + swing + back * 0.25)
             };
             gl.draw_plain(&p.arm, &a);
             if let Some(f) = &p.fist {
                 gl.draw_plain(f, &a);
             }
             if let (Some(b), true) = (&p.barrel, m.w.iter().any(|w| w.mount == sec && !w.dead)) {
-                gl.draw_plain(b, &a);
+                gl.draw_plain(b, &(a * M4::t(0., 0., -back)));
             }
         }
         if arms_only {
             return;
         }
+        let steel = [0.3, 0.31, 0.34];
+        let dark = [m.ch.col[0] * 0.55, m.ch.col[1] * 0.55, m.ch.col[2] * 0.55];
+        let rod = fx_mesh(self, Fx::Rod);
+        // A live piston: the fat cylinder from its upper end, the rod the rest of the way.
+        let piston = |gl: &mut Gl, a: V3, b: V3, pi: &crate::models::Piston| {
+            let len = (b - a).len().max(1e-3);
+            let f = (pi.fat * sc).min(len * 0.92);
+            let mid = a + (b - a) * (f / len);
+            gl.draw(rod, &rod_mat(a, mid, pi.d * sc), dark, 0.);
+            gl.draw(rod, &rod_mat(mid, b, pi.d * sc * 0.5), steel, 0.);
+        };
         let (c, sn) = (m.yaw.cos(), m.yaw.sin());
         for (i, l) in geo.legs().iter().enumerate() {
             let sec = if l.hx > 0. { Sec::LL } else { Sec::RL };
@@ -197,14 +312,21 @@ impl Scene {
                 Knee::Forward => v3(sn, 0., c),
             };
             let k = solve_knee(hp, ankle, pole, geo.l1 * sc, geo.l2 * sc);
-            gl.draw_plain(&p.uleg, &M4::limb(hp, k, pole, sc));
-            gl.draw_plain(&p.lleg, &M4::limb(k, ankle, pole, sc));
-            gl.draw_plain(
-                &p.foot,
-                &(M4::t(ankle.x, ankle.y - geo.ankle * sc + 0.2 * sc, ankle.z)
-                    * M4::ry(m.feet[i].yaw)
-                    * M4::s1(sc)),
-            );
+            let (mt, ms) = (M4::limb(hp, k, pole, sc), M4::limb(k, ankle, pole, sc));
+            let roll = an.map_or(0., |(pr, _)| anim::foot_roll(pr, m, i));
+            let mf = M4::t(ankle.x, ankle.y - geo.ankle * sc + 0.2 * sc, ankle.z)
+                * M4::ry(m.feet[i].yaw)
+                * M4::rx(roll)
+                * M4::s1(sc);
+            gl.draw_plain(&p.uleg, &mt);
+            gl.draw_plain(&p.lleg, &ms);
+            gl.draw_plain(&p.foot, &mf);
+            if p.pistons {
+                use crate::models::{ANKLE, KNEE};
+                let v = |a: [f32; 3]| v3(a[0], a[1], a[2]);
+                piston(gl, mt.apply(v(KNEE.from)), ms.apply(v(KNEE.to)), &KNEE);
+                piston(gl, ms.apply(v(ANKLE.from)), mf.apply(v(ANKLE.to)), &ANKLE);
+            }
         }
         if m.flash.frame + 1 >= g.frame {
             // The muzzle flash, two frames, facing the camera's plane.
