@@ -263,36 +263,35 @@ fn the_autocannon_hits_for_its_damage_uses_ammo_and_kicks() {
 }
 
 #[test]
-fn a_shove_moves_light_mechs_far_and_heavy_ones_little() {
-    let mut g = flat_game(Ch::Kestrel, 9);
-    let j = foe(&mut g, Ch::Jackal, 0., 8., PI);
+fn a_punch_moves_light_mechs_far_and_heavy_ones_little() {
+    let mut g = flat_game(Ch::Puncher, 9);
+    let j = foe(&mut g, Ch::Jackal, 0., 12., PI);
+    // Sturdy enough to take the blow and fly, rather than fall.
+    g.mechs[j].hp[Sec::T.i()] = 500.;
     let mut i = input();
     i.punch = true;
     update(&mut g, &i, DT);
     assert!(g.p().melee.is_some());
     let jz = g.mechs[j].z;
     steps(&mut g, &input(), 60);
-    assert!(
-        g.mechs[j].z - jz >= 6.,
-        "a SKEDADDLE moved {} m",
-        g.mechs[j].z - jz
-    );
-    assert!(g.p().z < 0., "the shover recoils");
+    let light = g.mechs[j].z - jz;
+    assert!(light >= 6., "a SKEDADDLE moved {light} m");
+    assert!(g.p().z < 0., "the puncher recoils");
     assert!(g.farthest_shove > 0. && sfx_count(&g, "punch") == 1);
-    let mut g = flat_game(Ch::Kestrel, 9);
-    let w = foe(&mut g, Ch::Warden, 0., 10., PI);
+    let mut g = flat_game(Ch::Puncher, 9);
+    let w = foe(&mut g, Ch::Warden, 0., 14., PI);
     update(&mut g, &i, DT);
     let wz = g.mechs[w].z;
     steps(&mut g, &input(), 60);
+    let heavy = g.mechs[w].z - wz;
     assert!(
-        g.mechs[w].z - wz < 3.,
-        "a SLOWPOKE moved {} m",
-        g.mechs[w].z - wz
+        heavy > 0. && heavy < light * 0.5,
+        "a SLOWPOKE moved {heavy} m, a SKEDADDLE {light}"
     );
 }
 #[test]
 fn no_punch_while_shut_down_or_mid_swing() {
-    let mut g = flat_game(Ch::Kestrel, 9);
+    let mut g = flat_game(Ch::Puncher, 9);
     g.pm().shutdown = true;
     assert!(!melee_press(&mut g, PLAYER));
     g.pm().shutdown = false;
@@ -317,9 +316,29 @@ fn purple_puncher_punches_with_whichever_fist_it_has() {
     assert!(std::ptr::eq(melee_of(g.p()), &FIST_MELEE) && punch_arm(g.p()) == Some(Sec::RA));
     g.pm().hp[Sec::RA.i()] = 0.;
     assert!(
-        std::ptr::eq(melee_of(g.p()), &DEFAULT_MELEE),
-        "no fists: it shoves"
+        std::ptr::eq(melee_of(g.p()), &DEFAULT_MELEE) && !melee_press(&mut g, PLAYER),
+        "no fists, no punch"
     );
+}
+#[test]
+fn only_purple_puncher_punches() {
+    for ch in [Ch::Kestrel, Ch::Jackal, Ch::Warden, Ch::Light1, Ch::Sniper1] {
+        let mut g = flat_game(ch, 9);
+        let j = foe(&mut g, Ch::Jackal, 0., 8., PI);
+        let mut i = input();
+        i.punch = true;
+        update(&mut g, &i, DT);
+        assert!(!g.punch_ready, "{ch:?}: no PUNCH on the HUD");
+        assert!(g.p().melee.is_none(), "{ch:?} doesn't punch");
+        let jz = g.mechs[j].z;
+        steps(&mut g, &input(), 60);
+        assert!((g.mechs[j].z - jz).abs() < 0.5, "{ch:?} doesn't shove");
+        assert_eq!(sfx_count(&g, "punch"), 0);
+    }
+    let mut g = flat_game(Ch::Puncher, 9);
+    foe(&mut g, Ch::Jackal, 0., 12., PI);
+    update(&mut g, &input(), DT);
+    assert!(g.punch_ready, "PURPLE PUNCHER: PUNCH on the HUD");
 }
 #[test]
 fn a_fall_onto_a_mech_stomps_it_and_a_hop_does_not() {
@@ -592,7 +611,7 @@ fn heavies_hold_the_line_and_harassers_flip_when_hit() {
     assert_eq!(g.mechs[j].ai.strafe, -s0);
 }
 #[test]
-fn an_adjacent_enemy_punches_on_hard() {
+fn an_adjacent_purple_puncher_punches_on_hard_and_nothing_else_does() {
     let mut g = Game::new(29);
     start_free_play(
         &mut g,
@@ -605,7 +624,7 @@ fn an_adjacent_enemy_punches_on_hard() {
         Diff::Hard,
         true,
     );
-    let j = new_mech(&mut g, Ch::Jackal, 1, 0., 7., PI).unwrap();
+    let j = new_mech(&mut g, Ch::Puncher, 1, 0., 10., PI).unwrap();
     g.mechs[j].ai.aware = true;
     let mut punched = false;
     for _ in 0..180 {
@@ -613,6 +632,27 @@ fn an_adjacent_enemy_punches_on_hard() {
         punched |= g.mechs[j].melee.is_some();
     }
     assert!(punched);
+    // Nothing else does, however close.
+    for ch in [Ch::Kestrel, Ch::Jackal, Ch::Warden, Ch::Light1, Ch::Sniper1] {
+        let mut g = Game::new(29);
+        start_free_play(
+            &mut g,
+            Biome::Dusk,
+            TimeOfDay::Dusk,
+            Weather::Clear,
+            0,
+            29,
+            Ch::Kestrel,
+            Diff::Hard,
+            true,
+        );
+        let j = new_mech(&mut g, ch, 1, 0., 7., PI).unwrap();
+        g.mechs[j].ai.aware = true;
+        for _ in 0..180 {
+            update(&mut g, &input(), DT);
+            assert!(g.mechs[j].melee.is_none(), "{ch:?} punched");
+        }
+    }
 }
 #[test]
 fn missions_start_with_their_foes() {

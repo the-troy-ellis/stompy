@@ -20,7 +20,7 @@ here is in `crates/game/src/controls.rs` (pure, with unit tests) and
 | B | Centre the torso over the legs. |
 | X | Next target (nearest first). |
 | Y | Zoom (toggle). |
-| Right stick click, R4, L4 | Punch. |
+| Right stick click, R4, L4 | Punch (PURPLE PUNCHER only: punching is its own). |
 | R5 | Centre the torso (so the right thumb never leaves the stick). |
 | L5, D-pad down | Full stop. |
 | Start, View | Pause. |
@@ -77,6 +77,6 @@ Steam Input is set to turn the gyro into mouse motion instead (see
 | Mouse | Torso twist and pitch (relative mouse, captured while playing). |
 | Left button | Energy. Right button: ballistic. Middle button or F: missiles. G: OOPS BUTTON. |
 | Space | Jump jets (hold, let go). |
-| E, mouse button 4 | Punch. |
+| E, mouse button 4 | Punch (PURPLE PUNCHER only). |
 | C | Centre torso. R: next target. Z: zoom. X: full stop. |
 | Escape | Pause; back in menus. Enter: pick. |

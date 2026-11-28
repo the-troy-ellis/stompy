@@ -1,6 +1,7 @@
-//! Melee: a press starts a wind-up; at the hit frame the nearest mech within
-//! reach and arc takes the blow and the knockback; then a recovery with no guns
-//! and half the turn rate. Miss and it whiffs. Landing on a mech is a stomp.
+//! Melee: punching is PURPLE PUNCHER's alone (the owner, 2026-11-28); every mech stomps. A
+//! press starts a wind-up; at the hit frame the nearest mech within reach and arc takes the
+//! blow and the knockback; then a recovery with no guns and half the turn rate. Miss and it
+//! whiffs. Landing on a mech is a stomp.
 use crate::combat::damage;
 use crate::data::*;
 use crate::feel::feel;
@@ -38,9 +39,22 @@ pub fn punch_arm(m: &Mech) -> Option<Sec> {
         None
     }
 }
+/// Whether a mech punches at all: only fists do, and only while it has an arm to throw one.
+pub fn punches(m: &Mech) -> bool {
+    melee_of(m).fists
+}
+/// How far its punch reaches (metres, to the target's skin); none for a mech that can't punch.
+pub fn punch_reach(m: &Mech) -> f32 {
+    if punches(m) {
+        melee_of(m).reach * m.ch.scale
+    } else {
+        0.
+    }
+}
 pub fn can_punch(g: &Game, id: MechId) -> bool {
     let m = &g.mechs[id];
-    m.alive
+    punches(m)
+        && m.alive
         && !m.shutdown
         && m.melee.is_none()
         && !(m.melee_cd > 0.)

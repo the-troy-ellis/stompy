@@ -141,4 +141,5 @@ port spec's "Changed" list is approved.
 | 2026-11-28 | The world | (none: a mech sim) | robots, no humans; demigods (the mechs) fight demigods; cities of tiny robots gather ore and are stomped (an honour, at a cost); temples are factories (world.md) | the owner |
 | 2026-11-28 | The order | P2 engine, P3 base builder by hand, P4 from above, P5 world | P2 engine for this world (battles, crowd, voxel ground, two-scale buildings), P3 the demigods' look and feel, P4 the loop by hand, P5 the god above, P6 the world | the world sets what the engine must carry |
 | 2026-11-28 | Throttle and twist | the throttle is a setting the stick nudges; the torso stays twisted | the stick is the throttle (back to zero when let go); walking forward, a torso left alone swings back over the legs (docs/controls.md) | the owner |
+| 2026-11-28 | Punching | everyone shoves, PURPLE PUNCHER punches | only PURPLE PUNCHER punches; everyone stomps (specs/00-core.md) | the owner: punching is a mechanic unique to PURPLE PUNCHER |
 | 2026-11-27 | Rust version | (n/a) | pinned in `rust-toolchain.toml` | fmt and clippy don't drift between builds |

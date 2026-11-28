@@ -64,9 +64,11 @@ torso.
 
 ### Melee (`sim/melee.rs`)
 
-Everyone shoves (8 damage, 9 m reach, a 10 m/s impulse); PURPLE PUNCHER
-punches (30, 14 m, 22) with whichever fist it still has, and shoves with
-none. A press starts a wind-up, the hit frame takes the nearest mech within
+Only PURPLE PUNCHER punches (the owner, 2026-11-28: punching is its unique
+mechanic; it was everyone's shove): 30 damage, 14 m, 22, with whichever
+fist it still has, and nothing once both are gone. Every mech stomps.
+The AI punches only with it, keeps out of its reach only, and walks up to
+a shut-down player only to punch. A press starts a wind-up, the hit frame takes the nearest mech within
 reach and arc, then a recovery with no guns and half turn rate. Knockback is
 scaled by mass (scale³), clamped 0.3..2.5×, with a fifth of it back on the
 attacker. Landing on a mech after 0.6 s in the air is a stomp; from a high
@@ -119,7 +121,7 @@ jets up the right with the charge inside it, speed along the bottom with a
 zero tick and the throttle's notch; the damage diagram in the middle, KPH
 under it. The weapons by category with their buttons, ammo and recharge
 bars; OOPS BUTTON's scan and recharge. The crosshair with a hit-stop and an
-X on a hit, PUNCH when a mech is in reach, STOMP when a charge is aimed. The
+X on a hit, PUNCH when a mech is in PURPLE PUNCHER's reach, STOMP when a charge is aimed. The
 target's brackets, a diamond on a lock, coloured by its torso and flashing
 under 15%, the distance under it, the shell's lead diamond. The radar. The
 compass with the target's bearing. The messages. Everything dark under a
@@ -139,7 +141,9 @@ All of `crates/`. The tests in `crates/sim/tests/`.
    melt; the beams off, it is cold in two seconds (test).
 4. An arm at zero kills its weapon and sheds debris; both legs sit the mech;
    the torso at zero gives the beat, the blast, the wreck, the win (test).
-5. A BARRY shoves a SKEDADDLE 6 m in a second and a SLOWPOKE under 3 (test).
+5. PURPLE PUNCHER punches a SKEDADDLE 6 m in a second and a SLOWPOKE under
+   half as far; no other mech punches or shoves, nor does the AI with one
+   (tests).
 6. A fall of 0.6 s onto a mech stomps it; a hop does not (test).
 7. A three-second scan kills the target and costs the shooter 140 heat, the
    shutdown and 35% of its torso; a slip pauses, a switch restarts (test).

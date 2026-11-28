@@ -689,7 +689,9 @@ pub struct MeleeDef {
     pub stomp_air: f32,
     pub fists: bool,
 }
-/// Everyone can shove. Reach is metres times the chassis's scale.
+/// What every chassis has without fists: the stomp. It doesn't punch or shove (punching is
+/// PURPLE PUNCHER's alone, the owner 2026-11-28); its punch numbers are unused. Reach is metres
+/// times the chassis's scale.
 pub static DEFAULT_MELEE: MeleeDef = MeleeDef {
     dmg: 8.,
     reach: 9.,

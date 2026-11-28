@@ -6,7 +6,7 @@ use crate::game::*;
 use crate::geom::{blocked, center_of, eye_of};
 use crate::math::*;
 use crate::mech::{grade_factor, grips};
-use crate::melee::{can_punch, melee_of, melee_press, melee_target};
+use crate::melee::{can_punch, melee_press, melee_target, punch_reach, punches};
 
 fn diff(g: &Game) -> &'static DiffDef {
     &DIFFS[g.diff.i()]
@@ -621,16 +621,16 @@ pub fn think(g: &mut Game, id: MechId, dt: f32) {
     } else {
         strafe_tick(g, id, dt);
         let (e, p) = (&g.mechs[id], &g.mechs[tid]);
-        let reach_p = melee_of(p).reach * p.ch.scale + e.radius();
-        let reach_e = melee_of(e).reach * e.ch.scale + p.radius();
-        let too_close = seen && dist < reach_p * AI_PUNCH_KEEP_OUT;
+        let reach_p = punch_reach(p) + e.radius();
+        let reach_e = punch_reach(e) + p.radius();
+        let too_close = seen && punches(p) && dist < reach_p * AI_PUNCH_KEEP_OUT;
         let brawling = e.ai.profile == Profile::Brawler;
         let punchable = e.ai.profile != Profile::Sniper
             && p.alive
             && can_punch(g, id)
             && melee_target(g, id) == Some(tid);
-        if p.shutdown && p.alive {
-            // A shut-down player: walk up and shove them. Correct Stompy behaviour.
+        if p.shutdown && p.alive && punches(e) {
+            // A shut-down player: walk up and punch them. Correct Stompy behaviour.
             move_yaw = to_yaw;
             thr = if dist < reach_p * 0.6 { 0. } else { 1. };
         } else if punchable || e.melee.is_some() {

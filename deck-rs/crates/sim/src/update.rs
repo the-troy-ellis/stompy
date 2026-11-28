@@ -11,7 +11,7 @@ use crate::geom::{center_of, eye_of, ray_hit};
 use crate::jets::{air_steer, jet_lock};
 use crate::math::*;
 use crate::mech::step_mech;
-use crate::melee::{melee_press, melee_target, melee_tick};
+use crate::melee::{can_punch, melee_press, melee_target, melee_tick};
 use crate::missiles::{cycle_target, fire_cat, missile_trigger, steer_volley};
 use crate::state::blend_pal;
 use crate::voice::voice;
@@ -168,7 +168,8 @@ pub fn update(g: &mut Game, i: &Input, dt: f32) {
     if live && i.punch {
         melee_press(g, PLAYER);
     }
-    g.punch_ready = live && g.p().melee.is_none() && melee_target(g, PLAYER).is_some();
+    g.punch_ready =
+        live && can_punch(g, PLAYER) && g.p().melee.is_none() && melee_target(g, PLAYER).is_some();
     let armed = live && g.p().melee.is_none(); // no guns during a swing or its recovery
     let guiding = g.guide.is_some();
     g.pm().beam_on = armed && i.energy && !guiding;
