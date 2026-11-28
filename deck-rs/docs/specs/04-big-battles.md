@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | part 1 built (2026-11-28): sides fight sides, the battle setup, the sim measured. Parts 2 to 4 next. **Deck check: open.** |
+| Status | parts 1 to 3 built (2026-11-28): sides fight sides, drawing in batches with less detail far off, a battle in Free Play with a readout. Part 4 if the Deck's numbers want it. **Deck check: open: the owner's table below.** |
 | Milestone | P2, the engine (`../parity.md`) |
 | Depends on | the browser version's `specs/34-big-fights.md` and `35-bigger-maps.md` for what it learned |
 
@@ -50,14 +50,27 @@ BARRY at level 2 is 9,200.
    hold). `start_battle`: you and your allies in a block, theirs in a block
    700 m off, everyone aware. The cap is 256 (was 24). Test: two armies
    lose mechs to each other, not to the player.
-2. **Drawn in batches, with less detail far away.** Every part of every
-   mech of a kind in one instanced draw; level 2 near, level 1 in the
-   middle distance, the box model far, and past that a single shape. The
-   drawn-only animation (anim.rs) near only.
-3. **A battle in the game, with a readout.** Free Play gets a BATTLE with
-   ALLIES and FOES up to the cap, and F3 shows mechs, sim ms, draw ms,
-   draws and triangles. The owner runs it on the Deck at 64, 128, 256 and
-   up; that table picks the number.
+2. **Drawn in batches, with less detail far away** (built). A frame's
+   mechs, wrecks, debris, pistons, shots, beams, flashes and shockwaves are
+   gathered by shape and each shape goes out in one instanced draw. Past
+   120 m a mech is drawn with its plain model and no drawn-only motion.
+   Frames before and after match pixel for pixel. In a 128-mech battle 22 s
+   in (103 standing, 254 shots in flight): **2,216 draws before, 138
+   after**; triangles 569,000 before, 488,000 after.
+3. **A battle in the game, with a readout** (built). Free Play has ALLIES
+   (0 to 127) and ENEMIES (1 to 8, then 16 to 128); any allies, or more
+   than eight enemies, is a battle (`start_battle`). The debug readout
+   (View held + Y, or F3) adds mechs alive, the sim's and the 3D drawing's
+   ms a frame (CPU side) and triangles. `--battle A F` for tools runs. The
+   cockpit voice reports only your kills. The owner runs it on the Deck and
+   fills in the table below; it picks the number.
+   
+   | allies + enemies | fps | sim ms | draw ms | draws | triangles |
+   |---|---|---|---|---|---|
+   | 16 + 16 | | | | | |
+   | 32 + 32 | | | | | |
+   | 64 + 64 | | | | | |
+   | 127 + 128 | | | | | |
 4. **The sim past 500**, if the number wants it: a grid of the mechs for
    the every-against-every checks, far mechs thinking less often, shots
    and particles capped.

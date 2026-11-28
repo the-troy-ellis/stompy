@@ -187,6 +187,12 @@ pub fn destroy(g: &mut Game, id: MechId, src: Option<MechId>) {
         g.stats.kills += 1;
         g.last_kill = Some(how);
     }
+    // The cockpit reports the player's kills (and a foe that dies of nothing in particular), not
+    // every death in a battle.
+    let enemy = g.mechs[id].team != g.mechs[PLAYER].team;
+    if !enemy || src.is_some_and(|s| s != PLAYER) {
+        return;
+    }
     let key = match how {
         Some(HitBy::Stomp) => Vo::KillStomp,
         Some(HitBy::Punch) => Vo::KillPunch,

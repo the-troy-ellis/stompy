@@ -6,6 +6,7 @@
 //!   --demo               the mech flies itself; --debug the readout; --screen NAME and --mech N open a menu;
 //!   --watch              a camera outside, following your own mech (clips of it walking);
 //!   --watch-from A       the same from A radians round from its nose (0 in front, 3.1 behind)
+//!   --battle A F         straight into a battle: A allies on your side, F foes on theirs
 //!   --record N K dir     save frames N to N+K-1 as dir/0000.ppm and on, then exit (clips)
 //!   --dither N           the dither's cell for this run (0 off, 1, 2, 3); --detail N the models' (0 boxes, 1, 2)
 //! The last five are for the tools (tools/shot.sh): screenshots on a box with no display.
@@ -47,6 +48,7 @@ fn main() {
         detail: None,
         record: None,
         watch: None,
+        battle: None,
     };
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut it = args.iter();
@@ -58,6 +60,10 @@ fn main() {
             "--free" => a.free = true,
             "--demo" => a.demo = true,
             "--watch" => a.watch = Some(1.1),
+            "--battle" => {
+                let (al, fo) = (num(it.next()) as usize, num(it.next()) as usize);
+                a.battle = Some((al, fo));
+            }
             "--watch-from" => a.watch = Some(num(it.next()) as f32),
             "--debug" => a.debug = true,
             "--dither" => a.dither = Some(num(it.next()) as u32),

@@ -665,3 +665,35 @@ fn two_armies_fight_each_other_not_just_the_player() {
         .filter_map(|m| m.ai.target);
     assert!(foe_of_ally.clone().all(|t| g.mechs[t].team == 1));
 }
+
+#[test]
+fn in_a_battle_the_cockpit_reports_only_the_players_kills() {
+    use stompy_sim::combat::destroy;
+    use stompy_sim::state::start_battle;
+    let mut g = Game::new(3);
+    start_battle(
+        &mut g,
+        Biome::Dusk,
+        TimeOfDay::Dusk,
+        2,
+        3,
+        3,
+        Ch::Kestrel,
+        Diff::Normal,
+        true,
+    );
+    let (ally, foe) = (1, 4);
+    assert_eq!((g.mechs[ally].team, g.mechs[foe].team), (0, 1));
+    g.events.clear();
+    destroy(&mut g, foe, Some(ally)); // an ally's kill: no line
+    destroy(&mut g, ally, Some(foe)); // an ally lost: no line
+    let says = |g: &Game| {
+        g.events
+            .iter()
+            .filter(|e| matches!(e, Event::Say { .. }))
+            .count()
+    };
+    assert_eq!(says(&g), 0);
+    destroy(&mut g, 5, Some(PLAYER)); // yours: the line
+    assert_eq!(says(&g), 1);
+}

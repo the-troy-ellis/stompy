@@ -41,6 +41,8 @@ pub struct Gl {
     u: Uniforms,
     inst: glow::Buffer,
     pub draws: usize,
+    /// Triangles drawn this frame (instances counted).
+    pub tris: usize,
 }
 const VS: &str = r#"#version 330 core
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNrm; layout(location=2) in vec3 aCol;
@@ -158,6 +160,7 @@ impl Gl {
                 u,
                 inst,
                 draws: 0,
+                tris: 0,
             })
         }
     }
@@ -170,6 +173,7 @@ impl Gl {
                 .clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
         }
         self.draws = 0;
+        self.tris = 0;
         self.dither(1.);
     }
     pub fn camera(&self, vp: &M4, eye: V3) {
@@ -307,6 +311,7 @@ impl Gl {
             gl.draw_arrays(glow::TRIANGLES, 0, m.n);
         }
         self.draws += 1;
+        self.tris += m.n as usize / 3;
     }
     pub fn draw_plain(&mut self, m: &Mesh, model: &M4) {
         self.draw(m, model, [1., 1., 1.], 0.);
@@ -335,6 +340,7 @@ impl Gl {
             gl.bind_vertex_array(None);
         }
         self.draws += 1;
+        self.tris += m.n as usize / 3 * count as usize;
     }
     /// The frame as RGB, top row first.
     pub fn read_pixels(&self, w: i32, h: i32) -> Vec<u8> {

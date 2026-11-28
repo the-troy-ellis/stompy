@@ -49,6 +49,8 @@ pub struct Prefs {
     pub biome: Biome,
     pub time: TimeOfDay,
     pub foes: usize,
+    /// Free Play's allies on your side: any (or more than eight foes) makes it a battle.
+    pub allies: usize,
     pub cleared: u32,
 }
 impl Default for Prefs {
@@ -72,6 +74,7 @@ impl Default for Prefs {
             biome: Biome::Dusk,
             time: TimeOfDay::Dusk,
             foes: 3,
+            allies: 0,
             cleared: 0,
         }
     }
@@ -89,6 +92,18 @@ fn pick<T: Copy>(all: &[T], i: f32) -> T {
 }
 fn idx<T: PartialEq>(all: &[T], v: T) -> usize {
     all.iter().position(|x| *x == v).unwrap_or(0)
+}
+/// Free Play's choices of numbers: up to eight foes is a skirmish; past that, or with allies, a
+/// battle of two armies (specs/04-big-battles.md).
+const FOE_STEPS: [usize; 12] = [1, 2, 3, 4, 5, 6, 7, 8, 16, 32, 64, 128];
+const ALLY_STEPS: [usize; 7] = [0, 4, 8, 16, 32, 64, 127];
+/// The next step up or down a list from the value now (or the nearest step to it).
+fn step_in(steps: &[usize], v: usize, d: i32) -> usize {
+    let i = steps
+        .iter()
+        .position(|&s| s >= v)
+        .unwrap_or(steps.len() - 1) as i32;
+    steps[(i + d).clamp(0, steps.len() as i32 - 1) as usize]
 }
 const GYROS: [GyroMode; 3] = [GyroMode::Off, GyroMode::RightPad, GyroMode::Always];
 impl Prefs {
@@ -128,7 +143,10 @@ impl Prefs {
                 }
                 "biome" => p.biome = pick(Biome::ALL, v),
                 "time" => p.time = pick(TimeOfDay::ALL, v),
-                "foes" => p.foes = clamp(v, 1., 8.) as usize,
+                "foes" => p.foes = clamp(v, 1., FOE_STEPS[FOE_STEPS.len() - 1] as f32) as usize,
+                "allies" => {
+                    p.allies = clamp(v, 0., ALLY_STEPS[ALLY_STEPS.len() - 1] as f32) as usize
+                }
                 "cleared" => p.cleared = v.max(0.) as u32,
                 _ => {}
             }
@@ -142,9 +160,9 @@ impl Prefs {
         }
         let b = |v: bool| if v { 1 } else { 0 };
         let s = format!(
-            "padSens={}\nmouseSens={}\ngyroSens={}\nfov={}\nvolume={}\ninvertY={}\ngyro={}\nrumble={}\nreducedMotion={}\nhudScale={}\ndither={}\nfullscreen={}\ndiff={}\nchassis={}\nmission={}\nbiome={}\ntime={}\nfoes={}\ncleared={}\n",
+            "padSens={}\nmouseSens={}\ngyroSens={}\nfov={}\nvolume={}\ninvertY={}\ngyro={}\nrumble={}\nreducedMotion={}\nhudScale={}\ndither={}\nfullscreen={}\ndiff={}\nchassis={}\nmission={}\nbiome={}\ntime={}\nfoes={}\nallies={}\ncleared={}\n",
             self.pad_sens, self.mouse_sens, self.gyro_sens, self.fov, self.volume, b(self.invert_y), idx(&GYROS, self.gyro), b(self.rumble), b(self.reduced_motion),
-            self.hud_scale, self.dither, b(self.fullscreen), self.diff.i(), self.chassis.i(), self.mission.map_or(-1, |m| m as i32), self.biome.i(), self.time.i(), self.foes, self.cleared
+            self.hud_scale, self.dither, b(self.fullscreen), self.diff.i(), self.chassis.i(), self.mission.map_or(-1, |m| m as i32), self.biome.i(), self.time.i(), self.foes, self.allies, self.cleared
         );
         let _ = std::fs::write(path, s);
     }
@@ -179,6 +197,8 @@ pub struct Args {
     pub detail: Option<u8>,
     /// A camera outside, three-quarters on, following the player's mech (tools).
     pub watch: Option<f32>,
+    /// Straight into a battle: allies, foes (tools).
+    pub battle: Option<(usize, usize)>,
 }
 /// A line the cockpit voice will say, and when.
 struct Line {
@@ -206,6 +226,9 @@ pub struct App {
     last_said: f64,
     queue: Vec<Line>,
     fps: f32,
+    /// The sim's and the drawing's share of a frame, in ms, smoothed (the debug readout).
+    sim_ms: f32,
+    draw_ms: f32,
     debug: bool,
     demo: bool,
     shot: Option<(u64, String)>,
@@ -299,6 +322,17 @@ impl App {
         self.g.reduced_motion = self.prefs.reduced_motion;
         match self.prefs.mission {
             Some(m) => start_mission(&mut self.g, m, self.prefs.chassis, self.prefs.diff, false),
+            None if self.prefs.allies > 0 || self.prefs.foes > 8 => start_battle(
+                &mut self.g,
+                self.prefs.biome,
+                self.prefs.time,
+                self.prefs.allies,
+                self.prefs.foes,
+                seed,
+                self.prefs.chassis,
+                self.prefs.diff,
+                false,
+            ),
             None => start_free_play(
                 &mut self.g,
                 self.prefs.biome,
@@ -444,16 +478,28 @@ impl App {
             }
             Screen::Free => {
                 let p = &self.prefs;
+                let battle = p.allies > 0 || p.foes > 8;
                 let rows = [
                     ("PLACE", biome_name(p.biome).into()),
                     ("TIME", time_name(p.time).into()),
+                    ("ALLIES", p.allies.to_string()),
                     ("ENEMIES", p.foes.to_string()),
                     ("DIFFICULTY", diff_label(p.diff).into()),
                     ("GO", String::new()),
                 ];
-                self.hud.text(80. * s, 70. * s, 3. * s, "FREE PLAY", DIM);
+                self.hud.text(
+                    80. * s,
+                    70. * s,
+                    3. * s,
+                    if battle {
+                        "FREE PLAY  BATTLE"
+                    } else {
+                        "FREE PLAY"
+                    },
+                    DIM,
+                );
                 self.rows(&rows, 80. * s, 140. * s, s);
-                self.nav(m, 5);
+                self.nav(m, 6);
                 if d != 0. {
                     self.click();
                     let p = &mut self.prefs;
@@ -462,12 +508,13 @@ impl App {
                     match self.sel {
                         0 => p.biome = Biome::ALL[step(p.biome.i(), Biome::N)],
                         1 => p.time = TimeOfDay::ALL[step(p.time.i(), TimeOfDay::N)],
-                        2 => p.foes = clamp(p.foes as f32 + d, 1., 8.) as usize,
-                        3 => p.diff = Diff::ALL[step(p.diff.i(), Diff::N)],
+                        2 => p.allies = step_in(&ALLY_STEPS, p.allies, d as i32),
+                        3 => p.foes = step_in(&FOE_STEPS, p.foes, d as i32),
+                        4 => p.diff = Diff::ALL[step(p.diff.i(), Diff::N)],
                         _ => {}
                     }
                 }
-                if m.accept && self.sel == 4 {
+                if m.accept && self.sel == 5 {
                     self.click();
                     self.prefs.mission = None;
                     self.screen = Screen::Mech;
@@ -756,6 +803,8 @@ impl App {
             last_said: -10.,
             queue: vec![],
             fps: 60.,
+            sim_ms: 0.,
+            draw_ms: 0.,
             debug: a.debug,
             demo: a.demo,
             tool_run: a.shot.is_some() || a.record.is_some(),
@@ -775,20 +824,34 @@ impl App {
             app.sel = k % Ch::N;
             app.prefs.chassis = MECH_ORDER[app.sel];
         }
-        if a.free {
+        if a.free || a.battle.is_some() {
             app.prefs.mission = None;
             let seed = if a.seed != 0 { a.seed } else { 7 };
-            start_free_play(
-                &mut app.g,
-                app.prefs.biome,
-                app.prefs.time,
-                Weather::Clear,
-                app.prefs.foes,
-                seed,
-                app.prefs.chassis,
-                app.prefs.diff,
-                false,
-            );
+            if let Some((allies, foes)) = a.battle {
+                start_battle(
+                    &mut app.g,
+                    app.prefs.biome,
+                    app.prefs.time,
+                    allies,
+                    foes,
+                    seed,
+                    app.prefs.chassis,
+                    app.prefs.diff,
+                    false,
+                );
+            } else {
+                start_free_play(
+                    &mut app.g,
+                    app.prefs.biome,
+                    app.prefs.time,
+                    Weather::Clear,
+                    app.prefs.foes,
+                    seed,
+                    app.prefs.chassis,
+                    app.prefs.diff,
+                    false,
+                );
+            }
             app.screen = Screen::Play;
             let mut t = 0.;
             while t < a.skip {
@@ -840,6 +903,7 @@ impl App {
                 }
                 acc += dt;
                 let mut n = 0;
+                let t_sim = self.plat.now();
                 // A fixed 1/60 step, up to four after a hitch; presses count on the first step only.
                 while acc >= STEP && n < 4 {
                     update(&mut self.g, &i, STEP as f32);
@@ -853,6 +917,10 @@ impl App {
                         i.twist_by,
                         i.pitch_by,
                     ) = (false, false, false, false, 0., 0.);
+                }
+                if n > 0 {
+                    let ms = ((self.plat.now() - t_sim) * 1e3 / n as f64) as f32;
+                    self.sim_ms += (ms - self.sim_ms) * 0.1;
                 }
                 let p = self.g.p();
                 self.audio.listener(self.g.eye, p.view_yaw());
@@ -894,14 +962,20 @@ impl App {
                         fov: 0.8,
                     }
                 });
+                let t_draw = self.plat.now();
                 let vp =
                     self.scene
                         .render(&mut self.gl, &self.g, self.prefs.fov, w, h, cam.as_ref());
+                let ms = ((self.plat.now() - t_draw) * 1e3) as f32;
+                self.draw_ms += (ms - self.draw_ms) * 0.1;
                 let o = HudOpts {
                     scale: self.prefs.hud_scale,
                     debug: self.debug,
                     fps: self.fps,
                     draws: self.gl.draws,
+                    tris: self.gl.tris,
+                    sim_ms: self.sim_ms,
+                    draw_ms: self.draw_ms,
                     pad: self.plat.has_pad(),
                 };
                 draw_hud(&mut self.hud, &mut self.gl, &self.g, &vp, &o);
@@ -968,5 +1042,18 @@ impl App {
         if !self.tool_run {
             self.prefs.save();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn free_play_numbers_step_through_their_lists() {
+        assert_eq!(step_in(&FOE_STEPS, 8, 1), 16);
+        assert_eq!(step_in(&FOE_STEPS, 16, -1), 8);
+        assert_eq!(step_in(&FOE_STEPS, 128, 1), 128);
+        assert_eq!(step_in(&ALLY_STEPS, 0, -1), 0);
+        assert_eq!(step_in(&ALLY_STEPS, 10, 1), 32); // an odd saved number snaps onto the list
     }
 }

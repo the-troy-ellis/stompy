@@ -24,7 +24,7 @@ here is in `crates/game/src/controls.rs` (pure, with unit tests) and
 | R5 | Centre the torso (so the right thumb never leaves the stick). |
 | L5, D-pad down | Full stop. |
 | Start, View | Pause. |
-| View held + Y, or F3 | The debug readout (fps, draws, particles). |
+| View held + Y, or F3 | The debug readout: fps, draws, particles, shots; then mechs alive, the sim's and the 3D drawing's ms a frame, and triangles (for measuring battles). |
 
 Menus: D-pad or the left stick moves, A picks, B goes back, left and right
 change a value.

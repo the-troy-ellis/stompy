@@ -496,6 +496,10 @@ pub struct HudOpts {
     pub debug: bool,
     pub fps: f32,
     pub draws: usize,
+    /// Triangles drawn, and the sim's and the 3D drawing's ms a frame (CPU side).
+    pub tris: usize,
+    pub sim_ms: f32,
+    pub draw_ms: f32,
     pub pad: bool,
 }
 /// The instruments for a match in play.
@@ -616,6 +620,15 @@ pub fn draw_hud(h: &mut Hud, gl: &mut Gl, g: &Game, vp: &M4, o: &HudOpts) {
             if o.pad { "PAD" } else { "KEYS" }
         );
         h.text(16. * s, 70. * s, 1.5 * s, &t, DIM);
+        let alive = g.mechs.iter().filter(|m| m.alive).count();
+        let t = format!(
+            "{} MECHS  SIM {:.2} MS  DRAW {:.2} MS  {}K TRIS",
+            alive,
+            o.sim_ms,
+            o.draw_ms,
+            o.tris / 1000
+        );
+        h.text(16. * s, 84. * s, 1.5 * s, &t, DIM);
     }
     h.flush(gl, 1.);
     // The flashes: a dithered sheet of red or white, never a blend; dark under a shutdown.
