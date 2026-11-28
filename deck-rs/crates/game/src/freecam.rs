@@ -20,12 +20,12 @@ impl FreeCam {
             yaw: 0.,
             pitch: 0.,
         };
-        c.to_the_fight(g);
+        c.jump_to_fight(g);
         c
     }
     /// Where the fighting is: behind your side, up high, looking past it at theirs, so both
     /// armies (or what is left of them) are in view.
-    pub fn to_the_fight(&mut self, g: &Game) {
+    pub fn jump_to_fight(&mut self, g: &Game) {
         let mid = |team: u8| {
             let (mut sum, mut n) = (V3::ZERO, 0.);
             for (i, m) in g.mechs.iter().enumerate() {
@@ -58,7 +58,7 @@ impl FreeCam {
     /// One frame of flying, from the same input the mech takes.
     pub fn fly(&mut self, g: &Game, i: &Input, dt: f32) {
         if i.target {
-            self.to_the_fight(g);
+            self.jump_to_fight(g);
         }
         self.yaw += i.twist * LOOK * dt + i.twist_by;
         self.pitch = clamp(self.pitch + i.pitch * LOOK * dt + i.pitch_by, -1.45, 1.2);
