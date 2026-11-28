@@ -52,7 +52,18 @@ pub struct Parts {
     pub pods: Builder,
     /// The antenna, standing at its own origin; drawn at its socket.
     pub antenna: Builder,
+    /// A toe's two segments, each standing at its own knuckle, pointing along z.
+    pub toe1: Builder,
+    pub toe2: Builder,
 }
+/// BARRY's three toes: where each knuckle sits on the foot (x, y, z) and which way it points.
+pub const TOES: [[f32; 4]; 3] = [
+    [-0.42, -0.3, 0.68, -0.35],
+    [0., -0.3, 0.72, 0.],
+    [0.42, -0.3, 0.68, 0.35],
+];
+/// The near segment's length: where the claw's knuckle is.
+pub const TOE_1: f32 = 0.55;
 /// A piston drawn live between two parts: `from` in the upper part's frame, `to` in the
 /// lower's, a fat cylinder `fat` long from `from`, a rod the rest of the way.
 pub struct Piston {
@@ -82,6 +93,7 @@ impl Parts {
             + self.torso.tris()
             + self.pods.tris()
             + self.antenna.tris()
+            + 6 * (self.toe1.tris() + self.toe2.tris())
             + 2 * [&self.uleg, &self.lleg, &self.foot, &self.arm, &self.barrel]
                 .iter()
                 .map(|b| b.tris())
@@ -231,26 +243,48 @@ pub fn barry(level: u8) -> Parts {
     let mut foot = Builder::default();
     foot.rod(v3(0., 0.12, 0.), v3(0., -0.2, 0.), 0.95 * w, n, col);
     foot.bbox(t(0., -0.25, 0.05), v3(1.25 * w, 0.36, 1.3), 0.1, 0.9, dark);
-    for s in [-1., 0., 1.] {
-        let m = t(s * 0.4 * w, -0.3, 0.75) * M4::ry(s * 0.35) * t(0., 0., 0.45);
-        foot.bbox(m, v3(0.36 * w, 0.3, 1.0), 0.07, 0.8, dark);
-        if hi {
-            foot.bbox(
-                m * t(0., -0.02, 0.6) * M4::rx(0.35),
-                v3(0.3 * w, 0.22, 0.35),
-                0.05,
-                0.7,
-                STEEL,
-            );
-            foot.rod(
-                m.apply(v3(-0.2, 0.05, -0.45)),
-                m.apply(v3(0.2, 0.05, -0.45)),
-                0.2,
-                8,
-                STEEL,
-            );
-        }
+    // The toes are their own pieces, two joints each, so they can curl and grip (anim.rs).
+    // Here: the knuckle housings they hinge from at the front of the base.
+    for h in TOES {
+        foot.rod(
+            v3(h[0] - 0.22 * w, h[1] + 0.02, h[2]),
+            v3(h[0] + 0.22 * w, h[1] + 0.02, h[2]),
+            0.32,
+            if hi { 10 } else { 8 },
+            STEEL,
+        );
     }
+    // A toe, standing at its knuckle and pointing along z: the near segment, then the claw.
+    let mut toe1 = Builder::default();
+    toe1.bbox(
+        t(0., 0., TOE_1 * 0.5),
+        v3(0.36 * w, 0.3, TOE_1 + 0.08),
+        0.07,
+        0.85,
+        dark,
+    );
+    toe1.rod(
+        v3(-0.17 * w, 0.0, TOE_1),
+        v3(0.17 * w, 0.0, TOE_1),
+        0.24,
+        if hi { 10 } else { 8 },
+        STEEL,
+    );
+    let mut toe2 = Builder::default();
+    toe2.bbox(
+        t(0., -0.01, 0.24),
+        v3(0.32 * w, 0.26, 0.52),
+        0.06,
+        0.8,
+        dark,
+    );
+    toe2.bbox(
+        t(0., -0.06, 0.55) * M4::rx(0.4),
+        v3(0.24 * w, 0.18, 0.32),
+        0.05,
+        0.6,
+        STEEL,
+    );
     foot.bbox(
         t(0., -0.3, -0.75) * M4::rx(-0.2),
         v3(0.45 * w, 0.3, 0.75),
@@ -388,6 +422,8 @@ pub fn barry(level: u8) -> Parts {
         barrel,
         pods,
         antenna,
+        toe1,
+        toe2,
     }
 }
 

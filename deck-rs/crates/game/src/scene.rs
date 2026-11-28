@@ -321,6 +321,17 @@ impl Scene {
             gl.draw_plain(&p.uleg, &mt);
             gl.draw_plain(&p.lleg, &ms);
             gl.draw_plain(&p.foot, &mf);
+            if let (Some(t1), Some(t2)) = (&p.toe1, &p.toe2) {
+                use crate::models::{TOES, TOE_1};
+                let (curl, spread) =
+                    an.map_or((0., 1.), |(pr, a)| anim::toe_pose(pr, m, a, i, g.time));
+                for h in TOES {
+                    let near =
+                        mf * M4::t(h[0], h[1], h[2]) * M4::ry(h[3] * spread) * M4::rx(curl * 0.55);
+                    gl.draw_plain(t1, &near);
+                    gl.draw_plain(t2, &(near * M4::t(0., 0., TOE_1) * M4::rx(curl * 0.75)));
+                }
+            }
             if p.pistons {
                 use crate::models::{ANKLE, KNEE};
                 let v = |a: [f32; 3]| v3(a[0], a[1], a[2]);

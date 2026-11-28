@@ -332,6 +332,8 @@ pub struct MechParts {
     /// Pieces that move on their own (`anim.rs`), and whether the pistons are drawn live.
     pub pods: Option<Mesh>,
     pub antenna: Option<Mesh>,
+    pub toe1: Option<Mesh>,
+    pub toe2: Option<Mesh>,
     pub pistons: bool,
 }
 fn t(x: f32, y: f32, z: f32) -> M4 {
@@ -381,6 +383,9 @@ pub fn build_mech_parts(gl: &Gl, ch: Ch, detail: u8) -> MechParts {
         let (mut pods, mut ant) = (d.pods, d.antenna);
         p.pods = Some(pods.upload(gl));
         p.antenna = Some(ant.upload(gl));
+        let (mut t1, mut t2) = (d.toe1, d.toe2);
+        p.toe1 = Some(t1.upload(gl));
+        p.toe2 = Some(t2.upload(gl));
         p.pistons = true;
     }
     p
@@ -629,6 +634,8 @@ fn build_box_parts(gl: &Gl, ch: Ch) -> MechParts {
         wreck,
         pods: None,
         antenna: None,
+        toe1: None,
+        toe2: None,
         pistons: false,
     }
 }

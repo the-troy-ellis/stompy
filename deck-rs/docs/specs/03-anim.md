@@ -29,8 +29,15 @@ without one draws as before.
 
 - **Arms** swing against the leg on their own side (0.09 rad at full pace)
   and trail a torso turn on a spring.
-- **Feet** roll in the air: toes down as one leaves the ground, toes up as it
-  comes in heel first. Planted feet stay flat, where the sim put them.
+- **Feet** roll a little in the air: toes down as one leaves the ground, toes
+  up as it comes in heel first. Planted feet stay flat, where the sim put
+  them.
+- **Toes** (the owner, 2026-11-28: the feet looked like flippers; they should
+  curl when they lift and plant when they land). Three toes of two segments
+  each, hinged at knuckles on the front of the foot (`models::TOES`). As a
+  foot lifts, the heel peels up and the toes stay on the ground; in the air
+  they curl under and close together like a claw; before landing they open
+  and reach; down, they spread and grip, then settle flat (`anim::toe_pose`).
 - **Pistons** are live: the knee's runs from the back of the thigh to the
   back of the shin, the ankle's from the shin to the heel, each a fat
   cylinder and a rod that slides as the joint bends (`models::KNEE`,
@@ -48,8 +55,9 @@ Clips: `--watch` (or `--watch-from A`) films your own mech from outside,
 
 ## Acceptance criteria
 
-1. A kick is out in under three frames and home by a third of a second
-   (test: `anim::tests`).
+1. A kick is out in under three frames and home by a third of a second;
+   toes curl in the air, reach before landing and lie flat down (tests:
+   `anim::tests`).
 2. BARRY's triangle budget still holds with the pods and antenna apart
    (test: `models::tests`).
 3. Clips before and after, from the front and from behind, in the PR.
