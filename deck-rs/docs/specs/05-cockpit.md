@@ -27,9 +27,27 @@ own; the mockups (window shapes for all six) came first.
   raised faceted ring and 24 rivets, the panel round it dished in toward
   the eye past the screen's edge.
 - **Eyelids**: steel shutters top and bottom with a rolled lip, ribs and a
-  piston, sliding just behind the ring. They rest almost open, squint as
-  the heat climbs past 55, slam shut when the machine shuts down (or dies),
-  and flinch half-closed for a moment when the torso is hit.
+  piston, sliding just behind the ring. Each is two plates hinged at their
+  outer ends, so the lids make shapes. The owner (2026-11-28): the giant
+  eye means every demigod is a cyclops, and the eyelid can be expressive.
+  The face, by priority:
+
+  | Face | Lids | When |
+  |---|---|---|
+  | Surprised | wide open for 0.3 s, then a hard flinch | a big hit (4% of the whole machine in a frame) |
+  | Pleased | the bottom lid rises in an arch, an eye that smiles | 0.5 to 3.5 s after the player's kill: the joke after the fact |
+  | Glare | a V, inner ends down | firing in the last 1.2 s, or zoomed in |
+  | Worried | tented, outer ends low | the torso under 30% |
+  | Locked | a milder V | a target locked |
+  | Sleepy | a heavy droop | nothing touched for 8 s |
+  | Relaxed | a little droop | otherwise |
+
+  Over every face the heat squints the eye as it climbs past 55; shut down
+  (or dead), the lids slam shut flat. A small hit flinches the lids for a
+  moment. A blink, top lid down to meet the bottom, every 2.5 to 6.5 s.
+  The faces move on springs. **No face covers the crosshair**: the lips'
+  inner ends stay 0.16 clear of the middle, so a glare flattens as the
+  heat squints the eye rather than closing over what it glares at (test).
 - **Heat coils**: a row of fins across the bottom of the eye: cold steel,
   then dull red, orange, and near white at shutdown, flickering when
   critical, with puffs of steam rising and thinning out. Shut down, they
@@ -59,10 +77,12 @@ pilot's.
 
 ## Acceptance criteria
 
-1. The lids rest open, squint when hot and shut when off; the coils run
-   from cold steel through red and orange to near white (tests:
-   `cockpit::tests`).
-2. Screenshots of the five states (`--cockpit-pose 0` to `4`: cool, hot,
-   critical, shut down, hurt) and a walking clip in the PR.
-3. On the Deck: it feels like being inside BARRY, and the view is not
-   cramped. **Deck check: open.**
+1. The lids rest open, squint when hot and shut when off; the faces make
+   their shapes and go by priority; no face covers the crosshair, however
+   hot; a blink takes a sixth of a second; the coils run from cold steel
+   through red and orange to near white (tests: `cockpit::tests`).
+2. Screenshots of the states (`--cockpit-pose 0` to `4`: cool, hot,
+   critical, shut down, hurt) and the faces (`5` glare, `6` worried, `7`
+   pleased, `8` sleepy, `9` surprised, `10` locked), and a clip in the PR.
+3. On the Deck: it feels like being inside BARRY, the view is not cramped,
+   and the face reads without getting in the way. **Deck check: open.**

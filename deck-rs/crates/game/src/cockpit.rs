@@ -5,7 +5,8 @@
 //!
 //! There is no pilot (docs/world.md), so nothing in here is an instrument for one. The machine
 //! shows its state through its own workings: eyelids that squint when it runs hot, slam shut on
-//! a shutdown and flinch when hit; heat coils under the eye that glow dull red to white and
+//! a shutdown and flinch when hit, and between those make its face (a glare, a worried tilt, a
+//! smug smile after a kill, a sleepy droop, a blink); heat coils under the eye that glow dull red to white and
 //! steam when critical; two jet capacitors that fill with light; cracks across the eye as it is
 //! hurt; and the maintenance tag the tiny robots tied on, swinging. BARRY's, so far.
 use crate::gl::{Gl, Mesh, Mode};
@@ -13,7 +14,7 @@ use crate::mesh::Builder;
 use stompy_sim::data::{chassis, Ch, Sec};
 use stompy_sim::math::*;
 use stompy_sim::spring::Spring;
-use stompy_sim::Mech;
+use stompy_sim::{Game, Mech};
 
 const STEEL: [f32; 3] = [0.24, 0.26, 0.31];
 const STEEL_DK: [f32; 3] = [0.13, 0.14, 0.17];
@@ -57,7 +58,7 @@ impl Reading {
             off: !m.alive || m.shutdown,
         }
     }
-    /// The tools' mockups: 0 cool, 1 hot, 2 critical, 3 shut down, 4 hurt.
+    /// The tools' mockups: 0 cool, 1 hot, 2 critical, 3 shut down, 4 hurt; 5 on are moods, cool.
     pub fn pose(n: u8) -> Reading {
         let (heat, fuel, torso, off) = match n {
             1 => (0.72, 0.6, 1., false),
@@ -74,13 +75,119 @@ impl Reading {
         }
     }
 }
-/// How far the eyelids close, 0 open to 1 shut: a resting droop, a squint as the heat climbs past
-/// 55, shut when the machine is off.
-pub fn lids_for(r: &Reading) -> f32 {
-    if r.off {
-        return 1.;
+/// What the eyelids are doing, besides the heat.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Mood {
+    Relaxed,
+    /// Firing or zoomed in: a V.
+    Glare,
+    /// A target locked: a milder V.
+    Lock,
+    /// Badly hurt: the other tilt, the outer ends low.
+    Worried,
+    /// A beat after a kill: the bottom lid rises in an arch, an eye that smiles.
+    Pleased,
+    /// Standing about: a heavy droop.
+    Sleepy,
+    /// A big hit: wide open for a moment, before the flinch.
+    Surprised,
+}
+impl Mood {
+    /// The tools' mockups, poses 5 on.
+    pub fn pose(n: u8) -> Option<Mood> {
+        Some(match n {
+            5 => Mood::Glare,
+            6 => Mood::Worried,
+            7 => Mood::Pleased,
+            8 => Mood::Sleepy,
+            9 => Mood::Surprised,
+            10 => Mood::Lock,
+            _ => return None,
+        })
     }
-    0.06 + 0.36 * smooth((r.heat - 0.55) / 0.42)
+}
+/// The lids' shape. `top` and `bot` are how far each closes, 0 open to 1 at the middle of the eye
+/// (a blink takes the top lid a little past it to meet the bottom one). `tilt` turns the top
+/// lid's halves about their outer ends, inner ends down (a V) when positive; `smile` turns the
+/// bottom lid's halves, inner ends up (an arch) when positive.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Face {
+    pub top: f32,
+    pub bot: f32,
+    pub tilt: f32,
+    pub smile: f32,
+}
+pub fn face(m: Mood) -> Face {
+    let f = |top, bot, tilt, smile| Face {
+        top,
+        bot,
+        tilt,
+        smile,
+    };
+    match m {
+        Mood::Relaxed => f(0.2, 0.08, 0., 0.),
+        Mood::Glare => f(0.3, 0.18, 0.24, 0.),
+        Mood::Lock => f(0.24, 0.12, 0.13, 0.),
+        Mood::Worried => f(0.62, 0.14, -0.3, -0.06),
+        Mood::Pleased => f(0.22, 0.4, -0.04, 0.18),
+        Mood::Sleepy => f(0.54, 0.18, -0.08, 0.),
+        Mood::Surprised => f(-0.06, -0.06, -0.04, 0.),
+    }
+}
+/// What the face can see of the machine this frame, beyond the reading.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Cue {
+    /// Fired in the last moment, or zoomed in.
+    pub attacking: bool,
+    pub locked: bool,
+    /// Seconds since the player's last kill (large if none).
+    pub since_kill: f32,
+    /// Seconds since anything was touched.
+    pub idle: f32,
+    /// A big hit just landed.
+    pub struck: bool,
+}
+/// The mood, by priority: a big hit, a kill a beat ago (the joke comes after the fact), a fight,
+/// a bad hurt, a lock, standing about.
+pub fn mood_for(r: &Reading, c: &Cue) -> Mood {
+    if c.struck {
+        Mood::Surprised
+    } else if (0.5..3.5).contains(&c.since_kill) {
+        Mood::Pleased
+    } else if c.attacking {
+        Mood::Glare
+    } else if r.torso < 0.3 {
+        Mood::Worried
+    } else if c.locked {
+        Mood::Lock
+    } else if c.idle > 8. {
+        Mood::Sleepy
+    } else {
+        Mood::Relaxed
+    }
+}
+/// How far the heat squints the eye, 0 to 0.36, as it climbs past 55.
+pub fn squint(heat: f32) -> f32 {
+    0.36 * smooth((heat - 0.55) / 0.42)
+}
+/// The lids for a reading and a mood: the mood's face, the heat's squint over it, and shut flat
+/// when the machine is off.
+pub fn lids_for(r: &Reading, m: Mood) -> Face {
+    if r.off {
+        return Face {
+            top: 1.,
+            bot: 1.,
+            tilt: 0.,
+            smile: 0.,
+        };
+    }
+    let f = face(m);
+    let q = squint(r.heat);
+    Face {
+        top: f.top + q * (1. - f.top),
+        bot: f.bot + q * (1. - f.bot),
+        ..f
+    }
 }
 /// The coils' colour for a heat: cold steel, then dull red, orange, and near white at shutdown.
 /// The second value is whether they glow.
@@ -106,8 +213,8 @@ pub fn coil_colour(heat: f32) -> ([f32; 3], bool) {
 
 pub struct Cockpit {
     frame: Mesh,
-    lid_top: Mesh,
-    lid_bot: Mesh,
+    /// The eyelids in halves, so they can tilt: top left, top right, bottom left, bottom right.
+    lids: [Mesh; 4],
     coils: Mesh,
     fins: Mesh,
     caps: Mesh,
@@ -117,8 +224,18 @@ pub struct Cockpit {
     tag: Mesh,
     swing_x: Spring,
     swing_z: Spring,
-    lids: Spring,
+    /// The face on springs: top, bottom, tilt, smile.
+    face: [Spring; 4],
     torso_was: f32,
+    hp_was: f32,
+    kills_was: i32,
+    kill_at: f32,
+    fired_at: f32,
+    busy_at: f32,
+    /// A big hit holds the eye wide until then, and the flinch follows.
+    struck_till: f32,
+    blink_at: f32,
+    blinks: u32,
     t: f32,
     eye: V3,
     vel: V3,
@@ -161,7 +278,49 @@ fn crack(b: &mut Builder, from: V3, dir: f32, steps: usize, seed: f32, branch: b
         p = q;
     }
 }
+/// How near the middle of the eye a lid's lip may come outside a blink, so no face covers the
+/// crosshair.
+const CLEAR: f32 = 0.16;
+/// Where the lids' outer ends sit (top, bottom: heights in the window) and how far each pair's
+/// halves turn, for a face `[top, bot, tilt, smile]`. The turn is held back so the lips' inner
+/// ends stay `CLEAR` of the middle: a glare flattens as the heat squints the eye, rather than
+/// closing over what it glares at.
+pub fn lid_edges([top, bot, tilt, smile]: [f32; 4]) -> [f32; 4] {
+    let open = WIN[1] * 1.04;
+    let (top_y, bot_y) = (open * (1. - top), -open * (1. - bot));
+    let room = |y: f32| (y.abs() - CLEAR).clamp(0., 0.9).asin();
+    [
+        top_y,
+        if top_y > 0. {
+            tilt.min(room(top_y))
+        } else {
+            0.
+        },
+        bot_y,
+        if bot_y < 0. {
+            smile.min(room(bot_y))
+        } else {
+            0.
+        },
+    ]
+}
+/// A blink's sweep, `t` seconds in: down and back up in 0.16 s, 0 outside it.
+fn blink(t: f32) -> f32 {
+    if (0.0..0.16).contains(&t) {
+        1. - (t / 0.08 - 1.).abs()
+    } else {
+        0.
+    }
+}
 impl Cockpit {
+    /// The face straight to its shape, no springing (a fresh start, a mockup).
+    fn snap(&mut self, r: &Reading, mood: Mood) {
+        let f = lids_for(r, mood);
+        for (sp, to) in self.face.iter_mut().zip([f.top, f.bot, f.tilt, f.smile]) {
+            sp.x = to;
+            sp.v = 0.;
+        }
+    }
     /// BARRY's head.
     pub fn barry(gl: &Gl) -> Cockpit {
         let n = 28;
@@ -190,38 +349,46 @@ impl Cockpit {
         }
         let frame = b.upload(gl);
 
-        // The eyelids: a plate each, its leading edge at the origin, a rolled lip, three ribs,
-        // and the piston that works it. The bottom one is built upside down, not mirrored.
+        // The eyelids: each a pair of plates hinged at their outer ends, their leading edges at
+        // y 0, overlapping a little in the middle so a tilt opens no gap; a rolled lip, two ribs,
+        // and the piston that works it. The bottom pair is built upside down, not mirrored.
         let mut lids = Vec::new();
         for s in [1., -1.] {
-            b.bbox(
-                M4::t(0., s * 0.38, 0.),
-                v3(2.0, 0.76, 0.03),
-                0.01,
-                1.,
-                STEEL,
-            );
-            b.rod(v3(-1., 0., -0.02), v3(1., 0., -0.02), 0.05, 8, STEEL_LT);
-            for x in [-0.45, 0., 0.45] {
+            for h in [1., -1.] {
                 b.bbox(
-                    M4::t(x, s * 0.3, -0.03),
-                    v3(0.05, 0.5, 0.03),
+                    M4::t(h * 0.45, s * 0.38, 0.),
+                    v3(1.1, 0.76, 0.03),
                     0.01,
                     1.,
-                    STEEL_DK,
+                    STEEL,
                 );
+                b.rod(
+                    v3(h * -0.02, 0., -0.02),
+                    v3(h, 0., -0.02),
+                    0.05,
+                    8,
+                    STEEL_LT,
+                );
+                for x in [0.14, 0.56] {
+                    b.bbox(
+                        M4::t(h * x, s * 0.3, -0.03),
+                        v3(0.05, 0.5, 0.03),
+                        0.01,
+                        1.,
+                        STEEL_DK,
+                    );
+                }
+                b.rod(
+                    v3(h * 0.34, s * 0.08, -0.05),
+                    v3(h * 0.4, s * 0.62, -0.05),
+                    0.04,
+                    6,
+                    STEEL_LT,
+                );
+                lids.push(b.upload(gl));
             }
-            b.rod(
-                v3(0.3, s * 0.08, -0.05),
-                v3(0.36, s * 0.62, -0.05),
-                0.04,
-                6,
-                STEEL_LT,
-            );
-            lids.push(b.upload(gl));
         }
-        let lid_bot = lids.pop().unwrap();
-        let lid_top = lids.pop().unwrap();
+        let lids: [Mesh; 4] = lids.try_into().ok().unwrap();
 
         // The heat coils: a bracket across the bottom of the eye holding a row of fins.
         b.bbox(
@@ -326,8 +493,7 @@ impl Cockpit {
         let tag = b.upload(gl);
         Cockpit {
             frame,
-            lid_top,
-            lid_bot,
+            lids,
             coils,
             fins,
             caps,
@@ -337,8 +503,21 @@ impl Cockpit {
             tag,
             swing_x: Spring::new(26., 0.1),
             swing_z: Spring::new(26., 0.1),
-            lids: Spring::new(220., 0.7),
+            face: [
+                Spring::new(220., 0.7),
+                Spring::new(220., 0.7),
+                Spring::new(120., 0.6),
+                Spring::new(90., 0.5),
+            ],
             torso_was: 1.,
+            hp_was: 1.,
+            kills_was: 0,
+            kill_at: -100.,
+            fired_at: -100.,
+            busy_at: 0.,
+            struck_till: -1.,
+            blink_at: 3.,
+            blinks: 0,
             t: -1.,
             eye: V3::ZERO,
             vel: V3::ZERO,
@@ -347,21 +526,70 @@ impl Cockpit {
         }
     }
 
-    /// Draws the head round the eye. `right`, `up`, `dir` are the camera's own axes this frame;
-    /// `pose` forces a reading (the tools' mockups).
+    /// Draws the player's head round the eye. `right`, `up`, `dir` are the camera's own axes this
+    /// frame; `pose` forces a reading or a mood (the tools' mockups).
     #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &mut self,
         gl: &mut Gl,
-        m: &Mech,
-        time: f32,
+        g: &Game,
         eye: V3,
         right: V3,
         up: V3,
         dir: V3,
         pose: Option<u8>,
     ) {
-        let r = pose.map_or_else(|| Reading::of(m), Reading::pose);
+        let (m, time) = (g.p(), g.time);
+        let r = match pose {
+            Some(n) if n >= 5 => Reading::pose(0),
+            Some(n) => Reading::pose(n),
+            None => Reading::of(m),
+        };
+        // What the face can see: the triggers, the stick, kills and hits.
+        let fresh = !(0.0..0.1).contains(&(time - self.t));
+        let i = &g.input;
+        if i.energy || i.ballistic || i.missile || i.fusion || i.punch {
+            self.fired_at = time;
+        }
+        let touched = [i.thr, i.turn, i.twist, i.pitch]
+            .iter()
+            .any(|v| v.abs() > 0.05)
+            || i.twist_by != 0.
+            || i.pitch_by != 0.
+            || i.jets
+            || time - self.fired_at < 0.1;
+        if touched || fresh {
+            self.busy_at = time;
+        }
+        if fresh {
+            self.kills_was = g.stats.kills;
+            self.struck_till = -1.;
+        } else if g.stats.kills > self.kills_was {
+            self.kills_was = g.stats.kills;
+            self.kill_at = time;
+        }
+        let hp = m.hp.iter().sum::<f32>() / m.max.iter().sum::<f32>().max(1.);
+        if !fresh && hp < self.hp_was - 0.04 {
+            self.struck_till = time + 0.3;
+        }
+        let struck = self.struck_till > time;
+        if time >= self.blink_at + 0.16 {
+            // The next blink, 2.5 to 6.5 seconds on.
+            self.blinks += 1;
+            let h = (self.blinks as f32 * 12.9898).sin() * 43758.547;
+            self.blink_at = time + 2.5 + 4. * (h - h.floor());
+        }
+        let cue = Cue {
+            attacking: time - self.fired_at < 1.2 || g.zoom,
+            locked: g.target.is_some(),
+            since_kill: time - self.kill_at,
+            idle: time - self.busy_at,
+            struck,
+        };
+        let mood = match pose {
+            Some(n) => Mood::pose(n).unwrap_or(Mood::Relaxed),
+            None => mood_for(&r, &cue),
+        };
         let left = right * -1.;
         let view = M4([
             left.x, left.y, left.z, 0., up.x, up.y, up.z, 0., dir.x, dir.y, dir.z, 0., eye.x,
@@ -389,19 +617,30 @@ impl Cockpit {
             self.swing_z.step(dt, 0.);
             self.swing_x.x = self.swing_x.x.clamp(-0.9, 0.9);
             self.swing_z.x = self.swing_z.x.clamp(-0.9, 0.9);
-            // The lids: toward their squint, and a flinch-blink when the torso is hit.
-            if r.torso < self.torso_was - 0.005 {
-                self.lids.v += 9.;
+            // The face: toward the mood's shape, with the heat's squint over it.
+            let f = lids_for(&r, mood);
+            for (sp, to) in self.face.iter_mut().zip([f.top, f.bot, f.tilt, f.smile]) {
+                sp.step(dt, to);
             }
-            self.lids.step(dt, lids_for(&r));
-            self.lids.x = self.lids.x.clamp(0., 1.);
+            // A hit flinches the lids (a big one after its moment wide open).
+            if r.torso < self.torso_was - 0.005 && !struck {
+                self.face[0].kick(9.);
+            }
+            if self.struck_till > 0. && time >= self.struck_till {
+                self.struck_till = -1.;
+                self.face[0].kick(12.);
+            }
+            for sp in &mut self.face[..2] {
+                sp.x = sp.x.clamp(-0.1, 1.);
+            }
         } else if !(0.0..0.1).contains(&dt) {
             self.vel = V3::ZERO;
-            self.lids.x = lids_for(&r);
+            self.snap(&r, mood);
         }
         if pose.is_some() {
-            self.lids.x = lids_for(&r); // a mockup shows the pose at rest
+            self.snap(&r, mood); // a mockup shows the pose at rest
         }
+        self.hp_was = hp;
         self.torso_was = r.torso;
         self.t = time;
         self.eye = eye;
@@ -412,11 +651,26 @@ impl Cockpit {
         gl.draw_plain(&self.frame, &view);
         gl.draw_plain(&self.coils, &view);
         gl.draw_plain(&self.caps, &view);
-        // The lids, from behind the ring toward the middle of the eye.
-        let shut = self.lids.x;
-        let gap = WIN[1] * 1.04 * (1. - shut);
-        gl.draw_plain(&self.lid_top, &(view * M4::t(0., gap, LID_Z)));
-        gl.draw_plain(&self.lid_bot, &(view * M4::t(0., -gap, LID_Z)));
+        // The lids, from behind the ring toward the middle of the eye, each half turned about
+        // its outer end. A blink sweeps the top lid down past the middle to meet the bottom one.
+        let k = if pose.is_some() || r.off {
+            0.
+        } else {
+            blink(time - self.blink_at)
+        };
+        let [top_y, tilt, bot_y, smile] = lid_edges(self.face.map(|sp| sp.x));
+        let (top_y, bot_y) = (top_y + (-0.1 - top_y) * k, bot_y + (-0.1 - bot_y) * k);
+        let (tilt, smile) = (tilt * (1. - k), smile * (1. - k));
+        let halves = [
+            (top_y, 1., tilt, 0.),
+            (top_y, -1., -tilt, 0.004),
+            (bot_y, 1., -smile, 0.),
+            (bot_y, -1., smile, 0.004),
+        ];
+        for (mesh, (y, h, a, dz)) in self.lids.iter().zip(halves) {
+            let at = view * M4::t(h, y, LID_Z + dz) * M4::rz(a) * M4::t(-h, 0., 0.);
+            gl.draw_plain(mesh, &at);
+        }
         let tag = view
             * M4::t(HOOK[0], HOOK[1], HOOK[2])
             * M4::rx(self.swing_x.x)
@@ -476,15 +730,103 @@ mod tests {
     use super::*;
     #[test]
     fn the_lids_rest_open_squint_when_hot_and_shut_when_off() {
-        let cool = lids_for(&Reading::pose(0));
-        let hot = lids_for(&Reading::pose(1));
-        let critical = lids_for(&Reading::pose(2));
-        assert!(cool < 0.1, "open at rest: {cool}");
+        let lids = |n| lids_for(&Reading::pose(n), Mood::Relaxed);
+        let (cool, hot, critical) = (lids(0), lids(1), lids(2));
+        assert!(cool.top <= 0.2 && cool.bot < 0.2, "open at rest: {cool:?}");
         assert!(
-            cool < hot && hot < critical && critical < 0.5,
+            cool.top < hot.top && hot.top < critical.top && critical.top < 0.5,
             "a squint, not shut"
         );
-        assert_eq!(lids_for(&Reading::pose(3)), 1.);
+        let off = lids_for(&Reading::pose(3), Mood::Glare);
+        assert_eq!((off.top, off.bot, off.tilt), (1., 1., 0.));
+    }
+    #[test]
+    fn the_moods_make_shapes() {
+        let (glare, worried, pleased) =
+            (face(Mood::Glare), face(Mood::Worried), face(Mood::Pleased));
+        assert!(
+            glare.tilt > 0.15 && worried.tilt < -0.15,
+            "a V and the other way"
+        );
+        assert!(
+            pleased.smile > 0.15 && pleased.bot > 0.3,
+            "the bottom lid rises in an arch"
+        );
+        assert!(face(Mood::Sleepy).top > 0.45, "a heavy droop");
+        assert!(
+            face(Mood::Surprised).top < face(Mood::Relaxed).top,
+            "wide open"
+        );
+    }
+    #[test]
+    fn the_mood_goes_by_priority() {
+        let cool = Reading::pose(0);
+        let hurt = Reading::pose(4);
+        let calm = Cue {
+            since_kill: 100.,
+            ..Cue::default()
+        };
+        assert_eq!(mood_for(&cool, &calm), Mood::Relaxed);
+        let idle = Cue { idle: 9., ..calm };
+        assert_eq!(mood_for(&cool, &idle), Mood::Sleepy);
+        let locked = Cue {
+            locked: true,
+            ..idle
+        };
+        assert_eq!(mood_for(&cool, &locked), Mood::Lock);
+        assert_eq!(mood_for(&hurt, &locked), Mood::Worried);
+        let fighting = Cue {
+            attacking: true,
+            ..locked
+        };
+        assert_eq!(mood_for(&hurt, &fighting), Mood::Glare);
+        // The joke comes after the fact: not the instant of the kill, a beat later, and not long.
+        let kill = |t| Cue {
+            since_kill: t,
+            ..fighting
+        };
+        assert_eq!(mood_for(&cool, &kill(0.2)), Mood::Glare);
+        assert_eq!(mood_for(&cool, &kill(1.)), Mood::Pleased);
+        assert_eq!(mood_for(&cool, &kill(5.)), Mood::Glare);
+        let hit = Cue {
+            struck: true,
+            ..kill(1.)
+        };
+        assert_eq!(mood_for(&cool, &hit), Mood::Surprised);
+    }
+    #[test]
+    fn no_face_covers_the_crosshair_however_hot() {
+        for m in [
+            Mood::Relaxed,
+            Mood::Glare,
+            Mood::Lock,
+            Mood::Worried,
+            Mood::Pleased,
+            Mood::Sleepy,
+            Mood::Surprised,
+        ] {
+            for heat in [0., 0.6, 0.8, 0.99] {
+                let r = Reading {
+                    heat,
+                    ..Reading::pose(0)
+                };
+                let f = lids_for(&r, m);
+                let [top_y, tilt, bot_y, smile] = lid_edges([f.top, f.bot, f.tilt, f.smile]);
+                // The lips' inner ends, one unit in from the hinges.
+                let (top_mid, bot_mid) = (top_y - tilt.sin(), bot_y + smile.sin());
+                assert!(
+                    top_mid > 0.12 && bot_mid < -0.12,
+                    "{m:?} at {heat}: {top_mid} {bot_mid}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn a_blink_closes_and_opens_in_a_sixth_of_a_second() {
+        assert_eq!(blink(-0.01), 0.);
+        assert!(blink(0.08) > 0.99);
+        assert!(blink(0.04) > 0.4 && blink(0.12) > 0.4);
+        assert_eq!(blink(0.17), 0.);
     }
     #[test]
     fn the_coils_go_from_cold_steel_through_red_and_orange_to_near_white() {
