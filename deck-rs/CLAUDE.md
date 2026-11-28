@@ -1,8 +1,10 @@
 # Stompy for the Steam Deck: notes for agents
 
 This folder is Stompy: the game, in Rust, for the Steam Deck. **Stompy is a
-base builder** with many mechs on the map, each of them pilotable from the
-cockpit (the owner, 2026-11-28). The browser version around this folder is
+base builder in a world of robots** (the owner, 2026-11-28; `docs/world.md`):
+the mechs are demigods that fight each other, cities of tiny robots gather
+ore and get stomped, temples are factories, and you step into any of your
+demigods. The browser version around this folder is
 **deprecated** and kept only as a reference: read its `docs/specs/`, `src/`
 and `test/` when bringing something across, and its `src/data/` for a tuned
 number to start from (don't reinvent a number it already tuned). Never change

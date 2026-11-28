@@ -109,6 +109,12 @@ Scorch only: BIG BOOMER, FIRECRACKERS, ANGRY BEES, the lasers, RATATAT,
 TOASTER, and a guided volley set off by hand (it dug 4 m in the browser
 version).
 
+**Giants fight giants; tiny robots are the crowd** (the owner, 2026-11-28,
+`../world.md`). The numbers above are the demigods. The tiny robots are a
+separate crowd, not mechs: simple agents that carry, cheer and scatter,
+drawn in batches with a few shapes, thousands of them cheap, measured on
+their own.
+
 Unit types (the owner: still to be decided) change the sums: a small cheap
 unit can be many, a big one fewer. The table above is per mech of today's
 kinds.

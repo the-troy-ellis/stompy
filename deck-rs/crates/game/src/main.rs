@@ -9,6 +9,7 @@
 //!   --battle A F         straight into a battle: A allies on your side, F foes on theirs;
 //!   --spectate           with it, watch it with the free camera (Free Play's WATCH);
 //!   --follow-fight       and keep the camera on the fighting (X every frame)
+//!   --cockpit-pose N     force what the cockpit shows: 0 cool, 1 hot, 2 critical, 3 off, 4 hurt
 //!   --record N K dir     save frames N to N+K-1 as dir/0000.ppm and on, then exit (clips)
 //!   --dither N           the dither's cell for this run (0 off, 1, 2, 3); --detail N the models' (0 boxes, 1, 2)
 //! The last five are for the tools (tools/shot.sh): screenshots on a box with no display.
@@ -21,6 +22,7 @@
 mod anim;
 mod app;
 mod audio;
+mod cockpit;
 mod controls;
 mod font;
 mod freecam;
@@ -54,6 +56,7 @@ fn main() {
         battle: None,
         spectate: false,
         follow: false,
+        cockpit_pose: None,
     };
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut it = args.iter();
@@ -67,6 +70,7 @@ fn main() {
             "--watch" => a.watch = Some(1.1),
             "--spectate" => a.spectate = true,
             "--follow-fight" => a.follow = true,
+            "--cockpit-pose" => a.cockpit_pose = Some(num(it.next()) as u8),
             "--battle" => {
                 let (al, fo) = (num(it.next()) as usize, num(it.next()) as usize);
                 a.battle = Some((al, fo));

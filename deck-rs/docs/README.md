@@ -11,11 +11,12 @@ Read in this order the first time:
 
 | Doc | What it answers |
 |---|---|
+| [world.md](world.md) | The world, being worked out: robots and no humans, demigods and tiny robots, temples that summon. Draft. |
 | [vision.md](vision.md) | What this rebuild is, what it is not, and the pillars that settle arguments. The brief, kept. |
 | [architecture.md](architecture.md) | The code as it is: the sim, the platform, the renderer, how they talk, the invariants. |
 | [controls.md](controls.md) | The Deck layout, the gyro, the paddles, and the keyboard and mouse second. |
 | [deck-setup.md](deck-setup.md) | Building it, putting it on the Deck, the Steam Input layout, playtesting. |
-| [parity.md](parity.md) | The order things are built in, and how a feature comes across from the deprecated browser version: where each stands, the phases, the decision log. |
+| [parity.md](parity.md) | **The plan**: the order things are built in (P1 to P6), where each stands, how a feature comes across from the deprecated browser version, and the decision log. |
 | [roadmap.md](roadmap.md) | The milestones, what is in each, what the owner plays before the next starts. |
 | [workflow.md](workflow.md) | How work is claimed, tested, playtested on the Deck and merged. The definition of done. |
 | [bugs.md](bugs.md) | The owner's bug list. Logged as found, fixed only when the owner picks one. |

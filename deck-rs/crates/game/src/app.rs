@@ -208,6 +208,8 @@ pub struct Args {
     pub spectate: bool,
     /// Watching: keep the camera on the fighting (tools).
     pub follow: bool,
+    /// Force what the cockpit shows (tools: mockups of its states).
+    pub cockpit_pose: Option<u8>,
 }
 /// A line the cockpit voice will say, and when.
 struct Line {
@@ -846,6 +848,7 @@ impl App {
             frame: 0,
             quit: false,
         };
+        app.scene.cockpit_pose = a.cockpit_pose;
         if let Some(d) = a.detail {
             app.scene.detail = d.min(2);
         }

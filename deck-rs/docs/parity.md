@@ -1,9 +1,14 @@
-# Bringing features across from the browser version
+# The plan: the order of work, and what comes across
+
+Stompy is a base builder in a world of robots (`world.md`): demigods (the
+mechs) fight demigods, cities of tiny robots gather ore and get stomped,
+temples are the factories that make demigods. This is the order it gets
+built in.
 
 The browser version (the rest of this repository) is **deprecated**
 (2026-11-28) and kept as a reference: about 20,000 lines, 40 specs and a lot
-of the owner's playtest notes. This game takes what a base builder needs from
-it **one feature at a time, on purpose**. The aim isn't
+of the owner's playtest notes. This game takes what it needs from it **one
+feature at a time, on purpose**. The aim isn't
 a copy. Each feature comes across once, gets checked against what playing on
 the Deck has taught us, and is kept, changed or dropped on the owner's call.
 
@@ -32,72 +37,90 @@ better on the way, not the same code.
 
 | Area | Browser version | Rust | Phase |
 |---|---|---|---|
-| Walking, torso twist, feet that never slide, gaits by body plan | specs 13, 16 | **ported** | P1 (tune) |
-| Heat, sections, the four weapon kinds, OOPS BUTTON, missile locks | spec 06 | **ported** | P1 (tune) |
-| Punch, shove, stomp; blast-off jets, the insta-stomp | specs 12, 26 | **ported** | P1 (tune) |
-| AI profiles and three difficulties | spec 05 | **ported** | P1 (tune) |
-| Thunk: feel table, camera, body, sub-bass, rumble | spec 13 | **ported**, not yet tuned on the Deck | P1 |
-| Six combat chassis, eleven weapons | spec 06 | **ported** | P1 |
-| Free Play; Act I missions 1 and 4 | spec 04 | **ported** | P1 |
-| Debug page, test range, cheats, live tuning | spec 19 | a debug overlay (F3) | P1 |
-| Structures: things in the world to shoot, punch and topple | spec 03 | data only | P2 |
-| Trucks, waves; DESTROY, ESCORT, SURVIVE, EXTRACT | spec 03 | data only | campaign |
-| Act I missions 2 and 3; the silent tutorial | specs 04, 11 | not yet | campaign |
-| Mechlab-lite (FIT) | spec 02 | not yet | P3 |
-| Night, headlights, weather, props, explosions' extras | spec 07 | palettes, weather keys, no drawing | P5 |
-| Ambience, CC0 samples, a recorded cockpit voice | spec 07 | synthesis only | campaign |
-| The glacier, volcanic plain and forest; Acts II and III; contracts | specs 04, 39 | palettes only | campaign |
-| Voxel ground: canyons, caves, craters, falling ground, on a 4 m grid | specs 18, 27, 29 | not yet (heightfield) | P2 |
-| Bigger maps and big fights (memory and cost that scale) | specs 34, 35 | not yet | P2 |
-| The AI in canyons, caves and tunnels | spec 18 | not yet | P3 |
-| Digging: BIG SCOOPER, hold to dig, dig up, dig feel | specs 20, 25, 28, 30 | not yet | P3 |
-| The base: silo, factory, crew and SWAP, raids, salvage | spec 20 | not yet | P3 |
-| Command view, orders, sites, the builder | specs 22, 23, 31 | not yet | P4 |
-| Base loop, production, territory, stealing, tunnelling | specs 32, 33, 37 | not yet | P4 |
-| Buildings and the city; the forest's toppling trees | specs 36, 38, 39 | not yet | P5 |
+| Walking, torso twist, feet that never slide, gaits by body plan | specs 13, 16 | **built** | P1 (tune) |
+| Heat, sections, the four weapon kinds, OOPS BUTTON, missile locks | spec 06 | **built** | P1 (tune) |
+| Punch, shove, stomp; blast-off jets, the insta-stomp | specs 12, 26 | **built** | P1 (tune) |
+| AI profiles, three difficulties; sides fight sides | spec 05 | **built** | P1 (tune) |
+| Thunk: feel table, camera, body, sub-bass, rumble | spec 13 | **built**, not yet tuned on the Deck | P1 |
+| Six combat demigods, eleven weapons | spec 06 | **built** | P1 |
+| The look: dither, ramps, side paint, lumps for effects | spec 14 | **built** (specs/02-look.md) | P3 (more) |
+| BARRY remodelled and animated (layer 1, toes, pods) | (new) | **built** (specs/03-anim.md) | P3 (the rest) |
+| Big battles: batches, distance detail, readout, WATCH | spec 34 | **built**, the number to measure on the Deck (specs/04-big-battles.md) | P2 |
+| Debug page, test range, cheats, live tuning | spec 19 | a readout (View + Y) | P1 |
+| The crowd: tiny robots by the thousand, honoured underfoot | (new) | not yet | P2 |
+| Voxel ground: canyons, caves, craters (big weapons and diggers only), falling ground | specs 18, 27, 29 | not yet (heightfield) | P2 |
+| Bigger maps | spec 35 | not yet | P2 |
+| Buildings at two scales: the tiny robots' (stompable) and the demigods' (temples, dead towers) | specs 36, 38 | not yet | P2 |
+| Cockpits: each demigod's head, from inside, in 3D | spec 17 (portrait, parked) | **BARRY's built** (specs/05-cockpit.md) | P3 (the other five) |
+| Digging: BIG SCOOPER, hold to dig, dig up, dig feel | specs 20, 25, 28, 30 | not yet | P4 |
+| Tiny robots gathering ore and carrying it home | (the hauler, spec 20) | not yet | P4 |
+| The builder demigod and its buildings, which make tiny robots | specs 23, 31, 36 | not yet | P4 |
+| The temple: a factory making demigods from ore and salvage | specs 20, 33 | not yet | P4 |
+| Descending into any of your demigods (was SWAP) | spec 20 | not yet | P4 |
+| The god above: command view, orders | specs 22, 32 | not yet | P5 |
+| Rival cities running the same loop; raids on temples; salvage | specs 20, 32, 33 | not yet | P5 |
+| Tunnelling, territory, stealing | specs 33, 37 | not yet | P5 |
+| The places: desert, glacier, volcanic plain, forest; the dead cities, relics | specs 07, 38, 39 | palettes only | P6 |
+| Night, headlights, weather (sprites considered), props | spec 07 | weather keys, no drawing | P6 |
+| Mechlab-lite (FIT) | spec 02 | not yet | owner decides (P4 or later) |
+| Campaign: missions, objectives, tutorial, acts | specs 03, 04, 11 | Act I missions 1 and 4 (old) | later, rethought for this world |
+| Ambience, CC0 samples, the voice (deadpan, and the rite) | spec 07 | synthesis only | later |
 | Mission editor | spec 15 | not yet | **owner decides** |
 | LAN arena, co-op, internet play | specs 08, 09, 10 | not yet | **owner decides** |
 | Phones, portrait cockpit, touch, PWA, app store | specs 11, 17, 24 | not planned | out |
 
 ## The phases
 
-**The gameplay core and the engine first; the campaign later** (the owner,
-2026-11-27). Until the campaign, new things are played in Free Play and the
-test range, so the test range comes first. Each phase starts with its asks
-and ends with the owner playing it on the Deck.
+The world first decides what the engine must carry: **many giants, a crowd
+of thousands, ground that is dug, buildings at two scales**. So the engine
+comes before the base builder's loop, and the loop before the wider world.
+Each phase starts with its asks and ends with the owner playing it on the
+Deck; no new system before the last one has been played.
 
-- **P1: Play the core, tune it.** The debug page grows a test range (a flat
-  field or a canyon, the foes you pick), cheats, live FEEL tuning and a
-  frame-time readout, since every later playtest uses them. Then the Deck
-  playtest (`roadmap.md` § M1) and the tuning it asks for.
-- **P2: The engine, built for a base builder's crowds.** The owner
-  (2026-11-28): eight mechs is not enough.
-  - **Big battles** ([specs/04-big-battles.md](specs/04-big-battles.md)).
-    Sides now fight sides, and the crowd test measures two armies: 256
-    mechs cost about 1 ms a frame, 512 about 2.6 ms, 1,024 about 9 ms on
-    the build machine. Drawing is the real limit (about 35 draws a
-    detailed mech): batches and less detail far away come next, then a
-    battle in the game with a readout, so the number is picked on the
-    Deck.
-  - **Voxel ground** on a 4 m grid: chunks meshed off the main thread, 3D
-    ground questions for feet, shots and sight, craters, falling ground,
-    sized for big maps from the start (in the browser version these came as
-    three rewrites).
-  - **Structures** as a general thing in the world that can be shot, punched
-    and toppled.
-- **P3: The base builder, by hand.** The AI in canyons and caves, then the
-  loop: BIG SCOOPER and digging, the base, the crew and SWAP, raids (spec
-  20's smallest loop, in Free Play), mechlab-lite.
-- **P4: The base builder, from above.** Command view, the builder, the base
-  loop, production, tunnelling.
-- **P5: The world.** Buildings and the city, the forest, night and
-  headlights, weather, props, explosions' extras.
-- **Later: the campaign.** Trucks, waves and the objective types, the
-  silent tutorial, the missions of Acts I to III, contracts, ambience and the
-  recorded voice.
+- **P1: Play and tune** (ongoing). The owner's notes from the Deck, bug 3
+  (feet sink too far), the battle numbers (16, 32, 64, 128 a side, from
+  the readout), then the tuning they ask for. A test range and live FEEL
+  tuning on the debug page when the tuning needs them.
+- **P2: The engine for this world.**
+  1. **Big battles** (built): measure on the Deck, then part 4 (a grid of
+     the mechs, far ones thinking less often) if the number wants more.
+  2. **The crowd**: tiny robots as simple agents, not mechs, drawn in
+     batches from a few shapes, thousands of them. They cheer and kneel for
+     their own demigods, scatter from the other city's, and are squished
+     back into ore underfoot with a crunch you feel. Measured like the
+     battles.
+  3. **Voxel ground** on a 4 m grid: sight through the grid, a top-surface
+     height map for feet, chunks remeshed off the sim's core, craters from
+     big weapons and diggers only, falling ground capped a frame, memory
+     that follows what was dug. Sized for big maps from the start.
+  4. **Buildings at two scales**: the tiny robots' (a storey a little over
+     a tiny robot; a demigod stands three storeys over them, steps on them,
+     knocks them down) and the demigods' (temples; the dead cities' towers,
+     8 m storeys).
+- **P3: The demigods' look and feel** (alongside P2, piece by piece as the
+  owner wants). Each demigod's **cockpit as its head, from inside, in 3D**
+  (BARRY first, from the mockups' window shapes); animation layers 2 and 3
+  on BARRY (states, then personality); then the other five remodelled and
+  animated; their trim colours.
+- **P4: The loop, by hand** (in Free Play, a city to grow). BIG SCOOPER
+  digs and reveals ore; tiny robots gather it and carry it home; the
+  builder demigod raises buildings; buildings make tiny robots; the temple
+  turns ore and salvage into demigods on a line you can watch; you descend
+  into any of your demigods. Honour costs: every squished gatherer is ore
+  you won't get.
+- **P5: The god above.** The command view (your city from above, orders to
+  demigods, where the builder builds), rival cities running the same loop,
+  raids on temples, salvage hauled from battlefields; then tunnelling and
+  territory.
+- **P6: The world.** The four places with their own ore and hazards; the
+  dead cities (demigod-scale ruins: salvage, cover, relics that teach the
+  temple new demigods); night and weather; statues, shrines and murals.
+- **Later: the campaign**, rethought for this world, with the ambience and
+  the voice (deadpan, and the rite: "Ore to ore." "Smelt me into thy
+  image.").
 
-The editor and multiplayer slot in wherever the owner wants them, or
-nowhere.
+The editor, multiplayer and mechlab slot in wherever the owner wants them,
+or nowhere.
 
 ## Decision log
 
@@ -115,4 +138,6 @@ port spec's "Changed" list is approved.
 | 2026-11-28 | Paint | a colour per chassis | a colour per side: yours slate blue, theirs mustard (specs/02-look.md) | the owner: chassis colours indicate teams |
 | 2026-11-28 | Craters | most hits dig (BIG BOOMER 2.5 m, every missile of a volley) | only big weapons and diggers dig; the rest scorch (specs/04-big-battles.md) | the owner: big battles on deformable ground |
 | 2026-11-28 | Mechs on a map | up to about 20 (MAX_MECHS 24) | the sim allows 256; the playable number is what the Deck holds at 60 | the owner: eight is not enough |
+| 2026-11-28 | The world | (none: a mech sim) | robots, no humans; demigods (the mechs) fight demigods; cities of tiny robots gather ore and are stomped (an honour, at a cost); temples are factories (world.md) | the owner |
+| 2026-11-28 | The order | P2 engine, P3 base builder by hand, P4 from above, P5 world | P2 engine for this world (battles, crowd, voxel ground, two-scale buildings), P3 the demigods' look and feel, P4 the loop by hand, P5 the god above, P6 the world | the world sets what the engine must carry |
 | 2026-11-27 | Rust version | (n/a) | pinned in `rust-toolchain.toml` | fmt and clippy don't drift between builds |
