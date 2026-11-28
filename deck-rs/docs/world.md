@@ -18,6 +18,12 @@ and the few words on screen keep the board-book voice.
   **salvage sacrifices**. The temple is the base builder's production
   building.
 
+- **The rite** (the owner): *"Ashes to ashes, ore to ore, smelt me into
+  thy will."* The dead feed the living: salvage becomes the next demigod.
+  The in-world half is used ("Ashes to ashes" echoes a real funeral rite,
+  and nothing here refers outside the game): **"Ore to ore."** and **"Smelt
+  me into thy will."** The one place the flat voice goes solemn.
+
 ## Proposed
 
 ### In one line
@@ -73,6 +79,15 @@ come for your temple; yours go for theirs.
 - **The forest:** grown over old scrap; close and misty.
 - **The dead cities:** from long ago, built at demigod scale (8 m storeys),
   empty: salvage, relics, cover, and maybe something that wakes.
+
+### Where the rite is heard and seen
+
+- Carved over every temple's door.
+- The system voice at a salvage sacrifice: "Ore to ore."
+- Your demigod's last line as it falls: "Ore to ore." (it will be hauled
+  home and come back as something else).
+- At a summoning, the moment the new demigod is lit: "Smelt me into thy
+  will." (the offering, speaking to you, the god above).
 
 ### Shown, not told
 
