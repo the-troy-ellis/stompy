@@ -112,5 +112,6 @@ port spec's "Changed" list is approved.
 | 2026-11-27 | Order | the campaign before the second arm | the core and the engine first, the campaign later | the owner's call: get the game's core and engine right first |
 | 2026-11-28 | The browser version | the game | deprecated: a reference for specs, code and numbers, never changed | the owner |
 | 2026-11-28 | What Stompy is | a mech sim; construction later, if it earned it | a mech base builder; construction is the heart of it | the owner |
+| 2026-11-28 | Craters | most hits dig (BIG BOOMER 2.5 m, every missile of a volley) | only big weapons and diggers dig; the rest scorch (specs/04-big-battles.md) | the owner: big battles on deformable ground |
 | 2026-11-28 | Mechs on a map | up to about 20 (MAX_MECHS 24) | the sim allows 256; the playable number is what the Deck holds at 60 | the owner: eight is not enough |
 | 2026-11-27 | Rust version | (n/a) | pinned in `rust-toolchain.toml` | fmt and clippy don't drift between builds |

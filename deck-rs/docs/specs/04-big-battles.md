@@ -62,6 +62,34 @@ BARRY at level 2 is 9,200.
    the every-against-every checks, far mechs thinking less often, shots
    and particles capped.
 
+### With deformable ground
+
+The voxel ground (P2, after this) is built against these battles, not
+retrofitted: sight lines step through the 4 m grid and stop at the first
+solid cell, a top-surface height map serves feet and movement and is redone
+only where the ground changed, chunks are remeshed off the sim's core a few
+a frame nearest first, routes are shared by everyone going the same way,
+falling-ground checks are capped a frame, and memory follows what was dug.
+Its budget: the ground's work under about 3 ms a frame in a 300-mech battle
+with craters, checked by the crowd test on dug ground.
+
+**Only big weapons and diggers make craters** (the owner, 2026-11-28).
+Everything else scorches. Proposed from the browser version's approved
+table (its `src/data/weapons.js`, `dig` and `DIG`), for the owner to adjust:
+
+| digs | radius |
+|---|---|
+| OOPS BUTTON | 6 m |
+| ANGRY ZAPPER | 4 m |
+| BIG BONKER | 3.5 m |
+| a mech's death blast | 5 m by its size, up to 7 |
+| a wreck's ammunition cooking off | 7 m |
+| diggers (construction gear) | 8 to 16 m |
+
+Scorch only: BIG BOOMER, FIRECRACKERS, ANGRY BEES, the lasers, RATATAT,
+TOASTER, and a guided volley set off by hand (it dug 4 m in the browser
+version).
+
 Unit types (the owner: still to be decided) change the sums: a small cheap
 unit can be many, a big one fewer. The table above is per mech of today's
 kinds.
